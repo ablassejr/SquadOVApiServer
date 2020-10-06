@@ -1,0 +1,12 @@
+{
+    "POSTGRES_HOST": "127.0.0.1",
+    "POSTGRES_USER": "postgres",
+    "POSTGRES_PASSWORD": "password",
+
+    "FUSIONAUTH_HOST": "127.0.0.1",
+    "FUSIONAUTH_DB_USER": "fusionauth",
+    "FUSIONAUTH_DB_PASSWORD": "password",
+    "FUSIONAUTH_CLIENT_ID": "1b94958e-e0a2-4dfa-887c-43e463ea38b5 ",
+    "FUSIONAUTH_CLIENT_SECRET": "Fk9D5bD--FSNJPzI-2IKtNbO0cB6UDFcOsbU99cUtrM ",
+    "FUSIONAUTH_API_KEY": "-8Z_0w0tcoW4uBS9ZXTNtak_lXCZlThRPn_ZETupW5E"
+}
