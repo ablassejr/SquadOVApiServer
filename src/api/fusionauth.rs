@@ -1,4 +1,5 @@
 mod login;
+mod register;
 mod user;
 
 use serde::{Deserialize};
@@ -42,4 +43,5 @@ impl FusionAuthClient {
 }
 
 pub use login::*;
+pub use register::*;
 pub use user::*;

@@ -17,10 +17,6 @@ struct LoginResponse {
 }
 
 /// Authenticates the user with our backend and returns a session.
-/// 
-/// This function is the interface between what FusionAuth returns and what we would
-/// want to do with that data. If the user successfully logs in, we'll create a new
-/// session using what FusionAuth returns.
 async fn login(fa: &fusionauth::FusionAuthClient, data: LoginData, ip: Option<&str>) -> Result<super::SquadOVSession, super::AuthError> {
     let res = fa.login(fa.build_login_input(
         data.username,
@@ -92,7 +88,7 @@ pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<api::Api
 
     // Ensure that the user is also being tracked by our own database.
     // If not, create a new user.
-    let storedUser = match app.users.get_stored_user_from_email(&session.user.email, &app.pool).await {
+    let stored_user = match app.users.get_stored_user_from_email(&session.user.email, &app.pool).await {
         Ok(x) => match x {
             Some(y) => y,
             None => match app.users.create_user(&session.user, &app.pool).await {
@@ -106,7 +102,7 @@ pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<api::Api
             message: format!("Get User {}", err)
         })
     };
-    session.user = storedUser;
+    session.user = stored_user;
 
     // Store this session in our database and ensure the user is made aware of which session they should
     // be echoing back to us so we can verify their session. It's the client's responsibility to store

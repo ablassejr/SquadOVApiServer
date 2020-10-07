@@ -16,7 +16,6 @@ struct DatabaseConfig {
 #[derive(Deserialize,Debug)]
 struct ApiConfig {
     fusionauth: fusionauth::FusionAuthConfig,
-    session: auth::SessionConfig,
     database: DatabaseConfig
 }
 
@@ -51,7 +50,7 @@ impl ApiApplication {
                 fusionauth: fusionauth::FusionAuthClient::new(config.fusionauth),
             },
             users: auth::UserManager{},
-            session: auth::SessionManager::new(config.session),
+            session: auth::SessionManager::new(),
             pool: pool,
         })
     }

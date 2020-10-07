@@ -1,4 +1,3 @@
-use serde::{Deserialize};
 use derive_more::{Display, Error};
 use sqlx;
 use sqlx::postgres::PgPool;
@@ -11,13 +10,7 @@ pub struct SquadOVSession {
     pub refresh_token: String
 }
 
-#[derive(Deserialize,Debug)]
-pub struct SessionConfig {
-    encryption_key: String
-}
-
 pub struct SessionManager {
-    cfg: SessionConfig,
 }
 
 #[derive(Debug, Display, Error)]
@@ -26,9 +19,8 @@ pub enum SessionError {
 }
 
 impl SessionManager {
-    pub fn new(cfg : SessionConfig) -> SessionManager {
+    pub fn new() -> SessionManager {
         return SessionManager{
-            cfg: cfg,
         }
     }
 

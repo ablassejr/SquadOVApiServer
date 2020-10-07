@@ -1,9 +1,7 @@
-use actix_web::{web, HttpResponse, HttpRequest, Result};
-use serde::{Deserialize};
+use actix_web::{HttpResponse, HttpRequest, Result};
 use crate::logged_error;
 use sqlx;
 use sqlx::postgres::PgPool;
-use derive_more::{Display};
 
 #[derive(Debug)]
 pub struct SquadOVUser {
@@ -13,11 +11,6 @@ pub struct SquadOVUser {
 }
 
 pub struct UserManager {
-}
-
-#[derive(Debug, Display)]
-pub enum UserError {
-    DbError(sqlx::Error)
 }
 
 impl UserManager {
@@ -53,18 +46,7 @@ impl UserManager {
     }
 }
 
-#[derive(Deserialize)]
-pub struct RegisterData {
-    username: String,
-    email: String,
-    password: String,
-}
-
 async fn logout() -> Result<(), super::AuthError> {
-    return Ok(())
-}
-
-async fn register(data: RegisterData) -> Result<(), super::AuthError> {
     return Ok(())
 }
 
@@ -74,28 +56,6 @@ async fn forgot_pw() -> Result<(), super::AuthError> {
 
 pub fn is_logged_in(req : &HttpRequest) -> bool {
     return false
-}
-
-/// Handles collecting the user data and passing it to FusionAuth for registration.
-/// 
-/// We expect only three parameters to be passed via the POST body: 
-/// * Username
-/// * Password
-/// * Email
-///
-/// Possible Responses:
-/// * 200 - Registration succeeded.
-/// * 400 - If a user is already logged in.
-/// * 500 - Registration failed due to other reasons.
-pub async fn register_handler(data : web::Json<RegisterData>, req : HttpRequest) -> Result<HttpResponse, super::AuthError> {
-    if is_logged_in(&req) {
-        return logged_error!(super::AuthError::BadRequest);
-    }
-
-    match register(data.into_inner()).await {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
-        Err(err) => logged_error!(err),
-    }
 }
 
 /// Logouts the user with SquadOV and FusionAuth.

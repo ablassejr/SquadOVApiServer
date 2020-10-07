@@ -1,9 +1,9 @@
-use serde::{Deserialize};
+use serde::{Serialize,Deserialize};
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct FusionAuthRegistration {
     #[serde(rename = "applicationId")]
-    application_id: String,
+    pub application_id: String,
     pub username: Option<String>
 }
 
@@ -11,6 +11,13 @@ pub struct FusionAuthRegistration {
 pub struct FusionAuthUser {
     pub email: String,
     pub registrations: Vec<FusionAuthRegistration>
+}
+
+#[derive(Serialize,Deserialize)]
+pub struct FusionSingleAppAuthUser {
+    pub email: String,
+    pub username: String,
+    pub password: Option<String>
 }
 
 impl super::FusionAuthClient {
