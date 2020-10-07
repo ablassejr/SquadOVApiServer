@@ -1,5 +1,7 @@
 use serde::{Deserialize};
 use derive_more::{Display, Error};
+use sqlx;
+use sqlx::postgres::PgPool;
 
 #[derive(Debug)]
 pub struct SquadOVSession {
@@ -15,12 +17,12 @@ pub struct SessionConfig {
 }
 
 pub struct SessionManager {
-    cfg: SessionConfig
+    cfg: SessionConfig,
 }
 
 #[derive(Debug, Display, Error)]
 pub enum SessionError {
-
+    DbError(sqlx::Error)
 }
 
 impl SessionManager {
@@ -30,9 +32,32 @@ impl SessionManager {
         }
     }
 
-    pub fn store_session(&self, session: &SquadOVSession) -> Result<(), SessionError> {
+    pub async fn store_session(&self, session: &SquadOVSession, pool: &PgPool) -> Result<(), SessionError> {
         // Store in database
-
-        return Ok(())
+        match sqlx::query!(
+            "
+            INSERT INTO squadov.user_sessions (
+                id,
+                access_token,
+                refresh_token,
+                user_id
+            )
+            VALUES (
+                $1,
+                $2,
+                $3,
+                $4
+            )
+            ",
+            session.session_id,
+            &session.access_token,
+            &session.refresh_token,
+            session.user.id
+        )
+            .execute(pool)
+            .await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(SessionError::DbError(err)),
+        }
     }
 }

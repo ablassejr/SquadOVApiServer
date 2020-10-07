@@ -34,6 +34,7 @@ async fn login(fa: &fusionauth::FusionAuthClient, data: LoginData, ip: Option<&s
                 Some(x) => Ok(super::SquadOVSession{
                     session_id: Uuid::new_v4().to_string(),
                     user: super::SquadOVUser{
+                        id: -1, // Invalid ID is fine here - we'll grab it later.
                         username: match &x.username {
                             Some(y) => y.clone(),
                             None => String::from(""),
@@ -87,16 +88,33 @@ pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<api::Api
         return logged_error!(err);
     }
 
+    let mut session = res.unwrap();
+
     // Ensure that the user is also being tracked by our own database.
+    // If not, create a new user.
+    let storedUser = match app.users.get_stored_user_from_email(&session.user.email, &app.pool).await {
+        Ok(x) => match x {
+            Some(y) => y,
+            None => match app.users.create_user(&session.user, &app.pool).await {
+                Ok(z) => z,
+                Err(err) => return logged_error!(super::AuthError::System{
+                    message: format!("Create User {}", err)
+                })
+            },
+        },
+        Err(err) => return logged_error!(super::AuthError::System{
+            message: format!("Get User {}", err)
+        })
+    };
+    session.user = storedUser;
 
     // Store this session in our database and ensure the user is made aware of which session they should
     // be echoing back to us so we can verify their session. It's the client's responsibility to store
     // the session ID securely.
-    let session = res.unwrap();
-    match app.session.store_session(&session) {
+    match app.session.store_session(&session, &app.pool).await {
         Ok(_) => Ok(HttpResponse::Ok().json(LoginResponse{session_id: session.session_id})),
         Err(err) =>  logged_error!(super::AuthError::System{
-            message: format!("{}", err),
+            message: format!("Store Session {}", err),
         })
     }
 }

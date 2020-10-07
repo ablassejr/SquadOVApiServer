@@ -5,11 +5,19 @@ pub mod fusionauth;
 use serde::{Deserialize};
 use std::fs;
 use std::io;
+use sqlx::postgres::{PgPool, PgPoolOptions};
+
+#[derive(Deserialize,Debug)]
+struct DatabaseConfig {
+    url: String,
+    connections: u32
+}
 
 #[derive(Deserialize,Debug)]
 struct ApiConfig {
     fusionauth: fusionauth::FusionAuthConfig,
     session: auth::SessionConfig,
+    database: DatabaseConfig
 }
 
 struct ApiClients {
@@ -18,15 +26,23 @@ struct ApiClients {
 
 pub struct ApiApplication {
     clients: ApiClients,
+    users: auth::UserManager,
     session: auth::SessionManager,
+    pool: PgPool
 }
 
 impl ApiApplication {
-    pub fn new(config_path: std::path::PathBuf) -> io::Result<ApiApplication> {
+    pub async fn new(config_path: std::path::PathBuf) -> io::Result<ApiApplication> {
         // Load TOML config.
         info!("Reading app config from: {:?}", config_path.to_str());
         let raw_cfg = fs::read_to_string(config_path)?;
         let config : ApiConfig = toml::from_str(&raw_cfg).unwrap();
+
+        let pool = PgPoolOptions::new()
+            .max_connections(config.database.connections)
+            .connect(&config.database.url)
+            .await
+            .unwrap();
 
         // Use TOML config to create application - e.g. for
         // database configuration, external API client configuration, etc.
@@ -34,7 +50,9 @@ impl ApiApplication {
             clients: ApiClients{
                 fusionauth: fusionauth::FusionAuthClient::new(config.fusionauth),
             },
+            users: auth::UserManager{},
             session: auth::SessionManager::new(config.session),
+            pool: pool,
         })
     }
 }

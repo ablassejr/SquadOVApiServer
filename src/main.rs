@@ -24,7 +24,7 @@ async fn main() -> std::io::Result<()> {
     env_logger::init();
 
     let opts = Options::from_args();
-    let app = web::Data::new(api::ApiApplication::new(opts.config)?);
+    let app = web::Data::new(api::ApiApplication::new(opts.config).await?);
 
     let local = tokio::task::LocalSet::new();
     let sys = actix_rt::System::run_in_tokio("server", &local);

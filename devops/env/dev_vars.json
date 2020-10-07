@@ -2,6 +2,7 @@
     "POSTGRES_HOST": "127.0.0.1",
     "POSTGRES_USER": "postgres",
     "POSTGRES_PASSWORD": "password",
+    "DATABASE_URL": "postgresql://postgres:password@127.0.0.1/squadov",
 
     "FUSIONAUTH_HOST": "127.0.0.1",
     "FUSIONAUTH_DB_USER": "fusionauth",
