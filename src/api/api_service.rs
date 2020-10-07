@@ -9,6 +9,9 @@ pub fn create_service() -> impl HttpServiceFactory {
                 .route("/login", web::post().to(auth::login_handler))
                 .route("/logout", web::post().to(auth::logout_handler))
                 .route("/register", web::post().to(auth::register_handler))
-                .route("/forgotpw", web::post().to(auth::forgot_pw_handler))
+                .route("/forgotpw", web::get().to(auth::forgot_pw_handler))
+                .route("/forgotpw/change", web::post().to(auth::forgot_pw_change_handler))
+                .route("/verify", web::post().to(auth::verify_email_handler))
+                .route("/verify/resend", web::get().to(auth::resend_verify_email_handler))
         )
 }

@@ -14,9 +14,15 @@ struct DatabaseConfig {
 }
 
 #[derive(Deserialize,Debug)]
+pub struct CorsConfig {
+    pub domain: String
+}
+
+#[derive(Deserialize,Debug)]
 struct ApiConfig {
     fusionauth: fusionauth::FusionAuthConfig,
-    database: DatabaseConfig
+    database: DatabaseConfig,
+    cors: CorsConfig
 }
 
 struct ApiClients {
@@ -24,6 +30,7 @@ struct ApiClients {
 }
 
 pub struct ApiApplication {
+    pub cors: CorsConfig,
     clients: ApiClients,
     users: auth::UserManager,
     session: auth::SessionManager,
@@ -46,6 +53,7 @@ impl ApiApplication {
         // Use TOML config to create application - e.g. for
         // database configuration, external API client configuration, etc.
         return Ok(ApiApplication{
+            cors: config.cors,
             clients: ApiClients{
                 fusionauth: fusionauth::FusionAuthClient::new(config.fusionauth),
             },

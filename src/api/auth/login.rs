@@ -13,6 +13,7 @@ pub struct LoginData {
 
 #[derive(Serialize)]
 struct LoginResponse {
+    #[serde(rename = "sessionId")]
     session_id: String
 }
 
@@ -106,7 +107,7 @@ pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<api::Api
 
     // Store this session in our database and ensure the user is made aware of which session they should
     // be echoing back to us so we can verify their session. It's the client's responsibility to store
-    // the session ID securely.
+    // the session ID and echo it back to us (since we're kinda assuming the lack of cookies because of Electron).
     match app.session.store_session(&session, &app.pool).await {
         Ok(_) => Ok(HttpResponse::Ok().json(LoginResponse{session_id: session.session_id})),
         Err(err) =>  logged_error!(super::AuthError::System{

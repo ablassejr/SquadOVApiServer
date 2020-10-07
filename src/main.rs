@@ -10,6 +10,7 @@ use actix_web::{App, HttpServer, web};
 use actix_web::middleware::Logger;
 use api::api_service;
 use structopt::StructOpt;
+use actix_cors::{Cors};
 
 #[derive(StructOpt, Debug)]
 struct Options {
@@ -33,6 +34,12 @@ async fn main() -> std::io::Result<()> {
     // so this server doesn't have to serve javascript or the like.
     let res = HttpServer::new(move || {
         App::new()
+            .wrap(
+                Cors::new()
+                    .allowed_origin(&app.cors.domain)
+                    .allowed_methods(vec!["GET", "POST", "OPTIONS"])
+                    .finish()
+            )
             .app_data(app.clone())
             .wrap(Logger::default())
             .service(api_service::create_service())
