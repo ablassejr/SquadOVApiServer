@@ -24,7 +24,6 @@ pub enum FusionAuthLoginError {
     Auth,
     WrongApp,
     ChangePassword(String),
-    EmailVerification,
     TwoFactor(String),
     Generic {
         code: u16,
@@ -71,7 +70,7 @@ impl super::FusionAuthClient {
                 let status = resp.status();
 
                 match status.as_u16() {
-                    200 => {
+                    200 | 212 => {
                         let body = resp.json::<FusionAuthLoginResult>().await;
                         match body {
                             Ok(j) => Ok(j),
@@ -92,7 +91,6 @@ impl super::FusionAuthClient {
                             }),
                         }
                     },
-                    212 => Err(FusionAuthLoginError::EmailVerification),
                     242 => {
                         let body = resp.json::<FusionAuthLoginTwoFactor>().await;
                         match body {

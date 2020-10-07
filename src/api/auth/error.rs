@@ -5,6 +5,8 @@ use derive_more::{Display, Error};
 pub enum AuthError {
     #[display(fmt = "[AuthError] Invalid credentials.")]
     Credentials,
+    #[display(fmt = "[AuthError] Unauthorized/not logged in.")]
+    Unauthorized,
     #[display(fmt = "[AuthError] Internal system error: {}", message)]
     System { message: String },
     #[display(fmt = "[AuthError] Invalid Request")]
@@ -19,6 +21,7 @@ impl error::ResponseError for AuthError {
     fn status_code(&self) -> StatusCode {
         match *self {
             AuthError::Credentials => StatusCode::UNAUTHORIZED,
+            AuthError::Unauthorized => StatusCode::UNAUTHORIZED,
             AuthError::System{..} => StatusCode::INTERNAL_SERVER_ERROR,
             AuthError::BadRequest => StatusCode::BAD_REQUEST,
         }

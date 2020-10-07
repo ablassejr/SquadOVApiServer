@@ -14,7 +14,8 @@ pub struct LoginData {
 #[derive(Serialize)]
 struct LoginResponse {
     #[serde(rename = "sessionId")]
-    session_id: String
+    session_id: String,
+    verified: Option<bool>,
 }
 
 /// Authenticates the user with our backend and returns a session.
@@ -37,6 +38,7 @@ async fn login(fa: &fusionauth::FusionAuthClient, data: LoginData, ip: Option<&s
                             None => String::from(""),
                         },
                         email: result.user.email,
+                        verified: Some(result.user.verified),
                     },
                     access_token: result.token,
                     refresh_token: result.refresh_token,
@@ -73,7 +75,7 @@ async fn login(fa: &fusionauth::FusionAuthClient, data: LoginData, ip: Option<&s
 /// * 401 - Login failed due to bad credentials.
 /// * 500 - Login failed due to other reasons.
 pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<api::ApiApplication>, req : HttpRequest) -> Result<HttpResponse, super::AuthError> {
-    if super::is_logged_in(&req) {
+    if app.session.is_logged_in(&req, &app.pool).await? {
         return logged_error!(super::AuthError::BadRequest);
     }
 
@@ -109,7 +111,10 @@ pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<api::Api
     // be echoing back to us so we can verify their session. It's the client's responsibility to store
     // the session ID and echo it back to us (since we're kinda assuming the lack of cookies because of Electron).
     match app.session.store_session(&session, &app.pool).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(LoginResponse{session_id: session.session_id})),
+        Ok(_) => Ok(HttpResponse::Ok().json(LoginResponse{
+            session_id: session.session_id,
+            verified: session.user.verified,
+        })),
         Err(err) =>  logged_error!(super::AuthError::System{
             message: format!("Store Session {}", err),
         })

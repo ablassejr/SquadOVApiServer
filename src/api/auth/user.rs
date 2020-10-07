@@ -1,4 +1,3 @@
-use actix_web::{HttpRequest};
 use sqlx;
 use sqlx::postgres::PgPool;
 
@@ -6,13 +5,28 @@ use sqlx::postgres::PgPool;
 pub struct SquadOVUser {
     pub id: i64,
     pub username: String,
-    pub email: String
+    pub email: String,
+    pub verified: Option<bool>,
 }
 
 pub struct UserManager {
 }
 
 impl UserManager {
+    pub async fn mark_user_email_verified_from_email(&self, email: &str, pool: &PgPool) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            "
+            UPDATE squadov.users
+            SET verified = TRUE
+            WHERE email = $1
+            ",
+            email
+        )
+            .execute(pool)
+            .await?;
+        return Ok(())
+    }
+
     pub async fn get_stored_user_from_email(&self, email : &str, pool: &PgPool) -> Result<Option<SquadOVUser>, sqlx::Error> {
         return sqlx::query_as!(
             SquadOVUser,
@@ -31,21 +45,19 @@ impl UserManager {
             "
             INSERT INTO squadov.users (
                 email,
-                username
+                username,
+                verified
             )
             VALUES (
                 $1,
-                $2
+                $2,
+                $3
             )
             RETURNING *
             ",
             user.email,
             user.username,
+            user.verified,
         ).fetch_one(pool).await;
     }
-}
-
-
-pub fn is_logged_in(req : &HttpRequest) -> bool {
-    return false
 }

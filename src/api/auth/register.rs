@@ -45,7 +45,7 @@ async fn register(fa: &fusionauth::FusionAuthClient, data: RegisterData) -> Resu
 /// * 400 - If a user is already logged in.
 /// * 500 - Registration failed due to other reasons.
 pub async fn register_handler(data : web::Json<RegisterData>, app : web::Data<api::ApiApplication>, req : HttpRequest) -> Result<HttpResponse, super::AuthError> {
-    if super::is_logged_in(&req) {
+    if app.session.is_logged_in(&req, &app.pool).await? {
         return logged_error!(super::AuthError::BadRequest);
     }
 
