@@ -73,7 +73,7 @@ pub async fn check_verify_email_handler(app : web::Data<api::ApiApplication>, re
         Ok(x) => match x {
             Some(y) => y,
             None => return logged_error!(super::AuthError::Unauthorized),
-        }
+        },
         Err(err) => return logged_error!(super::AuthError::System{
             message: format!("Get Session {}", err)
         })

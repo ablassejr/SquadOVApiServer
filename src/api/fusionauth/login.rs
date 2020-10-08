@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-
+use derive_more::{Display};
 #[derive(Serialize)]
 pub struct FusionAuthLoginInput {
     #[serde(rename = "applicationId")]
@@ -20,11 +20,14 @@ pub struct FusionAuthLoginResult {
     pub refresh_token: String
 }
 
+#[derive(Debug, Display)]
 pub enum FusionAuthLoginError {
     Auth,
     WrongApp,
     ChangePassword(String),
     TwoFactor(String),
+    InternalError,
+    #[display(fmt = "Generic: {} {}", code, message)]
     Generic {
         code: u16,
         message: String    
@@ -56,6 +59,30 @@ impl super::FusionAuthClient {
             },
             username: username,
             password: password,
+        }
+    }
+
+    pub async fn logout(&self, refresh_token: &str) -> Result<(), FusionAuthLoginError> {
+        let res = self.client.post(self.build_url(format!("/api/logout?refreshToken={}", refresh_token).as_str()).as_str())
+            .send()
+            .await;
+
+        match res {
+            Ok(resp) => {
+                let status = resp.status();
+                match status.as_u16() {
+                    200 => Ok(()),
+                    500 => Err(FusionAuthLoginError::InternalError),
+                    _ => Err(FusionAuthLoginError::Generic{
+                        code: status.as_u16(),
+                        message: format!("Fusion Auth Error: {}", resp.text().await.unwrap()),
+                    })
+                }
+            },
+            Err(err) => Err(FusionAuthLoginError::Generic{
+                code: 0,
+                message: format!("{}", err)
+            }),
         }
     }
 
