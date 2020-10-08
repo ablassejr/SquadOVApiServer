@@ -4,6 +4,7 @@ use crate::api;
 use crate::api::fusionauth;
 use crate::logged_error;
 use crate::common;
+use super::SquadOVSession;
 
 #[derive(Deserialize)]
 pub struct VerifyEmailData {
@@ -61,13 +62,11 @@ pub async fn verify_email_handler(data : web::Json<VerifyEmailData>, app : web::
 /// * 200 - Returns true/false depending on whether the user has verified their email.
 /// * 401 - User not logged in.
 /// * 500 - Could not check verification.
-pub async fn check_verify_email_handler(app : web::Data<api::ApiApplication>, req: HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
-    let session = match app.refresh_and_obtain_valid_session_from_request(&req).await {
-        Ok(x) => match x {
-            Some(y) => y,
-            None => return logged_error!(common::SquadOvError::Unauthorized),
-        },
-        Err(err) => return logged_error!(common::SquadOvError::InternalError(format!("Get Session {}", err)))
+pub async fn check_verify_email_handler(req: HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return logged_error!(common::SquadOvError::Unauthorized),
     };
 
     Ok(HttpResponse::Ok().json(CheckEmailVerifiedResponse{
@@ -82,12 +81,10 @@ pub async fn check_verify_email_handler(app : web::Data<api::ApiApplication>, re
 /// * 401 - User not logged in.
 /// * 500 - Email was not sent.
 pub async fn resend_verify_email_handler(app : web::Data<api::ApiApplication>, req: HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
-    let session = match app.refresh_and_obtain_valid_session_from_request(&req).await {
-        Ok(x) => match x {
-            Some(y) => y,
-            None => return logged_error!(common::SquadOvError::Unauthorized),
-        },
-        Err(err) => return logged_error!(common::SquadOvError::InternalError(format!("Get Session {}", err)))
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return logged_error!(common::SquadOvError::Unauthorized),
     };
 
     match resend_verify_email(&app.clients.fusionauth, &session.user.email).await {

@@ -16,8 +16,13 @@ pub fn create_service() -> impl HttpServiceFactory {
                 .route("/forgotpw", web::get().to(auth::forgot_pw_handler))
                 .route("/forgotpw/change", web::post().to(auth::forgot_pw_change_handler))
                 .route("/verify", web::post().to(auth::verify_email_handler))
-                .route("/verify", web::get().to(auth::check_verify_email_handler))
-                .route("/verify/resend", web::post().to(auth::resend_verify_email_handler))
+                .service(
+                    // These are the only two endpoints where the user needs to provide a valid session to use.
+                    web::scope("")
+                        .wrap(auth::ApiSessionValidator{})
+                        .route("/verify", web::get().to(auth::check_verify_email_handler))
+                        .route("/verify/resend", web::post().to(auth::resend_verify_email_handler))
+                )
         )
         .service(
             web::scope("/v1")

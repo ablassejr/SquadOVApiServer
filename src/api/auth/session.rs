@@ -13,12 +13,13 @@ pub struct SquadOVSession {
     pub user: super::SquadOVUser,
     pub access_token: String,
     pub refresh_token: String,
+    pub old_session_id: Option<String>
 }
 
 pub struct SessionManager {
 }
 
-const SESSION_ID_HEADER_KEY : &str = "X-SQUADOV-SESSION-ID";
+const SESSION_ID_HEADER_KEY : &str = "x-squadov-session-id";
 
 impl SessionManager {
     pub fn new() -> SessionManager {
@@ -70,6 +71,7 @@ impl SessionManager {
                 },
                 access_token: x.access_token,
                 refresh_token: x.refresh_token,
+                old_session_id: None,
             })),
             None => Ok(None),
         }
@@ -167,6 +169,8 @@ impl crate::api::ApiApplication {
                 Ok(_) => (),
                 Err(err) => return logged_error!(common::SquadOvError::InternalError(format!("Refresh Session {}", err)))
             };
+
+            session.old_session_id = Some(old_id);
         }
 
         return Ok(Some(session));
