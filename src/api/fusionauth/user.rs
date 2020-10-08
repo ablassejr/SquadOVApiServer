@@ -48,6 +48,17 @@ pub enum FusionAuthResendVerificationEmailError {
     Generic(String)
 }
 
+#[derive(Serialize)]
+struct FusionAuthStartForgotPasswordInput<'a> {
+    #[serde(rename = "loginId")]
+    login_id: &'a str
+}
+
+#[derive(Serialize)]
+struct FusionAuthChangePasswordInput<'a> {
+    password: &'a str
+}
+
 impl super::FusionAuthClient {
     pub fn find_auth_registration<'a>(&self, u: &'a FusionAuthUser) -> Option<&'a FusionAuthRegistration> {
         for reg in &u.registrations {
@@ -152,6 +163,76 @@ impl super::FusionAuthClient {
                         }
                     }
                     _ => Err(FusionAuthUserError::Generic(String::from("Unknown verification error."))),
+                }
+            },
+            Err(err) => Err(FusionAuthUserError::Generic(format!("{}", err))),
+        }
+    }
+
+    pub async fn start_forgot_password_workflow(&self, login_id: &str) -> Result<(), FusionAuthResendVerificationEmailError> {
+        match self.client.post(self.build_url("/api/user/forgot-password").as_str())
+            .json(&FusionAuthStartForgotPasswordInput{
+                login_id: login_id,
+            })
+            .send()
+            .await {
+            Ok(resp) => {
+                match resp.status().as_u16() {
+                    200 => Ok(()),
+                    400 => {
+                        let body = resp.text().await;
+                        match body {
+                            Ok(j) => Err(FusionAuthResendVerificationEmailError::InvalidRequest(j)),
+                            Err(err) => Err(FusionAuthResendVerificationEmailError::Generic(format!("{}", err))),
+                        }
+                    },
+                    401 => Err(FusionAuthResendVerificationEmailError::Auth),
+                    403 => Err(FusionAuthResendVerificationEmailError::Disabled),
+                    404 => Err(FusionAuthResendVerificationEmailError::DoesNotExist),
+                    500 => Err(FusionAuthResendVerificationEmailError::InternalError),
+                    503 => {
+                        let body = resp.text().await;
+                        match body {
+                            Ok(j) => Err(FusionAuthResendVerificationEmailError::Search(j)),
+                            Err(err) => Err(FusionAuthResendVerificationEmailError::Generic(format!("{}", err))),
+                        }
+                    }
+                    _ => Err(FusionAuthResendVerificationEmailError::Generic(String::from("Unknown start password workflow error."))),
+                }
+            },
+            Err(err) => Err(FusionAuthResendVerificationEmailError::Generic(format!("{}", err))),
+        }
+    }
+
+    pub async fn change_user_password(&self, change_password_id: &str, password: &str) -> Result<(), FusionAuthUserError> {
+        match self.client.post(self.build_url(format!("/api/user/change-password/{}", change_password_id).as_str()).as_str())
+            .json(&FusionAuthChangePasswordInput{
+                password: password,
+            })
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                match resp.status().as_u16() {
+                    200 => Ok(()),
+                    400 => {
+                        let body = resp.text().await;
+                        match body {
+                            Ok(j) => Err(FusionAuthUserError::InvalidRequest(j)),
+                            Err(err) => Err(FusionAuthUserError::Generic(format!("{}", err))),
+                        }
+                    },
+                    401 => Err(FusionAuthUserError::Auth),
+                    404 => Err(FusionAuthUserError::DoesNotExist),
+                    500 => Err(FusionAuthUserError::InternalError),
+                    503 => {
+                        let body = resp.text().await;
+                        match body {
+                            Ok(j) => Err(FusionAuthUserError::Search(j)),
+                            Err(err) => Err(FusionAuthUserError::Generic(format!("{}", err))),
+                        }
+                    }
+                    _ => Err(FusionAuthUserError::Generic(String::from("Unknown change password error."))),
                 }
             },
             Err(err) => Err(FusionAuthUserError::Generic(format!("{}", err))),
