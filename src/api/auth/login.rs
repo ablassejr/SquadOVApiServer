@@ -13,6 +13,8 @@ pub struct LoginData {
 
 #[derive(Serialize)]
 struct LoginResponse {
+    #[serde(rename = "userId")]
+    user_id: i64,
     #[serde(rename = "sessionId")]
     session_id: String,
     verified: Option<bool>,
@@ -112,6 +114,7 @@ pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<api::Api
     // the session ID and echo it back to us (since we're kinda assuming the lack of cookies because of Electron).
     match app.session.store_session(&session, &app.pool).await {
         Ok(_) => Ok(HttpResponse::Ok().json(LoginResponse{
+            user_id: session.user.id,
             session_id: session.session_id,
             verified: session.user.verified,
         })),
