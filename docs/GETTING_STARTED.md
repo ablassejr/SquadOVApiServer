@@ -29,6 +29,8 @@ Other, you will need to install additional dependencies in the `deps` folder.
 
     Give the application a reasonable name. Under the Security tab set
 
+    * `Require an API key` to true.
+    * `Generate Refresh Tokens` to true.
     * `Enable JWT refresh` to true.
 
     Hit save.

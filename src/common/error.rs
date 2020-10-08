@@ -16,6 +16,8 @@ pub enum SquadOvError {
     Unauthorized,
     #[display(fmt = "[SquadovError] Invalid Request")]
     BadRequest,
+    #[display(fmt = "[SquadovError] Not found")]
+    NotFound,
     #[display(fmt = "[SquadovError] Internal Error: {}", _0)]
     InternalError(String),
 }
@@ -30,6 +32,7 @@ impl error::ResponseError for SquadOvError {
             SquadOvError::Credentials => StatusCode::UNAUTHORIZED,
             SquadOvError::Unauthorized => StatusCode::UNAUTHORIZED,
             SquadOvError::BadRequest => StatusCode::BAD_REQUEST,
+            SquadOvError::NotFound => StatusCode::NOT_FOUND,
             SquadOvError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             
         }

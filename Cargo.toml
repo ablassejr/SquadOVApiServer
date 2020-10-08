@@ -10,6 +10,7 @@ edition = "2018"
 actix-web = "3.1.0"
 actix-rt = "1.1.1"
 actix-cors = "0.4.1"
+actix-service = "1.0.6"
 serde = "1.0.116"
 log = "0.4.0"
 env_logger = "0.7.1"
@@ -20,3 +21,4 @@ toml = "0.5"
 structopt = "0.3"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 sqlx = { version = "0.4.0-beta.1", default-features = false, features = [ "runtime-tokio", "macros", "postgres", "json", "ipnetwork", "uuid", "chrono" ] }
+futures = "0.3.6"

@@ -1,7 +1,8 @@
 use sqlx;
 use sqlx::postgres::PgPool;
+use serde::Serialize;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct SquadOVUser {
     pub id: i64,
     pub username: String,
@@ -36,6 +37,18 @@ impl UserManager {
             WHERE email = $1
             ",
             email
+        ).fetch_optional(pool).await;
+    }
+
+    pub async fn get_stored_user_from_id(&self, id : i64, pool: &PgPool) -> Result<Option<SquadOVUser>, sqlx::Error> {
+        return sqlx::query_as!(
+            SquadOVUser,
+            "
+            SELECT *
+            FROM squadov.users
+            WHERE id = $1
+            ",
+            id
         ).fetch_optional(pool).await;
     }
 

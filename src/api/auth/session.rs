@@ -4,8 +4,10 @@ use actix_web::{ HttpRequest };
 use crate::common;
 use crate::api::fusionauth;
 use uuid::Uuid;
+use crate::logged_error;
+use serde::Serialize;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct SquadOVSession {
     pub session_id: String,
     pub user: super::SquadOVUser,
@@ -136,7 +138,7 @@ impl crate::api::ApiApplication {
                 Some(y) => y,
                 None => return Ok(None),
             },
-            Err(err) => return Err(common::SquadOvError::InternalError(format!("Refresh And Obtain Session {}", err))),
+            Err(err) => return logged_error!(common::SquadOvError::InternalError(format!("Refresh And Obtain Session {}", err))),
         };
 
         // Check if the session is expired (as determined by FusionAuth).
@@ -146,14 +148,14 @@ impl crate::api::ApiApplication {
             Ok(_) => false,
             Err(err) => match err {
                 fusionauth::FusionAuthValidateJwtError::Invalid => true,
-                _ => return Err(common::SquadOvError::InternalError(format!("Validate JWT {}", err))),
+                _ => return logged_error!(common::SquadOvError::InternalError(format!("Validate JWT {}", err))),
             }
         };
 
         if expired {
             let new_token = match self.clients.fusionauth.refresh_jwt(&session.refresh_token).await {
                 Ok(t) => t,
-                Err(err) => return Err(common::SquadOvError::InternalError(format!("Refresh JWT {}", err)))
+                Err(err) => return logged_error!(common::SquadOvError::InternalError(format!("Refresh JWT {}", err)))
             };
 
             let old_id = session.session_id;
@@ -163,7 +165,7 @@ impl crate::api::ApiApplication {
 
             match self.session.refresh_session(&old_id, &session, &self.pool).await {
                 Ok(_) => (),
-                Err(err) => return Err(common::SquadOvError::InternalError(format!("Refresh Session {}", err)))
+                Err(err) => return logged_error!(common::SquadOvError::InternalError(format!("Refresh Session {}", err)))
             };
         }
 

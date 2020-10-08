@@ -40,8 +40,8 @@ async fn main() -> std::io::Result<()> {
                     .allowed_methods(vec!["GET", "POST", "OPTIONS"])
                     .finish()
             )
-            .app_data(app.clone())
             .wrap(Logger::default())
+            .app_data(app.clone())
             .service(api_service::create_service())
         })
         .bind("0.0.0.0:8080")?

@@ -74,7 +74,7 @@ impl super::FusionAuthClient {
                             Err(err) => Err(FusionAuthRefreshJwtError::Generic(format!("{}", err))),
                         }
                     },
-                    401 => Err(FusionAuthRefreshJwtError::Invalid),
+                    400 | 401 => Err(FusionAuthRefreshJwtError::Invalid),
                     404 => Err(FusionAuthRefreshJwtError::DoesNotExist),
                     500 => Err(FusionAuthRefreshJwtError::InternalError),
                     503 => Err(FusionAuthRefreshJwtError::SearchIndex),

@@ -1,6 +1,8 @@
 pub mod api_service;
 pub mod auth;
 pub mod fusionauth;
+pub mod access;
+pub mod v1;
 
 use serde::{Deserialize};
 use std::fs;

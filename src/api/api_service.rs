@@ -1,6 +1,10 @@
 use actix_web::{web};
 use actix_web::dev::{HttpServiceFactory};
 use super::auth;
+use super::v1;
+use super::access;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 pub fn create_service() -> impl HttpServiceFactory {
     return web::scope("")
@@ -14,5 +18,26 @@ pub fn create_service() -> impl HttpServiceFactory {
                 .route("/verify", web::post().to(auth::verify_email_handler))
                 .route("/verify", web::get().to(auth::check_verify_email_handler))
                 .route("/verify/resend", web::post().to(auth::resend_verify_email_handler))
+        )
+        .service(
+            web::scope("/v1")
+                .wrap(auth::ApiSessionValidator{})
+                .service(
+                    web::scope("/users")
+                        .service(
+                            web::scope("/{user_id}")
+                                .wrap(access::ApiAccess{
+                                    checker: Rc::new(RefCell::new(access::UserSpecificAccessChecker{
+                                        obtainer: access::UserIdPathSetObtainer{
+                                            key: "user_id"
+                                        },
+                                    })),
+                                })
+                                .service(
+                                    web::resource("/profile")
+                                        .route(web::get().to(v1::get_user_profile_handler))
+                                )
+                        )
+                )
         )
 }
