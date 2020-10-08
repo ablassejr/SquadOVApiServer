@@ -2,6 +2,7 @@ use actix_web::{web, HttpRequest, HttpResponse};
 use serde::{Deserialize};
 use crate::api;
 use crate::api::fusionauth;
+use crate::common;
 use crate::logged_error;
 
 #[derive(Deserialize)]
@@ -11,7 +12,7 @@ pub struct RegisterData {
     password: String,
 }
 
-async fn register(fa: &fusionauth::FusionAuthClient, data: RegisterData) -> Result<(), super::AuthError> {
+async fn register(fa: &fusionauth::FusionAuthClient, data: RegisterData) -> Result<(), common::SquadOvError> {
     let res = fa.register(fa.build_register_input(
         data.username,
         data.email,
@@ -20,13 +21,7 @@ async fn register(fa: &fusionauth::FusionAuthClient, data: RegisterData) -> Resu
 
     match res {
         Ok(_) => Ok(()),
-        Err(err) => match err {
-            fusionauth::FusionAuthRegisterError::InvalidRequest(x) => Err(super::AuthError::System{ message: x }),
-            fusionauth::FusionAuthRegisterError::ServerAuth => Err(super::AuthError::System{ message: String::from("Server Auth.")}),
-            fusionauth::FusionAuthRegisterError::InternalError => Err(super::AuthError::System{ message: String::from("Internal FA Error.")}),
-            fusionauth::FusionAuthRegisterError::Search(x) => Err(super::AuthError::System{ message: format!("Search: {}", x)}),
-            fusionauth::FusionAuthRegisterError::Generic(x) => Err(super::AuthError::System{ message: format!("Generic: {}", x)}),
-        }
+        Err(err) => Err(common::SquadOvError::InternalError(format!("Register {}", err))),
     }
 }
 
@@ -44,9 +39,9 @@ async fn register(fa: &fusionauth::FusionAuthClient, data: RegisterData) -> Resu
 /// * 200 - Registration succeeded.
 /// * 400 - If a user is already logged in.
 /// * 500 - Registration failed due to other reasons.
-pub async fn register_handler(data : web::Json<RegisterData>, app : web::Data<api::ApiApplication>, req : HttpRequest) -> Result<HttpResponse, super::AuthError> {
-    if app.session.is_logged_in(&req, &app.pool).await? {
-        return logged_error!(super::AuthError::BadRequest);
+pub async fn register_handler(data : web::Json<RegisterData>, app : web::Data<api::ApiApplication>, req : HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
+    if app.is_logged_in(&req).await? {
+        return logged_error!(common::SquadOvError::BadRequest);
     }
 
     match register(&app.clients.fusionauth, data.into_inner()).await {

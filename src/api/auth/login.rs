@@ -2,6 +2,7 @@ use actix_web::{web, HttpRequest, HttpResponse};
 use serde::{Serialize, Deserialize};
 use crate::api;
 use crate::api::fusionauth;
+use crate::common;
 use crate::logged_error;
 use uuid::Uuid;
 
@@ -21,7 +22,7 @@ struct LoginResponse {
 }
 
 /// Authenticates the user with our backend and returns a session.
-async fn login(fa: &fusionauth::FusionAuthClient, data: LoginData, ip: Option<&str>) -> Result<super::SquadOVSession, super::AuthError> {
+async fn login(fa: &fusionauth::FusionAuthClient, data: LoginData, ip: Option<&str>) -> Result<super::SquadOVSession, common::SquadOvError> {
     let res = fa.login(fa.build_login_input(
         data.username,
         data.password,
@@ -45,20 +46,14 @@ async fn login(fa: &fusionauth::FusionAuthClient, data: LoginData, ip: Option<&s
                     access_token: result.token,
                     refresh_token: result.refresh_token,
                 }),
-                None => Err(super::AuthError::System{
-                    message: String::from("Could not find user auth registration with the current app.")
-                }),
+                None => Err(common::SquadOvError::InternalError(String::from("Could not find user auth registration with the current app."))),
             }
         },
         // TODO: Handle two factor errors/change password errors/email verification errors.
         Err(err) => match err {
-            fusionauth::FusionAuthLoginError::Auth => Err(super::AuthError::Credentials),
-            fusionauth::FusionAuthLoginError::Generic{code, message} => Err(super::AuthError::System {
-                message: format!("Code: {} Message: {}", code, message)
-            }),
-            _ => Err(super::AuthError::System{ 
-                message: String::from("Unhandled error.")
-            })
+            fusionauth::FusionAuthLoginError::Auth => Err(common::SquadOvError::Credentials),
+            fusionauth::FusionAuthLoginError::Generic{code, message} => Err(common::SquadOvError::InternalError(format!("Code: {} Message: {}", code, message))),
+            _ => Err(common::SquadOvError::InternalError(String::from("Unhandled error."))),
         }
     }
 }
@@ -76,9 +71,9 @@ async fn login(fa: &fusionauth::FusionAuthClient, data: LoginData, ip: Option<&s
 /// * 400 - If a user is already logged in.
 /// * 401 - Login failed due to bad credentials.
 /// * 500 - Login failed due to other reasons.
-pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<api::ApiApplication>, req : HttpRequest) -> Result<HttpResponse, super::AuthError> {
-    if app.session.is_logged_in(&req, &app.pool).await? {
-        return logged_error!(super::AuthError::BadRequest);
+pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<api::ApiApplication>, req : HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
+    if app.is_logged_in(&req).await? {
+        return logged_error!(common::SquadOvError::BadRequest);
     }
 
     // First authenticate with our backend and obtain a valid session.
@@ -98,14 +93,10 @@ pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<api::Api
             Some(y) => y,
             None => match app.users.create_user(&session.user, &app.pool).await {
                 Ok(z) => z,
-                Err(err) => return logged_error!(super::AuthError::System{
-                    message: format!("Create User {}", err)
-                })
+                Err(err) => return logged_error!(common::SquadOvError::InternalError(format!("Create User {}", err))),
             },
         },
-        Err(err) => return logged_error!(super::AuthError::System{
-            message: format!("Get User {}", err)
-        })
+        Err(err) => return logged_error!(common::SquadOvError::InternalError(format!("Get User {}", err))),
     };
     session.user = stored_user;
 
@@ -118,8 +109,6 @@ pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<api::Api
             session_id: session.session_id,
             verified: session.user.verified,
         })),
-        Err(err) =>  logged_error!(super::AuthError::System{
-            message: format!("Store Session {}", err),
-        })
+        Err(err) =>  logged_error!(common::SquadOvError::InternalError(format!("Store Session {}", err))),
     }
 }

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-
+use derive_more::{Display};
 #[derive(Serialize)]
 pub struct FusionAuthRegisterInput {
     registration: super::FusionAuthRegistration,
@@ -14,6 +14,7 @@ pub struct FusionAuthRegisterResult {
     pub refresh_token: String
 }
 
+#[derive(Debug, Display)]
 pub enum FusionAuthRegisterError {
     InvalidRequest(String),
     ServerAuth,

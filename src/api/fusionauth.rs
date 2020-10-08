@@ -1,6 +1,7 @@
 mod login;
 mod register;
 mod user;
+mod jwt;
 
 use serde::{Deserialize};
 use reqwest::header;
@@ -45,3 +46,4 @@ impl FusionAuthClient {
 pub use login::*;
 pub use register::*;
 pub use user::*;
+pub use jwt::*;
