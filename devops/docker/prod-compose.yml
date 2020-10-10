@@ -1,0 +1,43 @@
+version: "3.8"
+services:
+    postgres:
+        image: gcr.io/cloudsql-docker/gce-proxy:1.16
+        command: ["/cloud_sql_proxy",
+          "-instances=${GCP_PROJECT}:us-central1:${POSTGRES_INSTANCE_NAME}=tcp:5432"
+        ]
+        ports:
+            - "127.0.0.1:5432:5432"
+        networks:
+            c3p0:
+                ipv4_address: "172.22.0.2"
+    fusionauth:
+        image: "fusionauth/fusionauth-app:1.19.8"
+        volumes:
+            - type: volume
+              source: fa-config
+              target: /usr/local/fusionauth/config
+        environment:
+            - "DATABASE_URL=jdbc:postgresql://172.22.0.2:5432/fusionauth?timezone=UTC"
+            - "DATABASE_ROOT_USER=${POSTGRES_USER}"
+            - "DATABASE_ROOT_PASSWORD=${POSTGRES_PASSWORD}"
+            - "DATABASE_USER=${FUSIONAUTH_DB_USER}"
+            - "DATABASE_PASSWORD=${FUSIONAUTH_DB_PASSWORD}"
+            - "FUSIONAUTH_MEMORY=1G"
+            - "FUSIONAUTH_SEARCH_ENGINE_TYPE=database"
+        ports:
+            - "9011:9011"
+        networks:
+            c3p0:
+                ipv4_address: "172.22.0.3"
+        depends_on:
+            - postgres
+volumes:
+    db-data:
+    fa-config:
+
+networks:
+    c3p0:
+        ipam:
+            driver: default
+            config:
+                - subnet: "172.22.0.0/24"

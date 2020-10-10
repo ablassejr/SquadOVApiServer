@@ -1,0 +1,49 @@
+- name: Install Docker
+  hosts: vm
+  tasks:
+    - name: Create Deployment Folder
+      file:
+        path: /squadov
+        state: directory
+        mode: '0755'
+        owner: "{{ lookup('env', 'USER') }}"
+      become: yes
+    - name: Install Docker Prereqs
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg-agent
+          - software-properties-common
+        update_cache: yes
+      become: yes
+    - name: Add Docker GPG key 
+      apt_key:
+        url: https://download.docker.com/linux/debian/gpg
+        state: present
+      become: yes
+    - name: Add Docker Repo
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/debian buster stable
+        state: present
+      become: yes
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        update_cache: yes
+      become: yes
+    - name: Install Docker Compose
+      get_url:
+        url:  "https://github.com/docker/compose/releases/download/1.27.4/docker-compose-Linux-x86_64"
+        dest: /squadov/docker-compose
+        mode: '0755'
+        owner: "{{ lookup('env', 'USER') }}"
+    - name: Add to Docker Group
+      user:
+        name: "{{ lookup('env', 'USER') }}"
+        group: docker
+      become: yes

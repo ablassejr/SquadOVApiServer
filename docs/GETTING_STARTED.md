@@ -23,7 +23,7 @@ Other, you will need to install additional dependencies in the `deps` folder.
 
 1. `cd $SRC/devops/docker`
 2. `..\env\dev_env.ps1`
-3. `docker-compose up`
+3. `docker-compose -f local-dev-compose.yml up`
 4. Open up `127.0.0.1:9011` in a browser and setup FusionAuth using the Setup Wizard.
 5. Login and create a new application.
 

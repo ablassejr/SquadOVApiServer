@@ -1,0 +1,14 @@
+- name: Deploy Support Infrastructure
+  vars_files:
+    - common/env.yml
+  hosts: vm
+  tasks:
+    - name: Copy Production Docker Compose
+      copy:
+        src: ../docker/prod-compose.yml
+        dest: /squadov/docker-compose.yml
+    - name: Up
+      command: 
+        cmd: ./docker-compose up --detach
+        chdir: /squadov
+      environment: "{{ env }}"
