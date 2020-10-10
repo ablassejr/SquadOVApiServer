@@ -1,12 +1,12 @@
 terraform {
     backend "gcs" {
-        bucket = "squadov-staging-tf-state"
+        bucket = "squadov-tf-state"
         prefix = "terraform/state"
     }
 }
 
 provider "google" {
-    project     = "squadov-staging"
+    project     = "squadov"
     region      = "us-central1"
     zone        = "us-central1-c"
     version     =  "~> 3.7"

@@ -1,33 +1,3 @@
-# ROOT
-server {
-    listen 443 ssl http2;
-    server_name ${DEPLOYMENT_DOMAIN};
-
-    include /etc/nginx/conf.d/common-tls-options.conf;
-    
-    if ($scheme = http) {
-        return 301 https://$host$request_uri;
-    }
-
-    if ($http_x_forwarded_proto = http) {
-        return 301 https://$host$request_uri;
-    }
-
-    location / {
-        return 301 https://www.squadov.gg;
-    }
-}
-
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    server_name ${DEPLOYMENT_DOMAIN};
-    
-    location / {
-        return 301 https://$host$request_uri;
-    }
-}
-
 # API
 
 server {

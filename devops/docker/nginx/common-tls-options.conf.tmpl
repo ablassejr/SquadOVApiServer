@@ -1,5 +1,5 @@
-ssl_certificate /etc/letsencrypt/live/${DEPLOYMENT_DOMAIN}/fullchain.pem;
-ssl_certificate_key /etc/letsencrypt/live/${DEPLOYMENT_DOMAIN}/privkey.pem;
+ssl_certificate /etc/letsencrypt/live/api.${DEPLOYMENT_DOMAIN}/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/api.${DEPLOYMENT_DOMAIN}/privkey.pem;
 
 ssl_session_timeout 1d;
 ssl_session_cache shared:MozSSL:10m;

@@ -1,7 +1,7 @@
 - name: Deploy Web App and API
   vars_files:
     - common/env.yml
-  hosts: vm
+  hosts: "{{ shosts }}"
   tasks:
     - name: Docker Login
       shell: echo {{ env.GITLAB_REGISTRY_TOKEN }} | docker login --username {{ env.GITLAB_USERNAME }} --password-stdin registry.gitlab.com

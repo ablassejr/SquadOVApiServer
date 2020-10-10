@@ -1,5 +1,5 @@
 - name: Install Docker
-  hosts: vm
+  hosts: "{{ shosts }}"
   tasks:
     - name: Create Deployment Folder
       file:
