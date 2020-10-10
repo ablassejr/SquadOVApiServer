@@ -3,7 +3,7 @@ services:
     postgres:
         image: gcr.io/cloudsql-docker/gce-proxy:1.16
         command: ["/cloud_sql_proxy",
-          "-instances=${GCP_PROJECT}:us-central1:${POSTGRES_INSTANCE_NAME}=tcp:5432"
+          "-instances=${GCP_PROJECT}:us-central1:${POSTGRES_INSTANCE_NAME}=tcp:0.0.0.0:5432"
         ]
         ports:
             - "127.0.0.1:5432:5432"
@@ -25,15 +25,33 @@ services:
             - "FUSIONAUTH_MEMORY=1G"
             - "FUSIONAUTH_SEARCH_ENGINE_TYPE=database"
         ports:
-            - "9011:9011"
+            - "127.0.0.1:9011:9011"
         networks:
             c3p0:
                 ipv4_address: "172.22.0.3"
         depends_on:
             - postgres
+    nginx:
+        image: "registry.gitlab.com/squadov/squadovapiserver/${GCP_PROJECT}/nginx:latest"
+        volumes:
+            - type: volume
+              source: nginx-certs
+              target: /etc/letsencrypt
+        ports:
+            - "80:80"
+            - "443:443"
+        networks:
+            c3p0:
+                ipv4_address: "172.22.0.4"
+        environment:
+            - "DEPLOYMENT_DOMAIN=${DEPLOYMENT_DOMAIN}"
+            - "DEPLOYMENT_DOMAIN_EMAIL=${DEPLOYMENT_DOMAIN_EMAIL}"
+        depends_on:
+            - fusionauth
 volumes:
     db-data:
     fa-config:
+    nginx-certs:
 
 networks:
     c3p0:

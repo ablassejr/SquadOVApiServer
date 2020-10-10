@@ -1,13 +1,13 @@
 [fusionauth]
-host = "http://127.0.0.1"
+host = "http://${FUSIONAUTH_HOST}"
 port = 9011
-api_key = "-8Z_0w0tcoW4uBS9ZXTNtak_lXCZlThRPn_ZETupW5E"
-tenant_id = "942c8e61-f64a-e9dc-03ec-ee5eca47da10"
-application_id = "1b94958e-e0a2-4dfa-887c-43e463ea38b5"
+api_key = "${FUSIONAUTH_API_KEY}"
+tenant_id = "${FUSIONAUTH_TENANT_ID}"
+application_id = "${FUSIONAUTH_CLIENT_ID}"
 
 [database]
-url = "postgresql://postgres:password@127.0.0.1/squadov"
+url = "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}/squadov"
 connections = 8
 
 [cors]
-domain = "http://localhost:3000"
+domain = "https://app.${DEPLOYMENT_DOMAIN}"

@@ -18,6 +18,10 @@ Other, you will need to install additional dependencies in the `deps` folder.
 
 1. `cd $SRC/config`
 2. `cp config.toml.tmpl config.toml`
+3. Set the following variables:
+   1. `fusionauth.host` to `http://127.0.0.1`
+   2. `database.url` to `postgresql://postgres:password@127.0.0.1/squadov`
+   3. `cors.domain` to `http://localhost:3000`
 
 ### Set up FusionAuth
 
@@ -61,3 +65,11 @@ Other, you will need to install additional dependencies in the `deps` folder.
 
 1. `cd $SRC/devops/database`
 2. `.\migrate.ps1`
+
+### Build and Run
+
+1. `cd $SRC`
+2. `cargo install sqlx-cli --no-default-features --features postgres --version 0.1.0-beta.1`
+3. `cargo sqlx prepare`
+4. `cargo build`
+5. `cargo run -- --config .\config\config.toml`

@@ -8,6 +8,13 @@
         mode: '0755'
         owner: "{{ lookup('env', 'USER') }}"
       become: yes
+    - name: Create Webapp Folder
+      file:
+        path: /webapp
+        state: directory
+        mode: '0755'
+        owner: "{{ lookup('env', 'USER') }}"
+      become: yes
     - name: Install Docker Prereqs
       apt:
         name:

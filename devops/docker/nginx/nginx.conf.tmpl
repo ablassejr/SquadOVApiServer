@@ -1,0 +1,124 @@
+# ROOT
+server {
+    listen 443 ssl http2;
+    server_name ${DEPLOYMENT_DOMAIN};
+
+    include /etc/nginx/conf.d/common-tls-options.conf;
+    
+    if ($scheme = http) {
+        return 301 https://$host$request_uri;
+    }
+
+    if ($http_x_forwarded_proto = http) {
+        return 301 https://$host$request_uri;
+    }
+
+    location / {
+        return 301 https://www.squadov.gg;
+    }
+}
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name ${DEPLOYMENT_DOMAIN};
+    
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# API
+
+server {
+    listen 443 ssl http2;
+    server_name api.${DEPLOYMENT_DOMAIN};
+
+    include /etc/nginx/conf.d/common-tls-options.conf;
+
+    if ($scheme = http) {
+        return 301 https://$host$request_uri;
+    }
+
+    if ($http_x_forwarded_proto = http) {
+        return 301 https://$host$request_uri;
+    }
+
+    location / {
+        include /etc/nginx/conf.d/common-http-headers.conf;
+        proxy_pass http://172.22.0.5:8080/;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name api.${DEPLOYMENT_DOMAIN};
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# APP
+
+server {
+    listen 443 ssl http2;
+    server_name app.${DEPLOYMENT_DOMAIN};
+
+    include /etc/nginx/conf.d/common-tls-options.conf;
+
+    if ($scheme = http) {
+        return 301 https://$host$request_uri;
+    }
+
+    if ($http_x_forwarded_proto = http) {
+        return 301 https://$host$request_uri;
+    }
+
+    location / {
+        include /etc/nginx/conf.d/common-http-headers.conf;
+        proxy_pass http://172.22.0.6:3000/;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name app.${DEPLOYMENT_DOMAIN};
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# AUTH
+server {
+    listen 443 ssl http2;
+    server_name auth.${DEPLOYMENT_DOMAIN};
+
+    include /etc/nginx/conf.d/common-tls-options.conf;
+
+    if ($scheme = http) {
+        return 301 https://$host$request_uri;
+    }
+
+    if ($http_x_forwarded_proto = http) {
+        return 301 https://$host$request_uri;
+    }
+
+    location / {
+        include /etc/nginx/conf.d/common-http-headers.conf;
+        proxy_pass http://172.22.0.3:9011/;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name auth.${DEPLOYMENT_DOMAIN};
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}

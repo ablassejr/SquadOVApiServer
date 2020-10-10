@@ -1,4 +1,4 @@
-- name: Deploy Support Infrastructure
+- name: Deploy Web App and API
   vars_files:
     - common/env.yml
   hosts: vm
@@ -7,15 +7,15 @@
       shell: echo {{ env.GITLAB_REGISTRY_TOKEN }} | docker login --username {{ env.GITLAB_USERNAME }} --password-stdin registry.gitlab.com
     - name: Copy Production Docker Compose
       copy:
-        src: ../docker/prod-compose.yml
-        dest: /squadov/docker-compose.yml
+        src: ../docker/prod-app-compose.yml
+        dest: /webapp/docker-compose.yml
     - name: Pull
       command: 
-        cmd: ./docker-compose pull
-        chdir: /squadov
+        cmd: ../squadov/docker-compose pull
+        chdir: /webapp
       environment: "{{ env }}"
     - name: Up
       command: 
-        cmd: ./docker-compose up --detach
-        chdir: /squadov
+        cmd: ../squadov/docker-compose up --detach
+        chdir: /webapp
       environment: "{{ env }}"

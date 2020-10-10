@@ -38,7 +38,6 @@ resource "google_compute_firewall" "vm-network-http-ingress" {
     }
 }
 
-
 resource "google_compute_address" "vm-static-ip" {
     name    = "vm-static-ip"
     region  = google_compute_subnetwork.vm-network-us-central1.region
