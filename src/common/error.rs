@@ -1,5 +1,6 @@
 use actix_web::{error, HttpResponse, http::StatusCode, dev::HttpResponseBuilder};
 use derive_more::{Display};
+use sqlx;
 
 #[macro_export]
 macro_rules! logged_error {
@@ -34,7 +35,18 @@ impl error::ResponseError for SquadOvError {
             SquadOvError::BadRequest => StatusCode::BAD_REQUEST,
             SquadOvError::NotFound => StatusCode::NOT_FOUND,
             SquadOvError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            
         }
+    }
+}
+
+impl From<sqlx::Error> for SquadOvError {
+    fn from(err: sqlx::Error) -> Self {
+        return Self::InternalError(format!("Database Error {}", err))
+    }
+}
+
+impl From<serde_json::Error> for SquadOvError {
+    fn from(err: serde_json::Error) -> Self {
+        return Self::InternalError(format!("Parse JSON Error {}", err))
     }
 }

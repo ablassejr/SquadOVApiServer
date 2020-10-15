@@ -18,7 +18,7 @@ struct LoginResponse {
     user_id: i64,
     #[serde(rename = "sessionId")]
     session_id: String,
-    verified: Option<bool>,
+    verified: bool,
 }
 
 /// Authenticates the user with our backend and returns a session.
@@ -41,7 +41,8 @@ async fn login(fa: &fusionauth::FusionAuthClient, data: LoginData, ip: Option<&s
                             None => String::from(""),
                         },
                         email: result.user.email,
-                        verified: Some(result.user.verified),
+                        verified: result.user.verified,
+                        uuid: Uuid::nil(), // We'll pull this later along with the id.
                     },
                     access_token: result.token,
                     refresh_token: result.refresh_token,

@@ -1,13 +1,15 @@
 use sqlx;
 use sqlx::postgres::PgPool;
 use serde::Serialize;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize)]
 pub struct SquadOVUser {
     pub id: i64,
     pub username: String,
     pub email: String,
-    pub verified: Option<bool>,
+    pub verified: bool,
+    pub uuid: Uuid,
 }
 
 pub struct UserManager {

@@ -1,0 +1,2 @@
+ALTER TABLE aimlab_tasks
+ADD COLUMN create_date TIMESTAMPTZ NOT NULL;

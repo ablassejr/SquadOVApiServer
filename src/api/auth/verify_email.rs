@@ -14,7 +14,7 @@ pub struct VerifyEmailData {
 
 #[derive(Serialize)]
 pub struct CheckEmailVerifiedResponse {
-    verified: Option<bool>
+    verified: bool
 }
 
 async fn verify_email(fa: &fusionauth::FusionAuthClient, verification_id: &str) -> Result<(), common::SquadOvError> {

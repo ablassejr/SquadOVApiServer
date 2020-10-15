@@ -10,7 +10,18 @@ services:
     networks:
       squadov_c3p0:
           ipv4_address: "172.22.0.6"
-
+  ingest:
+    image: "registry.gitlab.com/squadov/squadovapiserver/${GCP_PROJECT}/squadov_ingest:latest"
+    ports:
+      - "1935:1935"
+    networks:
+      squadov_c3p0:
+          ipv4_address: "172.22.0.7"
+    privileged: true
+    environment:
+      - "GCS_BUCKET=${SQUADOV_VOD_BUCKET}"
+    devices:
+      - "/dev/fuse"
 networks:
   squadov_c3p0:
     external: true

@@ -1,4 +1,4 @@
-use actix_web::{web};
+use actix_web::{web, FromRequest};
 use actix_web::dev::{HttpServiceFactory};
 use super::auth;
 use super::v1;
@@ -43,6 +43,25 @@ pub fn create_service() -> impl HttpServiceFactory {
                                         .route(web::get().to(v1::get_user_profile_handler))
                                 )
                         )
+                )
+                .service(
+                    web::scope("/valorant")
+                        .route("", web::post().to(v1::create_new_valorant_match_handler))
+                            .data(web::Json::<v1::InputValorantMatch>::configure(|cfg| {
+                                // Bump up the size limit on this endpoint for now because
+                                // the user will have to send the entire match detail. Not
+                                // sure how large that can be so setting a *really* large
+                                // limit here. This should be about 10 MB.
+                                cfg.limit(10 * 1024 * 1024)
+                            }))
+                )
+                .service(
+                    web::scope("/aimlab")
+                        .route("", web::post().to(v1::create_new_aimlab_task_handler))
+                )
+                .service(
+                    web::scope("/vod")
+                        .route("", web::post().to(v1::associate_vod_handler))
                 )
         )
 }

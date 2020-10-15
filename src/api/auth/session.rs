@@ -51,7 +51,8 @@ impl SessionManager {
                 u.id AS \"user_id\",
                 u.username AS \"user_username\",
                 u.email AS \"user_email\",
-                u.verified AS \"user_verified\"
+                u.verified AS \"user_verified\",
+                u.uuid AS \"user_uuid\"
             FROM squadov.user_sessions AS us
             INNER JOIN squadov.users AS u
                 ON u.id = us.user_id
@@ -68,6 +69,7 @@ impl SessionManager {
                     username: x.user_username,
                     email: x.user_email,
                     verified: x.user_verified,
+                    uuid: x.user_uuid,
                 },
                 access_token: x.access_token,
                 refresh_token: x.refresh_token,
