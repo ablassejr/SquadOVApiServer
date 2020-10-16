@@ -1,19 +1,36 @@
 use sqlx;
 use sqlx::postgres::PgPool;
-use actix_web::{ HttpRequest };
+use actix_web::{ HttpRequest, FromRequest, dev, Error };
+use actix_web::error::ErrorBadRequest;
+use futures_util::future::{ok, err, Ready};
 use crate::common;
 use crate::api::fusionauth;
 use uuid::Uuid;
 use crate::logged_error;
 use serde::Serialize;
+use std::clone::Clone;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct SquadOVSession {
     pub session_id: String,
     pub user: super::SquadOVUser,
     pub access_token: String,
     pub refresh_token: String,
     pub old_session_id: Option<String>
+}
+
+impl FromRequest for SquadOVSession {
+    type Error = Error;
+    type Future = Ready<Result<Self, Self::Error>>;
+    type Config = ();
+
+    fn from_request(req : &HttpRequest, _: &mut dev::Payload) -> Self::Future {
+        let extensions = req.extensions();
+        match extensions.get::<SquadOVSession>() {
+            Some(x) => ok(x.clone()),
+            None => err(ErrorBadRequest("No session available."))
+        }
+    }
 }
 
 pub struct SessionManager {

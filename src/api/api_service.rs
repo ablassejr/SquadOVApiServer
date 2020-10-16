@@ -66,11 +66,32 @@ pub fn create_service() -> impl HttpServiceFactory {
                 .service(
                     web::scope("/aimlab")
                         .route("", web::post().to(v1::create_new_aimlab_task_handler))
+                        .service(
+                            web::scope("/user/{user_id}")
+                                .wrap(access::ApiAccess{
+                                    checker: Rc::new(RefCell::new(access::UserSpecificAccessChecker{
+                                        obtainer: access::UserIdPathSetObtainer{
+                                            key: "user_id"
+                                        },
+                                    })),
+                                })
+                                .route("", web::get().to(v1::list_aimlab_matches_for_user_handler))
+                        )
                         .route("/bulk", web::post().to(v1::bulk_create_aimlab_task_handler))
                             .data(web::Json::<Vec<v1::AimlabTask>>::configure(|cfg| {
                                 cfg.limit(1 * 1024 * 1024)
                             }))
-                        
+                        .service(
+                            web::scope("/match/{match_uuid}")
+                                .service(
+                                    web::resource("/task")
+                                        .route(web::get().to(v1::get_aimlab_task_data_handler))
+                                )
+                                .service(
+                                    web::resource("/vod")
+                                        .route(web::get().to(v1::get_aimlab_vod_data_handler))
+                                )
+                        )
                 )
                 .service(
                     web::scope("/vod")

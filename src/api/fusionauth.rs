@@ -6,7 +6,7 @@ mod jwt;
 use serde::{Deserialize};
 use reqwest::header;
 
-#[derive(Deserialize,Debug)]
+#[derive(Deserialize,Debug,Clone)]
 pub struct FusionAuthConfig {
     host: String,
     port: u16,

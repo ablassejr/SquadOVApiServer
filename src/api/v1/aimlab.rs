@@ -1,10 +1,13 @@
 mod create;
+mod list;
+mod get_task;
+mod get_vod;
 
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct AimlabTask {
     pub id: i64,
     #[serde(rename = "userId", default)]
@@ -21,7 +24,15 @@ pub struct AimlabTask {
     #[serde(rename = "createDate")]
     pub create_date: DateTime<Utc>,
     #[serde(rename = "rawData")]
-    pub raw_data: String
+    pub raw_data: serde_json::Value
+}
+
+#[derive(Deserialize)]
+pub struct AimlabTaskGetInput {
+    match_uuid: String
 }
 
 pub use create::*;
+pub use list::*;
+pub use get_task::*;
+pub use get_vod::*;

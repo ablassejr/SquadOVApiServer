@@ -2,8 +2,9 @@ use sqlx;
 use sqlx::postgres::PgPool;
 use serde::Serialize;
 use uuid::Uuid;
+use std::clone::Clone;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct SquadOVUser {
     pub id: i64,
     pub username: String,

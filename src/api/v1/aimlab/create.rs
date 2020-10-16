@@ -53,7 +53,7 @@ impl api::ApiApplication {
                 score=m.score,
                 version=&m.version,
                 create_date=&m.create_date,
-                raw_data=serde_json::from_str::<serde_json::Value>(&m.raw_data)?
+                raw_data=&m.raw_data
             ));
 
             if idx != all_matches.len() - 1 {
@@ -104,7 +104,7 @@ impl api::ApiApplication {
                 raw_match.score,
                 &raw_match.version,
                 &raw_match.create_date,
-                serde_json::from_str::<serde_json::Value>(&raw_match.raw_data)?
+                &raw_match.raw_data
             )
         ).await?;
         return Ok(());

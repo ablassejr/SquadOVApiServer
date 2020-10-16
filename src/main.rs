@@ -11,6 +11,7 @@ use actix_web::middleware::Logger;
 use api::api_service;
 use structopt::StructOpt;
 use actix_cors::{Cors};
+use std::fs;
 
 #[derive(StructOpt, Debug)]
 struct Options {
@@ -26,7 +27,10 @@ async fn main() -> std::io::Result<()> {
     env_logger::init();
 
     let opts = Options::from_args();
-    let app = web::Data::new(api::ApiApplication::new(opts.config).await?);
+    let raw_cfg = fs::read_to_string(opts.config)?;
+    let config : api::ApiConfig = toml::from_str(&raw_cfg).unwrap();
+    let config2 = config.clone();
+    let app = web::Data::new(api::ApiApplication::new(&config).await?);
 
     let local = tokio::task::LocalSet::new();
     let sys = actix_rt::System::run_in_tokio("server", &local);
@@ -37,7 +41,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(
                 Cors::new()
-                    .allowed_origin(&app.cors.domain)
+                    .allowed_origin(&config.cors.domain)
                     .allowed_methods(vec!["GET", "POST", "OPTIONS"])
                     .finish()
             )
@@ -45,6 +49,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(app.clone())
             .service(api_service::create_service())
         })
+        .server_hostname(&config2.server.domain)
         .bind("0.0.0.0:8080")?
         .run()
         .await?;
