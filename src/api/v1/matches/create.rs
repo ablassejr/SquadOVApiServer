@@ -31,4 +31,20 @@ impl crate::api::ApiApplication {
 
         return Ok(new_match);
     }
+
+    pub async fn bullk_create_matches(&self, tx : &mut Transaction<'_, Postgres>, count : usize) -> Result<Vec<super::Match>, common::SquadOvError> {
+        let matches = sqlx::query_as!(
+            super::Match,
+            "
+            INSERT INTO squadov.matches (uuid)
+            SELECT gen_random_uuid()
+            FROM generate_series(1, $1)
+            RETURNING *
+            ",
+            count as i32
+        )
+            .fetch_all(tx)
+            .await?;
+        return Ok(matches);
+    }
 }

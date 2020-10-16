@@ -5,6 +5,7 @@ use super::v1;
 use super::access;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::vec::Vec;
 
 pub fn create_service() -> impl HttpServiceFactory {
     return web::scope("")
@@ -65,6 +66,11 @@ pub fn create_service() -> impl HttpServiceFactory {
                 .service(
                     web::scope("/aimlab")
                         .route("", web::post().to(v1::create_new_aimlab_task_handler))
+                        .route("/bulk", web::post().to(v1::bulk_create_aimlab_task_handler))
+                            .data(web::Json::<Vec<v1::AimlabTask>>::configure(|cfg| {
+                                cfg.limit(1 * 1024 * 1024)
+                            }))
+                        
                 )
                 .service(
                     web::scope("/vod")
