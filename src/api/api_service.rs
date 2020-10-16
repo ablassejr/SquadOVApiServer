@@ -30,6 +30,13 @@ pub fn create_service() -> impl HttpServiceFactory {
                 .service(
                     web::scope("/users")
                         .service(
+                            web::scope("/me")
+                                .service(
+                                    web::resource("/profile")
+                                        .route(web::get().to(v1::get_current_user_profile_handler))
+                                )
+                        )
+                        .service(
                             web::scope("/{user_id}")
                                 .wrap(access::ApiAccess{
                                     checker: Rc::new(RefCell::new(access::UserSpecificAccessChecker{
@@ -62,6 +69,13 @@ pub fn create_service() -> impl HttpServiceFactory {
                 .service(
                     web::scope("/vod")
                         .route("", web::post().to(v1::associate_vod_handler))
+                        .service(
+                            web::scope("/{vod_uuid}")
+                                .service(
+                                    web::resource("")
+                                        .route(web::delete().to(v1::delete_vod_handler))
+                                )
+                        )
                 )
         )
 }

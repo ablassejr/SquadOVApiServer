@@ -12,7 +12,7 @@ pub struct InputValorantMatch {
     #[serde(rename = "matchId")]
     pub match_id: String,
     #[serde(rename = "rawData")]
-    pub raw_data: String
+    pub raw_data: Option<String>
 }
 
 #[derive(Serialize)]
@@ -40,44 +40,66 @@ impl api::ApiApplication {
     // TODO: When/if we get a production API key we need to have the user enter in the match UUID
     // and pull the data ourselves.
     pub async fn create_new_valorant_match(&self, tx : &mut Transaction<'_, Postgres>, uuid: &Uuid, raw_match : InputValorantMatch) -> Result<(), common::SquadOvError> {
-        let full_match_data : super::FullValorantMatchData = serde_json::from_str(&raw_match.raw_data)?;     
-        tx.execute(
-            sqlx::query!(
-                "
-                INSERT INTO squadov.valorant_matches (
-                    match_id,
-                    match_uuid,
-                    game_mode,
-                    map,
-                    is_ranked,
-                    provisioning_flow_id,
-                    game_version,
-                    server_start_time_utc,
-                    raw_data
-                )
-                VALUES (
-                    $1,
-                    $2,
-                    $3,
-                    $4,
-                    $5,
-                    $6,
-                    $7,
-                    $8,
-                    $9
-                )
-                ",
-                &full_match_data.match_info.match_id,
-                uuid,
-                &full_match_data.match_info.game_mode,
-                &full_match_data.match_info.map_id,
-                full_match_data.match_info.is_ranked,
-                &full_match_data.match_info.provisioning_flow_id,
-                &full_match_data.match_info.game_version,
-                full_match_data.match_info.server_start_time_utc,
-                serde_json::from_str::<serde_json::Value>(&raw_match.raw_data)?
-            )
-        ).await?;
+        match raw_match.raw_data {
+            Some(json) => {
+                let full_match_data : super::FullValorantMatchData = serde_json::from_str(&json)?;
+                
+                if raw_match.match_id != full_match_data.match_info.match_id {
+                    return Err(common::SquadOvError::BadRequest);
+                }
+
+                tx.execute(
+                    sqlx::query!(
+                        "
+                        INSERT INTO squadov.valorant_matches (
+                            match_id,
+                            match_uuid,
+                            game_mode,
+                            map,
+                            is_ranked,
+                            provisioning_flow_id,
+                            game_version,
+                            server_start_time_utc,
+                            raw_data
+                        )
+                        VALUES (
+                            $1,
+                            $2,
+                            $3,
+                            $4,
+                            $5,
+                            $6,
+                            $7,
+                            $8,
+                            $9
+                        )
+                        ",
+                        &raw_match.match_id,
+                        uuid,
+                        &full_match_data.match_info.game_mode,
+                        &full_match_data.match_info.map_id,
+                        full_match_data.match_info.is_ranked,
+                        &full_match_data.match_info.provisioning_flow_id,
+                        &full_match_data.match_info.game_version,
+                        full_match_data.match_info.server_start_time_utc,
+                        serde_json::from_str::<serde_json::Value>(&json)?
+                    )
+                ).await?;
+            }
+            None => {
+                tx.execute(
+                    sqlx::query!(
+                        "
+                        INSERT INTO squadov.valorant_matches ( match_id, match_uuid )
+                        VALUES ($1, $2)
+                        ",
+                        &raw_match.match_id,
+                        uuid
+                    )
+                ).await?;
+            }
+        }
+        
         return Ok(());
     }
 }

@@ -1,4 +1,5 @@
 mod create;
+mod delete;
 
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
@@ -19,3 +20,4 @@ pub struct VodAssociation {
 }
 
 pub use create::*;
+pub use delete::*;
