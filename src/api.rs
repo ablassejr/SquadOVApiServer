@@ -3,15 +3,16 @@ pub mod auth;
 pub mod fusionauth;
 pub mod access;
 pub mod v1;
+pub mod internal;
 
 use serde::{Deserialize};
-use std::io;
-use sqlx::postgres::{PgPool, PgPoolOptions};
+use sqlx::postgres::{PgPool};
 use actix_web::{HttpRequest};
 use crate::common::SquadOvError;
 use crate::common::HalResponse;
 use url::Url;
 use std::vec::Vec;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct PaginationParameters {
@@ -64,9 +65,9 @@ pub fn construct_hal_pagination_response<T>(data : T, req: &HttpRequest, params:
 }
 
 #[derive(Deserialize,Debug,Clone)]
-struct DatabaseConfig {
-    url: String,
-    connections: u32
+pub struct DatabaseConfig {
+    pub url: String,
+    pub connections: u32
 }
 
 #[derive(Deserialize,Debug,Clone)]
@@ -82,7 +83,7 @@ pub struct ServerConfig {
 #[derive(Deserialize,Debug,Clone)]
 pub struct ApiConfig {
     fusionauth: fusionauth::FusionAuthConfig,
-    database: DatabaseConfig,
+    pub database: DatabaseConfig,
     pub cors: CorsConfig,
     pub server: ServerConfig
 }
@@ -95,26 +96,27 @@ pub struct ApiApplication {
     clients: ApiClients,
     users: auth::UserManager,
     session: auth::SessionManager,
-    pool: PgPool
+    vod: Box<dyn v1::VodManager>,
+    pool: Arc<PgPool>
 }
 
 impl ApiApplication {
-    pub async fn new(config: &ApiConfig) -> io::Result<ApiApplication> {
-        let pool = PgPoolOptions::new()
-            .max_connections(config.database.connections)
-            .connect(&config.database.url)
-            .await
-            .unwrap();
-
+    pub fn new(pool: Arc<PgPool>, config: &ApiConfig) -> ApiApplication {
         // Use TOML config to create application - e.g. for
         // database configuration, external API client configuration, etc.
-        return Ok(ApiApplication{
+        ApiApplication{
             clients: ApiClients{
                 fusionauth: fusionauth::FusionAuthClient::new(config.fusionauth.clone()),
             },
             users: auth::UserManager{},
             session: auth::SessionManager::new(),
+            vod:  Box::new(
+                match v1::get_current_vod_manager_type() {
+                    v1::VodManagerType::GCS => v1::FilesystemVodManager{},
+                    v1::VodManagerType::FileSystem => v1::FilesystemVodManager{}
+                }
+            ),
             pool: pool,
-        })
+        }
     }
 }

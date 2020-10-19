@@ -11,14 +11,18 @@ impl api::ApiApplication {
         tx.execute(
             sqlx::query!(
                 "
-                INSERT INTO squadov.vods (match_uuid, user_uuid, video_uuid, start_time, end_time)
-                VALUES ($1, $2, $3, $4, $5)
+                UPDATE squadov.vods
+                SET match_uuid = $1,
+                    user_uuid = $2,
+                    start_time = $3,
+                    end_time = $4
+                WHERE video_uuid = $5
                 ",
                 assoc.match_uuid,
                 assoc.user_uuid,
-                assoc.vod_uuid,
                 assoc.start_time,
-                assoc.end_time
+                assoc.end_time,
+                assoc.video_uuid
             )
         ).await?;
 
@@ -39,7 +43,14 @@ pub async fn associate_vod_handler(data : web::Json<super::VodAssociation>, app 
         Some(x) => x,
         None => return Err(common::SquadOvError::BadRequest)
     };
-    if assoc.user_uuid != session.user.uuid {
+
+    
+    let input_user_uuid = match assoc.user_uuid {
+        Some(x) => x,
+        None => return Err(common::SquadOvError::BadRequest)
+    };
+
+    if input_user_uuid != session.user.uuid {
         return Err(common::SquadOvError::Unauthorized);
     }
 

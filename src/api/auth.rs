@@ -124,3 +124,79 @@ where
         })
     }
 }
+
+static INTERNAL_API_KEY: &'static str = "9e9109d2e2772d6fe1408878c009708ddd4f55f7c68346f61089740b0ca9c35f";
+/// Internal API key validator.
+///
+/// We need a way of protecting the internal API as a fallback for
+/// when/if the network based (NGINX) rules fail. So for now just have
+/// a hard-coded API key that we expect.
+pub struct InternalApiKeyValidator;
+
+impl<S, B> Transform<S> for InternalApiKeyValidator
+where
+    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S::Future: 'static,
+    B: 'static,
+{
+    type Request = ServiceRequest;
+    type Response = ServiceResponse<B>;
+    type Error = Error;
+    type InitError = ();
+    type Transform = InternalApiKeyValidatorMiddleware<S>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
+
+    fn new_transform(&self, service: S) -> Self::Future {
+        ok(InternalApiKeyValidatorMiddleware { 
+            service: Rc::new(RefCell::new(service)),
+        })
+    }
+}
+
+pub struct InternalApiKeyValidatorMiddleware<S> {
+    service: Rc<RefCell<S>>,
+}
+
+impl<S, B> Service for InternalApiKeyValidatorMiddleware<S>
+where
+    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    S::Future: 'static,
+    B: 'static,
+{
+    type Request = ServiceRequest;
+    type Response = ServiceResponse<B>;
+    type Error = Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.service.borrow_mut().poll_ready(cx)
+    }
+
+    fn call(&mut self, req: ServiceRequest) -> Self::Future {
+        let mut srv = self.service.clone();
+
+        Box::pin(async move {
+            let (request, payload) = req.into_parts();
+            let headers = request.headers();
+
+            match headers.get("Authorization") {
+                Some(x) => {
+                    match x.to_str() {
+                        Ok(token) => {
+                            if token.trim_start_matches("Bearer ") != INTERNAL_API_KEY {
+                                return Err(actix_web::error::ErrorUnauthorized("Invalid bearer token"));
+                            }
+                        }
+                        Err(_) => return Err(actix_web::error::ErrorUnauthorized("Invalid bearer token"))
+                    }
+                }
+                None => return Err(actix_web::error::ErrorUnauthorized("Invalid bearer token"))
+            };
+
+            match ServiceRequest::from_parts(request, payload) {
+                Ok(x) => srv.call(x).await,
+                Err(_) => return Err(actix_web::error::ErrorInternalServerError("Failed to reconstruct service request"))
+            }
+        })
+    }
+}

@@ -33,7 +33,7 @@ impl api::ApiApplication {
             ",
         )  
             .bind(match_id)
-            .fetch_one(&self.pool)
+            .fetch_one(&*self.pool)
             .await?)
     }
 

@@ -1,7 +1,6 @@
 mod create;
 mod list;
 mod get_task;
-mod get_vod;
 
 use chrono::{DateTime, Utc};
 use serde::{Serialize, Deserialize};
@@ -29,10 +28,9 @@ pub struct AimlabTask {
 
 #[derive(Deserialize)]
 pub struct AimlabTaskGetInput {
-    match_uuid: String
+    match_uuid: Uuid
 }
 
 pub use create::*;
 pub use list::*;
 pub use get_task::*;
-pub use get_vod::*;

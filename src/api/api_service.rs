@@ -2,6 +2,7 @@ use actix_web::{web, FromRequest};
 use actix_web::dev::{HttpServiceFactory};
 use super::auth;
 use super::v1;
+use super::internal;
 use super::access;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -23,6 +24,24 @@ pub fn create_service() -> impl HttpServiceFactory {
                         .wrap(auth::ApiSessionValidator{})
                         .route("/verify", web::get().to(auth::check_verify_email_handler))
                         .route("/verify/resend", web::post().to(auth::resend_verify_email_handler))
+                )
+        )
+        .service(
+            web::scope("/internal")
+                .wrap(auth::InternalApiKeyValidator{})
+                .service(
+                    web::scope("/vod")
+                        .service(
+                            web::resource("/verify")
+                                .route(web::get().to(internal::verify_and_reserve_vod_stream_key_handler))
+                        )
+                        .service(
+                            web::scope("/{video_uuid}")
+                                .service(
+                                    web::resource("")
+                                        .route(web::post().to(internal::bulk_add_video_metadata_handler))
+                                )
+                        )
                 )
         )
         .service(
@@ -87,20 +106,31 @@ pub fn create_service() -> impl HttpServiceFactory {
                                     web::resource("/task")
                                         .route(web::get().to(v1::get_aimlab_task_data_handler))
                                 )
-                                .service(
-                                    web::resource("/vod")
-                                        .route(web::get().to(v1::get_aimlab_vod_data_handler))
-                                )
                         )
                 )
                 .service(
                     web::scope("/vod")
                         .route("", web::post().to(v1::associate_vod_handler))
                         .service(
+                            web::scope("/match/{match_uuid}")
+                                .service(
+                                    web::scope("/user/{user_uuid}")
+                                        .service(
+                                            web::resource("")
+                                                .route(web::get().to(v1::find_vod_from_match_user_handler))
+                                        )
+                                )
+                        )
+                        .service(
                             web::scope("/{vod_uuid}")
                                 .service(
                                     web::resource("")
                                         .route(web::delete().to(v1::delete_vod_handler))
+                                        .route(web::get().to(v1::get_vod_handler))
+                                )
+                                .service(
+                                    web::scope("/quality")
+                                        .route("", web::get().to(v1::get_vod_quality_handler))
                                 )
                         )
                 )

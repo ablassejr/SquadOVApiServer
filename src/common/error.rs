@@ -2,6 +2,7 @@ use actix_web::{error, HttpResponse, http::StatusCode, dev::HttpResponseBuilder}
 use derive_more::{Display};
 use sqlx;
 use url;
+use std::str;
 
 #[macro_export]
 macro_rules! logged_error {
@@ -55,5 +56,22 @@ impl From<serde_json::Error> for SquadOvError {
 impl From<url::ParseError> for SquadOvError {
     fn from(err: url::ParseError) -> Self {
         return Self::InternalError(format!("Parse URL Error {}", err))
+    }
+}
+impl From<str::Utf8Error> for SquadOvError {
+    fn from(err: str::Utf8Error) -> Self {
+        return Self::InternalError(format!("String from UTF-8 Bytes Error {}", err))
+    }
+}
+
+impl From<uuid::Error> for SquadOvError {
+    fn from(err: uuid::Error) -> Self {
+        return Self::InternalError(format!("Parse UUID Error {}", err))
+    }
+}
+
+impl From<base64::DecodeError> for SquadOvError {
+    fn from(err: base64::DecodeError) -> Self {
+        return Self::InternalError(format!("Base64 Decode Error {}", err))
     }
 }

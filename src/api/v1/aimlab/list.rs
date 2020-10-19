@@ -23,7 +23,7 @@ impl api::ApiApplication {
             end - start,
             start
         )
-            .fetch_all(&self.pool)
+            .fetch_all(&*self.pool)
             .await?;
         return Ok(matches);
     }
