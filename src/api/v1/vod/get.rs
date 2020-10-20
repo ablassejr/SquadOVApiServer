@@ -1,8 +1,7 @@
 use crate::common;
 use crate::api;
 use actix_web::{web, HttpResponse};
-use m3u8_rs::playlist::{MasterPlaylist, VariantStream, AlternativeMedia, AlternativeMediaType};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize};
 use std::default::Default;
 use uuid::Uuid;
 
@@ -12,64 +11,63 @@ pub struct VodFindFromVideoUuid {
 }
 
 impl api::ApiApplication {
-    pub async fn get_vod_quality_options(&self, video_uuid: &Uuid) -> Result<Vec<super::VodVideoQualityOption>, common::SquadOvError> {
-        // List variants by querying the storage system (filesystem vs GCS).
-        let options = self.vod.get_vod_video_quality_options(video_uuid).await?;
-        Ok(options)
+    pub async fn get_vod_quality_options(&self, video_uuid: &Uuid) -> Result<Vec<common::VodMetadata>, common::SquadOvError> {
+        Ok(sqlx::query_as!(
+            common::VodMetadata,
+            "
+            SELECT *
+            FROM squadov.vod_metadata
+            WHERE video_uuid = $1
+            ",
+            video_uuid
+        ).fetch_all(&*self.pool).await?)
     }
 
-    pub async fn get_vod(&self, video_uuid: &Uuid) -> Result<String, common::SquadOvError> {
-        return Ok(String::from(""));
-
-        /*
-        let mut alts = vec![
-            AlternativeMedia{
-                media_type: AlternativeMediaType::Audio,
-                group_id: String::from("source"),
-                name: String::from("Source"),
-                uri: Some(String::from("")),
-                default: true,
-                autoselect: true,
-                ..Default::default()
-            }
-        ];
-
-        let options = self.get_vod_quality_options(video_uuid).await?;
-
-        let mut variants = vec![];
-        for o in &options {
-            variants.push(
-                VariantStream{
-                    uri: String::from(""),
-                    bandwidth: String::from(""),
-                    codecs: Some(String::from("")),
-                    alternatives: alts.clone(),
-                    ..Default::default()
-                }
-            )
-        }
-        let playlist = MasterPlaylist{
-            version : 3,
-            independent_segments: true,
-            variants: variants,
+    pub async fn get_vod(&self, video_uuid: &Uuid) -> Result<common::VodManifest, common::SquadOvError> {
+        // We return our custom manifest format here instead of using M3U8 because we're not
+        // going to be using a standard HLS player anyway and we're going to be using webm+opus
+        // audio files which aren't standard HLS so it doesn't make sense to try and cram our
+        // data into an M3U8 playlist. This way we have more flexibility in playing videos anyway so
+        // all's good in the hood.
+        let mut manifest = common::VodManifest{
             ..Default::default()
         };
 
+        let quality_options = self.get_vod_quality_options(video_uuid).await?;
+        for quality in &quality_options {
+            let mut track = common::VodTrack{
+                metadata: quality.clone(),
+                segments: Vec::new(),
+            };
 
+            // Eventually we'll want to figure out how to do real segments and maintaining
+            // compatability wit Electron but for now just a single file is all we have so just
+            // pretend we just have a single segment.
+            track.segments.push(common::VodSegment{
+                uri: format!("/v1/vod/{video_uuid}/{quality}/{segment}",
+                    video_uuid=video_uuid,
+                    quality=&quality.id,
+                    segment=&quality.fname,
+                ),
+                // Duration is a placeholder - not really needed but will be useful once we get
+                // back to using semgnets.
+                duration: 0.0,
+                segment_start: 0.0,
+            });
 
-        let mut v : Vec<u8> = Vec::new();
-        playlist.write_to(&mut v)?;
-        Ok(String::from(std::str::from_utf8(&v)?))
-        */
+            manifest.video_tracks.push(track);
+        }
+
+        Ok(manifest)
     }
 }
 
 pub async fn get_vod_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<api::ApiApplication>) -> Result<HttpResponse, common::SquadOvError> {
-    let m3u8 = app.get_vod(&data.video_uuid).await?;
-    Ok(HttpResponse::Ok().json(&m3u8))
+    let manifest = app.get_vod(&data.video_uuid).await?;
+    Ok(HttpResponse::Ok().json(&manifest))
 }
 
-pub async fn get_vod_quality_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<api::ApiApplication>) -> Result<HttpResponse, common::SquadOvError> {
-    let opts = app.get_vod_quality_options(&data.video_uuid).await?;
-    Ok(HttpResponse::Ok().json(&opts))
+pub async fn get_vod_track_segment_handler(data : web::Path<common::VodSegmentId>, app : web::Data<api::ApiApplication>) -> Result<HttpResponse, common::SquadOvError> {
+    let redirect_uri = app.vod.get_segment_redirect_uri(&data)?;
+    return Ok(HttpResponse::Ok().json(&redirect_uri))
 }

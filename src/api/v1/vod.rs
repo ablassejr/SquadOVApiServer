@@ -38,19 +38,11 @@ pub struct VodAssociation {
     end_time: Option<DateTime<Utc>>
 }
 
-#[derive(Serialize)]
-pub struct VodVideoQualityOption {
-    option: String,
-    bandwidth: i64,
-    width: i32,
-    height: i32,
-    codec: String,
-}
-
 #[async_trait]
 pub trait VodManager {
-    async fn get_vod_video_quality_options(&self, video_uuid: &Uuid) -> Result<Vec<VodVideoQualityOption>, common::SquadOvError>;
+    fn get_segment_redirect_uri(&self, segment: &common::VodSegmentId) -> Result<String, common::SquadOvError>;
 }
+
 
 pub use create::*;
 pub use delete::*;

@@ -1,0 +1,2 @@
+ALTER TABLE vod_metadata
+ADD COLUMN fname VARCHAR NOT NULL;

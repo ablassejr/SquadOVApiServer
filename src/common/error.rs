@@ -3,6 +3,7 @@ use derive_more::{Display};
 use sqlx;
 use url;
 use std::str;
+use std::io;
 
 #[macro_export]
 macro_rules! logged_error {
@@ -73,5 +74,11 @@ impl From<uuid::Error> for SquadOvError {
 impl From<base64::DecodeError> for SquadOvError {
     fn from(err: base64::DecodeError) -> Self {
         return Self::InternalError(format!("Base64 Decode Error {}", err))
+    }
+}
+
+impl From<io::Error> for SquadOvError {
+    fn from(err: io::Error) -> Self {
+        return Self::InternalError(format!("IO Error {}", err))
     }
 }

@@ -23,7 +23,7 @@ impl api::ApiApplication {
                 avg_bitrate,
                 max_bitrate,
                 id,
-                data_type
+                fname
             )
             VALUES
         "));
@@ -37,7 +37,7 @@ impl api::ApiApplication {
                 {avg_bitrate},
                 {max_bitrate},
                 '{id}',
-                '{data_type}'
+                '{fname}'
             )",
                 video_uuid=vod_uuid,
                 res_x=m.res_x,
@@ -46,7 +46,7 @@ impl api::ApiApplication {
                 avg_bitrate=m.avg_bitrate,
                 max_bitrate=m.max_bitrate,
                 id=m.id,
-                data_type=m.data_type
+                fname=m.fname
             ));
 
             if idx != data.len() - 1 {

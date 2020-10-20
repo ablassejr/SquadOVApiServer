@@ -122,15 +122,15 @@ pub fn create_service() -> impl HttpServiceFactory {
                                 )
                         )
                         .service(
-                            web::scope("/{vod_uuid}")
+                            web::scope("/{video_uuid}")
                                 .service(
                                     web::resource("")
                                         .route(web::delete().to(v1::delete_vod_handler))
                                         .route(web::get().to(v1::get_vod_handler))
                                 )
                                 .service(
-                                    web::scope("/quality")
-                                        .route("", web::get().to(v1::get_vod_quality_handler))
+                                    web::resource("/{quality}/{segment_name}")
+                                        .route(web::get().to(v1::get_vod_track_segment_handler))
                                 )
                         )
                 )

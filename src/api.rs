@@ -112,8 +112,8 @@ impl ApiApplication {
             session: auth::SessionManager::new(),
             vod:  Box::new(
                 match v1::get_current_vod_manager_type() {
-                    v1::VodManagerType::GCS => v1::FilesystemVodManager{},
-                    v1::VodManagerType::FileSystem => v1::FilesystemVodManager{}
+                    v1::VodManagerType::GCS => v1::FilesystemVodManager::new().unwrap(),
+                    v1::VodManagerType::FileSystem => v1::FilesystemVodManager::new().unwrap()
                 }
             ),
             pool: pool,
