@@ -2,6 +2,7 @@ use crate::common;
 use crate::api;
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct VerifyVodStreamKeyInput {
@@ -37,7 +38,7 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn verify_and_reserve_vod_stream_key_handler(data : web::Query<VerifyVodStreamKeyInput>, app : web::Data<api::ApiApplication>) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn verify_and_reserve_vod_stream_key_handler(data : web::Query<VerifyVodStreamKeyInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, common::SquadOvError> {
     app.verify_and_reserve_vod_stream_key(&data.name).await?;
     Ok(HttpResponse::Ok().finish())
 }

@@ -4,6 +4,9 @@ use sqlx;
 use url;
 use std::str;
 use std::io;
+use jsonwebtoken;
+use reqwest;
+use openssl;
 
 #[macro_export]
 macro_rules! logged_error {
@@ -80,5 +83,29 @@ impl From<base64::DecodeError> for SquadOvError {
 impl From<io::Error> for SquadOvError {
     fn from(err: io::Error) -> Self {
         return Self::InternalError(format!("IO Error {}", err))
+    }
+}
+
+impl From<jsonwebtoken::errors::Error> for SquadOvError {
+    fn from(err: jsonwebtoken::errors::Error) -> Self {
+        return Self::InternalError(format!("JWT Error {}", err))
+    }
+}
+
+impl From<reqwest::Error> for SquadOvError {
+    fn from(err: reqwest::Error) -> Self {
+        return Self::InternalError(format!("HTTP Request Error {}", err))
+    }
+}
+
+impl From<reqwest::header::InvalidHeaderValue> for SquadOvError {
+    fn from(err: reqwest::header::InvalidHeaderValue) -> Self {
+        return Self::InternalError(format!("HTTP Header Value Error {}", err))
+    }
+}
+
+impl From<openssl::error::ErrorStack> for SquadOvError {
+    fn from(err: openssl::error::ErrorStack) -> Self {
+        return Self::InternalError(format!("OpenSSL Error {}", err))
     }
 }

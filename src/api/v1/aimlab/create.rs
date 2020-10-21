@@ -6,6 +6,7 @@ use sqlx::{Transaction, Executor, Postgres};
 use serde::Serialize;
 use crate::api::auth::SquadOVSession;
 use std::vec::Vec;
+use std::sync::Arc;
 
 #[derive(Serialize)]
 struct CreateAimlabTaskResponse<'a> {
@@ -111,7 +112,7 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn create_new_aimlab_task_handler(data : web::Json<super::AimlabTask>, app : web::Data<api::ApiApplication>, request : HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn create_new_aimlab_task_handler(data : web::Json<super::AimlabTask>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
     let mut raw_data = data.into_inner();
 
     let extensions = request.extensions();
@@ -135,7 +136,7 @@ pub async fn create_new_aimlab_task_handler(data : web::Json<super::AimlabTask>,
     ))
 }
 
-pub async fn bulk_create_aimlab_task_handler(data : web::Json<Vec<super::AimlabTask>>, app : web::Data<api::ApiApplication>, request : HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn bulk_create_aimlab_task_handler(data : web::Json<Vec<super::AimlabTask>>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
     let mut raw_data = data.into_inner();
 
     // First bulk create a bunch of matches for each of the input Aim Lab tasks. 

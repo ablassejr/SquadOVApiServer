@@ -14,6 +14,7 @@ pub use verify_email::*;
 pub use logout::*;
 pub use session::*;
 
+use std::sync::Arc;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::rc::Rc;
@@ -82,7 +83,7 @@ where
             // The docs say to use app::data::<web::Data<T>> when we store the data using
             // App::data...but we're using App::app_data but if we don't retrieve a web::Data the
             // Option return none. /shrug.
-            let app = match request.app_data::<web::Data<crate::api::ApiApplication>>() {
+            let app = match request.app_data::<web::Data<Arc<crate::api::ApiApplication>>>() {
                 Some(x) => x,
                 None => return Err(actix_web::error::ErrorInternalServerError("Bad App Data")),
             };

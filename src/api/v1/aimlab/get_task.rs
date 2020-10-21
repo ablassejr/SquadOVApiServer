@@ -2,6 +2,7 @@ use crate::common;
 use crate::api;
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
+use std::sync::Arc;
 
 impl api::ApiApplication {
     pub async fn get_aimlab_task_data(&self, match_id : Uuid) -> Result<Option<super::AimlabTask>, common::SquadOvError> {
@@ -20,7 +21,7 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn get_aimlab_task_data_handler(data : web::Path<super::AimlabTaskGetInput>, app : web::Data<api::ApiApplication>) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn get_aimlab_task_data_handler(data : web::Path<super::AimlabTaskGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, common::SquadOvError> {
     let task = app.get_aimlab_task_data(data.match_uuid).await?;
     match task {
         Some(x) => Ok(HttpResponse::Ok().json(&x)),

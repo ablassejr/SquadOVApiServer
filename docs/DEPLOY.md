@@ -56,6 +56,7 @@ You will need to ensure that you have a few Debian packages installed to complet
     * `GITLAB_REGISTRY_TOKEN` to a personal access token that has the `read_registry` and `write_registry` permissions.
     * `DEPLOYMENT_DOMAIN` to the domain you wish to deploy to (e.g. `staging.squadov.gg`).
     * `DEPLOYMENT_DOMAIN_EMAIL` to the email address that you wish to register the Let's Encrypt certificate with.
+    * `` 
 
    We'll setup the other environment variables later.
    Save the file and verify that the contents of the `$ENV_vars.json` file is encrypted (i.e. `cat $ENV_vars.json`).
@@ -71,7 +72,14 @@ You will need to ensure that you have a few Debian packages installed to complet
    9. Enable versioning: `gsutil versioning set on gs://GCP_BUCKET`
    10. Enable the Google Compute Engine API by going here: `https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=${ENV}`
    11. `sops exec-env ../env/$ENV_vars.json './run_terraform.sh $ENV'`
-4.  Setup Flyway.
+4.  Create a service account and service account key for the API server. See [here](https://cloud.google.com/iam/docs/creating-managing-service-account-keys#creating_service_account_keys). The service account needs the following permissions:
+    * storage.objects.get
+    * storage.objects.delete
+    * storage.objects.list
+    * storage.buckets.get
+
+    Store the key in `devops/gcp/${ENV}.json`.
+5.  Setup Flyway.
     1.  `curl -O https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/7.0.2/flyway-commandline-7.0.2-linux-x64.tar.gz`
     2.  `tar xvf flyway-commandline-7.0.2-linux-x64.tar.gz`
     3.  Add the `flyway-7.0.2` folder to your `$PATH`.
@@ -80,7 +88,7 @@ You will need to ensure that you have a few Debian packages installed to complet
     6.  Add the location of the `cloud_sql_proxy` executable to your `$PATH`.
     7.  `cd $SRC/devops/database`
     8.  `sops exec-env ../env/$ENV_vars.json './migrate.sh'`
-5.  Setup Ansible.
+6.  Setup Ansible.
     1.  `echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main" | sudo tee -a /etc/apt/sources.list`
     2.  `sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367`
     3.  `sudo apt update && sudo apt install ansible`
@@ -92,15 +100,15 @@ You will need to ensure that you have a few Debian packages installed to complet
     ```
 
     Note that you can't have special characters in the group name so change `$ENV` only when dealing with Ansible.
-6.  You will now need to enable your machine to SSH into your VM instance in an Ansible friendly way.
+7.  You will now need to enable your machine to SSH into your VM instance in an Ansible friendly way.
     1. `ssh-keygen -t rsa -b 4096 -C $(whoami)`
     2. `cp PUB_FILE GCLOUD_PUB_FILE`. Replace `PUB_FILE` with the public key you just generated.
     3. Open `GCLOUD_PUB_FILE` in an editor and append the username part of your SSH public key to the front.
     e.g. If your key looks like `ssh-rsa KEY_VALUE USERNAME` change it to `USERNAME:sh-rsa KEY_VALUE USERNAME`
     1. `gcloud compute project-info add-metadata --metadata-from-file ssh-keys=GCLOUD_PUB_FILE`
     2. Running `ansible $ENV -m ping` should now succeed.
-7. Go here in your browser and enable the SQL Admin API: `https://console.developers.google.com/apis/api/sqladmin.googleapis.com/overview?project=$ENV`
-8. Go to Cloudflare.com and add DNS entries for the root, `app`, `auth`, and `api` subdomains to `${DEPLOYMENT_DOMAIN}`. Set the IP address to be the external static IP of the Google Cloud VM you created.
+8. Go here in your browser and enable the SQL Admin API: `https://console.developers.google.com/apis/api/sqladmin.googleapis.com/overview?project=$ENV`
+9.  Go to Cloudflare.com and add DNS entries for the root, `app`, `auth`, and `api` subdomains to `${DEPLOYMENT_DOMAIN}`. Set the IP address to be the external static IP of the Google Cloud VM you created.
 **NOTE**: Unless you are deploying for the root subdomain `squadov.gg`, do not allow Cloudflare to proxy these domains.
 9. Before deploying the support infrastructure, we will need to create the NGINX container.
    1. `cd $SRC/devops/docker/nginx`

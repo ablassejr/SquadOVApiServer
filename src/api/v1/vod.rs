@@ -3,6 +3,7 @@ mod delete;
 mod find;
 mod get;
 mod filesystem_vod_manager;
+mod gcs_vod_manager;
 
 use crate::common;
 use async_trait::async_trait;
@@ -40,7 +41,7 @@ pub struct VodAssociation {
 
 #[async_trait]
 pub trait VodManager {
-    fn get_segment_redirect_uri(&self, segment: &common::VodSegmentId) -> Result<String, common::SquadOvError>;
+    async fn get_segment_redirect_uri(&self, segment: &common::VodSegmentId) -> Result<String, common::SquadOvError>;
 }
 
 
@@ -49,3 +50,4 @@ pub use delete::*;
 pub use find::*;
 pub use get::*;
 pub use filesystem_vod_manager::*;
+pub use gcs_vod_manager::*;

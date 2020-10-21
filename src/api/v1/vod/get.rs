@@ -4,6 +4,7 @@ use actix_web::{web, HttpResponse};
 use serde::{Deserialize};
 use std::default::Default;
 use uuid::Uuid;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct VodFindFromVideoUuid {
@@ -62,12 +63,16 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn get_vod_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<api::ApiApplication>) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn get_vod_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, common::SquadOvError> {
     let manifest = app.get_vod(&data.video_uuid).await?;
     Ok(HttpResponse::Ok().json(&manifest))
 }
 
-pub async fn get_vod_track_segment_handler(data : web::Path<common::VodSegmentId>, app : web::Data<api::ApiApplication>) -> Result<HttpResponse, common::SquadOvError> {
-    let redirect_uri = app.vod.get_segment_redirect_uri(&data)?;
+pub async fn get_vod_track_segment_handler(data : web::Path<common::VodSegmentId>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, common::SquadOvError> {
+    let redirect_uri = app.vod.get_segment_redirect_uri(&data).await?;
+    // You may be tempted to make this into a TemporaryRedirect and point
+    // a media player (e.g. VideoJS) to load from this directly. Don't do that
+    // unless you can figure out how to also pass the user's session ID along
+    // with that request since this is a protected endpoint.
     return Ok(HttpResponse::Ok().json(&redirect_uri))
 }

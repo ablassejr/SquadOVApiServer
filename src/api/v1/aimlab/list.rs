@@ -2,6 +2,7 @@ use crate::common;
 use crate::api;
 use actix_web::{web, HttpResponse, HttpRequest};
 use serde::Deserialize;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct AimlabUserTaskListInput {
@@ -29,7 +30,7 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn list_aimlab_matches_for_user_handler(data : web::Path<AimlabUserTaskListInput>, query: web::Query<api::PaginationParameters>, app : web::Data<api::ApiApplication>, req: HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn list_aimlab_matches_for_user_handler(data : web::Path<AimlabUserTaskListInput>, query: web::Query<api::PaginationParameters>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
     let query = query.into_inner();
     let matches = app.list_aimlab_matches_for_user(
         data.user_id,

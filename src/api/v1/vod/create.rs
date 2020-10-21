@@ -3,6 +3,7 @@ use crate::api;
 use actix_web::{web, HttpResponse, HttpRequest};
 use sqlx::{Executor};
 use crate::api::auth::SquadOVSession;
+use std::sync::Arc;
 
 impl api::ApiApplication {
     pub async fn associate_vod(&self, assoc : super::VodAssociation) -> Result<(), common::SquadOvError> {
@@ -31,7 +32,7 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn associate_vod_handler(data : web::Json<super::VodAssociation>, app : web::Data<api::ApiApplication>, request : HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn associate_vod_handler(data : web::Json<super::VodAssociation>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
     let assoc = data.into_inner();
 
     // If the current user doesn't match the UUID passed in the association then reject the request.

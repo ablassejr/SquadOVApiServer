@@ -4,6 +4,7 @@ use crate::api;
 use crate::api::fusionauth;
 use crate::common;
 use crate::logged_error;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct RegisterData {
@@ -39,7 +40,7 @@ async fn register(fa: &fusionauth::FusionAuthClient, data: RegisterData) -> Resu
 /// * 200 - Registration succeeded.
 /// * 400 - If a user is already logged in.
 /// * 500 - Registration failed due to other reasons.
-pub async fn register_handler(data : web::Json<RegisterData>, app : web::Data<api::ApiApplication>, req : HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn register_handler(data : web::Json<RegisterData>, app : web::Data<Arc<api::ApiApplication>>, req : HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
     if app.is_logged_in(&req).await? {
         return logged_error!(common::SquadOvError::BadRequest);
     }

@@ -4,6 +4,7 @@ use crate::logged_error;
 use crate::api;
 use crate::api::fusionauth;
 use crate::common;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct ForgotPasswordInputs {
@@ -43,7 +44,7 @@ async fn change_pw(fa: &fusionauth::FusionAuthClient, change_id: &str, password:
 /// Possible Responses:
 /// * 200 - Success.
 /// * 500 - Internal error (no email sent).
-pub async fn forgot_pw_handler(data : web::Query<ForgotPasswordInputs>, app : web::Data<api::ApiApplication>) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn forgot_pw_handler(data : web::Query<ForgotPasswordInputs>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, common::SquadOvError> {
     match forgot_pw(&app.clients.fusionauth, &data.login_id).await {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(err) => logged_error!(err),
@@ -55,7 +56,7 @@ pub async fn forgot_pw_handler(data : web::Query<ForgotPasswordInputs>, app : we
 /// Possible Responses:
 /// * 200 - Success.
 /// * 500 - Internal error (password was not  changed).
-pub async fn forgot_pw_change_handler(app : web::Data<api::ApiApplication>, data : web::Json<ChangePasswordInputs>) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn forgot_pw_change_handler(app : web::Data<Arc<api::ApiApplication>>, data : web::Json<ChangePasswordInputs>) -> Result<HttpResponse, common::SquadOvError> {
     match change_pw(&app.clients.fusionauth, &data.change_password_id, &data.password).await {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(err) => logged_error!(err),

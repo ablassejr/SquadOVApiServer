@@ -3,7 +3,7 @@ use crate::api;
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
 use sqlx::{Transaction, Executor, Postgres};
-
+use std::sync::Arc;
 use serde::{Serialize,Deserialize};
 
 #[derive(Deserialize)]
@@ -104,7 +104,7 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn create_new_valorant_match_handler(data : web::Json<InputValorantMatch>, app : web::Data<api::ApiApplication>) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn create_new_valorant_match_handler(data : web::Json<InputValorantMatch>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, common::SquadOvError> {
     let raw_data = data.into_inner();
     // First check if this match exists.
     // If the match doesn't exist, then someone else reported it first - it's ok! The data should be the same.

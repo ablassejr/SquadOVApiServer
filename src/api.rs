@@ -8,11 +8,13 @@ pub mod internal;
 use serde::{Deserialize};
 use sqlx::postgres::{PgPool};
 use actix_web::{HttpRequest};
+use crate::common;
 use crate::common::SquadOvError;
 use crate::common::HalResponse;
 use url::Url;
 use std::vec::Vec;
 use std::sync::Arc;
+use sqlx::postgres::{PgPoolOptions};
 
 #[derive(Deserialize)]
 pub struct PaginationParameters {
@@ -83,6 +85,7 @@ pub struct ServerConfig {
 #[derive(Deserialize,Debug,Clone)]
 pub struct ApiConfig {
     fusionauth: fusionauth::FusionAuthConfig,
+    pub gcp: common::GCPConfig,
     pub database: DatabaseConfig,
     pub cors: CorsConfig,
     pub server: ServerConfig
@@ -96,26 +99,38 @@ pub struct ApiApplication {
     clients: ApiClients,
     users: auth::UserManager,
     session: auth::SessionManager,
-    vod: Box<dyn v1::VodManager>,
+    vod: Arc<dyn v1::VodManager + Send + Sync>,
     pool: Arc<PgPool>
 }
 
 impl ApiApplication {
-    pub fn new(pool: Arc<PgPool>, config: &ApiConfig) -> ApiApplication {
+    pub async fn new(config: &ApiConfig) -> ApiApplication {
         // Use TOML config to create application - e.g. for
         // database configuration, external API client configuration, etc.
+        let pool = Arc::new(PgPoolOptions::new()
+            .max_connections(config.database.connections)
+            .connect(&config.database.url)
+            .await
+            .unwrap());
+
+        let gcp = Arc::new(
+            if config.gcp.enabled {
+                Some(common::GCPClient::new(&config.gcp).await)
+            } else {
+                None
+            }
+        );
+
         ApiApplication{
             clients: ApiClients{
                 fusionauth: fusionauth::FusionAuthClient::new(config.fusionauth.clone()),
             },
             users: auth::UserManager{},
             session: auth::SessionManager::new(),
-            vod:  Box::new(
-                match v1::get_current_vod_manager_type() {
-                    v1::VodManagerType::GCS => v1::FilesystemVodManager::new().unwrap(),
-                    v1::VodManagerType::FileSystem => v1::FilesystemVodManager::new().unwrap()
-                }
-            ),
+            vod: match v1::get_current_vod_manager_type() {
+                v1::VodManagerType::GCS => Arc::new(v1::GCSVodManager::new(gcp.clone()).await.unwrap()) as Arc<dyn v1::VodManager + Send + Sync>,
+                v1::VodManagerType::FileSystem => Arc::new(v1::FilesystemVodManager::new().unwrap()) as Arc<dyn v1::VodManager + Send + Sync>
+            },
             pool: pool,
         }
     }

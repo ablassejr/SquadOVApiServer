@@ -5,6 +5,7 @@ use crate::api::fusionauth;
 use crate::logged_error;
 use crate::common;
 use super::SquadOVSession;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct VerifyEmailData {
@@ -38,7 +39,7 @@ async fn resend_verify_email(fa: &fusionauth::FusionAuthClient, email: &str) -> 
 /// Possible Responses:
 /// * 200 - Email verification succeded.
 /// * 500 - Email verification failed.
-pub async fn verify_email_handler(data : web::Json<VerifyEmailData>, app : web::Data<api::ApiApplication>) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn verify_email_handler(data : web::Json<VerifyEmailData>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, common::SquadOvError> {
     // Get the user for this verification ID.
     // Note that we can't assume that the user is logged in here.
     let user = match app.clients.fusionauth.find_user_from_email_verification_id(&data.verification_id).await {
@@ -80,7 +81,7 @@ pub async fn check_verify_email_handler(req: HttpRequest) -> Result<HttpResponse
 /// * 200 - Email sent.
 /// * 401 - User not logged in.
 /// * 500 - Email was not sent.
-pub async fn resend_verify_email_handler(app : web::Data<api::ApiApplication>, req: HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn resend_verify_email_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,

@@ -5,6 +5,7 @@ use crate::api::fusionauth;
 use crate::common;
 use crate::logged_error;
 use uuid::Uuid;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct LoginData {
@@ -73,7 +74,7 @@ async fn login(fa: &fusionauth::FusionAuthClient, data: LoginData, ip: Option<&s
 /// * 400 - If a user is already logged in.
 /// * 401 - Login failed due to bad credentials.
 /// * 500 - Login failed due to other reasons.
-pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<api::ApiApplication>, req : HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<Arc<api::ApiApplication>>, req : HttpRequest) -> Result<HttpResponse, common::SquadOvError> {
     if app.is_logged_in(&req).await? {
         return logged_error!(common::SquadOvError::BadRequest);
     }

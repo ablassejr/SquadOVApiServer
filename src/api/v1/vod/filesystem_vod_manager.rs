@@ -1,9 +1,7 @@
 use crate::api::v1;
 use crate::common;
 use async_trait::async_trait;
-use uuid::Uuid;
 use std::path::Path;
-use std::io::Read;
 use std::str::FromStr;
 
 pub struct FilesystemVodManager {
@@ -27,7 +25,7 @@ impl FilesystemVodManager {
 
 #[async_trait]
 impl v1::VodManager for FilesystemVodManager {
-    fn get_segment_redirect_uri(&self, segment: &common::VodSegmentId) -> Result<String, common::SquadOvError> {
+    async fn get_segment_redirect_uri(&self, segment: &common::VodSegmentId) -> Result<String, common::SquadOvError> {
         let fname = Path::new(&self.root).join(&segment.video_uuid.to_string()).join(&segment.quality).join(&segment.segment_name);
         if !fname.exists() {
             return Err(common::SquadOvError::NotFound);

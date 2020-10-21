@@ -5,6 +5,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 use sqlx;
 use std::vec::Vec;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct BulkAddVodMetadataInput {
@@ -60,7 +61,7 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn bulk_add_video_metadata_handler(data : web::Json<Vec<common::VodMetadata>>, inp : web::Path<BulkAddVodMetadataInput>, app : web::Data<api::ApiApplication>) -> Result<HttpResponse, common::SquadOvError> {
+pub async fn bulk_add_video_metadata_handler(data : web::Json<Vec<common::VodMetadata>>, inp : web::Path<BulkAddVodMetadataInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, common::SquadOvError> {
     app.bulk_add_video_metadata(&inp.video_uuid, &data).await?;
     Ok(HttpResponse::Ok().finish())
 }
