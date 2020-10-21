@@ -11,7 +11,7 @@ impl super::GCSClient {
                 "{}/b/{}/o/{}",
                 super::STORAGE_BASE_URL,
                 bucket_id,
-                path,
+                common::url_encode(path),
             ))
             .send()
             .await?;

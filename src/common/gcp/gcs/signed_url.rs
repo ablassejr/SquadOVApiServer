@@ -5,27 +5,6 @@ use sha2::{Sha256, Digest};
 use openssl::sign::Signer;
 use openssl::pkey::PKey;
 use openssl::hash::MessageDigest;
-use percent_encoding::{CONTROLS, AsciiSet};
-
-const URL_ENCODE_ASCII_SET : &AsciiSet = &CONTROLS
-    .add(b'!')
-    .add(b'*')
-    .add(b'\'')
-    .add(b'(')
-    .add(b')')
-    .add(b';')
-    .add(b':')
-    .add(b'@')
-    .add(b'&')
-    .add(b'=')
-    .add(b'+')
-    .add(b'$')
-    .add(b',')
-    .add(b'/')
-    .add(b'?')
-    .add(b'#')
-    .add(b'[')
-    .add(b']');
 
 impl super::GCSClient {
     fn create_credential_scope(&self, dt: &DateTime<Utc>) -> String {
@@ -39,8 +18,8 @@ impl super::GCSClient {
     }
     
     fn create_canonical_query_string(&self, dt: &DateTime<Utc>) -> String {
-        let encoded_email = percent_encoding::percent_encode(self.http.credentials.client_email.as_bytes(), &URL_ENCODE_ASCII_SET).to_string();
-        let encoded_scope = percent_encoding::percent_encode(self.create_credential_scope(dt).as_bytes(), &URL_ENCODE_ASCII_SET).to_string();
+        let encoded_email = common::url_encode(&self.http.credentials.client_email);
+        let encoded_scope = common::url_encode(&self.create_credential_scope(dt));
         
         // required query string parameters: 
         // - X-Goog-Algorithm
