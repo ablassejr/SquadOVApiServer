@@ -1,9 +1,10 @@
 mod backfill;
 mod create;
+mod list;
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use crate::common;
 use std::collections::HashMap;
 
@@ -173,5 +174,48 @@ pub struct ValorantPlayerMatchMetadata {
     pub rounds: Vec<ValorantPlayerRoundMetadata>
 }
 
+#[derive(Serialize,Deserialize)]
+pub struct ValorantPlayerMatchSummary {
+    #[serde(rename = "matchId")]
+    match_id: String,
+    #[serde(rename = "serverStartTimeUtc")]
+    server_start_time_utc: Option<DateTime<Utc>>,
+    #[serde(rename = "gameMode")]
+    game_mode: Option<String>,
+    map: Option<String>,
+    #[serde(rename = "isRanked")]
+    is_ranked: Option<bool>,
+    #[serde(rename = "provisioningFlowID")]
+    provisioning_flow_id: Option<String>,
+    #[serde(rename = "gameVersion")]
+    game_version: Option<String>,
+    #[serde(rename = "characterId")]
+    character_id: String,
+    won: bool,
+    #[serde(rename = "roundsWon")]
+    rounds_won: i32,
+    #[serde(rename = "roundsLost")]
+    rounds_lost: i32,
+    #[serde(rename = "combatScoreRank")]
+    combat_score_rank: i64,
+    #[serde(rename = "competitiveTier")]
+    competitive_tier: i32,
+    kills: i32,
+    deaths: i32,
+    assists: i32,
+    #[serde(rename = "roundsPlayed")]
+    rounds_played: i32,
+    #[serde(rename = "totalCombatScore")]
+    total_combat_score: i32,
+    #[serde(rename = "totalDamage")]
+    total_damage: i64,
+    headshots: i64,
+    bodyshots: i64,
+    legshots: i64,
+    #[serde(rename = "hasVod")]
+    has_vod: bool
+}
+
 pub use backfill::*;
 pub use create::*;
+pub use list::*;

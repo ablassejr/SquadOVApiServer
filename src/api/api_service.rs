@@ -82,6 +82,13 @@ pub fn create_service() -> impl HttpServiceFactory {
                                 cfg.limit(10 * 1024 * 1024)
                             }))
                         .route("/backfill", web::post().to(v1::obtain_valorant_matches_to_backfill))
+                        .service(
+                            web::scope("/accounts/{puuid}")
+                                .service(
+                                    web::resource("/matches")
+                                        .route(web::get().to(v1::list_valorant_matches_for_user_handler))
+                                )
+                        )
                 )
                 .service(
                     web::scope("/aimlab")

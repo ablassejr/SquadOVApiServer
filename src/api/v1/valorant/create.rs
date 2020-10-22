@@ -281,6 +281,7 @@ impl api::ApiApplication {
                 ));
 
                 sql.push(String::from(","));
+                added += 1;
             }
         }
 
