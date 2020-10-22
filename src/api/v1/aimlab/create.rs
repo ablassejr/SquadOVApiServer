@@ -61,7 +61,7 @@ impl api::ApiApplication {
                 sql.push(String::from(","))
             }
         }
-        sql.push(String::from("ON CONFLICT DO NOTHING"));
+        sql.push(String::from(" ON CONFLICT DO NOTHING"));
         sqlx::query(&sql.join("")).execute(tx).await?;
         return Ok(());
     }

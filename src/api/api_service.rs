@@ -81,6 +81,7 @@ pub fn create_service() -> impl HttpServiceFactory {
                                 // limit here. This should be about 10 MB.
                                 cfg.limit(10 * 1024 * 1024)
                             }))
+                        .route("/backfill", web::post().to(v1::obtain_valorant_matches_to_backfill))
                 )
                 .service(
                     web::scope("/aimlab")
