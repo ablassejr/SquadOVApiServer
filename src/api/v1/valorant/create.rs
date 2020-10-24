@@ -30,7 +30,7 @@ struct CreateValorantMatchResponse<'a> {
 }
 
 impl api::ApiApplication {
-    pub async fn check_if_valorant_match_exists(&self, tx : &mut Transaction<'_, Postgres>, match_id : &str) -> Result<Option<v1::Match>, common::SquadOvError> {
+    pub async fn check_if_valorant_match_exists(&self, match_id : &str) -> Result<Option<v1::Match>, common::SquadOvError> {
         Ok(sqlx::query_as!(
             v1::Match,
             "
@@ -40,7 +40,7 @@ impl api::ApiApplication {
             ",
             match_id
         )
-            .fetch_optional(tx)
+            .fetch_optional(&*self.pool)
             .await?)
     }
 
@@ -422,8 +422,9 @@ impl api::ApiApplication {
         match raw_data {
             Some(json) => {
                 let full_match_data : super::FullValorantMatchData = serde_json::from_str(&json)?;
+                let match_info = &full_match_data.match_info;
                 
-                if match_id != full_match_data.match_info.match_id {
+                if match_id != match_info.match_id {
                     return Err(common::SquadOvError::BadRequest);
                 }
                 
@@ -452,16 +453,23 @@ impl api::ApiApplication {
                             $8,
                             $9
                         )
-                        ON CONFLICT DO NOTHING
+                        ON CONFLICT (match_id) DO UPDATE
+                            SET game_mode = EXCLUDED.game_mode,
+                                map = EXCLUDED.map,
+                                is_ranked = EXCLUDED.is_ranked,
+                                provisioning_flow_id = EXCLUDED.provisioning_flow_id,
+                                game_version = EXCLUDED.game_version,
+                                server_start_time_utc = EXCLUDED.server_start_time_utc,
+                                raw_data = EXCLUDED.raw_data
                         ",
                         match_id,
                         uuid,
-                        &full_match_data.match_info.game_mode,
-                        &full_match_data.match_info.map_id,
-                        full_match_data.match_info.is_ranked,
-                        &full_match_data.match_info.provisioning_flow_id,
-                        &full_match_data.match_info.game_version,
-                        full_match_data.match_info.server_start_time_utc,
+                        match_info.game_mode,
+                        match_info.map_id,
+                        match_info.is_ranked,
+                        match_info.provisioning_flow_id,
+                        match_info.game_version,
+                        match_info.server_start_time_utc,
                         serde_json::from_str::<serde_json::Value>(&json)?
                     )
                 ).await?;
@@ -508,14 +516,14 @@ impl api::ApiApplication {
                 '{match_id}',
                 '{puuid}',
                 {round},
-                '{buy_time}',
-                '{round_time}'
+                {buy_time},
+                {round_time}
             )",
                 match_id=&m.match_id,
                 puuid=&m.puuid,
                 round=m.round,
-                buy_time=&m.buy_time,
-                round_time=&m.round_time
+                buy_time=common::sql_format_option_some_time(m.buy_time.as_ref()),
+                round_time=common::sql_format_option_some_time(m.round_time.as_ref())
             ));
 
             if idx != data.len() - 1 {
@@ -581,7 +589,7 @@ pub async fn create_new_valorant_match_handler(data : web::Json<InputValorantMat
     // Create a new match ID and then create the match.
     // Note that we only create a new match if it's needed because
     // we could be doing a backfill.
-    let internal_match = match app.check_if_valorant_match_exists(&mut tx, &raw_data.match_id).await? {
+    let internal_match = match app.check_if_valorant_match_exists(&raw_data.match_id).await? {
         Some(x) => x,
         None => app.create_new_match(&mut tx).await?
     };

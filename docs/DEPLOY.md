@@ -76,6 +76,7 @@ You will need to ensure that you have a few Debian packages installed to complet
     * storage.objects.get
     * storage.objects.delete
     * storage.objects.list
+    * storage.objects.create
     * storage.buckets.get
 
     Store the key in `devops/gcp/${ENV}.json`.

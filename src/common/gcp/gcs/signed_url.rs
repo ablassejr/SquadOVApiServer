@@ -5,6 +5,10 @@ use sha2::{Sha256, Digest};
 use openssl::sign::Signer;
 use openssl::pkey::PKey;
 use openssl::hash::MessageDigest;
+use url::Url;
+use std::collections::{BTreeMap, btree_map::Entry};
+
+const GOOGLE_STORAGE_API_URL: &str = "https://storage.googleapis.com";
 
 impl super::GCSClient {
     fn create_credential_scope(&self, dt: &DateTime<Utc>) -> String {
@@ -16,48 +20,79 @@ impl super::GCSClient {
             request_type="goog4_request"
         )
     }
-    
-    fn create_canonical_query_string(&self, dt: &DateTime<Utc>) -> String {
+
+    fn create_required_query_parameters(&self, dt: &DateTime<Utc>, headers: &BTreeMap<String, Vec<String>>) -> BTreeMap<String, String> {
         let encoded_email = common::url_encode(&self.http.credentials.client_email);
         let encoded_scope = common::url_encode(&self.create_credential_scope(dt));
-        
+
+        let mut ret: BTreeMap<String, String> = BTreeMap::new();
         // required query string parameters: 
         // - X-Goog-Algorithm
         // - X-Goog-Credential
         // - X-Goog-Date
         // - X-Goog-Expires
         // - X-Goog-SignedHeaders
-        format!(
-            "X-Goog-Algorithm={alg}&X-Goog-Credential={authorizer}%2F{scope}&X-Goog-Date={date}&X-Goog-Expires={expires}&X-Goog-SignedHeaders={headers}",
-            alg="GOOG4-RSA-SHA256",
+        ret.insert("X-Goog-Algorithm".to_string(), "GOOG4-RSA-SHA256".to_string());
+        ret.insert("X-Goog-Credential".to_string(), format!("{authorizer}%2F{scope}",
             authorizer=&encoded_email,
             scope=&encoded_scope,
-            date=dt.format("%Y%m%dT%H%M%SZ"),
-            expires="43200", // ~12 hours. Should be good enough for pretty much all situations.
-            headers="host"
-        )
+        ));
+        ret.insert("X-Goog-Date".to_string(), dt.format("%Y%m%dT%H%M%SZ").to_string());
+        ret.insert("X-Goog-Expires".to_string(), "43200".to_string());
+        ret.insert("X-Goog-SignedHeaders".to_string(), headers.keys().map(|x| x.clone()).collect::<Vec<String>>().join("%3B"));
+        ret
     }
 
-    fn create_canonical_request(&self, dt: &DateTime<Utc>, bucket_id: &str, path: &str) -> String {
+    fn create_canonical_base_url(&self, dt: &DateTime<Utc>, uri: Url, headers: &BTreeMap<String, Vec<String>>) -> Result<Url, common::SquadOvError> {
+        let mut ret_uri = uri;
+
+        // The main thing we want to change is the query string so that it *also* contains the
+        // canonical query string. Note that the query string keys must be sorted in alphabetical order.
+        let mut all_query_params: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for (key, value) in ret_uri.query_pairs().into_owned() {
+            match all_query_params.entry(key) {
+                Entry::Vacant(e) => { e.insert(vec![value]); },
+                Entry::Occupied(mut e) => {e.get_mut().push(value); }
+            }
+        }
+
+        for (key, value) in self.create_required_query_parameters(dt, headers).into_iter() {
+            all_query_params.insert(key, vec![value]);
+        }
+
+        let mut new_query_params: Vec<String> = Vec::new();
+        for (key, values) in all_query_params.iter() {
+            for v in values {
+                new_query_params.push(format!("{}={}", key, v));
+            }
+        }
+        ret_uri.set_query(Some(&new_query_params.join("&")));
+
+        Ok(ret_uri)
+    }
+
+    fn create_canonical_request(&self, method: &str, uri: &Url, headers: &BTreeMap<String, Vec<String>>) -> String {
         let mut contents: Vec<String> = Vec::new();
 
         // HTTP verb
-        contents.push(String::from("GET"));
+        contents.push(String::from(method));
 
         // path to resource
-        contents.push(format!("/{}/{}", bucket_id, path));
+        contents.push(String::from(uri.path()));
 
         // canonical query string
-        contents.push(self.create_canonical_query_string(dt));
+        contents.push(String::from(uri.query().unwrap_or("")));
 
         // canonical headers
-        contents.push(String::from("host:storage.googleapis.com"));
+        for (key, values) in headers.iter() {
+            contents.push(format!("{}:{}", key, values.join(",")));
+        }
         
         // mandatory new line
         contents.push(String::from(""));
 
         // Signed headers
-        contents.push(String::from("host"));
+        contents.push(headers.keys().map(|x| x.clone()).collect::<Vec<String>>().join(";"));
 
         // payload
         contents.push(String::from("UNSIGNED-PAYLOAD"));
@@ -84,18 +119,24 @@ impl super::GCSClient {
         Ok(hex::encode(signer.sign_to_vec()?))
     }
 
-    pub fn create_signed_url(&self, bucket_id: &str, path: &str) -> Result<String, common::SquadOvError> {
+    pub fn create_signed_url(&self, method: &str, uri: &str, addtl_headers: &BTreeMap<String, Vec<String>>) -> Result<String, common::SquadOvError> {
+        let mut headers = addtl_headers.clone();
+        headers.insert(String::from("host"), vec![String::from("storage.googleapis.com")]);
+
+        let uri = format!("{}{}", GOOGLE_STORAGE_API_URL, uri);
+        let uri = Url::parse(&uri)?;
+
         let now_time = Utc::now();
-        let canonical_request = self.create_canonical_request(&now_time, bucket_id, path);
+        let uri = self.create_canonical_base_url(&now_time, uri, &headers)?;
+        
+
+        let canonical_request = self.create_canonical_request(method, &uri, &headers);
         let signature = self.create_request_signature(&now_time, &canonical_request)?;
 
         Ok(
             format!(
-                "{host}/{bucket}/{path}?{query}&X-Goog-Signature={sig}",
-                host="https://storage.googleapis.com",
-                bucket=bucket_id,
-                path=path,
-                query=self.create_canonical_query_string(&now_time),
+                "{uri}&X-Goog-Signature={sig}",
+                uri=uri.to_string(),
                 sig=&signature,
             )
         )

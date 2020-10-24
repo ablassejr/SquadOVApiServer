@@ -45,10 +45,9 @@ impl api::ApiApplication {
             // compatability wit Electron but for now just a single file is all we have so just
             // pretend we just have a single segment.
             track.segments.push(common::VodSegment{
-                uri: format!("/v1/vod/{video_uuid}/{quality}/{segment}",
+                uri: format!("/v1/vod/{video_uuid}/{quality}/video.mp4",
                     video_uuid=video_uuid,
                     quality=&quality.id,
-                    segment=&quality.fname,
                 ),
                 // Duration is a placeholder - not really needed but will be useful once we get
                 // back to using semgnets.

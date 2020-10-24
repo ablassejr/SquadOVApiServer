@@ -3,7 +3,6 @@ pub mod auth;
 pub mod fusionauth;
 pub mod access;
 pub mod v1;
-pub mod internal;
 
 use serde::{Deserialize};
 use sqlx::postgres::{PgPool};

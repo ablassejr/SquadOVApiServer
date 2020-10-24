@@ -10,7 +10,8 @@ CREATE VIEW view_valorant_player_match_stats (
     total_damage,
     headshots,
     bodyshots,
-    legshots
+    legshots,
+    won
 )
 AS
 SELECT
@@ -22,11 +23,14 @@ SELECT
     vmp.assists,
     vmp.rounds_played,
     vmp.total_combat_score,
-    SUM(vmd.damage),
-    SUM(vmd.headshots),
-    SUM(vmd.bodyshots),
-    SUM(vmd.legshots)
+    COALESCE(SUM(vmd.damage), 0),
+    COALESCE(SUM(vmd.headshots), 0),
+    COALESCE(SUM(vmd.bodyshots), 0),
+    COALESCE(SUM(vmd.legshots), 0),
+    vmt.won
 FROM valorant_match_players AS vmp
+INNER JOIN valorant_match_teams AS vmt
+    ON vmt.match_id = vmp.match_id AND vmt.team_id = vmp.team_id
 LEFT JOIN valorant_match_damage AS vmd
     ON vmd.instigator_puuid = vmp.puuid AND vmd.match_id = vmp.match_id
-GROUP BY vmp.match_id, vmp.puuid
+GROUP BY vmp.match_id, vmp.puuid, vmt.won

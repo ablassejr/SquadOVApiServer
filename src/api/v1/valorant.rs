@@ -1,6 +1,8 @@
 mod backfill;
 mod create;
 mod list;
+mod stats;
+mod get;
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -8,25 +10,39 @@ use serde::{Serialize, Deserialize};
 use crate::common;
 use std::collections::HashMap;
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct ValorantMatchMetadata {
     #[serde(rename = "matchId")]
     pub match_id: String,
     #[serde(rename = "gameMode")]
-    pub game_mode: String,
+    pub game_mode: Option<String>,
     #[serde(rename = "mapId")]
-    pub map_id: String,
+    pub map_id: Option<String>,
     #[serde(rename = "isRanked")]
-    pub is_ranked: bool,
+    pub is_ranked: Option<bool>,
     #[serde(rename = "provisioningFlowID")]
-    pub provisioning_flow_id: String,
+    pub provisioning_flow_id: Option<String>,
     #[serde(rename = "gameVersion")]
-    pub game_version: String,
-    #[serde(rename = "gameStartMillis", deserialize_with="common::parse_utc_time_from_milliseconds")]
-    pub server_start_time_utc: DateTime<Utc>,
+    pub game_version: Option<String>,
+    #[serde(rename(serialize="serverStartTimeUtc", deserialize="gameStartMillis"), deserialize_with="common::parse_utc_time_from_milliseconds")]
+    pub server_start_time_utc: Option<DateTime<Utc>>,
 }
 
-#[derive(Deserialize)]
+impl Default for ValorantMatchMetadata {
+    fn default() -> Self {
+        Self {
+            match_id: String::new(),
+            game_mode: None,
+            map_id: None,
+            is_ranked: None,
+            provisioning_flow_id: None,
+            game_version: None,
+            server_start_time_utc: None
+        }
+    }
+}
+
+#[derive(Serialize,Deserialize)]
 pub struct ValorantMatchTeamData {
     #[serde(rename = "teamId")]
     team_id: String,
@@ -37,7 +53,7 @@ pub struct ValorantMatchTeamData {
     rounds_won: i32
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct ValorantMatchPlayerStats {
     score: i32,
     #[serde(rename = "roundsPlayed")]
@@ -47,7 +63,7 @@ pub struct ValorantMatchPlayerStats {
     assists: i32
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct ValorantMatchPlayerData {
     subject: String,
     #[serde(rename = "characterId")]
@@ -59,7 +75,7 @@ pub struct ValorantMatchPlayerData {
     stats: ValorantMatchPlayerStats
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct ValorantMatchDamageData {
     receiver: String,
     damage: i32,
@@ -68,14 +84,14 @@ pub struct ValorantMatchDamageData {
     headshots: i32
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct ValorantMatchPlayerRoundStatsData {
     subject: String,
     score: i32,
     damage: Vec<ValorantMatchDamageData>
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct ValorantMatchPlayerRoundEconomyData {
     subject: String,
     armor: String,
@@ -86,7 +102,7 @@ pub struct ValorantMatchPlayerRoundEconomyData {
     spent: i32
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct ValorantMatchRoundData {
     #[serde(rename = "roundNum")]
     round_num: i32,
@@ -112,7 +128,7 @@ type ValorantAllPlayerRoundEconomyData<'a> = HashMap<i32, &'a Vec<ValorantMatchP
 type ValorantPerRoundPlayerDamageData<'a> = HashMap<String, &'a Vec<ValorantMatchDamageData>>;
 type ValorantAllPlayerDamageData<'a> = HashMap<i32, ValorantPerRoundPlayerDamageData<'a>>;
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct ValorantMatchKillFinishingDamage {
     #[serde(rename = "damageType")]
     damage_type: String,
@@ -122,7 +138,7 @@ pub struct ValorantMatchKillFinishingDamage {
     is_secondary_fire_mode: bool
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct ValorantMatchKillData {
     #[serde(rename = "roundTime")]
     round_time: i32,
@@ -134,10 +150,10 @@ pub struct ValorantMatchKillData {
     victim: String
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct FullValorantMatchData {
     // Our internal UUID
-    #[serde(default)]
+    #[serde(rename = "matchUuid", default)]
     pub match_uuid: Uuid,
     #[serde(rename = "matchInfo")]
     pub match_info: ValorantMatchMetadata,
@@ -146,23 +162,39 @@ pub struct FullValorantMatchData {
     #[serde(rename = "roundResults")]
     pub rounds: Vec<ValorantMatchRoundData>,
     pub kills: Vec<ValorantMatchKillData>,
-    #[serde(default)]
+    #[serde(rename = "rawData", default)]
     pub raw_data: serde_json::Value
 }
 
-#[derive(Deserialize)]
+impl Default for FullValorantMatchData {
+    fn default() -> Self {
+        Self {
+            match_uuid: Uuid::nil(),
+            match_info: ValorantMatchMetadata {
+                ..Default::default()
+            },
+            teams: Vec::new(),
+            players: Vec::new(),
+            rounds: Vec::new(),
+            kills: Vec::new(),
+            raw_data: serde_json::Value::Null,
+        }
+    }
+}
+
+#[derive(Serialize,Deserialize)]
 pub struct ValorantPlayerRoundMetadata {
     #[serde(rename = "matchId")]
     pub match_id: String,
     pub puuid: String,
     pub round: i32,
     #[serde(rename = "buyTime")]
-    pub buy_time: DateTime<Utc>,
+    pub buy_time: Option<DateTime<Utc>>,
     #[serde(rename = "roundTime")]
-    pub round_time: DateTime<Utc>
+    pub round_time: Option<DateTime<Utc>>
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct ValorantPlayerMatchMetadata {
     #[serde(rename = "matchId")]
     pub match_id: String,
@@ -216,6 +248,45 @@ pub struct ValorantPlayerMatchSummary {
     has_vod: bool
 }
 
+#[derive(Serialize)]
+pub struct ValorantPlayerStatsSummary {
+    rank: i32,
+    kills: i64,
+    deaths: i64,
+    assists: i64,
+    rounds: i64,
+    #[serde(rename = "totalCombatScore")]
+    total_combat_score: i64,
+    #[serde(rename = "totalDamage")]
+    total_damage: i64,
+    headshots: i64,
+    bodyshots: i64,
+    legshots: i64,
+    wins: i64,
+    games: i64
+}
+
+impl Default for ValorantPlayerStatsSummary {
+    fn default() -> Self {
+        Self {
+            rank: 0,
+            kills: 0,
+            deaths: 0,
+            assists: 0,
+            rounds: 0,
+            total_combat_score: 0,
+            total_damage: 0,
+            headshots: 0,
+            bodyshots: 0,
+            legshots: 0,
+            wins: 0,
+            games: 0
+        }
+    }
+}
+
 pub use backfill::*;
 pub use create::*;
 pub use list::*;
+pub use stats::*;
+pub use get::*;

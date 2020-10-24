@@ -16,7 +16,7 @@ impl api::ApiApplication {
                 ) AS t(id)
                 LEFT JOIN squadov.valorant_matches AS vm
                     ON vm.match_id = t.id
-                WHERE vm.match_id IS NULL
+                WHERE vm.raw_data IS NULL
                 ",
                 request=request_matches.iter().map(|x| format!("('{}')", x)).collect::<Vec<String>>().join(",")
             )

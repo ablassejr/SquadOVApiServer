@@ -41,6 +41,7 @@ pub struct VodAssociation {
 
 #[async_trait]
 pub trait VodManager {
+    async fn get_segment_upload_uri(&self, segment: &common::VodSegmentId) -> Result<String, common::SquadOvError>;
     async fn get_segment_redirect_uri(&self, segment: &common::VodSegmentId) -> Result<String, common::SquadOvError>;
 }
 

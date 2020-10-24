@@ -1,8 +1,7 @@
 use crate::api::v1;
 use crate::common;
 use async_trait::async_trait;
-use std::path::Path;
-use std::str::FromStr;
+use std::path::{Path,PathBuf};
 
 pub struct FilesystemVodManager {
     root: String
@@ -23,14 +22,24 @@ impl FilesystemVodManager {
     }
 }
 
+impl FilesystemVodManager {
+    fn segment_id_to_path(&self, segment: &common::VodSegmentId) -> PathBuf {
+        Path::new(&self.root).join(&segment.video_uuid.to_string()).join(&segment.quality).join(&segment.segment_name)
+    }
+}
+
 #[async_trait]
 impl v1::VodManager for FilesystemVodManager {
     async fn get_segment_redirect_uri(&self, segment: &common::VodSegmentId) -> Result<String, common::SquadOvError> {
-        let fname = Path::new(&self.root).join(&segment.video_uuid.to_string()).join(&segment.quality).join(&segment.segment_name);
+        let fname = self.segment_id_to_path(segment);
         if !fname.exists() {
             return Err(common::SquadOvError::NotFound);
         }
 
-        Ok(String::from_str(fname.to_str().unwrap()).unwrap())
+        Ok(String::from(fname.to_str().unwrap_or("")))
+    }
+
+    async fn get_segment_upload_uri(&self, segment: &common::VodSegmentId) -> Result<String, common::SquadOvError> {
+        Ok(String::from(self.segment_id_to_path(segment).to_str().unwrap_or("")))
     }
 }

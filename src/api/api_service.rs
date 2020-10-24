@@ -2,7 +2,6 @@ use actix_web::{web, FromRequest};
 use actix_web::dev::{HttpServiceFactory};
 use super::auth;
 use super::v1;
-use super::internal;
 use super::access;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -24,24 +23,6 @@ pub fn create_service() -> impl HttpServiceFactory {
                         .wrap(auth::ApiSessionValidator{})
                         .route("/verify", web::get().to(auth::check_verify_email_handler))
                         .route("/verify/resend", web::post().to(auth::resend_verify_email_handler))
-                )
-        )
-        .service(
-            web::scope("/internal")
-                .wrap(auth::InternalApiKeyValidator{})
-                .service(
-                    web::scope("/vod")
-                        .service(
-                            web::resource("/verify")
-                                .route(web::get().to(internal::verify_and_reserve_vod_stream_key_handler))
-                        )
-                        .service(
-                            web::scope("/{video_uuid}")
-                                .service(
-                                    web::resource("")
-                                        .route(web::post().to(internal::bulk_add_video_metadata_handler))
-                                )
-                        )
                 )
         )
         .service(
@@ -88,6 +69,21 @@ pub fn create_service() -> impl HttpServiceFactory {
                                     web::resource("/matches")
                                         .route(web::get().to(v1::list_valorant_matches_for_user_handler))
                                 )
+                                .service(
+                                    web::resource("/stats")
+                                        .route(web::get().to(v1::get_player_stats_summary_handler))
+                                )
+                        )
+                        .service(
+                            web::scope("/match/{match_id}")
+                                .service(
+                                    web::resource("")
+                                        .route(web::get().to(v1::get_valorant_match_details_handler))
+                                )
+                                .service(
+                                    web::resource("/metadata/{puuid}")
+                                        .route(web::get().to(v1::get_valorant_player_match_metadata_handler))
+                                )
                         )
                 )
                 .service(
@@ -118,7 +114,7 @@ pub fn create_service() -> impl HttpServiceFactory {
                 )
                 .service(
                     web::scope("/vod")
-                        .route("", web::post().to(v1::associate_vod_handler))
+                        .route("", web::post().to(v1::create_vod_destination_handler))
                         .service(
                             web::scope("/match/{match_uuid}")
                                 .service(
@@ -135,6 +131,7 @@ pub fn create_service() -> impl HttpServiceFactory {
                                     web::resource("")
                                         .route(web::delete().to(v1::delete_vod_handler))
                                         .route(web::get().to(v1::get_vod_handler))
+                                        .route(web::post().to(v1::associate_vod_handler))
                                 )
                                 .service(
                                     web::resource("/{quality}/{segment_name}")
