@@ -7,7 +7,7 @@ mod common;
 use tokio;
 use actix_rt;
 use actix_web::{App, HttpServer, web};
-use actix_web::middleware::Logger;
+use actix_web::middleware::{Logger, Compress};
 use api::api_service;
 use structopt::StructOpt;
 use actix_cors::{Cors};
@@ -40,6 +40,7 @@ async fn main() -> std::io::Result<()> {
     // so this server doesn't have to serve javascript or the like.
     let res = HttpServer::new(move || {
         App::new()
+            .wrap(Compress::default())
             .wrap(
                 Cors::new()
                     .allowed_origin(&config.cors.domain)
