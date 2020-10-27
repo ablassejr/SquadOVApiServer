@@ -6,6 +6,7 @@ pub mod gcp;
 pub mod oauth;
 pub mod encode;
 pub mod sql;
+pub mod stats;
 
 pub use error::*;
 pub use parse::*;

@@ -44,12 +44,13 @@ async fn main() -> std::io::Result<()> {
             .wrap(
                 Cors::new()
                     .allowed_origin(&config.cors.domain)
+                    .allowed_origin("http://127.0.0.1:8080")
                     .allowed_methods(vec!["GET", "POST", "OPTIONS"])
                     .finish()
             )
             .wrap(Logger::default())
             .app_data(web::Data::new(app.clone()))
-            .service(api_service::create_service())
+            .service(api_service::create_service(config.server.graphql_debug))
         })
         .server_hostname(&config2.server.domain)
         .bind("0.0.0.0:8080")?

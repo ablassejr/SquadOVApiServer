@@ -3,12 +3,13 @@ use actix_web::dev::{HttpServiceFactory};
 use super::auth;
 use super::v1;
 use super::access;
+use super::graphql;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::vec::Vec;
 
-pub fn create_service() -> impl HttpServiceFactory {
-    return web::scope("")
+pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
+    let mut scope = web::scope("")
         .service(
             web::scope("/auth")
                 .route("/login", web::post().to(auth::login_handler))
@@ -139,5 +140,20 @@ pub fn create_service() -> impl HttpServiceFactory {
                                 )
                         )
                 )
-        )
+        );
+
+    if graphql_debug {
+        scope = scope.service(
+            web::resource("/graphql")
+                    .route(web::post().to(graphql::graphql_handler))
+                    .route(web::get().to(graphql::graphiql_handler))
+        );
+    } else {
+        scope = scope.service(
+            web::resource("/graphql")
+                    .wrap(auth::ApiSessionValidator{})
+                    .route(web::post().to(graphql::graphql_handler))
+        );
+    }
+    scope
 }

@@ -55,6 +55,18 @@ impl UserManager {
         ).fetch_optional(pool).await;
     }
 
+    pub async fn get_stored_user_from_uuid(&self, uuid: &Uuid, pool: &PgPool) -> Result<Option<SquadOVUser>, sqlx::Error> {
+        return sqlx::query_as!(
+            SquadOVUser,
+            "
+            SELECT *
+            FROM squadov.users
+            WHERE uuid = $1
+            ",
+            uuid
+        ).fetch_optional(pool).await;
+    }
+
     pub async fn create_user(&self, user: &SquadOVUser, pool: &PgPool) -> Result<SquadOVUser, sqlx::Error> {
         return sqlx::query_as!(
             SquadOVUser,

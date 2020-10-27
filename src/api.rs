@@ -3,6 +3,7 @@ pub mod auth;
 pub mod fusionauth;
 pub mod access;
 pub mod v1;
+pub mod graphql;
 
 use serde::{Deserialize};
 use sqlx::postgres::{PgPool};
@@ -78,7 +79,8 @@ pub struct CorsConfig {
 
 #[derive(Deserialize,Debug,Clone)]
 pub struct ServerConfig {
-    pub domain: String
+    pub domain: String,
+    pub graphql_debug: bool
 }
 
 #[derive(Deserialize,Debug,Clone)]
@@ -95,11 +97,13 @@ struct ApiClients {
 }
 
 pub struct ApiApplication {
+    pub config: ApiConfig,
     clients: ApiClients,
     users: auth::UserManager,
     session: auth::SessionManager,
     vod: Arc<dyn v1::VodManager + Send + Sync>,
-    pool: Arc<PgPool>
+    pool: Arc<PgPool>,
+    schema: Arc<graphql::GraphqlSchema>
 }
 
 impl ApiApplication {
@@ -121,6 +125,7 @@ impl ApiApplication {
         );
 
         ApiApplication{
+            config: config.clone(),
             clients: ApiClients{
                 fusionauth: fusionauth::FusionAuthClient::new(config.fusionauth.clone()),
             },
@@ -131,6 +136,7 @@ impl ApiApplication {
                 v1::VodManagerType::FileSystem => Arc::new(v1::FilesystemVodManager::new().unwrap()) as Arc<dyn v1::VodManager + Send + Sync>
             },
             pool: pool,
+            schema: Arc::new(graphql::create_schema())
         }
     }
 }
