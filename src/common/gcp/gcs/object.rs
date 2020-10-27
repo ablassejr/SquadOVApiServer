@@ -21,4 +21,23 @@ impl super::GCSClient {
         }
         Ok(())
     }
+
+    pub async fn delete_object(&self, bucket_id: &str, path: &str) -> Result<(), common::SquadOvError> {
+        let client = self.http.create_http_client()?;
+
+        let resp = client.delete(
+            &format!(
+                "{}/b/{}/o/{}",
+                super::STORAGE_BASE_URL,
+                bucket_id,
+                common::url_encode(path),
+            ))
+            .send()
+            .await?;
+
+        if resp.status() != StatusCode::NO_CONTENT {
+            return Err(common::SquadOvError::InternalError(format!("GCS Error: {}", resp.status())));
+        }
+        Ok(())
+    }
 }

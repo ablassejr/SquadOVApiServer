@@ -73,4 +73,10 @@ impl v1::VodManager for GCSVodManager {
 
         client.create_signed_url("POST", &format!("/{}/{}", &self.bucket, fname), &headers)
     }
+
+    async fn delete_vod(&self, segment: &common::VodSegmentId) -> Result<(), common::SquadOvError> {
+        let fname = self.get_fname_from_segment_id(segment);
+        let client = self.get_gcp_client().gcs();
+        Ok(client.delete_object(&self.bucket, &fname).await?)
+    }
 }

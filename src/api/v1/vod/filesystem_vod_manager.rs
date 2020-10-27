@@ -2,6 +2,7 @@ use crate::api::v1;
 use crate::common;
 use async_trait::async_trait;
 use std::path::{Path,PathBuf};
+use std::fs;
 
 pub struct FilesystemVodManager {
     root: String
@@ -41,5 +42,14 @@ impl v1::VodManager for FilesystemVodManager {
 
     async fn get_segment_upload_uri(&self, segment: &common::VodSegmentId) -> Result<String, common::SquadOvError> {
         Ok(String::from(self.segment_id_to_path(segment).to_str().unwrap_or("")))
+    }
+
+    async fn delete_vod(&self, segment: &common::VodSegmentId) -> Result<(), common::SquadOvError> {
+        let fname = self.segment_id_to_path(segment);
+        if !fname.exists() {
+            return Err(common::SquadOvError::NotFound);
+        }
+
+        Ok(fs::remove_file(fname)?)
     }
 }
