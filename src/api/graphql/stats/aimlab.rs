@@ -154,7 +154,7 @@ impl GraphqlAimlabStats {
     fn detection(&self) -> detection::GraphqlAimlabDetectionStats {
         detection::GraphqlAimlabDetectionStats {
             user_uuid: self.user_uuid.clone(),
-            task: String::from("gridshot")
+            task: String::from("detection")
         }
     }
 
