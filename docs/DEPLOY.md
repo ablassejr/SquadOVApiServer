@@ -56,7 +56,7 @@ You will need to ensure that you have a few Debian packages installed to complet
     * `GITLAB_REGISTRY_TOKEN` to a personal access token that has the `read_registry` and `write_registry` permissions.
     * `DEPLOYMENT_DOMAIN` to the domain you wish to deploy to (e.g. `staging.squadov.gg`).
     * `DEPLOYMENT_DOMAIN_EMAIL` to the email address that you wish to register the Let's Encrypt certificate with.
-    * `` 
+    * `VOD_BUCKET` to a unique bucket name to store VODs in.
 
    We'll setup the other environment variables later.
    Save the file and verify that the contents of the `$ENV_vars.json` file is encrypted (i.e. `cat $ENV_vars.json`).
@@ -152,3 +152,18 @@ Go back into a Powershell terminal.
 5. `.\package.ps1 $ENV never`. If this is an offical release, change `never` to `always`. If set to `always` you will need to get the `GH_TOKEN` environment variable (i.e. `$env:GH_TOKEN="TOKEN_HERE"; ...`).
 
 You should now see the `SquadOV.exe` executable in `$CLIENT\client_ui\package\win\x64\$VERSION\win-unpacked` where `$VERSION` is whatever the version is in the `package.json`.
+
+## Update Deployment Guide
+
+1. `cd $SRC/devops/terraform`
+2. `sops exec-env ../env/$ENV_vars.json './run_terraform.sh $ENV'`
+3. `cd $SRC/devops/database`
+4. `sops exec-env ../env/$ENV_vars.json './migrate.sh'`
+5. `cd $SRC/devops/docker/nginx`
+6. `sops exec-env ../../env/$ENV_vars.json './build.sh'`
+7. `cd $SRC/devops/build`
+8. `sops exec-env ../env/$ENV_vars.json './build.sh'`
+9. (Optionally): `cd $APP && ./devops/build.sh $ENV`
+10. `cd $SRC/devops/ansible`
+11. (Optionally): `sops exec-env ../env/$ENV_vars.json 'ansible-playbook -e "shosts=$ENV" -v deploy_supporting_infra.yml'`
+12. `sops exec-env ../env/$ENV_vars.json 'ansible-playbook -e "shosts=$ENV" -v deploy_web_api_app.yml'`

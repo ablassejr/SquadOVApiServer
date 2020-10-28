@@ -5,6 +5,8 @@ services:
     networks:
       squadov_c3p0:
           ipv4_address: "172.22.0.5"
+    environment:
+      - "SQUADOV_VOD_ROOT=gs://${VOD_BUCKET}"
   app:
     image: "registry.gitlab.com/squadov/squadovapiserver/${GCP_PROJECT}/squadov_webapp:latest"
     networks:

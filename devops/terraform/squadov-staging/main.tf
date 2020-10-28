@@ -31,4 +31,7 @@ module "database" {
 
 module "vm" {
     source = "../modules/vm"
+
+    service_account_key_filename = "../../gcp/squadov-staging.json"
+    vod_storage_bucket = var.vod_storage_bucket
 }
