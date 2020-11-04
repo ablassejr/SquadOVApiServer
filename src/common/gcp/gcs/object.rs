@@ -36,7 +36,7 @@ impl super::GCSClient {
             .await?;
 
         if resp.status() != StatusCode::NO_CONTENT {
-            return Err(common::SquadOvError::InternalError(format!("GCS Error: {}", resp.status())));
+            return Err(common::SquadOvError::InternalError(format!("GCS Error: {} - {}", resp.status(), resp.text().await?)));
         }
         Ok(())
     }
