@@ -1,0 +1,9 @@
+ALTER TABLE hearthstone_matches
+ADD COLUMN deck_name VARCHAR NOT NULL;
+
+ALTER TABLE hearthstone_match_player_medals
+DROP CONSTRAINT hearthstone_match_player_medals_match_uuid_player_match_id_fkey;
+
+ALTER TABLE hearthstone_match_player_medals
+ADD CONSTRAINT hearthstone_match_player_medals_match_uuid_player_match_id_fkey
+FOREIGN KEY (match_uuid, player_match_id) REFERENCES hearthstone_match_players(match_uuid, player_match_id) ON DELETE CASCADE;

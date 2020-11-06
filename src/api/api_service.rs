@@ -114,6 +114,17 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         )
                 )
                 .service(
+                    web::scope("/hearthstone")
+                        .service(
+                            web::scope("/match")
+                                .route("", web::post().to(v1::create_hearthstone_match_handler))
+                                .service(
+                                    web::scope("/{match_uuid}")
+                                        .route("", web::post().to(v1::upload_hearthstone_logs_handler))
+                                )
+                        )
+                )
+                .service(
                     web::scope("/vod")
                         .route("", web::post().to(v1::create_vod_destination_handler))
                         .service(

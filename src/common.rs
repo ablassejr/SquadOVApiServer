@@ -7,6 +7,7 @@ pub mod oauth;
 pub mod encode;
 pub mod sql;
 pub mod stats;
+pub mod hearthstone;
 
 pub use error::*;
 pub use parse::*;
