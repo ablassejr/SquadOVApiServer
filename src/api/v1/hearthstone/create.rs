@@ -53,36 +53,36 @@ impl api::ApiApplication {
                 if info.reconnecting {
                     return Err(common::SquadOvError::NotFound);
                 } else {
-                    self.create_new_match(tx).await?
+                    let mt = self.create_new_match(tx).await?;
+                    sqlx::query!(
+                        "
+                        INSERT INTO squadov.hearthstone_matches (
+                            match_uuid,
+                            server_ip,
+                            port,
+                            game_id,
+                            match_day
+                        )
+                        VALUES (
+                            $1,
+                            $2,
+                            $3,
+                            $4,
+                            $5
+                        )
+                        ",
+                        mt.uuid,
+                        info.ip,
+                        info.port,
+                        info.game_id,
+                        timestamp.date().naive_utc(),
+                    )
+                        .execute(tx)
+                        .await?;
+                    mt
                 }
             }
         };
-
-        sqlx::query!(
-            "
-            INSERT INTO squadov.hearthstone_matches (
-                match_uuid,
-                server_ip,
-                port,
-                game_id,
-                match_day
-            )
-            VALUES (
-                $1,
-                $2,
-                $3,
-                $4,
-                $5
-            )
-            ",
-            current_match.uuid,
-            info.ip,
-            info.port,
-            info.game_id,
-            timestamp.date().naive_utc(),
-        )
-            .execute(tx)
-            .await?;
 
         Ok(current_match.uuid)
     }
@@ -129,6 +129,7 @@ impl api::ApiApplication {
             added += 1;
         }
 
+        sql.push(String::from(" ON CONFLICT DO NOTHING"));
         if added > 0 {
             sqlx::query(&sql.join("")).execute(tx).await?;
         }
@@ -161,6 +162,7 @@ impl api::ApiApplication {
                     $8,
                     $9
                 )
+                ON CONFLICT DO NOTHING
                 ",
                 user_id,
                 match_uuid,
@@ -203,6 +205,7 @@ impl api::ApiApplication {
                 $8,
                 $9
             )
+            ON CONFLICT DO NOTHING
             ",
             match_uuid,
             player_match_id,
@@ -228,8 +231,6 @@ impl api::ApiApplication {
                     match_uuid,
                     player_match_id,
                     player_name,
-                    is_local,
-                    side,
                     card_back_id,
                     arena_wins,
                     arena_loss,
@@ -245,10 +246,18 @@ impl api::ApiApplication {
                     $6,
                     $7,
                     $8,
-                    $9,
-                    $10,
-                    $11
+                    $9
                 )
+                ON CONFLICT (match_uuid, player_match_id) DO UPDATE SET
+                    user_id = COALESCE(squadov.hearthstone_match_players.user_id, EXCLUDED.user_id),
+                    arena_wins = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.arena_wins
+                                      ELSE squadov.hearthstone_match_players.arena_wins END,
+                    arena_loss = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.arena_loss
+                                 ELSE squadov.hearthstone_match_players.arena_loss END,
+                    tavern_brawl_wins = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.tavern_brawl_wins
+                                        ELSE squadov.hearthstone_match_players.tavern_brawl_wins END,
+                    tavern_brawl_loss = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.tavern_brawl_loss
+                                        ELSE squadov.hearthstone_match_players.tavern_brawl_loss END
                 ",
                 // *ONLY* The local player should be associated with the user we pulled from the session.
                 // Ideally we'd get them to OAuth with Blizzard to verify account ownership instead?
@@ -260,8 +269,6 @@ impl api::ApiApplication {
                 match_uuid,
                 player_match_id,
                 player.name,
-                player.local,
-                player.side,
                 player.card_back_id,
                 player.arena_wins as i32,
                 player.arena_loss as i32,

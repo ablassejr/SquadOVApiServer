@@ -7,6 +7,7 @@ use super::graphql;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::vec::Vec;
+use crate::common;
 
 pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
     let mut scope = web::scope("")
@@ -121,6 +122,9 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .service(
                                     web::scope("/{match_uuid}")
                                         .route("", web::post().to(v1::upload_hearthstone_logs_handler))
+                                            .data(web::Json::<Vec<common::hearthstone::HearthstoneRawLog>>::configure(|cfg| {
+                                                cfg.limit(10 * 1024 * 1024)
+                                            }))
                                 )
                         )
                 )
