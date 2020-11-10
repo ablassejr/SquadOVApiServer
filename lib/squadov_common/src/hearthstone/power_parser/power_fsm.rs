@@ -277,6 +277,10 @@ impl PowerFsm {
         return logs.join("\n");
     }
 
+    pub fn finish(&mut self) {
+        self.game.borrow_mut().finish();
+    }
+
     pub fn parse(&mut self, tm : &DateTime<Utc>, log: &PowerLog) -> Result<(), crate::SquadOvError> {
         let mut parsed = false;
         

@@ -85,6 +85,7 @@ impl HearthstonePowerLogParser {
                 continue;
             }
         }
+        self.fsm.finish();
         return Ok(())
     }
 

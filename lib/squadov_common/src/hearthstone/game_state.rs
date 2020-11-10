@@ -1,4 +1,6 @@
-mod game_entity;
+pub mod game_entity;
+pub mod game_step;
+pub mod player_entity;
 
 use derive_more::{Display};
 use chrono::{DateTime, Utc};
@@ -48,29 +50,63 @@ pub struct HearthstoneEntity {
     pub attributes: HashMap<String, String>
 }
 
+#[derive(Clone,Display,Debug)]
+#[display(fmt="HearthstoneGameSnapshotAuxData[]")]
+pub struct HearthstoneGameSnapshotAuxData {
+    current_turn: i32,
+    step: game_step::GameStep,
+    current_player_id: i32
+}
+
 #[derive(Clone,Display)]
-#[display(fmt="HearthstoneGameSnapshot[GameEntityId: {}\tNameToPlayerId: {:#?}\tPlayerIdToEntityId: {:#?}\tEntities: {:#?}]", game_entity_id, player_name_to_player_id, player_id_to_entity_id, entities)]
+#[display(fmt="HearthstoneGameSnapshot[Time: {:?}\tGameEntityId: {}\tNameToPlayerId: {:#?}\tPlayerIdToEntityId: {:#?}\tEntities: {:#?}\tAux Data {:?}]", tm, game_entity_id, player_name_to_player_id, player_id_to_entity_id, entities, aux_data)]
 pub struct HearthstoneGameSnapshot {
+    tm: Option<DateTime<Utc>>,
     // The ID of the entity to find when the entityId is "GameEntity"
     game_entity_id: i32,
     // Map to go from player name/tag => Player ID => Entity ID.
     player_name_to_player_id: HashMap<String, i32>,
     player_id_to_entity_id: HashMap<i32, i32>,
     // All entities indexed using their entity ID.
-    entities: HashMap<i32, HearthstoneEntity>
+    entities: HashMap<i32, HearthstoneEntity>,
+    aux_data: Option<HearthstoneGameSnapshotAuxData>
 }
 
 impl HearthstoneGameSnapshot {
     pub fn new() -> Self {
         Self {
+            tm: None,
             game_entity_id: 0,
             player_name_to_player_id: HashMap::new(),
             player_id_to_entity_id: HashMap::new(),
-            entities: HashMap::new()
+            entities: HashMap::new(),
+            aux_data: None,
         }
     }
 
+    fn extract_aux_data(&mut self) {
+        let entity = game_entity::GameEntity::new(self.get_game_entity());
+        let mut current_player_id = 0;
+
+        // Needs the clone because rust doesn't like the reference borrow for player_id_to_entity_id (and thus self)
+        // coupled with the mutable borrow of self in get_entity_from_id.
+        for (pid, eid) in self.player_id_to_entity_id.clone() {
+            let player = player_entity::PlayerEntity::new(self.get_entity_from_id(eid));    
+            if player.is_current_player() {
+                current_player_id = pid;
+                break;
+            }
+        } 
+
+        self.aux_data = Some(HearthstoneGameSnapshotAuxData{
+            current_turn: entity.current_turn(),
+            step: entity.current_step(),
+            current_player_id: current_player_id
+        });
+    }
+
     fn advance(&mut self, action: &HearthstoneGameAction) {
+        self.tm = Some(action.tm.clone());
         let entity = match &action.entity_id {
             EntityId::GameEntity => self.get_game_entity(),
             EntityId::NewGameEntity(entity_id) => self.create_game_entity(*entity_id),
@@ -212,9 +248,23 @@ impl HearthstoneGameLog {
         }
 
         let new_game_entity = game_entity::GameEntity::new(self.current_state.get_game_entity());
-        if old_game_entity.current_turn() != new_game_entity.current_turn() {
-            self.snapshots.push(self.current_state.clone());
+        if old_game_entity.current_turn() != new_game_entity.current_turn() ||
+            old_game_entity.simple_step() != new_game_entity.simple_step() {
+            self.create_new_snapshot();
         }
+    }
+
+    pub fn create_new_snapshot(&mut self) {
+        // Create a copy of the current state of the game and push it onto the snapshot list.
+        // Furthermore, at this point we want to extract certain information out of the snapshot
+        // that'll be useful for us in presenting information to the user.
+        let mut new_snapshot = self.current_state.clone();
+        new_snapshot.extract_aux_data();
+        self.snapshots.push(new_snapshot);
+    }
+
+    pub fn finish(&mut self) {
+        self.create_new_snapshot();
     }
 
     pub fn set_player_map(&mut self, m: &HashMap<i32, String>) {
