@@ -1,6 +1,6 @@
 use bytes::Bytes;
 
-use crate::common::StatementCache;
+use squadov_common::StatementCache;
 use crate::error::Error;
 use crate::mysql::connection::{tls, MySqlStream, MAX_PACKET_SIZE};
 use crate::mysql::protocol::connect::{

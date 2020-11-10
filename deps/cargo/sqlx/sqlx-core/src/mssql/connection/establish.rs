@@ -1,4 +1,4 @@
-use crate::common::StatementCache;
+use squadov_common::StatementCache;
 use crate::error::Error;
 use crate::io::Decode;
 use crate::mssql::connection::stream::MssqlStream;

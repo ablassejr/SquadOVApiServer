@@ -1,4 +1,4 @@
-use crate::common::StatementCache;
+use squadov_common::StatementCache;
 use crate::connection::Connection;
 use crate::error::Error;
 use crate::executor::Executor;
