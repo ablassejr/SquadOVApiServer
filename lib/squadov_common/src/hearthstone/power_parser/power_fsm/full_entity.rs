@@ -25,6 +25,10 @@ impl PowerFsmState for FullEntityState {
             }
         ])
     }
+
+    fn handle_tag_attribute(&mut self, tag: &str, val: &str) {
+        self.info.tags.insert(tag.to_string(), val.to_string());
+    }
 }
 
 impl FullEntityState {

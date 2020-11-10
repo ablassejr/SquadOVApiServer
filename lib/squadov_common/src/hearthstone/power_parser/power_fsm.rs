@@ -100,7 +100,7 @@ trait PowerFsmState {
     fn on_leave_state_to_child(&mut self) {}
     fn on_leave_state_to_parent(&mut self) {}
 
-    fn handle_tag_attribute(&self, _tag: &str, _val: &str) {}
+    fn handle_tag_attribute(&mut self, _tag: &str, _val: &str) {}
     // can_receive_action is called whenever we parse a line that contains an
     // action denoted in PowerFsmAction (which should contain the whole list of possible
     // actions we can encounter). If this returns false it indicates that this should
