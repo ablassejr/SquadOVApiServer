@@ -20,6 +20,8 @@ impl PowerFsmState for ShowEntityState {
             HearthstoneGameAction {
                 tm: self.info.tm.clone(),
                 entity_id: EntityId::Existing(self.info.attrs.get("Entity").unwrap().to_string()),
+                real_entity_id: None,
+                current_block_id: None,
                 tags: self.info.tags.clone(),
                 attributes: self.info.attrs.clone()
             }

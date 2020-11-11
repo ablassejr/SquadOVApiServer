@@ -12,6 +12,7 @@ pub struct DefaultPowerState {
 
 impl PowerFsmState for DefaultPowerState {
     fn on_enter_state_from_child(&mut self, previous: &mut Box<dyn PowerFsmState>) {
+        // A catch-all for actions that don't fall within any particular block.
         let action = previous.generate_hearthstone_game_actions();
         if action.is_some() {
             self.game.borrow_mut().advance(action.unwrap());

@@ -40,4 +40,8 @@ fn main() {
     for action in &parser.fsm.game.borrow().actions {
         writeln!(&mut writer, "{}", action).unwrap();
     }
+    writeln!(&mut writer, "=================== BLOCKS ====================").unwrap();
+    for (_bid, block) in &parser.fsm.game.borrow().blocks {
+        writeln!(&mut writer, "{}", block).unwrap();
+    }
 }

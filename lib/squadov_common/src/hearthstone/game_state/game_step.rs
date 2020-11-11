@@ -1,7 +1,10 @@
 use crate::SquadOvError;
 use derive_more::{Display};
+use num_enum::TryFromPrimitive;
+use serde_repr::Serialize_repr;
 
-#[derive(Display, Debug, Clone, Copy, PartialEq)]
+#[derive(Display, Debug, Clone, Copy, PartialEq, Serialize_repr, TryFromPrimitive)]
+#[repr(i32)]
 pub enum GameStep {
     #[display(fmt = "INVALID")]
     Invalid,

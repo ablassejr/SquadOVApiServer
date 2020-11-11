@@ -18,8 +18,8 @@ use derive_more::{Display};
 
 /// An action is represented in the logs as an all-caps string that
 /// starts the line (after any whitespace).
-#[derive(Display)]
-enum PowerFsmAction {
+#[derive(Display,Debug)]
+pub enum PowerFsmAction {
     CreateGame,
     CreateGameEntity,
     CreatePlayerEntity,
@@ -58,10 +58,9 @@ impl std::str::FromStr for PowerFsmAction {
     }
 }
 
-fn is_fsm_action_block_end(a: &PowerFsmAction) -> bool {
+pub fn is_fsm_action_block_end(a: &PowerFsmAction) -> bool {
     match a {
         PowerFsmAction::BlockEnd => true,
-        PowerFsmAction::SubSpellEnd => true,
         _ => false
     }
 }
@@ -108,6 +107,8 @@ trait PowerFsmState {
     fn can_receive_action(&self, _action: &PowerFsmAction) -> bool { false }
 }
 
+#[derive(Display,Debug)]
+#[display(fmt="PowerLogAction[Action:{} Attrs:{:?}]", action, attrs)]
 struct PowerLogAction {
     action: PowerFsmAction,
     attrs: HashMap<String, String>
@@ -218,7 +219,7 @@ impl PowerLogTagAttribute {
     }
 }
 
-fn power_log_action_to_fsm_state(tm: &DateTime<Utc>, action: &PowerLogAction) -> Box<dyn PowerFsmState> {
+fn power_log_action_to_fsm_state(tm: &DateTime<Utc>, action: &PowerLogAction, st: Rc<RefCell<HearthstoneGameLog>>) -> Box<dyn PowerFsmState> {
     let mut info = PowerFsmStateInfo::new(tm);
     info.attrs = action.attrs.clone();
 
@@ -229,8 +230,7 @@ fn power_log_action_to_fsm_state(tm: &DateTime<Utc>, action: &PowerLogAction) ->
         PowerFsmAction::FullEntity => Box::new(full_entity::FullEntityState::new(info)),
         PowerFsmAction::ShowEntity => Box::new(show_entity::ShowEntityState::new(info)),
         PowerFsmAction::TagChange => Box::new(tag_change::TagChangeState::new(info)),
-        PowerFsmAction::BlockStart => Box::new(block_state::BlockState::new(info)),
-        PowerFsmAction::SubSpellStart => Box::new(block_state::BlockState::new(info)),
+        PowerFsmAction::BlockStart => Box::new(block_state::BlockState::new(info, st)),
         _ => Box::new(null_state::NullState::new())
     }
 }
@@ -302,8 +302,13 @@ impl PowerFsm {
             // Note that the exception to this rule are the actions that denote an end of the block in which case
             // popping the latest block off is sufficient.
             if !is_fsm_action_block_end(&parsed_action.action) {
-                let next_state = power_log_action_to_fsm_state(tm, &parsed_action);
+                let next_state = power_log_action_to_fsm_state(tm, &parsed_action, self.game.clone());
                 self.push_state(next_state);
+            } else if self.states.len() > 1 {
+                // If it is an block end then we need to pop off ANOTHER state as the previous pop off
+                // only popped off the latest action within the block. However, we also need to handle
+                // the possibility of empty blocks so only do another pop if the current state
+                self.pop_current_state();
             }
 
             parsed = true;

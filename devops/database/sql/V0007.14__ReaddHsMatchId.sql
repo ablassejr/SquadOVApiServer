@@ -1,0 +1,2 @@
+ALTER TABLE hearthstone_matches
+ADD COLUMN id BIGSERIAL PRIMARY KEY;

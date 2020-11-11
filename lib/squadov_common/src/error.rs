@@ -114,3 +114,9 @@ impl From<std::num::ParseFloatError> for SquadOvError {
         return Self::InternalError(format!("Parse Float {}", err))
     }
 }
+
+impl<T : num_enum::TryFromPrimitive> From<num_enum::TryFromPrimitiveError<T>> for SquadOvError {
+    fn from(err: num_enum::TryFromPrimitiveError<T>) -> Self {
+        return Self::InternalError(format!("TryFromPrimitive {}", err))
+    }
+}

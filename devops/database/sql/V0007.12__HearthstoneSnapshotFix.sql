@@ -1,0 +1,2 @@
+ALTER TABLE hearthstone_snapshots
+DROP CONSTRAINT hearthstone_snapshots_match_uuid_key;

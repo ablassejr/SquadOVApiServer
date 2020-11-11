@@ -6,6 +6,9 @@ use derive_more::{Display};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use regex::Regex;
+use uuid::Uuid;
+use serde::Serialize;
+use serde_repr::Serialize_repr;
 
 #[derive(Display, Clone)]
 pub enum EntityId {
@@ -22,18 +25,75 @@ pub enum EntityId {
     #[display(fmt = "New {}", _0)]
     New(i32),
     #[display(fmt = "Existing {}", _0)]
-    Existing(String)
+    Existing(String),
+    #[display(fmt = "None")]
+    None
+}
+
+#[derive(sqlx::Type, Display, Clone, Copy, Serialize_repr)]
+#[repr(i32)]
+pub enum BlockType {
+    Invalid = 0,
+    Attack = 1,
+    Joust = 2,
+    Power = 3,
+    Trigger = 5,
+    Deaths = 6,
+    Play = 7,
+    Fatigue = 8,
+    Ritual = 9,
+    RevealCard = 10,
+    GameReset = 11,
+    MoveMinion = 12
+}
+
+impl std::str::FromStr for BlockType {
+    type Err = crate::SquadOvError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "INVALID" => BlockType::Invalid,
+            "ATTACK" => BlockType::Attack,
+            "JOUST" => BlockType::Joust,
+            "POWER" => BlockType::Power,
+            "TRIGGER" => BlockType::Trigger,
+            "DEATHS" => BlockType::Deaths,
+            "PLAY" => BlockType::Play,
+            "FATIGUE" => BlockType::Fatigue,
+            "RITUAL" => BlockType::Ritual,
+            "REVEAL_CARD" => BlockType::RevealCard,
+            "GAME_RESET" => BlockType::GameReset,
+            "MOVE_MINION" => BlockType::MoveMinion,
+            _ => return Err(crate::SquadOvError::NotFound)
+        })
+    }
+}
+
+// A block represents a group of actions that represent one "logical" action.
+// A "logical" action is, for example, something that the player does (e.g. playing a card).
+// While the user only did one thing, the game has to perform actions to accomplish that.
+#[derive(sqlx::FromRow, Display, Clone, Serialize)]
+#[display(fmt="HearthstoneGameBlock[Uuid: {} Parent: {:?} Start: {} End: {} Type: {}]", block_id, parent_block, start_action_index, end_action_index, block_type)]
+pub struct HearthstoneGameBlock {
+    pub block_id: Uuid,
+    pub start_action_index: i32,
+    pub end_action_index: i32,
+    pub block_type: BlockType,
+    pub parent_block: Option<Uuid>
 }
 
 // Generally actions are just a matter of creating or modifying an "entity".
-#[derive(Clone,Display)]
-#[display(fmt="HearthstoneGameAction[TM: {}\tEntityId: {}\tTags: {:#?}\tAttributes: {:#?}]", tm, entity_id, tags, attributes)]
+#[derive(Clone,Display, Serialize)]
+#[display(fmt="HearthstoneGameAction[TM: {}\tBlock: {:?}\tEntityId: {}\tTags: {:#?}\tAttributes: {:#?}]", tm, current_block_id, entity_id, tags, attributes)]
 pub struct HearthstoneGameAction {
     // Time at which this action was performed
     pub tm: DateTime<Utc>,
     // Which entity is this action referring to. It's either the
     // GameEntity (modifying game state), a player, a new entity, or an existing entity.
+    #[serde(skip_serializing)]
     pub entity_id: EntityId,
+    pub current_block_id: Option<Uuid>,
+    // Only set once used to advance the game snapshot.
+    pub real_entity_id: Option<i32>,
     // Tags to apply to this specific entity.
     pub tags: HashMap<String, String>,
     // Attributes to apply to this specific entry.
@@ -42,39 +102,42 @@ pub struct HearthstoneGameAction {
     pub attributes: HashMap<String, String>
 }
 
-#[derive(Clone,Display,Debug)]
+#[derive(Clone,Display,Debug,Serialize)]
 #[display(fmt="HearthstoneEntity[EntityId: {}\tTags: {:#?}\tAttributes: {:#?}]", entity_id, tags, attributes)]
 pub struct HearthstoneEntity {
-    entity_id: i32,
+    pub entity_id: i32,
     pub tags: HashMap<String, String>,
     pub attributes: HashMap<String, String>
 }
 
-#[derive(Clone,Display,Debug)]
+#[derive(Clone,Display,Debug,Serialize)]
 #[display(fmt="HearthstoneGameSnapshotAuxData[]")]
 pub struct HearthstoneGameSnapshotAuxData {
-    current_turn: i32,
-    step: game_step::GameStep,
-    current_player_id: i32
+    pub current_turn: i32,
+    pub step: game_step::GameStep,
+    pub current_player_id: i32,
+    pub last_action_index: usize
 }
 
-#[derive(Clone,Display)]
-#[display(fmt="HearthstoneGameSnapshot[Time: {:?}\tGameEntityId: {}\tNameToPlayerId: {:#?}\tPlayerIdToEntityId: {:#?}\tEntities: {:#?}\tAux Data {:?}]", tm, game_entity_id, player_name_to_player_id, player_id_to_entity_id, entities, aux_data)]
+#[derive(Clone,Display,Serialize)]
+#[display(fmt="HearthstoneGameSnapshot[Uuid: {}\tTime: {:?}\tGameEntityId: {}\tNameToPlayerId: {:#?}\tPlayerIdToEntityId: {:#?}\tEntities: {:#?}\tAux Data {:?}]", uuid, tm, game_entity_id, player_name_to_player_id, player_id_to_entity_id, entities, aux_data)]
 pub struct HearthstoneGameSnapshot {
-    tm: Option<DateTime<Utc>>,
+    pub uuid: Uuid,
+    pub tm: Option<DateTime<Utc>>,
     // The ID of the entity to find when the entityId is "GameEntity"
-    game_entity_id: i32,
+    pub game_entity_id: i32,
     // Map to go from player name/tag => Player ID => Entity ID.
-    player_name_to_player_id: HashMap<String, i32>,
-    player_id_to_entity_id: HashMap<i32, i32>,
+    pub player_name_to_player_id: HashMap<String, i32>,
+    pub player_id_to_entity_id: HashMap<i32, i32>,
     // All entities indexed using their entity ID.
-    entities: HashMap<i32, HearthstoneEntity>,
-    aux_data: Option<HearthstoneGameSnapshotAuxData>
+    pub entities: HashMap<i32, HearthstoneEntity>,
+    pub aux_data: Option<HearthstoneGameSnapshotAuxData>
 }
 
 impl HearthstoneGameSnapshot {
     pub fn new() -> Self {
         Self {
+            uuid: Uuid::new_v4(),
             tm: None,
             game_entity_id: 0,
             player_name_to_player_id: HashMap::new(),
@@ -84,7 +147,7 @@ impl HearthstoneGameSnapshot {
         }
     }
 
-    fn extract_aux_data(&mut self) {
+    fn extract_aux_data(&mut self, last_action_index: usize) {
         let entity = game_entity::GameEntity::new(self.get_game_entity());
         let mut current_player_id = 0;
 
@@ -101,11 +164,12 @@ impl HearthstoneGameSnapshot {
         self.aux_data = Some(HearthstoneGameSnapshotAuxData{
             current_turn: entity.current_turn(),
             step: entity.current_step(),
-            current_player_id: current_player_id
+            current_player_id: current_player_id,
+            last_action_index: last_action_index
         });
     }
 
-    fn advance(&mut self, action: &HearthstoneGameAction) {
+    fn advance(&mut self, action: &mut HearthstoneGameAction) {
         self.tm = Some(action.tm.clone());
         let entity = match &action.entity_id {
             EntityId::GameEntity => self.get_game_entity(),
@@ -113,7 +177,8 @@ impl HearthstoneGameSnapshot {
             EntityId::Player(name) => self.get_player_entity(name.clone()),
             EntityId::NewPlayer{entity_id, player_id} => self.create_player_entity(*entity_id, *player_id),
             EntityId::New(id) => self.create_entity(*id),
-            EntityId::Existing(id) => self.get_entity_from_generic_id(id)
+            EntityId::Existing(id) => self.get_entity_from_generic_id(id),
+            _ => None
         };
 
         if entity.is_none() {
@@ -122,6 +187,7 @@ impl HearthstoneGameSnapshot {
         }
 
         let entity = entity.unwrap();
+        action.real_entity_id = Some(entity.entity_id);
         // Merge tags and attributes into the entity.
         for (key, value) in &action.tags {
             entity.tags.insert(key.clone(), value.clone());
@@ -225,7 +291,9 @@ impl HearthstoneGameSnapshot {
 pub struct HearthstoneGameLog {
     pub current_state: HearthstoneGameSnapshot,
     pub snapshots: Vec<HearthstoneGameSnapshot>,
-    pub actions: Vec<HearthstoneGameAction>
+    pub actions: Vec<HearthstoneGameAction>,
+    pub blocks: HashMap<Uuid, HearthstoneGameBlock>,
+    pub current_blocks: Vec<Uuid>
 }
 
 impl HearthstoneGameLog {
@@ -234,7 +302,34 @@ impl HearthstoneGameLog {
             current_state: HearthstoneGameSnapshot::new(),
             snapshots: Vec::new(),
             actions: Vec::new(),
+            blocks: HashMap::new(),
+            current_blocks: Vec::new(),
         }
+    }
+
+    pub fn push_block(&mut self, block_type: BlockType) {
+        let block = HearthstoneGameBlock{
+            block_id: Uuid::new_v4(),
+            // We'll use end_action_index < start_action_index as indicating an empty block.
+            start_action_index: self.actions.len() as i32,
+            end_action_index: 0,
+            block_type: block_type,
+            parent_block: self.current_blocks.last().copied(),
+        };
+
+        self.current_blocks.push(block.block_id.clone());
+        self.blocks.insert(block.block_id, block);
+    }
+
+    pub fn pop_block(&mut self) {
+        match self.current_blocks.pop() {
+            Some(x) => {
+                let block = self.blocks.get_mut(&x).unwrap();
+                block.end_action_index = (self.actions.len() - 1) as i32;
+                ()
+            },
+            None => ()
+        };
     }
 
     pub fn advance(&mut self, actions: Vec<HearthstoneGameAction>) {
@@ -242,8 +337,9 @@ impl HearthstoneGameLog {
         // Namely, we want to keep a snapshot every time the turn updates.
         let old_game_entity = game_entity::GameEntity::new(self.current_state.get_game_entity());
 
-        for a in actions {
-            self.current_state.advance(&a);
+        for mut a in actions {
+            a.current_block_id = self.current_blocks.last().copied();
+            self.current_state.advance(&mut a);
             self.actions.push(a);
         }
 
@@ -259,7 +355,8 @@ impl HearthstoneGameLog {
         // Furthermore, at this point we want to extract certain information out of the snapshot
         // that'll be useful for us in presenting information to the user.
         let mut new_snapshot = self.current_state.clone();
-        new_snapshot.extract_aux_data();
+        new_snapshot.uuid = Uuid::new_v4();
+        new_snapshot.extract_aux_data(self.actions.len() - 1);
         self.snapshots.push(new_snapshot);
     }
 

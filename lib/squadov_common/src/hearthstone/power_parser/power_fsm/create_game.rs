@@ -43,6 +43,8 @@ impl PowerFsmState for CreateGameEntityState {
                 entity_id: EntityId::NewGameEntity(
                     self.info.attrs.get("EntityID").unwrap().parse().unwrap()
                 ),
+                real_entity_id: None,
+                current_block_id: None,
                 tags: self.info.tags.clone(),
                 attributes: self.info.attrs.clone()
             }
@@ -78,6 +80,8 @@ impl PowerFsmState for CreateGamePlayerState {
                     entity_id: self.info.attrs.get("EntityID").unwrap().parse().unwrap(),
                     player_id: self.info.attrs.get("PlayerID").unwrap().parse().unwrap(),
                 },
+                real_entity_id: None,
+                current_block_id: None,
                 tags: self.info.tags.clone(),
                 attributes: self.info.attrs.clone()
             }

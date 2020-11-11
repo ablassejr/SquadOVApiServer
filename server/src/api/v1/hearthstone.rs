@@ -1,4 +1,6 @@
 mod create;
+mod list;
+mod get;
 
 use serde::{Deserialize};
 use uuid::Uuid;
@@ -9,3 +11,5 @@ pub struct HearthstoneMatchGetInput {
 }
 
 pub use create::*;
+pub use list::*;
+pub use get::*;

@@ -20,6 +20,8 @@ impl PowerFsmState for FullEntityState {
             HearthstoneGameAction {
                 tm: self.info.tm.clone(),
                 entity_id: EntityId::New(self.info.attrs.get("ID").unwrap().parse().unwrap()),
+                real_entity_id: None,
+                current_block_id: None,
                 tags: self.info.tags.clone(),
                 attributes: self.info.attrs.clone()
             }

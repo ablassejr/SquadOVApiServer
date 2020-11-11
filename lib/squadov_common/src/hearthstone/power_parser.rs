@@ -5,9 +5,9 @@ use std::fmt;
 use std::collections::HashMap;
 
 pub struct HearthstoneGameState {
-    game_type: GameType,
-    format_type: FormatType,
-    scenario_id: i32,
+    pub game_type: GameType,
+    pub format_type: FormatType,
+    pub scenario_id: i32,
     player_map: HashMap<i32, String>
 }
 

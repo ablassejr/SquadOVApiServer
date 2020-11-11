@@ -125,7 +125,20 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                             .data(web::Json::<Vec<squadov_common::hearthstone::HearthstoneRawLog>>::configure(|cfg| {
                                                 cfg.limit(10 * 1024 * 1024)
                                             }))
+                                        .route("", web::get().to(v1::get_hearthstone_match_handler))
+                                        .route("/logs", web::get().to(v1::get_hearthstone_match_logs_handler))
                                 )
+                        )
+                        .service(
+                            web::scope("/user/{user_id}")
+                                .wrap(access::ApiAccess{
+                                    checker: Rc::new(RefCell::new(access::UserSpecificAccessChecker{
+                                        obtainer: access::UserIdPathSetObtainer{
+                                            key: "user_id"
+                                        },
+                                    })),
+                                })
+                                .route("", web::get().to(v1::list_hearthstone_matches_for_user_handler))
                         )
                 )
                 .service(
