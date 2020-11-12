@@ -74,10 +74,15 @@ impl std::str::FromStr for BlockType {
 #[derive(sqlx::FromRow, Display, Clone, Serialize)]
 #[display(fmt="HearthstoneGameBlock[Uuid: {} Parent: {:?} Start: {} End: {} Type: {}]", block_id, parent_block, start_action_index, end_action_index, block_type)]
 pub struct HearthstoneGameBlock {
+    #[serde(rename = "blockId")]
     pub block_id: Uuid,
+    #[serde(rename = "startActionIndex")]
     pub start_action_index: i32,
+    #[serde(rename = "endActionIndex")]
     pub end_action_index: i32,
+    #[serde(rename = "blockType")]
     pub block_type: BlockType,
+    #[serde(rename = "parentBlock")]
     pub parent_block: Option<Uuid>
 }
 
@@ -91,8 +96,10 @@ pub struct HearthstoneGameAction {
     // GameEntity (modifying game state), a player, a new entity, or an existing entity.
     #[serde(skip_serializing)]
     pub entity_id: EntityId,
+    #[serde(rename = "currentBlockId")]
     pub current_block_id: Option<Uuid>,
     // Only set once used to advance the game snapshot.
+    #[serde(rename = "realEntityId")]
     pub real_entity_id: Option<i32>,
     // Tags to apply to this specific entity.
     pub tags: HashMap<String, String>,
@@ -113,9 +120,12 @@ pub struct HearthstoneEntity {
 #[derive(Clone,Display,Debug,Serialize)]
 #[display(fmt="HearthstoneGameSnapshotAuxData[]")]
 pub struct HearthstoneGameSnapshotAuxData {
+    #[serde(rename = "currentTurn")]
     pub current_turn: i32,
     pub step: game_step::GameStep,
+    #[serde(rename = "currentPlayerId")]
     pub current_player_id: i32,
+    #[serde(rename = "lastActionIndex")]
     pub last_action_index: usize
 }
 
@@ -125,12 +135,16 @@ pub struct HearthstoneGameSnapshot {
     pub uuid: Uuid,
     pub tm: Option<DateTime<Utc>>,
     // The ID of the entity to find when the entityId is "GameEntity"
+    #[serde(rename = "gameEntityId")]
     pub game_entity_id: i32,
     // Map to go from player name/tag => Player ID => Entity ID.
+    #[serde(rename = "playerNameToPlayerId")]
     pub player_name_to_player_id: HashMap<String, i32>,
+    #[serde(rename = "playerIdToEntityId")]
     pub player_id_to_entity_id: HashMap<i32, i32>,
     // All entities indexed using their entity ID.
     pub entities: HashMap<i32, HearthstoneEntity>,
+    #[serde(rename = "auxData")]
     pub aux_data: Option<HearthstoneGameSnapshotAuxData>
 }
 

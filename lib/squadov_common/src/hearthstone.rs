@@ -25,13 +25,13 @@ pub struct HearthstoneGameConnectionInfo {
     pub reconnecting: bool
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize,Serialize)]
 pub struct HearthstoneCardCount {
     pub normal: i32,
     pub golden: i32
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize,Serialize)]
 pub struct HearthstoneDeckSlot {
     pub index: i32,
     #[serde(rename = "cardId")]
@@ -40,7 +40,7 @@ pub struct HearthstoneDeckSlot {
     pub count: HearthstoneCardCount
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize,Serialize)]
 pub struct HearthstoneDeck {
     pub name: String,
     #[serde(rename = "deckId")]
@@ -58,7 +58,7 @@ pub struct HearthstoneDeck {
     pub slots: Vec<HearthstoneDeckSlot>
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize,Serialize)]
 pub struct HearthstoneMedalInfo {
     #[serde(rename = "leagueId")]
     pub league_id: i32,
@@ -74,13 +74,39 @@ pub struct HearthstoneMedalInfo {
     pub legend_index: i32
 }
 
-#[derive(Deserialize)]
+impl Default for HearthstoneMedalInfo {
+    fn default() -> Self {
+        Self {
+            league_id: 0,
+            earned_stars: 0,
+            star_level: 0,
+            best_star_level: 0,
+            win_streak: 0,
+            legend_index: 0
+        }
+    }
+}
+
+#[derive(Deserialize,Serialize)]
 pub struct HearthstonePlayerMedalInfo {
     pub standard: HearthstoneMedalInfo,
     pub wild: HearthstoneMedalInfo
 }
 
-#[derive(Deserialize)]
+impl HearthstonePlayerMedalInfo {
+    pub fn new() -> Self {
+        Self {
+            standard: HearthstoneMedalInfo{
+                ..Default::default()
+            },
+            wild: HearthstoneMedalInfo{
+                ..Default::default()
+            }
+        }
+    }
+}
+
+#[derive(Deserialize,Serialize)]
 pub struct HearthstonePlayer {
     pub name: String,
     pub local: bool,

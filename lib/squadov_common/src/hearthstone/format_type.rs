@@ -1,7 +1,8 @@
 use derive_more::{Display};
 use serde_repr::Serialize_repr;
+use num_enum::TryFromPrimitive;
 
-#[derive(sqlx::Type, Display, Clone, Copy, Serialize_repr)]
+#[derive(sqlx::Type, Display, Clone, Copy, Serialize_repr, TryFromPrimitive)]
 #[repr(i32)]
 pub enum FormatType {
     Unknown,

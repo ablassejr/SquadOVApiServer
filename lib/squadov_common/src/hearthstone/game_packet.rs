@@ -1,48 +1,48 @@
 use serde::Serialize;
 use chrono::{DateTime, Utc};
-use crate::hearthstone::game_state::{HearthstoneGameBlock, HearthstoneGameSnapshot, HearthstoneGameAction, game_step::GameStep};
-use crate::hearthstone::{GameType, FormatType};
+use crate::hearthstone::game_state::{HearthstoneGameBlock, HearthstoneGameSnapshot, HearthstoneGameAction};
+use crate::hearthstone::{GameType, FormatType, HearthstoneDeck, HearthstonePlayer};
 use uuid::Uuid;
+use std::collections::HashMap;
 
 #[derive(Serialize)]
-pub struct HearthstoneSnapshotMetadata {
-    pub current_turn: i32,
-    pub step: GameStep,
-    pub current_player_id: i32,
-    pub last_action_id: i64
-}
-
-#[derive(Serialize)]
-pub struct HearthstoneSerializedSnapshot {
-    pub snapshot: HearthstoneGameSnapshot,
-    pub metadata: HearthstoneSnapshotMetadata
-}
-
-#[derive(Serialize, sqlx::FromRow)]
 pub struct HearthstoneMatchMetadata {
+    #[serde(rename = "gameType")]
     pub game_type: GameType,
+    #[serde(rename = "elapsedSeconds")]
+    pub elapsed_seconds: f64,
+    #[serde(rename = "formatType")]
     pub format_type: FormatType,
+    #[serde(rename = "scenarioId")]
     pub scenario_id: i32,
-    pub match_time: DateTime<Utc>
+    #[serde(rename = "matchTime")]
+    pub match_time: DateTime<Utc>,
+    pub deck: Option<HearthstoneDeck>,
+    pub players: HashMap<i32, HearthstonePlayer>
 }
 
 #[derive(Serialize)]
 pub struct HearthstoneGameLogMetadata {
+    #[serde(rename = "snapshotIds")]
     pub snapshot_ids: Vec<Uuid>,
+    #[serde(rename = "numActions")]
     pub num_actions: i64
 }
 
 #[derive(Serialize)]
 pub struct HearthstoneSerializedGameLog{
-    pub snapshots: Vec<HearthstoneSerializedSnapshot>,
+    pub snapshots: Vec<HearthstoneGameSnapshot>,
     pub actions: Vec<HearthstoneGameAction>,
     pub blocks: Vec<HearthstoneGameBlock>
 }
 
 #[derive(Serialize)]
 pub struct HearthstoneGamePacket {
+    #[serde(rename = "matchUuid")]
     pub match_uuid: Uuid,
     pub metadata: HearthstoneMatchMetadata,
+    #[serde(rename = "logMetadata")]
     pub log_metadata: HearthstoneGameLogMetadata,
-    pub latest_snapshot: Option<HearthstoneSerializedSnapshot>
+    #[serde(rename = "latestSnapshot")]
+    pub latest_snapshot: Option<HearthstoneGameSnapshot>
 }

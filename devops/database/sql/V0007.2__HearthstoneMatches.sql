@@ -32,7 +32,7 @@ CREATE TABLE hearthstone_player_match_deck_slots (
     normal_count INTEGER NOT NULL,
     golden_count INTEGER NOT NULL,
     FOREIGN KEY(deck_id, match_uuid) REFERENCES hearthstone_player_match_decks(deck_id, match_uuid) ON DELETE CASCADE,
-    UNIQUE(deck_id, card_id, match_uuid)
+    UNIQUE(match_uuid, deck_id, card_id)
 );
 
 CREATE TABLE hearthstone_match_players (
