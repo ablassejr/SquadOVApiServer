@@ -112,6 +112,7 @@ pub struct HearthstoneGameAction {
 #[derive(Clone,Display,Debug,Serialize)]
 #[display(fmt="HearthstoneEntity[EntityId: {}\tTags: {:#?}\tAttributes: {:#?}]", entity_id, tags, attributes)]
 pub struct HearthstoneEntity {
+    #[serde(rename = "entityId")]
     pub entity_id: i32,
     pub tags: HashMap<String, String>,
     pub attributes: HashMap<String, String>

@@ -245,11 +245,13 @@ impl api::ApiApplication {
                 COALESCE(EXTRACT(EPOCH FROM (
                     SELECT tm
                     FROM squadov.hearthstone_actions
+                    WHERE match_uuid = $1
                     ORDER BY action_id DESC
                     LIMIT 1
                 )) - EXTRACT(EPOCH FROM (
                     SELECT tm
                     FROM squadov.hearthstone_actions
+                    WHERE match_uuid = $1
                     ORDER BY action_id ASC
                     LIMIT 1
                 )), 0) AS \"elapsed_seconds!\"
