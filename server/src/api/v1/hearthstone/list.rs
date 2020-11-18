@@ -16,6 +16,8 @@ pub struct HearthstoneMatchListEntry {
 
 impl api::ApiApplication {
     pub async fn list_hearthstone_matches_for_user(&self, user_id: i64, start: i64, end: i64) -> Result<Vec<Uuid>, squadov_common::SquadOvError> {
+        // Need to inner join on hearthstone_match_metadata as we won't be able to
+        // successfully display the match otherwise.
         Ok(sqlx::query_as!(
             HearthstoneMatchListEntry,
             "
@@ -23,6 +25,8 @@ impl api::ApiApplication {
             FROM squadov.hearthstone_matches AS hm
             INNER JOIN squadov.hearthstone_match_players AS hmp
                 ON hmp.match_uuid = hm.match_uuid
+            INNER JOIN squadov.hearthstone_match_metadata AS hmm
+                ON hmm.match_uuid = hm.match_uuid
             WHERE hmp.user_id = $1
             ORDER BY hm.id DESC
             LIMIT $2 OFFSET $3

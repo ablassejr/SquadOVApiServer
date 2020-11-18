@@ -303,9 +303,6 @@ impl api::ApiApplication {
                 $3,
                 $4
             )
-            ON CONFLICT (match_uuid, user_id) DO UPDATE
-                SET raw_logs = EXCLUDED.raw_logs,
-                    parsed = FALSE
             ",
             user_id,
             match_uuid,

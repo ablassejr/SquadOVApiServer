@@ -143,6 +143,10 @@ fn parse_action_attributes(attrs: &str) -> HashMap<String, String> {
                 if pidx > lidx && pidx < ridx {
                     ptr = attrs[0..lidx].rfind('=');
                 }
+
+                if !ptr.is_some() {
+                    continue;
+                }
             }
 
             match attrs[0..ptr.unwrap()].rfind(' ') {
