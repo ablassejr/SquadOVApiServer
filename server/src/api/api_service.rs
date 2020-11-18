@@ -140,6 +140,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 })
                                 .route("", web::get().to(v1::list_hearthstone_matches_for_user_handler))
                         )
+                        .service(
+                            web::scope("/cards")
+                                .route("", web::post().to(v1::bulk_get_hearthstone_cards_metadata_handler))
+                        )
                 )
                 .service(
                     web::scope("/vod")

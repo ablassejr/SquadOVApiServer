@@ -1,3 +1,4 @@
+mod cards;
 mod create;
 mod list;
 mod get;
@@ -10,6 +11,7 @@ pub struct HearthstoneMatchGetInput {
     match_uuid: Uuid
 }
 
+pub use cards::*;
 pub use create::*;
 pub use list::*;
 pub use get::*;

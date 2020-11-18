@@ -1,6 +1,6 @@
 use squadov_common::SquadOvError;
 use squadov_common::hearthstone::{HearthstoneDeck, HearthstoneDeckSlot, HearthstoneCardCount, HearthstonePlayer, HearthstonePlayerMedalInfo, FormatType, GameType};
-use squadov_common::hearthstone::game_state::{HearthstoneGameBlock, HearthstoneGameSnapshot, HearthstoneGameSnapshotAuxData, HearthstoneGameAction, HearthstoneEntity, game_step::GameStep, EntityId};
+use squadov_common::hearthstone::game_state::{HearthstoneGameBlock, HearthstoneGameSnapshot, HearthstoneGameSnapshotAuxData, HearthstoneGameAction, HearthstoneEntity, game_step::GameStep, EntityId, ActionType};
 use squadov_common::hearthstone::game_packet::{HearthstoneMatchMetadata, HearthstoneGamePacket, HearthstoneGameLogMetadata, HearthstoneSerializedGameLog};
 use crate::api;
 use actix_web::{web, HttpResponse, HttpRequest};
@@ -341,6 +341,7 @@ impl api::ApiApplication {
             "
             SELECT
                 action_id,
+                action_type,
                 tm,
                 entity_id,
                 tags,
@@ -349,6 +350,7 @@ impl api::ApiApplication {
             FROM squadov.hearthstone_actions
             WHERE match_uuid = $1
                 AND user_id = $2
+            ORDER BY action_id ASC
             ",
             match_uuid,
             user_id
@@ -359,6 +361,7 @@ impl api::ApiApplication {
         for ra in raw_actions {
             actions.push(HearthstoneGameAction{
                 tm: ra.tm,
+                action_type: ActionType::try_from(ra.action_type)?,
                 entity_id: EntityId::None,
                 current_block_id: ra.parent_block,
                 real_entity_id: Some(ra.entity_id),
@@ -377,10 +380,12 @@ impl api::ApiApplication {
                     start_action_index,
                     end_action_index,
                     block_type,
-                    parent_block
+                    parent_block,
+                    entity_id
                 FROM squadov.hearthstone_blocks
                 WHERE match_uuid = $1
                     AND user_id = $2
+                ORDER BY end_action_index ASC
                 ",
             )
                 .bind(match_uuid)

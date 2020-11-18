@@ -1,4 +1,4 @@
-use crate::hearthstone::game_state::{HearthstoneGameAction, HearthstoneGameLog, BlockType};
+use crate::hearthstone::game_state::{HearthstoneGameAction, EntityId, HearthstoneGameLog, BlockType};
 use crate::hearthstone::power_parser::power_fsm::{PowerFsmState, PowerFsmStateInfo, PowerFsmAction, is_fsm_action_block_end};
 use uuid::Uuid;
 use std::rc::Rc;
@@ -8,13 +8,14 @@ pub struct BlockState {
     info: PowerFsmStateInfo,
     game: Rc<RefCell<HearthstoneGameLog>>,
     block_type: BlockType,
+    entity_id: EntityId,
     has_actions: bool
 }
 
 impl PowerFsmState for BlockState {
     fn on_enter_state_from_parent(&mut self, _previous: &mut Box<dyn PowerFsmState>) {
         // Start Block
-        self.game.borrow_mut().push_block(self.block_type);
+        self.game.borrow_mut().push_block(self.block_type, &self.entity_id);
     }
 
     fn on_enter_state_from_child(&mut self, previous: &mut Box<dyn PowerFsmState>) {
@@ -59,14 +60,17 @@ impl PowerFsmState for BlockState {
 }
 impl BlockState {
     pub fn new(info: PowerFsmStateInfo, st: Rc<RefCell<HearthstoneGameLog>>) -> Self {
-        let block_type = match info.attrs.get("BlockType") {
+        let block_type = match &info.attrs.get("BlockType") {
             Some(x) => x.parse().unwrap_or(BlockType::Invalid),
             None => BlockType::Invalid,
         };
+
+        let entity = EntityId::Existing(info.attrs.get("Entity").unwrap().to_string());
         Self {
             info,
             game: st.clone(),
             block_type: block_type,
+            entity_id: entity,
             has_actions: false
         }
     }

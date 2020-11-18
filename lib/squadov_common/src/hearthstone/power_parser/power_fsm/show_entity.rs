@@ -1,4 +1,4 @@
-use crate::hearthstone::game_state::{HearthstoneGameAction, EntityId};
+use crate::hearthstone::game_state::{HearthstoneGameAction, EntityId, ActionType};
 use crate::hearthstone::power_parser::power_fsm::{PowerFsmState, PowerFsmStateInfo, PowerFsmAction};
 use uuid::Uuid;
 
@@ -19,6 +19,7 @@ impl PowerFsmState for ShowEntityState {
         Some(vec![
             HearthstoneGameAction {
                 tm: self.info.tm.clone(),
+                action_type: ActionType::ShowEntity,
                 entity_id: EntityId::Existing(self.info.attrs.get("Entity").unwrap().to_string()),
                 real_entity_id: None,
                 current_block_id: None,

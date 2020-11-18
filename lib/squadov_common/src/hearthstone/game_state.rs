@@ -9,6 +9,7 @@ use regex::Regex;
 use uuid::Uuid;
 use serde::Serialize;
 use serde_repr::Serialize_repr;
+use num_enum::TryFromPrimitive;
 
 #[derive(Display, Clone)]
 pub enum EntityId {
@@ -47,6 +48,16 @@ pub enum BlockType {
     MoveMinion = 12
 }
 
+#[derive(sqlx::Type, Display, Clone, Copy, Serialize_repr, TryFromPrimitive)]
+#[repr(i32)]
+pub enum ActionType {
+    CreateGame,
+    CreatePlayer,
+    FullEntity,
+    ShowEntity,
+    TagChange
+}
+
 impl std::str::FromStr for BlockType {
     type Err = crate::SquadOvError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -72,7 +83,7 @@ impl std::str::FromStr for BlockType {
 // A "logical" action is, for example, something that the player does (e.g. playing a card).
 // While the user only did one thing, the game has to perform actions to accomplish that.
 #[derive(sqlx::FromRow, Display, Clone, Serialize)]
-#[display(fmt="HearthstoneGameBlock[Uuid: {} Parent: {:?} Start: {} End: {} Type: {}]", block_id, parent_block, start_action_index, end_action_index, block_type)]
+#[display(fmt="HearthstoneGameBlock[Uuid: {} Parent: {:?} Start: {} End: {} Type: {} Entity: {}]", block_id, parent_block, start_action_index, end_action_index, block_type, entity_id)]
 pub struct HearthstoneGameBlock {
     #[serde(rename = "blockId")]
     pub block_id: Uuid,
@@ -83,15 +94,19 @@ pub struct HearthstoneGameBlock {
     #[serde(rename = "blockType")]
     pub block_type: BlockType,
     #[serde(rename = "parentBlock")]
-    pub parent_block: Option<Uuid>
+    pub parent_block: Option<Uuid>,
+    #[serde(rename = "entityId")]
+    pub entity_id: i32
 }
 
 // Generally actions are just a matter of creating or modifying an "entity".
 #[derive(Clone,Display, Serialize)]
-#[display(fmt="HearthstoneGameAction[TM: {}\tBlock: {:?}\tEntityId: {}\tTags: {:#?}\tAttributes: {:#?}]", tm, current_block_id, entity_id, tags, attributes)]
+#[display(fmt="HearthstoneGameAction[TM: {}\tType: {}\tBlock: {:?}\tEntityId: {}\tTags: {:#?}\tAttributes: {:#?}]", tm, action_type, current_block_id, entity_id, tags, attributes)]
 pub struct HearthstoneGameAction {
     // Time at which this action was performed
     pub tm: DateTime<Utc>,
+    #[serde(rename = "actionType")]
+    pub action_type: ActionType,
     // Which entity is this action referring to. It's either the
     // GameEntity (modifying game state), a player, a new entity, or an existing entity.
     #[serde(skip_serializing)]
@@ -169,7 +184,7 @@ impl HearthstoneGameSnapshot {
         // Needs the clone because rust doesn't like the reference borrow for player_id_to_entity_id (and thus self)
         // coupled with the mutable borrow of self in get_entity_from_id.
         for (pid, eid) in self.player_id_to_entity_id.clone() {
-            let player = player_entity::PlayerEntity::new(self.get_entity_from_id(eid));    
+            let player = player_entity::PlayerEntity::new(self.get_entity_from_id(eid));
             if player.is_current_player() {
                 current_player_id = pid;
                 break;
@@ -177,16 +192,15 @@ impl HearthstoneGameSnapshot {
         } 
 
         self.aux_data = Some(HearthstoneGameSnapshotAuxData{
-            current_turn: entity.current_turn(),
+            current_turn: entity.current_turn() ,
             step: entity.current_step(),
             current_player_id: current_player_id,
             last_action_index: last_action_index
         });
     }
 
-    fn advance(&mut self, action: &mut HearthstoneGameAction) {
-        self.tm = Some(action.tm.clone());
-        let entity = match &action.entity_id {
+    fn entity_from_entity_id(&mut self, entity_id: &EntityId) -> Option<&mut HearthstoneEntity> {
+        match entity_id {
             EntityId::GameEntity => self.get_game_entity(),
             EntityId::NewGameEntity(entity_id) => self.create_game_entity(*entity_id),
             EntityId::Player(name) => self.get_player_entity(name.clone()),
@@ -194,7 +208,12 @@ impl HearthstoneGameSnapshot {
             EntityId::New(id) => self.create_entity(*id),
             EntityId::Existing(id) => self.get_entity_from_generic_id(id),
             _ => None
-        };
+        }
+    }
+
+    fn advance(&mut self, action: &mut HearthstoneGameAction) {
+        self.tm = Some(action.tm.clone());
+        let entity = self.entity_from_entity_id(&action.entity_id);
 
         if entity.is_none() {
             log::warn!("Unknown Entity: {}", &action.entity_id);
@@ -322,7 +341,9 @@ impl HearthstoneGameLog {
         }
     }
 
-    pub fn push_block(&mut self, block_type: BlockType) {
+    pub fn push_block(&mut self, block_type: BlockType, entity_id: &EntityId) {
+        let entity = self.current_state.entity_from_entity_id(entity_id);
+
         let block = HearthstoneGameBlock{
             block_id: Uuid::new_v4(),
             // We'll use end_action_index < start_action_index as indicating an empty block.
@@ -330,6 +351,10 @@ impl HearthstoneGameLog {
             end_action_index: 0,
             block_type: block_type,
             parent_block: self.current_blocks.last().copied(),
+            entity_id: match entity {
+                Some(x) => x.entity_id,
+                None => 0
+            }
         };
 
         self.current_blocks.push(block.block_id.clone());
@@ -359,7 +384,9 @@ impl HearthstoneGameLog {
         }
 
         let new_game_entity = game_entity::GameEntity::new(self.current_state.get_game_entity());
-        if old_game_entity.current_turn() != new_game_entity.current_turn() ||
+        // Check if we're about to advance to the next turn
+        if (new_game_entity.current_step() == game_step::GameStep::MainNext && new_game_entity.current_step() != old_game_entity.current_step()) ||
+        // Check if we advanced from mulligan to the first turn
             old_game_entity.simple_step() != new_game_entity.simple_step() {
             self.create_new_snapshot();
         }

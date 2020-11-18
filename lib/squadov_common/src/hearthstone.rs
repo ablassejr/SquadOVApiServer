@@ -40,6 +40,15 @@ pub struct HearthstoneDeckSlot {
     pub count: HearthstoneCardCount
 }
 
+#[derive(Serialize)]
+pub struct HearthstoneCardMetadata {
+    #[serde(rename = "cardId")]
+    pub card_id: String,
+    pub name: String,
+    pub cost: i32,
+    pub rarity: i32
+}
+
 #[derive(Deserialize,Serialize)]
 pub struct HearthstoneDeck {
     pub name: String,

@@ -9,7 +9,7 @@ impl PlayerEntity {
         match entity {
             Some(e) => Self{
                 current_player: match e.tags.get("CURRENT_PLAYER") {
-                    Some(x) => x.parse::<i32>().unwrap_or(0) == 0,
+                    Some(x) => x.parse::<i32>().unwrap_or(0) == 1,
                     None => false
                 }
             },

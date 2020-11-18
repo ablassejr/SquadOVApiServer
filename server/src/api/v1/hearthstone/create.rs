@@ -358,7 +358,8 @@ impl api::ApiApplication {
                 entity_id,
                 tags,
                 attributes,
-                parent_block
+                parent_block,
+                action_type
             )
             VALUES
         "));
@@ -371,7 +372,8 @@ impl api::ApiApplication {
                 {entity_id},
                 '{tags}',
                 '{attributes}',
-                {parent_block}
+                {parent_block},
+                {action_type}
             )",
                 match_uuid=uuid,
                 user_id=user_id,
@@ -380,7 +382,8 @@ impl api::ApiApplication {
                 entity_id=m.real_entity_id.unwrap_or(0),
                 tags=squadov_common::sql_format_json(&m.tags)?,
                 attributes=squadov_common::sql_format_json(&m.attributes)?,
-                parent_block=squadov_common::sql_format_option_string(&m.current_block_id)
+                parent_block=squadov_common::sql_format_option_string(&m.current_block_id),
+                action_type=m.action_type as i32,
             ));
 
             if idx != actions.len() - 1 {
@@ -525,7 +528,8 @@ impl api::ApiApplication {
                 start_action_index,
                 end_action_index,
                 block_type,
-                parent_block
+                parent_block,
+                entity_id
             )
             VALUES
         ".to_string());
@@ -538,7 +542,8 @@ impl api::ApiApplication {
                 {start_action_index},
                 {end_action_index},
                 {block_type},
-                {parent_block}
+                {parent_block},
+                {entity_id}
             )",
                 match_uuid=uuid,
                 user_id=user_id,
@@ -546,7 +551,8 @@ impl api::ApiApplication {
                 start_action_index=block.start_action_index,
                 end_action_index=block.end_action_index,
                 block_type=block.block_type as i32,
-                parent_block=squadov_common::sql_format_option_string(&block.parent_block)
+                parent_block=squadov_common::sql_format_option_string(&block.parent_block),
+                entity_id=block.entity_id
             ));
             sql.push(", ".to_string());
         }
