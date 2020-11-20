@@ -11,6 +11,36 @@ use std::convert::TryFrom;
 use std::collections::HashMap;
 
 impl api::ApiApplication {
+    pub async fn get_player_entity_from_hearthstone_snapshot(&self, snapshot_uuid: &Uuid, user_id: i64) -> Result<HearthstoneEntity, SquadOvError> {
+        let raw_entity = sqlx::query!(
+            "
+            SELECT
+                hse.entity_id,
+                hse.tags,
+                hse.attributes
+            FROM squadov.hearthstone_snapshots AS hs
+            INNER JOIN squadov.hearthstone_match_players AS hmp
+                ON hmp.match_uuid = hs.match_uuid
+            INNER JOIN squadov.hearthstone_snapshots_player_map AS pm
+                ON pm.player_id = hmp.player_match_id AND pm.snapshot_id = hs.snapshot_id
+            INNER JOIN squadov.hearthstone_snapshots_entities AS hse
+                ON hse.entity_id = pm.entity_id AND hse.snapshot_id = hs.snapshot_id
+            WHERE hse.snapshot_id = $1
+                AND hmp.user_id = $2
+            ORDER BY hse.entity_id ASC
+            ",
+            snapshot_uuid,
+            user_id
+        )
+            .fetch_one(&*self.pool)
+            .await?;
+        
+        Ok(HearthstoneEntity{
+            entity_id: raw_entity.entity_id,
+            tags: serde_json::from_value(raw_entity.tags)?,
+            attributes: serde_json::from_value(raw_entity.attributes)?
+        })
+    }
 
     pub async fn get_hearthstone_snapshot(&self, snapshot_uuid: &Uuid) -> Result<HearthstoneGameSnapshot, SquadOvError> {
         let raw_metadata = sqlx::query!(
@@ -166,6 +196,21 @@ impl api::ApiApplication {
         Ok(ret_map)
     }
 
+    pub async fn get_hearthstone_snapshots_for_match(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<Uuid>, SquadOvError> {
+        Ok(sqlx::query_scalar(
+            "
+            SELECT hs.snapshot_id
+            FROM squadov.hearthstone_snapshots AS hs
+            WHERE hs.match_uuid = $1 AND hs.user_id = $2
+            ORDER BY hs.last_action_id ASC
+            ",
+        )
+            .bind(match_uuid)
+            .bind(user_id)
+            .fetch_all(&*self.pool)
+            .await?)
+    }
+
     pub async fn get_hearthstone_match_for_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<HearthstoneGamePacket, SquadOvError> {
         // Give users some summary data about the match and then just dump the latest snapshot on them and let them figure out what
         // data they need from the snapshot on their own.
@@ -211,18 +256,7 @@ impl api::ApiApplication {
         
         // Is there a way to combine this into 1 SQL statement?
         let log_metadata = HearthstoneGameLogMetadata{
-            snapshot_ids: sqlx::query_scalar(
-                "
-                SELECT hs.snapshot_id
-                FROM squadov.hearthstone_snapshots AS hs
-                WHERE hs.match_uuid = $1 AND hs.user_id = $2
-                ORDER BY hs.last_action_id ASC
-                ",
-            )
-                .bind(match_uuid)
-                .bind(user_id)
-                .fetch_all(&*self.pool)
-                .await?,
+            snapshot_ids: self.get_hearthstone_snapshots_for_match(match_uuid, user_id).await?,
             num_actions: sqlx::query_scalar(
                 "
                 SELECT COUNT(action_id)

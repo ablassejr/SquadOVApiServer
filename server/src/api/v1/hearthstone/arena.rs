@@ -7,8 +7,8 @@ use sqlx::{Transaction, Postgres};
 use std::sync::Arc;
 use uuid::Uuid;
 use chrono::{DateTime,Utc};
-use squadov_common::hearthstone::HearthstoneArenaRun;
-use squadov_common::hearthstone::HearthstoneDeck;
+use squadov_common::hearthstone::game_state::play_state::PlayState;
+use squadov_common::hearthstone::{HearthstoneArenaRun, HearthstoneDeck};
 
 #[derive(Deserialize)]
 pub struct CreateHearthstoneArenaDeckInput {
@@ -127,7 +127,10 @@ impl api::ApiApplication {
             FROM squadov.match_to_match_collection AS mmc
             INNER JOIN squadov.hearthstone_arena_drafts AS had
                 ON had.collection_uuid = mmc.collection_uuid AND had.user_id = $2
+            INNER JOIN squadov.hearthstone_matches AS hm
+                ON hm.match_uuid = mmc.match_uuid
             WHERE mmc.collection_uuid = $1
+            ORDER BY hm.match_time DESC
             ",
         )
             .bind(collection_uuid)
@@ -157,11 +160,40 @@ impl api::ApiApplication {
             .fetch_one(&*self.pool)
             .await?;
 
+        let mut wins = 0;
+        let mut loss = 0;
+
+        let matches = self.list_matches_for_arena_run(collection_uuid, user_id).await?;
+        if !matches.is_empty() {
+            let match_players = self.get_hearthstone_players_for_match(&matches[0], user_id).await?;
+            for (_, player) in match_players {
+                if player.local {
+                    wins = player.arena_wins;
+                    loss = player.arena_loss;
+                }
+            }
+
+            let snapshot_ids = self.get_hearthstone_snapshots_for_match(&matches[0], user_id).await?;
+            let player_entity = match snapshot_ids.last() {
+                Some(x) => Some(self.get_player_entity_from_hearthstone_snapshot(x, user_id).await?),
+                None => None
+            };
+
+            if player_entity.is_some() {
+                let player_entity = player_entity.unwrap();
+                if player_entity.play_state() == PlayState::Won {
+                    wins += 1;
+                } else {
+                    loss += 1;
+                }
+            }
+        }
+
         Ok(HearthstoneArenaRun{
             arena_uuid: collection_uuid.clone(),
-            deck: self.get_hearthstone_deck(basic_data.draft_deck_id, user_id).await?,
-            wins: 0,
-            loss: 0,
+            deck: self.get_latest_hearthstone_deck(basic_data.draft_deck_id, user_id).await?,
+            wins,
+            loss,
             timestamp: basic_data.creation_time
         })
     }

@@ -1,26 +1,28 @@
 use squadov_common::SquadOvError;
 use crate::api;
 use sqlx::{Transaction, Executor, Postgres};
-use squadov_common::hearthstone::{HearthstoneDeck, HearthstoneDeckSlot, HearthstoneCardCount};
+use squadov_common::hearthstone::{HearthstoneDeck, HearthstoneDeckSlot, HearthstoneCardCount, are_deck_slots_equivalent};
 use uuid::Uuid;
 use chrono::Utc;
 
 impl api::ApiApplication {
     pub async fn get_hearthstone_deck_for_match_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<Option<HearthstoneDeck>, SquadOvError> {
-        let deck_id : Option<i64> = sqlx::query_scalar(
+        let data = sqlx::query!(
             "
-            SELECT deck_id
-            FROM squadov.hearthstone_match_user_deck
-            WHERE match_uuid = $1 AND user_id = $2
-            "
+            SELECT hmud.deck_version_id, hdv.deck_id
+            FROM squadov.hearthstone_match_user_deck AS hmud
+            INNER JOIN squadov.hearthstone_deck_versions AS hdv
+                ON hdv.version_id = hmud.deck_version_id
+            WHERE hmud.match_uuid = $1 AND hmud.user_id = $2
+            ",
+            match_uuid,
+            user_id
         )
-            .bind(match_uuid)
-            .bind(user_id)
             .fetch_optional(&*self.pool)
             .await?;
         
-        Ok(match deck_id {
-            Some(x) => self.get_hearthstone_deck(x, user_id).await?,
+        Ok(match data {
+            Some(x) => self.get_versioned_hearthstone_deck(x.deck_id, x.deck_version_id, user_id).await?,
             None => None
         })
     }
@@ -39,12 +41,12 @@ impl api::ApiApplication {
             .await?;
         
         Ok(match deck_id {
-            Some(x) => self.get_hearthstone_deck(x, user_id).await?,
+            Some(x) => self.get_latest_hearthstone_deck(x, user_id).await?,
             None => None
         })
     }
 
-    pub async fn get_hearthstone_deck(&self, deck_id: i64, user_id: i64) -> Result<Option<HearthstoneDeck>, SquadOvError> {
+    pub async fn get_versioned_hearthstone_deck(&self, deck_id: i64, version_id: i64, user_id: i64) -> Result<Option<HearthstoneDeck>, SquadOvError> {
         let raw_deck = sqlx::query!(
             "
             SELECT
@@ -70,34 +72,9 @@ impl api::ApiApplication {
         }
 
         let raw_deck = raw_deck.unwrap();
-        let raw_slots = sqlx::query!(
-            "
-            SELECT
-                index,
-                card_id,
-                owned,
-                normal_count,
-                golden_count
-            FROM squadov.hearthstone_deck_slots
-            WHERE deck_id = $1
-            ",
-            deck_id,
-        )
-            .fetch_all(&*self.pool)
-            .await?;
 
         Ok(Some(HearthstoneDeck{
-            slots: raw_slots.into_iter().map(|x| {
-                HearthstoneDeckSlot {
-                    index: x.index,
-                    card_id: x.card_id,
-                    owned: x.owned,
-                    count: HearthstoneCardCount{
-                        normal: x.normal_count,
-                        golden: x.golden_count
-                    },
-                }
-            }).collect(),
+            slots: self.get_hearthstone_deck_slots_for_version(version_id).await?,
             name: raw_deck.name,
             deck_id: raw_deck.deck_id,
             hero_card: raw_deck.hero_card,
@@ -108,11 +85,107 @@ impl api::ApiApplication {
         }))
     }
 
+    pub async fn get_latest_hearthstone_deck(&self, deck_id: i64, user_id: i64) -> Result<Option<HearthstoneDeck>, SquadOvError> {
+        let version = self.get_latest_deck_version_id(deck_id).await?;
+        if version.is_none() {
+            Ok(None)
+        } else {
+            Ok(self.get_versioned_hearthstone_deck(deck_id, version.unwrap(), user_id).await?)
+        }
+    }
+
+    pub async fn get_latest_deck_version_id(&self, deck_id: i64) -> Result<Option<i64>, SquadOvError> {
+        Ok(sqlx::query_scalar(
+            "
+            SELECT version_id
+            FROM squadov.hearthstone_deck_versions
+            WHERE deck_id = $1
+            ORDER BY version_id DESC
+            LIMIT 1
+            "
+        )
+            .bind(deck_id)
+            .fetch_optional(&*self.pool)
+            .await?)
+    }
+
+    pub async fn create_new_deck_version(&self, tx : &mut Transaction<'_, Postgres>, deck_id: i64) -> Result<i64, SquadOvError> {
+        Ok(sqlx::query_scalar(
+            "
+            INSERT INTO squadov.hearthstone_deck_versions(deck_id)
+            VALUES ($1)
+            RETURNING version_id
+            "
+        )
+            .bind(deck_id)
+            .fetch_one(tx)
+            .await?)
+    }
+
+    pub async fn get_latest_hearthstone_deck_slots_for_deck(&self, deck_id: i64) -> Result<Vec<HearthstoneDeckSlot>, SquadOvError> {
+        let version_id = self.get_latest_deck_version_id(deck_id).await?;
+        Ok(match version_id {
+            Some(id) => self.get_hearthstone_deck_slots_for_version(id).await?,
+            None => vec![],
+        })
+    }
+    
+    pub async fn get_hearthstone_deck_slots_for_version(&self, version_id: i64) -> Result<Vec<HearthstoneDeckSlot>, SquadOvError> {
+        let raw_slots = sqlx::query!(
+            "
+            SELECT
+                index,
+                card_id,
+                owned,
+                normal_count,
+                golden_count
+            FROM squadov.hearthstone_deck_slots
+            WHERE deck_version_id = $1
+            ",
+            version_id,
+        )
+            .fetch_all(&*self.pool)
+            .await?;
+
+        Ok(raw_slots.into_iter().map(|x| {
+            HearthstoneDeckSlot {
+                index: x.index,
+                card_id: x.card_id,
+                owned: x.owned,
+                count: HearthstoneCardCount{
+                    normal: x.normal_count,
+                    golden: x.golden_count
+                },
+            }
+        }).collect())
+    }
+
     pub async fn store_hearthstone_deck_slots(&self, tx : &mut Transaction<'_, Postgres>, deck_id: i64, slots: &[HearthstoneDeckSlot]) -> Result<(), SquadOvError> {
+        // Deck slots need to be able to handle the case where we're using the same deck ID but it has different cards in it.
+        // From what I gather, a new deck ID is only created when the user creates a new deck in their collection but is not
+        // created when the user edits an existing deck with new cards. Thus, we need to create a concept of "deck version."
+        // If the stored slots don't EXACTLY match the input slots, then we have to assume that the user edited their deck and
+        // created a new version of the deck. We associate versions of a deck with a match so that the user is still able to see
+        // exactly what deck they used in any given match.
+        let latest_slots = self.get_latest_hearthstone_deck_slots_for_deck(deck_id).await?;
+        let are_equivalent = are_deck_slots_equivalent(&latest_slots, slots);
+        let version_id = if !latest_slots.is_empty() && are_equivalent {
+            self.get_latest_deck_version_id(deck_id).await?.unwrap()
+        } else {
+            self.create_new_deck_version(tx, deck_id).await?
+        };
+
+        // This should be here AFTER creating a new version because we want
+        // a version to be registered even if the deck is empty (e.g. when the
+        // user starts an arena draft).
+        if slots.len() == 0 {
+            return Ok(())
+        }
+
         let mut sql : Vec<String> = Vec::new();
         sql.push(String::from("
             INSERT INTO squadov.hearthstone_deck_slots (
-                deck_id,
+                deck_version_id,
                 index,
                 card_id,
                 owned,
@@ -122,17 +195,16 @@ impl api::ApiApplication {
             VALUES
         "));
 
-        let mut added = 0;
         for (idx, m) in slots.iter().enumerate() {
             sql.push(format!("(
-                {deck_id},
+                {deck_version_id},
                 {index},
                 '{card_id}',
                 {owned},
                 {normal_count},
                 {golden_count}
             )",
-                deck_id=deck_id,
+                deck_version_id=version_id,
                 index=m.index,
                 card_id=&m.card_id,
                 owned=m.owned,
@@ -143,14 +215,10 @@ impl api::ApiApplication {
             if idx != slots.len() - 1 {
                 sql.push(String::from(","));
             }
-
-            added += 1;
         }
 
         sql.push(String::from(" ON CONFLICT DO NOTHING"));
-        if added > 0 {
-            sqlx::query(&sql.join("")).execute(tx).await?;
-        }
+        sqlx::query(&sql.join("")).execute(tx).await?;
         Ok(())
     }
 
@@ -194,7 +262,14 @@ impl api::ApiApplication {
                     $7,
                     $8
                 )
-                ON CONFLICT DO NOTHING
+                ON CONFLICT (deck_id) DO UPDATE SET
+                    user_id = EXCLUDED.user_id,
+                    deck_name = EXCLUDED.deck_name,
+                    hero_card = EXCLUDED.hero_card,
+                    hero_premium = EXCLUDED.hero_premium,
+                    deck_type = EXCLUDED.deck_type,
+                    create_date = EXCLUDED.create_date,
+                    is_wild = EXCLUDED.is_wild
                 ",
                 user_id,
                 deck.deck_id,
@@ -215,15 +290,15 @@ impl api::ApiApplication {
         sqlx::query!(
             "
             INSERT INTO squadov.hearthstone_match_user_deck (
-                deck_id,
+                deck_version_id,
                 user_id,
                 match_uuid
             )
-            VALUES (
-                $1,
-                $2,
-                $3
-            )
+            SELECT version_id, $2, $3
+            FROM squadov.hearthstone_deck_versions
+            WHERE deck_id = $1
+            ORDER BY version_id DESC
+            LIMIT 1
             ",
             deck_id,
             user_id,

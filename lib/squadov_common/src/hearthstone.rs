@@ -12,6 +12,7 @@ use serde::{Serialize,Deserialize};
 use chrono::{DateTime, Utc, serde::ts_seconds};
 use ipnetwork::IpNetwork;
 use uuid::Uuid;
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 pub struct HearthstoneGameConnectionInfo {
@@ -26,19 +27,49 @@ pub struct HearthstoneGameConnectionInfo {
     pub reconnecting: bool
 }
 
-#[derive(Deserialize,Serialize)]
+#[derive(Deserialize,Serialize,PartialEq)]
 pub struct HearthstoneCardCount {
     pub normal: i32,
     pub golden: i32
 }
 
-#[derive(Deserialize,Serialize)]
+#[derive(Deserialize,Serialize,PartialEq)]
 pub struct HearthstoneDeckSlot {
     pub index: i32,
     #[serde(rename = "cardId")]
     pub card_id: String,
     pub owned: bool,
     pub count: HearthstoneCardCount
+}
+
+pub fn are_deck_slots_equivalent(a: &[HearthstoneDeckSlot], b: &[HearthstoneDeckSlot]) -> bool {
+    let mut a_map: HashMap<String, &HearthstoneDeckSlot> = HashMap::new();
+    for a_slot in a {
+        a_map.insert(a_slot.card_id.clone(), a_slot);
+    }
+
+    let mut b_map: HashMap<String, &HearthstoneDeckSlot> = HashMap::new();
+    for b_slot in b {
+        b_map.insert(b_slot.card_id.clone(), b_slot);
+    }
+
+    for b_slot in b {
+        if !a_map.contains_key(&b_slot.card_id) {
+            return false;
+        }
+
+        if a_map.get(&b_slot.card_id).unwrap() != &b_slot {
+            return false;
+        }
+    }
+
+    for a_slot in a {
+        if !b_map.contains_key(&a_slot.card_id) {
+            return false;
+        }
+    }
+
+    true
 }
 
 #[derive(Serialize)]

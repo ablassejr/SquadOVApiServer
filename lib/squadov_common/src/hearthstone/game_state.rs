@@ -1,6 +1,7 @@
 pub mod game_entity;
 pub mod game_step;
 pub mod player_entity;
+pub mod play_state;
 
 use derive_more::{Display};
 use chrono::{DateTime, Utc};
@@ -10,6 +11,7 @@ use uuid::Uuid;
 use serde::Serialize;
 use serde_repr::Serialize_repr;
 use num_enum::TryFromPrimitive;
+use std::str::FromStr;
 
 #[derive(Display, Clone)]
 pub enum EntityId {
@@ -131,6 +133,16 @@ pub struct HearthstoneEntity {
     pub entity_id: i32,
     pub tags: HashMap<String, String>,
     pub attributes: HashMap<String, String>
+}
+
+impl HearthstoneEntity {
+    pub fn play_state(&self) -> play_state::PlayState {
+        println!("PLAYSTATE TAG: {:?}", self.tags.get("PLAYSTATE"));
+        match self.tags.get("PLAYSTATE") {
+            Some(playstate) => play_state::PlayState::from_str(playstate).unwrap_or(play_state::PlayState::Invalid),
+            None => play_state::PlayState::Invalid
+        }
+    }
 }
 
 #[derive(Clone,Display,Debug,Serialize)]

@@ -520,6 +520,11 @@ pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstone
     let uuid = app.create_hearthstone_match(&mut tx, &data.timestamp, &data.info).await?;
     match &data.deck {
         Some(x) => {
+            // store_hearthstone_deck MUST be called before associate_deck_with_match_user because
+            // associate_deck_with_match_user assumes that the latest deck is the correct deck version
+            // to associate with the match. So if associate_deck_with_match_user is called before
+            // store_hearthstone_deck, it'll be possible for us to associate an older version of the deck
+            // with the match incorrectly.
             app.store_hearthstone_deck(&mut tx, &x, session.user.id).await?;
             app.associate_deck_with_match_user(&mut tx, x.deck_id, &uuid, session.user.id).await?;
         },
