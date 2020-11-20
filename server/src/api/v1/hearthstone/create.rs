@@ -2,6 +2,7 @@ use squadov_common;
 use squadov_common::hearthstone;
 use squadov_common::hearthstone::{power_parser::{HearthstonePowerLogParser, HearthstoneGameState} };
 use squadov_common::hearthstone::game_state::{HearthstoneGameLog, HearthstoneGameAction, HearthstoneGameSnapshot, HearthstoneGameBlock};
+use squadov_common::hearthstone::GameType;
 use crate::api;
 use actix_web::{web, HttpResponse, HttpRequest};
 use serde::{Deserialize};
@@ -29,12 +30,12 @@ impl api::ApiApplication {
         Ok(sqlx::query_as!(
             v1::Match,
             "
-            SELECT match_uuid as \"uuid\"
-            FROM squadov.hearthstone_matches
-            WHERE match_day = $1
-                AND server_ip = $2
-                AND port = $3
-                AND game_id = $4
+            SELECT hm.match_uuid as \"uuid\"
+            FROM squadov.hearthstone_matches AS hm
+            WHERE hm.match_day = $1
+                AND hm.server_ip = $2
+                AND hm.port = $3
+                AND hm.game_id = $4
             ",
             timestamp.date().naive_utc(),
             info.ip,
@@ -90,99 +91,6 @@ impl api::ApiApplication {
         };
 
         Ok(current_match.uuid)
-    }
-
-    pub async fn store_hearthstone_deck_slots(&self, tx : &mut Transaction<'_, Postgres>, match_uuid: &Uuid, deck_id: i64, slots: &[hearthstone::HearthstoneDeckSlot]) -> Result<(), squadov_common::SquadOvError> {
-        let mut sql : Vec<String> = Vec::new();
-        sql.push(String::from("
-            INSERT INTO squadov.hearthstone_player_match_deck_slots (
-                match_uuid,
-                deck_id,
-                index,
-                card_id,
-                owned,
-                normal_count,
-                golden_count
-            )
-            VALUES
-        "));
-
-        let mut added = 0;
-        for (idx, m) in slots.iter().enumerate() {
-            sql.push(format!("(
-                '{match_uuid}',
-                {deck_id},
-                {index},
-                '{card_id}',
-                {owned},
-                {normal_count},
-                {golden_count}
-            )",
-                match_uuid=match_uuid,
-                deck_id=deck_id,
-                index=m.index,
-                card_id=&m.card_id,
-                owned=m.owned,
-                normal_count=m.count.normal,
-                golden_count=m.count.golden,
-            ));
-
-            if idx != slots.len() - 1 {
-                sql.push(String::from(","));
-            }
-
-            added += 1;
-        }
-
-        sql.push(String::from(" ON CONFLICT DO NOTHING"));
-        if added > 0 {
-            sqlx::query(&sql.join("")).execute(tx).await?;
-        }
-        Ok(())
-    }
-
-    pub async fn store_hearthstone_deck_for_user_match(&self, tx : &mut Transaction<'_, Postgres>, deck: &hearthstone::HearthstoneDeck, match_uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
-        tx.execute(
-            sqlx::query!(
-                "
-                INSERT INTO squadov.hearthstone_player_match_decks (
-                    user_id,
-                    match_uuid,
-                    deck_id,
-                    deck_name,
-                    hero_card,
-                    hero_premium,
-                    deck_type,
-                    create_date,
-                    is_wild
-                )
-                VALUES (
-                    $1,
-                    $2,
-                    $3,
-                    $4,
-                    $5,
-                    $6,
-                    $7,
-                    $8,
-                    $9
-                )
-                ON CONFLICT DO NOTHING
-                ",
-                user_id,
-                match_uuid,
-                deck.deck_id,
-                deck.name,
-                deck.hero_card,
-                deck.hero_premium,
-                deck.deck_type,
-                deck.create_date,
-                deck.is_wild
-            )
-        ).await?;
-
-        self.store_hearthstone_deck_slots(tx, match_uuid, deck.deck_id, &deck.slots).await?;
-        Ok(())
     }
 
     pub async fn store_hearthstone_player_medal_info(&self, tx : &mut Transaction<'_, Postgres>, player_match_id: i32, match_uuid: &Uuid, info: &hearthstone::HearthstoneMedalInfo, is_standard: bool) -> Result<(), squadov_common::SquadOvError> {
@@ -577,6 +485,28 @@ impl api::ApiApplication {
         ).await?;
         Ok(())
     }
+
+    pub async fn associate_hearthstone_match_with_arena_run(&self, tx: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+        // Note that each hearthstone match could be associated with 2 arena runs - one for each player.
+        sqlx::query!(
+            "
+            INSERT INTO squadov.match_to_match_collection (
+                match_uuid,
+                collection_uuid
+            )
+            SELECT $1, had.collection_uuid
+            FROM squadov.hearthstone_arena_drafts AS had
+            INNER JOIN squadov.hearthstone_decks AS hpmd
+                ON hpmd.deck_id = had.draft_deck_id AND hpmd.user_id = had.user_id
+            WHERE had.user_id = $2
+            ",
+            match_uuid,
+            user_id
+        )
+            .execute(tx)
+            .await?;
+        Ok(())
+    }
 }
 
 pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstoneMatchInput>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
@@ -589,7 +519,10 @@ pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstone
     let mut tx = app.pool.begin().await?;
     let uuid = app.create_hearthstone_match(&mut tx, &data.timestamp, &data.info).await?;
     match &data.deck {
-        Some(x) => app.store_hearthstone_deck_for_user_match(&mut tx, &x, &uuid, session.user.id).await?,
+        Some(x) => {
+            app.store_hearthstone_deck(&mut tx, &x, session.user.id).await?;
+            app.associate_deck_with_match_user(&mut tx, x.deck_id, &uuid, session.user.id).await?;
+        },
         None => (),
     };
 
@@ -621,6 +554,13 @@ pub async fn upload_hearthstone_logs_handler(data : web::Json<Vec<hearthstone::H
     parser.parse(&data)?;
 
     app.store_hearthstone_match_metadata(&mut tx, &parser.state, &path.match_uuid).await?;
+
+    // If the match is for the Arena then we must associate the match with the right match collection
+    // using the stored deck ID.
+    if parser.state.game_type == GameType::Arena {
+        app.associate_hearthstone_match_with_arena_run(&mut tx, &path.match_uuid, session.user.id).await?;
+    }
+
     app.store_hearthstone_match_game_log(&mut tx, &parser.fsm.game.borrow(), &path.match_uuid, session.user.id).await?;
     tx.commit().await?;
 

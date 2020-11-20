@@ -34,9 +34,9 @@ impl api::ApiApplication {
         Ok(sqlx::query_as!(
             v1::Match,
             "
-            SELECT match_uuid as \"uuid\"
-            FROM squadov.valorant_matches
-            WHERE match_id = $1
+            SELECT vm.match_uuid as \"uuid\"
+            FROM squadov.valorant_matches AS vm
+            WHERE vm.match_id = $1
             ",
             match_id
         )

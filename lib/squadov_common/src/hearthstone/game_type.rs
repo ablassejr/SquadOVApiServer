@@ -1,8 +1,8 @@
 use derive_more::{Display};
-use serde_repr::Serialize_repr;
+use serde_repr::{Serialize_repr, Deserialize_repr};
 use num_enum::TryFromPrimitive;
 
-#[derive(sqlx::Type, Display, Clone, Copy, Serialize_repr, TryFromPrimitive)]
+#[derive(sqlx::Type, Display, Clone, Copy, Serialize_repr, Deserialize_repr, TryFromPrimitive, PartialEq)]
 #[repr(i32)]
 pub enum GameType {
     Unknown = 0,
@@ -26,6 +26,35 @@ pub enum GameType {
     Reserved1823 = 27,
     PvpDrPaid = 28,
     PvpDr = 29
+}
+
+pub fn get_all_hearthstone_game_types() -> &'static [GameType] {
+    lazy_static!{
+        static ref ALL_TYPES: Vec<GameType> = vec![
+            GameType::Unknown,
+            GameType::VsAi,
+            GameType::VsFriend,
+            GameType::Tutorial,
+            GameType::Arena,
+            GameType::TestAiVsAi,
+            GameType::Ranked,
+            GameType::Casual,
+            GameType::TavernBrawl,
+            GameType::Tb1pVsAi,
+            GameType::Tb2pCoop,
+            GameType::FsgBrawlVsFriend,
+            GameType::FsgBrawl,
+            GameType::FsgBrawl1pVsAi,
+            GameType::FsgBrawl2pCoop,
+            GameType::Battlegrounds,
+            GameType::BattlegroundsFriendly,
+            GameType::Reserved1822,
+            GameType::Reserved1823,
+            GameType::PvpDrPaid,
+            GameType::PvpDr,
+        ];
+    }
+    &ALL_TYPES
 }
 
 impl std::str::FromStr for GameType {

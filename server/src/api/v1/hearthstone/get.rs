@@ -1,5 +1,5 @@
 use squadov_common::SquadOvError;
-use squadov_common::hearthstone::{HearthstoneDeck, HearthstoneDeckSlot, HearthstoneCardCount, HearthstonePlayer, HearthstonePlayerMedalInfo, FormatType, GameType};
+use squadov_common::hearthstone::{HearthstonePlayer, HearthstonePlayerMedalInfo, FormatType, GameType};
 use squadov_common::hearthstone::game_state::{HearthstoneGameBlock, HearthstoneGameSnapshot, HearthstoneGameSnapshotAuxData, HearthstoneGameAction, HearthstoneEntity, game_step::GameStep, EntityId, ActionType};
 use squadov_common::hearthstone::game_packet::{HearthstoneMatchMetadata, HearthstoneGamePacket, HearthstoneGameLogMetadata, HearthstoneSerializedGameLog};
 use crate::api;
@@ -85,72 +85,6 @@ impl api::ApiApplication {
         }
 
         Ok(snapshot)
-    }
-
-    pub async fn get_hearthstone_deck_for_match_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<Option<HearthstoneDeck>, SquadOvError> {
-        let raw_deck = sqlx::query!(
-            "
-            SELECT
-                deck_id,
-                hero_card,
-                hero_premium,
-                deck_type,
-                create_date,
-                is_wild,
-                deck_name AS \"name\"
-            FROM squadov.hearthstone_player_match_decks
-            WHERE match_uuid = $1
-                AND user_id = $2
-            ",
-            match_uuid,
-            user_id
-        )
-            .fetch_optional(&*self.pool)
-            .await?;
-
-        if raw_deck.is_none() {
-            return Ok(None);
-        }
-
-        let raw_deck = raw_deck.unwrap();
-        let raw_slots = sqlx::query!(
-            "
-            SELECT
-                index,
-                card_id,
-                owned,
-                normal_count,
-                golden_count
-            FROM squadov.hearthstone_player_match_deck_slots
-            WHERE match_uuid = $1
-                AND deck_id = $2
-            ",
-            match_uuid,
-            raw_deck.deck_id
-        )
-            .fetch_all(&*self.pool)
-            .await?;
-
-        Ok(Some(HearthstoneDeck{
-            slots: raw_slots.into_iter().map(|x| {
-                HearthstoneDeckSlot {
-                    index: x.index,
-                    card_id: x.card_id,
-                    owned: x.owned,
-                    count: HearthstoneCardCount{
-                        normal: x.normal_count,
-                        golden: x.golden_count
-                    },
-                }
-            }).collect(),
-            name: raw_deck.name,
-            deck_id: raw_deck.deck_id,
-            hero_card: raw_deck.hero_card,
-            hero_premium: raw_deck.hero_premium,
-            deck_type: raw_deck.deck_type,
-            create_date: raw_deck.create_date,
-            is_wild: raw_deck.is_wild
-        }))
     }
 
     pub async fn get_hearthstone_players_for_match(&self, match_uuid: &Uuid, user_id: i64) -> Result<HashMap<i32, HearthstonePlayer>, SquadOvError> {

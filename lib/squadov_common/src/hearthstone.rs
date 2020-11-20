@@ -11,6 +11,7 @@ pub use format_type::*;
 use serde::{Serialize,Deserialize};
 use chrono::{DateTime, Utc, serde::ts_seconds};
 use ipnetwork::IpNetwork;
+use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct HearthstoneGameConnectionInfo {
@@ -139,4 +140,14 @@ pub struct HearthstoneRawLog {
     pub time: DateTime<Utc>,
     pub section: String,
     pub log: String
+}
+
+#[derive(Serialize)]
+pub struct HearthstoneArenaRun {
+    #[serde(rename = "arenaUuid")]
+    pub arena_uuid: Uuid,
+    pub deck: Option<HearthstoneDeck>,
+    pub wins: u32,
+    pub loss: u32,
+    pub timestamp: DateTime<Utc>
 }

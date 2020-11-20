@@ -1,0 +1,2 @@
+ALTER TABLE hearthstone_arena_drafts
+ADD CONSTRAINT hearthstone_arena_drafts_draft_deck_id_fkey FOREIGN KEY(draft_deck_id) REFERENCES hearthstone_decks(deck_id) ON DELETE CASCADE;

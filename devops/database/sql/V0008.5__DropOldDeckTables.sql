@@ -1,0 +1,2 @@
+DROP TABLE hearthstone_player_match_decks CASCADE;
+DROP TABLE hearthstone_player_match_deck_slots CASCADE;

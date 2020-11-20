@@ -138,7 +138,19 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         },
                                     })),
                                 })
-                                .route("", web::get().to(v1::list_hearthstone_matches_for_user_handler))
+                                .route("/match", web::get().to(v1::list_hearthstone_matches_for_user_handler))
+                                .service(
+                                    web::scope("/arena")
+                                        .route("", web::get().to(v1::list_arena_runs_for_user_handler))
+                                        .route("", web::post().to(v1::create_or_retrieve_arena_draft_for_user_handler))
+                                        .service(
+                                            web::scope("/{collection_uuid}")
+                                                .route("", web::post().to(v1::add_hearthstone_card_to_arena_deck_handler))
+                                                .route("", web::get().to(v1::get_hearthstone_arena_run_handler))
+                                                .route("/matches", web::get().to(v1::list_matches_for_arena_run_handler))
+                                                .route("/deck", web::post().to(v1::create_finished_arena_draft_deck_handler))
+                                        )
+                                )
                         )
                         .service(
                             web::scope("/cards")

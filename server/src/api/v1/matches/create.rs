@@ -16,7 +16,7 @@ impl crate::api::ApiApplication {
     // we haven't seen.
     pub async fn create_new_match(&self, tx : &mut Transaction<'_, Postgres>) -> Result<super::Match, squadov_common::SquadOvError> {
         let new_match = super::Match {
-            uuid: Uuid::new_v4()
+            uuid: Uuid::new_v4(),
         };
 
         tx.execute(
@@ -30,6 +30,26 @@ impl crate::api::ApiApplication {
         ).await?;
 
         return Ok(new_match);
+    }
+
+    // Similarly to the create_new_match function, this creates a new "match collection" which is just
+    // a logical grouping of matches. It should be accessed via game-specific endpoints.
+    pub async fn create_new_match_collection(&self, tx : &mut Transaction<'_, Postgres>) -> Result<super::MatchCollection, squadov_common::SquadOvError> {
+        let new_collection = super::MatchCollection {
+            uuid: Uuid::new_v4()
+        };
+
+        tx.execute(
+            sqlx::query!(
+                "
+                INSERT INTO squadov.match_collections (uuid)
+                VALUES ($1)
+                ",
+                new_collection.uuid
+            )
+        ).await?;
+
+        return Ok(new_collection);
     }
 
     pub async fn bullk_create_matches(&self, tx : &mut Transaction<'_, Postgres>, count : usize) -> Result<Vec<super::Match>, squadov_common::SquadOvError> {

@@ -1,0 +1,2 @@
+ALTER TABLE hearthstone_decks
+ADD COLUMN deck_name VARCHAR NOT NULL DEFAULT '';
