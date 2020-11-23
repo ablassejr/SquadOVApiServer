@@ -18,7 +18,7 @@ use derive_more::{Display};
 
 /// An action is represented in the logs as an all-caps string that
 /// starts the line (after any whitespace).
-#[derive(Display,Debug)]
+#[derive(Display,Debug,PartialEq)]
 pub enum PowerFsmAction {
     CreateGame,
     CreateGameEntity,
@@ -310,8 +310,7 @@ impl PowerFsm {
                 self.push_state(next_state);
             } else if self.states.len() > 1 {
                 // If it is an block end then we need to pop off ANOTHER state as the previous pop off
-                // only popped off the latest action within the block. However, we also need to handle
-                // the possibility of empty blocks so only do another pop if the current state
+                // only popped off the latest action within the block.
                 self.pop_current_state();
             }
 

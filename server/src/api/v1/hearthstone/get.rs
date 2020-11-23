@@ -1,7 +1,7 @@
 use squadov_common::SquadOvError;
 use squadov_common::hearthstone::{HearthstonePlayer, HearthstonePlayerMedalInfo, FormatType, GameType};
 use squadov_common::hearthstone::game_state::{HearthstoneGameBlock, HearthstoneGameSnapshot, HearthstoneGameSnapshotAuxData, HearthstoneGameAction, HearthstoneEntity, game_step::GameStep, EntityId, ActionType};
-use squadov_common::hearthstone::game_packet::{HearthstoneMatchMetadata, HearthstoneGamePacket, HearthstoneGameLogMetadata, HearthstoneSerializedGameLog};
+use squadov_common::hearthstone::game_packet::{HearthstoneMatchMetadata, HearthstoneGamePacket, HearthstoneSerializedGameLog};
 use crate::api;
 use actix_web::{web, HttpResponse, HttpRequest};
 use std::sync::Arc;
@@ -254,23 +254,8 @@ impl api::ApiApplication {
             players: self.get_hearthstone_players_for_match(match_uuid, user_id).await?
         };
         
-        // Is there a way to combine this into 1 SQL statement?
-        let log_metadata = HearthstoneGameLogMetadata{
-            snapshot_ids: self.get_hearthstone_snapshots_for_match(match_uuid, user_id).await?,
-            num_actions: sqlx::query_scalar(
-                "
-                SELECT COUNT(action_id)
-                FROM squadov.hearthstone_actions AS ha
-                WHERE ha.match_uuid = $1 and ha.user_id = $2
-                ",
-            )
-                .bind(match_uuid)
-                .bind(user_id)
-                .fetch_one(&*self.pool)
-                .await?
-        };
-
-        let latest_snapshot = match log_metadata.snapshot_ids.last() {
+        let snapshot_ids = self.get_hearthstone_snapshots_for_match(match_uuid, user_id).await?;
+        let latest_snapshot = match snapshot_ids.last() {
             Some(x) => Some(self.get_hearthstone_snapshot(x).await?),
             None => None
         };
@@ -281,7 +266,6 @@ impl api::ApiApplication {
         Ok(HearthstoneGamePacket{
             match_uuid: match_uuid.clone(),
             metadata: metadata,
-            log_metadata: log_metadata,
             latest_snapshot: latest_snapshot
         })
     }

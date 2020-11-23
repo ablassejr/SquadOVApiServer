@@ -123,7 +123,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::scope("/{match_uuid}")
                                         .route("", web::post().to(v1::upload_hearthstone_logs_handler))
                                             .data(web::Json::<Vec<squadov_common::hearthstone::HearthstoneRawLog>>::configure(|cfg| {
-                                                cfg.limit(10 * 1024 * 1024)
+                                                // This needs to be huge to support battlegrounds yikes. But the client *should*
+                                                // be submitting using GZIP so it's smaller but the resulting JSON is large (hence
+                                                // the large number here).
+                                                cfg.limit(50 * 1024 * 1024)
                                             }))
                                         .route("", web::get().to(v1::get_hearthstone_match_handler))
                                         .route("/logs", web::get().to(v1::get_hearthstone_match_logs_handler))

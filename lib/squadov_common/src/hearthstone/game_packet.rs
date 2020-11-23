@@ -22,14 +22,6 @@ pub struct HearthstoneMatchMetadata {
 }
 
 #[derive(Serialize)]
-pub struct HearthstoneGameLogMetadata {
-    #[serde(rename = "snapshotIds")]
-    pub snapshot_ids: Vec<Uuid>,
-    #[serde(rename = "numActions")]
-    pub num_actions: i64
-}
-
-#[derive(Serialize)]
 pub struct HearthstoneSerializedGameLog{
     pub snapshots: Vec<HearthstoneGameSnapshot>,
     pub actions: Vec<HearthstoneGameAction>,
@@ -41,8 +33,6 @@ pub struct HearthstoneGamePacket {
     #[serde(rename = "matchUuid")]
     pub match_uuid: Uuid,
     pub metadata: HearthstoneMatchMetadata,
-    #[serde(rename = "logMetadata")]
-    pub log_metadata: HearthstoneGameLogMetadata,
     #[serde(rename = "latestSnapshot")]
     pub latest_snapshot: Option<HearthstoneGameSnapshot>
 }

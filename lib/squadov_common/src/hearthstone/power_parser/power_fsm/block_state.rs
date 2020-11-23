@@ -26,7 +26,14 @@ impl PowerFsmState for BlockState {
         if action.is_some() {
             self.game.borrow_mut().advance(action.unwrap());
         }
-        self.has_actions = true;
+
+        // Blocks clean themselves up so if we come from a block we don't have an
+        // active action going on.
+        if previous.get_state_action() != PowerFsmAction::BlockStart {
+            self.has_actions = true;
+        } else {
+            self.has_actions = false;
+        }
     }
 
     fn on_leave_state_to_parent(&mut self) {
@@ -55,7 +62,10 @@ impl PowerFsmState for BlockState {
     // received actions. There's a guaranteed pop by the FSM so this is the 2nd pop
     // when we receive a block end.
     fn can_receive_action(&self, action: &PowerFsmAction) -> bool {
-        !is_fsm_action_block_end(action) && !self.has_actions
+        // So the logic here is we want to POP when the it's a block end action AND we have subactions.
+        // In that scenario we want to return false so the logical inverse there is that we want to return
+        // true if we're either not a block end or we have no actions.
+        !is_fsm_action_block_end(action) || !self.has_actions
      }
 }
 impl BlockState {

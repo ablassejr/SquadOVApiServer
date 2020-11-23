@@ -74,5 +74,5 @@ pub async fn list_hearthstone_matches_for_user_handler(data : web::Path<super::H
     Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(matches, &req, &api::PaginationParameters{
         start: query.start,
         end: query.end,
-    }, expected_total == got_total)?)) 
+    }, expected_total == got_total)?))
 }
