@@ -30,7 +30,8 @@ impl fmt::Display for HearthstoneGameState {
 
 pub struct PowerLog {
     pub func: String,
-    pub log: String
+    pub log: String,
+    pub indent_level: i32
 }
 
 impl PowerLog {
@@ -38,9 +39,19 @@ impl PowerLog {
         let tokens: Vec<&str> = input.log.splitn(2, '-').collect();
 
         if tokens.len() == 2 {
+            let mut indent_level = 0;
+            for c in tokens[1].chars() {
+                if c.is_whitespace() {
+                    indent_level += 1
+                } else {
+                    break
+                }
+            }
+
             Some(Self {
                 func: tokens[0].trim().to_string(),
-                log: tokens[1].trim().to_string()
+                log: tokens[1].trim().to_string(),
+                indent_level
             })
         } else {
             None

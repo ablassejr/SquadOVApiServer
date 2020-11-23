@@ -9,7 +9,8 @@ pub struct BlockState {
     game: Rc<RefCell<HearthstoneGameLog>>,
     block_type: BlockType,
     entity_id: EntityId,
-    has_actions: bool
+    has_actions: bool,
+    indent_level: i32
 }
 
 impl PowerFsmState for BlockState {
@@ -61,15 +62,20 @@ impl PowerFsmState for BlockState {
     // to do it once if this block has received no actions and twice if this block has
     // received actions. There's a guaranteed pop by the FSM so this is the 2nd pop
     // when we receive a block end.
-    fn can_receive_action(&self, action: &PowerFsmAction) -> bool {
+    fn can_receive_action(&self, action: &PowerFsmAction, indent_level: i32) -> bool {
         // So the logic here is we want to POP when the it's a block end action AND we have subactions.
         // In that scenario we want to return false so the logical inverse there is that we want to return
         // true if we're either not a block end or we have no actions.
-        !is_fsm_action_block_end(action) || !self.has_actions
-     }
+        !(is_fsm_action_block_end(action) || self.is_implicit_block_end(action, indent_level)) || !self.has_actions
+    }
+
+    // Sometimes Hearthstone skips BLOCK_END so in that case we need to return true here when we detect that case.
+    fn is_implicit_block_end(&self, action: &PowerFsmAction, indent_level: i32) -> bool {
+        indent_level == self.indent_level && !is_fsm_action_block_end(action)
+    }
 }
 impl BlockState {
-    pub fn new(info: PowerFsmStateInfo, st: Rc<RefCell<HearthstoneGameLog>>) -> Self {
+    pub fn new(info: PowerFsmStateInfo, st: Rc<RefCell<HearthstoneGameLog>>, indent_level: i32) -> Self {
         let block_type = match &info.attrs.get("BlockType") {
             Some(x) => x.parse().unwrap_or(BlockType::Invalid),
             None => BlockType::Invalid,
@@ -81,7 +87,8 @@ impl BlockState {
             game: st.clone(),
             block_type: block_type,
             entity_id: entity,
-            has_actions: false
+            has_actions: false,
+            indent_level
         }
     }
 }

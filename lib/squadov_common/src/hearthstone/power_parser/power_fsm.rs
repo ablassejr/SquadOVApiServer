@@ -104,14 +104,16 @@ trait PowerFsmState {
     // action denoted in PowerFsmAction (which should contain the whole list of possible
     // actions we can encounter). If this returns false it indicates that this should
     // be the start of a new action.
-    fn can_receive_action(&self, _action: &PowerFsmAction) -> bool { false }
+    fn can_receive_action(&self, _action: &PowerFsmAction, _indent_level: i32) -> bool { false }
+    fn is_implicit_block_end(&self, _action: &PowerFsmAction, _indent_level: i32) -> bool { false }
 }
 
 #[derive(Display,Debug)]
 #[display(fmt="PowerLogAction[Action:{} Attrs:{:?}]", action, attrs)]
 struct PowerLogAction {
     action: PowerFsmAction,
-    attrs: HashMap<String, String>
+    attrs: HashMap<String, String>,
+    indent_level: i32
 }
 
 fn parse_action_attributes(attrs: &str) -> HashMap<String, String> {
@@ -179,12 +181,14 @@ impl PowerLogAction {
         if log.log.starts_with("GameEntity") {
             Some(Self {
                 action: PowerFsmAction::CreateGameEntity,
-                attrs: parse_action_attributes(log.log.strip_prefix("GameEntity").unwrap_or(""))
+                attrs: parse_action_attributes(log.log.strip_prefix("GameEntity").unwrap_or("")),
+                indent_level: log.indent_level,
             })
         } else if log.log.starts_with("Player") {
             Some(Self {
                 action: PowerFsmAction::CreatePlayerEntity,
-                attrs: parse_action_attributes(log.log.strip_prefix("Player").unwrap_or(""))
+                attrs: parse_action_attributes(log.log.strip_prefix("Player").unwrap_or("")),
+                indent_level: log.indent_level,
             })
         } else {
             let action_tokens : Vec<&str> = log.log.split_whitespace().collect();
@@ -195,7 +199,8 @@ impl PowerLogAction {
 
             Some(Self {
                 action: action,
-                attrs: parse_action_attributes(&action_tokens[1..].join(" "))
+                attrs: parse_action_attributes(&action_tokens[1..].join(" ")),
+                indent_level: log.indent_level,
             })
         }
     }
@@ -234,7 +239,7 @@ fn power_log_action_to_fsm_state(tm: &DateTime<Utc>, action: &PowerLogAction, st
         PowerFsmAction::FullEntity => Box::new(full_entity::FullEntityState::new(info)),
         PowerFsmAction::ShowEntity => Box::new(show_entity::ShowEntityState::new(info)),
         PowerFsmAction::TagChange => Box::new(tag_change::TagChangeState::new(info)),
-        PowerFsmAction::BlockStart => Box::new(block_state::BlockState::new(info, st)),
+        PowerFsmAction::BlockStart => Box::new(block_state::BlockState::new(info, st, action.indent_level)),
         _ => Box::new(null_state::NullState::new())
     }
 }
@@ -297,8 +302,13 @@ impl PowerFsm {
 
             // A new action means we go to a new state. The only question at this point
             // is whether or not we need to leave the current state.
-            let can_receive = current_state.can_receive_action(&parsed_action.action);
+            let can_receive = current_state.can_receive_action(&parsed_action.action, parsed_action.indent_level);
+            let is_implicit_end = current_state.is_implicit_block_end(&parsed_action.action, parsed_action.indent_level);
             if !can_receive && self.states.len() > 1 {
+                self.pop_current_state();
+            }
+
+            if  is_implicit_end && self.states.len() > 1 {
                 self.pop_current_state();
             }
 
