@@ -201,7 +201,7 @@ impl HearthstoneGameSnapshot {
                 current_player_id = pid;
                 break;
             }
-        } 
+        }
 
         self.aux_data = Some(HearthstoneGameSnapshotAuxData{
             current_turn: entity.current_turn() ,
@@ -272,10 +272,14 @@ impl HearthstoneGameSnapshot {
 
             let entity_id : i32 = captures.get(1).map_or("-1", |m| m.as_str()).parse().unwrap_or(-1);
             self.get_entity_from_id(entity_id)
-        } else if id == "UNKNOWN HUMAN PLAYER" || id.find('#').is_some() {
+        } else if id == "UNKNOWN HUMAN PLAYER" || id.find('#').is_some() || id == "Bob's Tavern" {
             self.get_player_entity(String::from(id))
         } else {
-            None
+            // In Battlegrounds, we'll encounter names that we haven't seen before when we start vsing other
+            // players...In some cases, it'll set CURRENT_PLAYER on Bob's Tavern and on other times it'll set
+            // CURRENT_PLAYER on this other player. Honestly no idea why so we're going to pretend in those cases
+            // that the game wrote Bob's Tavern instead.
+            self.get_player_entity(String::from("Bob's Tavern"))
         }
     }
 
@@ -304,17 +308,29 @@ impl HearthstoneGameSnapshot {
         // 2) The player's name does not exist! In which case
         //  a) UNKNOWN HUMAN PLAYER should exist in the map instead. We can replace UNKNOWN HUMAN PLAYER with the new name we found.
         //  b) UNKNOWN HUMAN PLAYER doesn't exist in which case wtf.
+        let mut need_replacement = false;
         let player_id = match self.player_name_to_player_id.get(&player_name) {
             Some(x) => Some(x),
-            None => self.player_name_to_player_id.get("UNKNOWN HUMAN PLAYER")
+            None => {
+                if player_name == "Bob's Tavern" {
+                    self.player_name_to_player_id.get("The Innkeeper")
+                } else {
+                    need_replacement = true;
+                    self.player_name_to_player_id.get("UNKNOWN HUMAN PLAYER")
+                }
+            }
         };
 
         if player_id.is_none() {
             return None;
         }
 
-        let player_id = player_id.unwrap();
-        let entity_id = match self.player_id_to_entity_id.get(player_id) {
+        let player_id = *player_id.unwrap();
+        if need_replacement {
+            self.player_name_to_player_id.insert(player_name.clone(), player_id);
+        }
+
+        let entity_id = match self.player_id_to_entity_id.get(&player_id) {
             Some(x) => x,
             None => return None
         }.clone();
