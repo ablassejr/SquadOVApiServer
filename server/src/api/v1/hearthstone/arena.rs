@@ -7,7 +7,6 @@ use sqlx::{Transaction, Postgres};
 use std::sync::Arc;
 use uuid::Uuid;
 use chrono::{DateTime,Utc};
-use squadov_common::hearthstone::game_state::play_state::PlayState;
 use squadov_common::hearthstone::{HearthstoneArenaRun, HearthstoneDeck};
 
 #[derive(Deserialize)]
@@ -173,19 +172,11 @@ impl api::ApiApplication {
                 }
             }
 
-            let snapshot_ids = self.get_hearthstone_snapshots_for_match(&matches[0], user_id).await?;
-            let player_entity = match snapshot_ids.last() {
-                Some(x) => Some(self.get_player_entity_from_hearthstone_snapshot(x, user_id).await?),
-                None => None
-            };
-
-            if player_entity.is_some() {
-                let player_entity = player_entity.unwrap();
-                if player_entity.play_state() == PlayState::Won {
-                    wins += 1;
-                } else {
-                    loss += 1;
-                }
+            let win = self.did_user_win_hearthstone_match(&matches[0], user_id).await?;
+            if win {
+                wins += 1
+            } else {
+                loss += 1
             }
         }
 

@@ -1,0 +1,2 @@
+ALTER TABLE hearthstone_match_metadata
+ADD COLUMN match_winner_player_id INTEGER;

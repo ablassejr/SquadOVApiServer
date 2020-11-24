@@ -263,6 +263,7 @@ pub struct PowerFsm {
     store_raw: bool,
     raw: Vec<RawLog>,
     states: Vec<Box<dyn PowerFsmState + Send + Sync>>,
+    pub start_time: Option<DateTime<Utc>>,
     pub game: Arc<RwLock<HearthstoneGameLog>>
 }
 
@@ -272,6 +273,7 @@ impl PowerFsm {
         Self {
             store_raw: store_raw,
             raw: Vec::new(),
+            start_time: None,
             states: vec![Box::new(default_state::DefaultPowerState::new(game.clone()))],
             game: game.clone(),
         }
@@ -341,6 +343,10 @@ impl PowerFsm {
         if !parsed {
             // At this point we've encountered an unknown line. Oh well!
             log::warn!("Unknown Power Log Line: {}", log.log);
+        }
+
+        if self.start_time.is_none() {
+            self.start_time = Some(tm.clone());
         }
 
         if self.store_raw {

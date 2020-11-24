@@ -11,37 +11,6 @@ use std::convert::TryFrom;
 use std::collections::HashMap;
 
 impl api::ApiApplication {
-    pub async fn get_player_entity_from_hearthstone_snapshot(&self, snapshot_uuid: &Uuid, user_id: i64) -> Result<HearthstoneEntity, SquadOvError> {
-        let raw_entity = sqlx::query!(
-            "
-            SELECT
-                hse.entity_id,
-                hse.tags,
-                hse.attributes
-            FROM squadov.hearthstone_snapshots AS hs
-            INNER JOIN squadov.hearthstone_match_players AS hmp
-                ON hmp.match_uuid = hs.match_uuid
-            INNER JOIN squadov.hearthstone_snapshots_player_map AS pm
-                ON pm.player_id = hmp.player_match_id AND pm.snapshot_id = hs.snapshot_id
-            INNER JOIN squadov.hearthstone_snapshots_entities AS hse
-                ON hse.entity_id = pm.entity_id AND hse.snapshot_id = hs.snapshot_id
-            WHERE hse.snapshot_id = $1
-                AND hmp.user_id = $2
-            ORDER BY hse.entity_id ASC
-            ",
-            snapshot_uuid,
-            user_id
-        )
-            .fetch_one(&*self.pool)
-            .await?;
-        
-        Ok(HearthstoneEntity{
-            entity_id: raw_entity.entity_id,
-            tags: serde_json::from_value(raw_entity.tags)?,
-            attributes: serde_json::from_value(raw_entity.attributes)?
-        })
-    }
-
     pub async fn get_hearthstone_snapshot(&self, snapshot_uuid: &Uuid) -> Result<HearthstoneGameSnapshot, SquadOvError> {
         let raw_metadata = sqlx::query!(
             "
@@ -270,8 +239,26 @@ impl api::ApiApplication {
         })
     }
 
+    pub async fn did_user_win_hearthstone_match(&self, match_uuid: &Uuid, user_id: i64) -> Result<bool, SquadOvError> {
+        let ret: Option<bool> = sqlx::query_scalar(
+            "
+            SELECT true
+            FROM squadov.hearthstone_match_metadata AS hmm
+            INNER JOIN squadov.hearethstone_match_players AS hmp
+                ON hmp.match_uuid = hmm.match_uuid AND hmm.match_winner_player_id = hmp.player_match_id
+            WHERE hmm.match_uuid = $1
+                AND hmp.user_id = $2
+            ",
+        )
+            .bind(match_uuid)
+            .bind(user_id)
+            .fetch_optional(&*self.pool)
+            .await?;
+
+        Ok(ret.is_some())
+    }
+
     pub async fn get_hearthstone_match_logs_for_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<HearthstoneSerializedGameLog, SquadOvError> {
-        let start = std::time::Instant::now();
         let snapshot_ids: Vec<Uuid> = sqlx::query_scalar(
             "
             SELECT hs.snapshot_id

@@ -9,7 +9,8 @@ pub struct HearthstoneGameState {
     pub game_type: GameType,
     pub format_type: FormatType,
     pub scenario_id: i32,
-    player_map: HashMap<i32, String>
+    player_map: HashMap<i32, String>,
+    pub match_winner_player_id: Option<i32>
 }
 
 impl Default for HearthstoneGameState {
@@ -18,7 +19,8 @@ impl Default for HearthstoneGameState {
             game_type: GameType::Unknown,
             format_type: FormatType::Unknown,
             scenario_id: 0,
-            player_map: HashMap::new()
+            player_map: HashMap::new(),
+            match_winner_player_id: None
         }
     }
 }
@@ -79,6 +81,14 @@ impl HearthstonePowerLogParser {
         }
     }
 
+    pub fn get_log_start_time(&self) -> DateTime<Utc> {
+        if self.fsm.start_time.is_some() {
+            self.fsm.start_time.unwrap()
+        } else {
+            Utc::now()
+        }
+    }
+
     pub fn parse(&mut self, logs: &[HearthstoneRawLog]) -> Result<(), crate::SquadOvError> {
         for log in logs {
             // Parse the log even further into the power log format.
@@ -98,6 +108,12 @@ impl HearthstonePowerLogParser {
             }
         }
         self.fsm.finish()?;
+
+        // The only thing in the metadata (game state) that comes from the logs
+        // is who won the match. We only know this information once we've fully parsed
+        // the logs.
+        self.state.match_winner_player_id = self.fsm.game.read()?.current_state.get_match_winner_player_id();
+
         return Ok(())
     }
 

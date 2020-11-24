@@ -4,6 +4,7 @@ mod create;
 mod deck;
 mod list;
 mod get;
+mod duels;
 
 use serde::{Deserialize};
 use uuid::Uuid;
@@ -30,3 +31,4 @@ pub use create::*;
 pub use deck::*;
 pub use list::*;
 pub use get::*;
+pub use duels::*;

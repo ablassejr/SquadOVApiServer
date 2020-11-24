@@ -157,7 +157,6 @@ pub struct HearthstoneEntity {
 
 impl HearthstoneEntity {
     pub fn play_state(&self) -> play_state::PlayState {
-        println!("PLAYSTATE TAG: {:?}", self.tags.get("PLAYSTATE"));
         match self.tags.get("PLAYSTATE") {
             Some(playstate) => play_state::PlayState::from_str(playstate).unwrap_or(play_state::PlayState::Invalid),
             None => play_state::PlayState::Invalid
@@ -322,20 +321,35 @@ impl HearthstoneGameSnapshot {
         self.create_entity(id)
     }
 
+    pub fn get_match_winner_player_id(&self) -> Option<i32> {
+        for (pid, eid) in &self.player_id_to_entity_id {
+            let entity = self.entities.get(eid);
+            if entity.is_none() {
+                continue
+            }
+            let entity = entity.unwrap();
+            let playstate = entity.play_state();
+            if playstate == play_state::PlayState::Won {
+                return Some(*pid)
+            }
+        }
+        None
+    }
+
     fn get_player_entity(&mut self, player_name: String) -> Option<&mut HearthstoneEntity> {
         // There's a couple of possibilities here:
         // 1) The player name exists in our player_name_to_player_id map, proceeding is straightforward.
         // 2) The player's name does not exist! In which case
         //  a) UNKNOWN HUMAN PLAYER should exist in the map instead. We can replace UNKNOWN HUMAN PLAYER with the new name we found.
         //  b) UNKNOWN HUMAN PLAYER doesn't exist in which case wtf.
-        let mut need_replacement = false;
+        let mut need_replacement: Option<String> = None;
         let player_id = match self.player_name_to_player_id.get(&player_name) {
             Some(x) => Some(x),
             None => {
                 if player_name == "Bob's Tavern" {
                     self.player_name_to_player_id.get("The Innkeeper")
                 } else {
-                    need_replacement = true;
+                    need_replacement = Some(String::from("UNKNOWN HUMAN PLAYER"));
                     self.player_name_to_player_id.get("UNKNOWN HUMAN PLAYER")
                 }
             }
@@ -346,8 +360,10 @@ impl HearthstoneGameSnapshot {
         }
 
         let player_id = *player_id.unwrap();
-        if need_replacement {
+        if need_replacement.is_some() {
+            let need_replacement = need_replacement.unwrap();
             self.player_name_to_player_id.insert(player_name.clone(), player_id);
+            self.player_name_to_player_id.remove(&need_replacement);
         }
 
         let entity_id = match self.player_id_to_entity_id.get(&player_id) {

@@ -231,19 +231,22 @@ impl api::ApiApplication {
                 match_uuid,
                 game_type,
                 format_type,
-                scenario_id
+                scenario_id,
+                match_winner_player_id
             )
             VALUES (
                 $1,
                 $2,
                 $3,
-                $4
+                $4,
+                $5
             )
             ",
             uuid,
             st.game_type as i32,
             st.format_type as i32,
-            st.scenario_id
+            st.scenario_id,
+            st.match_winner_player_id
         )
             .execute(tx)
             .await?;
@@ -500,6 +503,94 @@ impl api::ApiApplication {
             .await?;
         Ok(())
     }
+
+    pub async fn associate_hearthstone_match_with_duels_run(&self, tx: &mut Transaction<'_, Postgres> , match_uuid: &Uuid, user_id: i64, start_time: &DateTime<Utc>) -> Result<(), squadov_common::SquadOvError> {
+        // First check if a duels run already exists.
+        let mut duels_run_uuid = sqlx::query_scalar(
+            "
+            SELECT hd.collection_uuid
+            FROM squadov.hearthstone_duels AS hd
+            INNER JOIN squadov.hearthstone_deck_versions AS hdv
+                ON hdv.deck_id = hd.deck_id
+            INNER JOIN squadov.hearthstone_match_user_deck AS hmud
+                ON hmud.deck_version_id = hdv.version_id
+            WHERE hd.user_id = $2 AND hmud.user_id = $2 AND hmud.match_uuid = $1
+            "
+        )
+            .bind(match_uuid)
+            .bind(user_id)
+            .fetch_optional(&*self.pool)
+            .await?;
+
+        if duels_run_uuid.is_none() {
+            duels_run_uuid = Some(self.create_hearthstone_duels_run(tx, match_uuid, user_id, start_time).await?);
+        }
+
+        let duels_run_uuid = duels_run_uuid.unwrap();
+        sqlx::query!(
+            "
+            INSERT INTO squadov.match_to_match_collection (
+                match_uuid,
+                collection_uuid
+            )
+            VALUES (
+                $1,
+                $2
+            )
+            ",
+            match_uuid,
+            duels_run_uuid,
+        )
+            .execute(tx)
+            .await?;
+        Ok(())
+    }
+
+    async fn parse_hearthstone_power_logs(&self, data: &[u8], match_uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+        // Need to try to uncompress using GZIP. If that fails we'll assume that the input data is raw JSON data.
+        // TODO: Use the HTTP headers instead?
+        let mut gz = flate2::read::GzDecoder::new(data);
+        let mut uncompressed_data: Vec<u8> = Vec::new();
+        gz.read_to_end(&mut uncompressed_data)?;
+        let data: Vec<HearthstoneRawLog> = match gz.read_to_end(&mut uncompressed_data) {
+            Ok(_) => serde_json::from_slice(&uncompressed_data)?,
+            Err(_) => serde_json::from_slice(&data)? 
+        };
+
+        let mut tx = self.pool.begin().await?;
+        let parser = Arc::new(RwLock::new(HearthstonePowerLogParser::new(false)));
+
+        // This needs to be a match otherwise Rustc gives us an type annotations needed error?
+        match parser.write()?.parse(&data) {
+            Ok(_) => (),
+            Err(e) => return Err(e)
+        };
+
+        {
+            let state = parser.read()?.state.clone();
+            self.store_hearthstone_match_metadata(&mut tx, &state, match_uuid).await?;
+        }
+
+        {
+            // If the match is for the Arena then we must associate the match with the right match collection
+            // using the stored deck ID. If the match is for Duels then we must either associate the match with
+            // an already created Duels run or create a new match collection using the current deck's ID.
+            let game_type = parser.read()?.state.game_type;
+            if  game_type == GameType::Arena {
+                self.associate_hearthstone_match_with_arena_run(&mut tx, match_uuid, user_id).await?;
+            } else if game_type == GameType::PvpDr || game_type == GameType::PvpDrPaid {
+                let start_time = parser.read()?.get_log_start_time();
+                self.associate_hearthstone_match_with_duels_run(&mut tx, match_uuid, user_id, &start_time).await?;
+            }
+        }
+
+        {
+            let game = parser.read()?.fsm.game.clone();
+            self.store_hearthstone_match_game_log(&mut tx, game, match_uuid, user_id).await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
 }
 
 pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstoneMatchInput>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
@@ -561,43 +652,13 @@ pub async fn upload_hearthstone_logs_handler(mut body : web::Payload, path : web
 
     // Do the log parsing in a separate thread because it's potentially a fairly lengthy process.
     tokio::task::spawn(async move {
-        // Need to try to uncompress using GZIP. If that fails we'll assume that the input data is raw JSON data.
-        // TODO: Use the HTTP headers instead?
-        let data = data.to_vec();
-        let mut gz = flate2::read::GzDecoder::new(&data[..]);
-        let mut uncompressed_data: Vec<u8> = Vec::new();
-        gz.read_to_end(&mut uncompressed_data)?;
-        let data: Vec<HearthstoneRawLog> = match gz.read_to_end(&mut uncompressed_data) {
-            Ok(_) => serde_json::from_slice(&uncompressed_data)?,
-            Err(_) => serde_json::from_slice(&data)? 
-        };
-
-        let mut tx = app.pool.begin().await?;
-        let parser = Arc::new(RwLock::new(HearthstonePowerLogParser::new(false)));
-
-        // This needs to be a match otherwise Rustc gives us an type annotations needed error?
-        match parser.write()?.parse(&data) {
-            Ok(_) => (),
-            Err(e) => return Err(e)
-        };
-
-        {
-            let state = parser.read()?.state.clone();
-            app.store_hearthstone_match_metadata(&mut tx, &state, &path.match_uuid).await?;
+        match app.parse_hearthstone_power_logs(&data, &path.match_uuid, user_id).await {
+            Ok(_) => Ok(()),
+            Err(err) => {
+                log::error!("Failed to parse Hearthstone logs: {:?}", err);
+                Err(err)
+            }
         }
-
-        // If the match is for the Arena then we must associate the match with the right match collection
-        // using the stored deck ID.
-        if parser.read()?.state.game_type == GameType::Arena {
-            app.associate_hearthstone_match_with_arena_run(&mut tx, &path.match_uuid, user_id).await?;
-        }
-
-        {
-            let game = parser.read()?.fsm.game.clone();
-            app.store_hearthstone_match_game_log(&mut tx, game, &path.match_uuid, user_id).await?;
-        }
-        tx.commit().await?;
-        Ok(())
     });
 
     Ok(HttpResponse::Ok().finish())
