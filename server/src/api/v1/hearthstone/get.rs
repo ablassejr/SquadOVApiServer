@@ -271,6 +271,7 @@ impl api::ApiApplication {
     }
 
     pub async fn get_hearthstone_match_logs_for_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<HearthstoneSerializedGameLog, SquadOvError> {
+        let start = std::time::Instant::now();
         let snapshot_ids: Vec<Uuid> = sqlx::query_scalar(
             "
             SELECT hs.snapshot_id

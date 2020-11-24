@@ -7,7 +7,6 @@ use super::graphql;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::vec::Vec;
-use squadov_common;
 
 pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
     let mut scope = web::scope("")
@@ -122,11 +121,9 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .service(
                                     web::scope("/{match_uuid}")
                                         .route("", web::post().to(v1::upload_hearthstone_logs_handler))
-                                            .data(web::Json::<Vec<squadov_common::hearthstone::HearthstoneRawLog>>::configure(|cfg| {
-                                                // This needs to be huge to support battlegrounds yikes. But the client *should*
-                                                // be submitting using GZIP so it's smaller but the resulting JSON is large (hence
-                                                // the large number here).
-                                                cfg.limit(50 * 1024 * 1024)
+                                            .data(web::Payload::configure(|cfg| {
+                                                // Note that we should be submitting GZIP here so this shouldn't get super super large.
+                                                cfg.limit(5 * 1024 * 1024)
                                             }))
                                         .route("", web::get().to(v1::get_hearthstone_match_handler))
                                         .route("/logs", web::get().to(v1::get_hearthstone_match_logs_handler))

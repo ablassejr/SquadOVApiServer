@@ -120,3 +120,15 @@ impl<T : num_enum::TryFromPrimitive> From<num_enum::TryFromPrimitiveError<T>> fo
         return Self::InternalError(format!("TryFromPrimitive {}", err))
     }
 }
+
+impl<T> From<std::sync::PoisonError<T>> for SquadOvError {
+    fn from(err: std::sync::PoisonError<T>) -> Self {
+        return Self::InternalError(format!("Sync PoisonError {}", err))
+    }
+}
+
+impl From<actix_web::error::PayloadError> for SquadOvError {
+    fn from(err: actix_web::error::PayloadError) -> Self {
+        return Self::InternalError(format!("Payload {}", err))
+    }
+}

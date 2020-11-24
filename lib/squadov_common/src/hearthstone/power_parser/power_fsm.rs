@@ -11,8 +11,7 @@ use crate::hearthstone::game_state::{HearthstoneGameLog, HearthstoneGameAction};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use regex::Regex;
-use std::rc::Rc;
-use std::cell::RefCell;
+use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 use derive_more::{Display};
 
@@ -94,10 +93,10 @@ trait PowerFsmState {
 
     fn generate_hearthstone_game_actions(&self) -> Option<Vec<HearthstoneGameAction>> { None }
 
-    fn on_enter_state_from_parent(&mut self, _previous: &mut Box<dyn PowerFsmState>) {}
-    fn on_enter_state_from_child(&mut self, _previous: &mut Box<dyn PowerFsmState>) {}
-    fn on_leave_state_to_child(&mut self) {}
-    fn on_leave_state_to_parent(&mut self) {}
+    fn on_enter_state_from_parent(&mut self, _previous: &mut Box<dyn PowerFsmState + Send + Sync>) -> Result<(), crate::SquadOvError> { Ok(()) }
+    fn on_enter_state_from_child(&mut self, _previous: &mut Box<dyn PowerFsmState + Send + Sync>)  -> Result<(), crate::SquadOvError> { Ok(()) }
+    fn on_leave_state_to_child(&mut self) -> Result<(), crate::SquadOvError>{ Ok(()) }
+    fn on_leave_state_to_parent(&mut self) -> Result<(), crate::SquadOvError>{ Ok(()) }
 
     fn handle_tag_attribute(&mut self, _tag: &str, _val: &str) {}
     // can_receive_action is called whenever we parse a line that contains an
@@ -228,7 +227,7 @@ impl PowerLogTagAttribute {
     }
 }
 
-fn power_log_action_to_fsm_state(tm: &DateTime<Utc>, action: &PowerLogAction, st: Rc<RefCell<HearthstoneGameLog>>) -> Box<dyn PowerFsmState> {
+fn power_log_action_to_fsm_state(tm: &DateTime<Utc>, action: &PowerLogAction, st: Arc<RwLock<HearthstoneGameLog>>) -> Box<dyn PowerFsmState + Send + Sync> {
     let mut info = PowerFsmStateInfo::new(tm);
     info.attrs = action.attrs.clone();
 
@@ -263,13 +262,13 @@ struct RawLog {
 pub struct PowerFsm {
     store_raw: bool,
     raw: Vec<RawLog>,
-    states: Vec<Box<dyn PowerFsmState>>,
-    pub game: Rc<RefCell<HearthstoneGameLog>>
+    states: Vec<Box<dyn PowerFsmState + Send + Sync>>,
+    pub game: Arc<RwLock<HearthstoneGameLog>>
 }
 
 impl PowerFsm {
     pub fn new(store_raw: bool) -> Self {
-        let game = Rc::new(RefCell::new(HearthstoneGameLog::new()));
+        let game = Arc::new(RwLock::new(HearthstoneGameLog::new()));
         Self {
             store_raw: store_raw,
             raw: Vec::new(),
@@ -286,8 +285,9 @@ impl PowerFsm {
         return logs.join("\n");
     }
 
-    pub fn finish(&mut self) {
-        self.game.borrow_mut().finish();
+    pub fn finish(&mut self) -> Result<(), crate::SquadOvError> {
+        self.game.write()?.finish();
+        Ok(())
     }
 
     pub fn parse(&mut self, tm : &DateTime<Utc>, log: &PowerLog) -> Result<(), crate::SquadOvError> {
@@ -305,11 +305,11 @@ impl PowerFsm {
             let can_receive = current_state.can_receive_action(&parsed_action.action, parsed_action.indent_level);
             let is_implicit_end = current_state.is_implicit_block_end(&parsed_action.action, parsed_action.indent_level);
             if !can_receive && self.states.len() > 1 {
-                self.pop_current_state();
+                self.pop_current_state()?;
             }
 
             if  is_implicit_end && self.states.len() > 1 {
-                self.pop_current_state();
+                self.pop_current_state()?;
             }
 
             // At this point we should be able to push a state and make it the new current state.
@@ -317,11 +317,11 @@ impl PowerFsm {
             // popping the latest block off is sufficient.
             if !is_fsm_action_block_end(&parsed_action.action) {
                 let next_state = power_log_action_to_fsm_state(tm, &parsed_action, self.game.clone());
-                self.push_state(next_state);
+                self.push_state(next_state)?;
             } else if self.states.len() > 1 {
                 // If it is an block end then we need to pop off ANOTHER state as the previous pop off
                 // only popped off the latest action within the block.
-                self.pop_current_state();
+                self.pop_current_state()?;
             }
 
             parsed = true;
@@ -356,18 +356,20 @@ impl PowerFsm {
         Ok(())
     }
 
-    fn pop_current_state(&mut self) {
+    fn pop_current_state(&mut self) -> Result<(), crate::SquadOvError> {
         let mut current_state = self.states.pop().unwrap();
         let parent_state = self.states.last_mut().unwrap();
 
-        current_state.on_leave_state_to_parent();
-        parent_state.on_enter_state_from_child(&mut current_state);
+        current_state.on_leave_state_to_parent()?;
+        parent_state.on_enter_state_from_child(&mut current_state)?;
+        Ok(())
     }
 
-    fn push_state(&mut self, mut st: Box<dyn PowerFsmState>) {
+    fn push_state(&mut self, mut st: Box<dyn PowerFsmState + Send + Sync>) -> Result<(), crate::SquadOvError> {
         let current_state = self.states.last_mut().unwrap();
-        current_state.on_leave_state_to_child();
-        st.on_enter_state_from_parent(current_state);
+        current_state.on_leave_state_to_child()?;
+        st.on_enter_state_from_parent(current_state)?;
         self.states.push(st);
+        Ok(())
     }
 }

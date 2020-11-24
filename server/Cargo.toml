@@ -35,3 +35,4 @@ percent-encoding = "2.1.0"
 juniper = { git = "https://github.com/graphql-rust/juniper", rev = "cd66bdb", features = ["scalar-naivetime"]}
 ipnetwork = { version = "0.17.0", features = ["serde"] }
 squadov_common = { path="../lib/squadov_common" }
+flate2 = "1.0"

@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use std::fmt;
 use std::collections::HashMap;
 
+#[derive(Clone)]
 pub struct HearthstoneGameState {
     pub game_type: GameType,
     pub format_type: FormatType,
@@ -96,7 +97,7 @@ impl HearthstonePowerLogParser {
                 continue;
             }
         }
-        self.fsm.finish();
+        self.fsm.finish()?;
         return Ok(())
     }
 
@@ -126,7 +127,7 @@ impl HearthstonePowerLogParser {
 
             // We need to update the FSM parser with this player map because some entity names are specified
             // using the player's name so we need to be able to map the player name to the entity ID.
-            self.fsm.game.borrow_mut().set_player_map(&self.state.player_map);
+            self.fsm.game.write()?.set_player_map(&self.state.player_map);
         }
 
         return Ok(true);

@@ -1,16 +1,18 @@
 use squadov_common;
 use squadov_common::hearthstone;
-use squadov_common::hearthstone::{power_parser::{HearthstonePowerLogParser, HearthstoneGameState} };
-use squadov_common::hearthstone::game_state::{HearthstoneGameLog, HearthstoneGameAction, HearthstoneGameSnapshot, HearthstoneGameBlock};
+use squadov_common::hearthstone::{HearthstoneRawLog, power_parser::{HearthstonePowerLogParser, HearthstoneGameState} };
+use squadov_common::hearthstone::game_state::{HearthstoneGameLog};
 use squadov_common::hearthstone::GameType;
 use crate::api;
 use actix_web::{web, HttpResponse, HttpRequest};
 use serde::{Deserialize};
 use sqlx::{Transaction, Executor, Postgres};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use uuid::Uuid;
+use futures_util::StreamExt;
 use chrono::{DateTime, Utc};
+use std::io::Read;
 use crate::api::auth::SquadOVSession;
 use crate::api::v1;
 
@@ -195,9 +197,8 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_raw_power_logs(&self, tx : &mut Transaction<'_, Postgres>, logs: &[hearthstone::HearthstoneRawLog], match_uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
-        let raw = serde_json::to_value(logs)?;
-        let blob_uuid = self.blob.store_new_json_blob(tx, &raw).await?;
+    pub async fn store_hearthstone_raw_power_logs(&self, tx : &mut Transaction<'_, Postgres>, data: &[u8], match_uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+        let blob_uuid = self.blob.store_new_blob(tx, data).await?;
         tx.execute(
             sqlx::query!(
                 "
@@ -249,12 +250,17 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_match_game_actions(&self, tx: &mut Transaction<'_, Postgres>, actions: &[HearthstoneGameAction], uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
-        if actions.is_empty() {
-            return Ok(());
+    pub async fn store_hearthstone_match_game_actions(&self, tx: &mut Transaction<'_, Postgres>, logs: Arc<RwLock<HearthstoneGameLog>>, uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+        let raw_data;
+
+        {
+            let actions = &logs.read()?.actions;
+            if actions.is_empty() {
+                return Ok(());
+            }
+            raw_data = serde_json::to_value(actions)?;
         }
 
-        let raw_data = serde_json::to_value(actions)?;
         let blob_uuid = self.blob.store_new_json_blob(tx, &raw_data).await?;
         sqlx::query!(
             "
@@ -278,108 +284,112 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_match_game_snapshots(&self, tx: &mut Transaction<'_, Postgres> , snapshots: &[HearthstoneGameSnapshot], uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
-        if snapshots.is_empty() {
-            return Ok(());
-        }
+    pub async fn store_hearthstone_match_game_snapshots(&self, tx: &mut Transaction<'_, Postgres> , logs: Arc<RwLock<HearthstoneGameLog>>, uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
         // Each snapshot contains information that needs to be inserted into 3 different tables:
         // 1) hearthstone_snapshots: Contains general information about the snapshot (time, turn, etc)
         // 2) hearthstone_snapshots_player_map: Contains information about what we know about the player name -> player id -> entity id map at that point in time.
         // 3) hearthstone_snapshots_entities: Contains information about what we know about all the entities on the board at that time.
         let mut snapshots_sql : Vec<String> = Vec::new();
-        snapshots_sql.push(String::from("
-            INSERT INTO squadov.hearthstone_snapshots (
-                snapshot_id,
-                match_uuid,
-                user_id,
-                last_action_id,
-                tm,
-                game_entity_id,
-                current_turn,
-                step,
-                current_player_id
-            )
-            VALUES
-        "));
-
         let mut players_sql : Vec<String> = Vec::new();
-        players_sql.push(String::from("
-            INSERT INTO squadov.hearthstone_snapshots_player_map (
-                snapshot_id,
-                player_name,
-                player_id,
-                entity_id
-            )
-            VALUES
-        "));
-
         let mut entities_sql : Vec<String> = Vec::new();
-        entities_sql.push(String::from("
-            INSERT INTO squadov.hearthstone_snapshots_entities (
-                snapshot_id,
-                entity_id,
-                tags,
-                attributes
-            )
-            VALUES
-        "));
 
-        for m in snapshots {
-            let aux = m.aux_data.as_ref().unwrap();
-            snapshots_sql.push(format!("(
-                '{snapshot_id}',
-                '{match_uuid}',
-                {user_id},
-                {last_action_id},
-                {tm},
-                {game_entity_id},
-                {current_turn},
-                {step},
-                {current_player_id}
-            )",
-                snapshot_id=m.uuid,
-                match_uuid=uuid,
-                user_id=user_id,
-                last_action_id=aux.last_action_index,
-                tm=squadov_common::sql_format_option_some_time(m.tm.as_ref()),
-                game_entity_id=m.game_entity_id,
-                current_turn=aux.current_turn,
-                step=aux.step as i32,
-                current_player_id=aux.current_player_id
-            ));
-            snapshots_sql.push(String::from(","));
-
-            // Going to assume that player_name_to_player_id hashmap is the same size as the
-            // player_id_to_entity_id hashmap. Pretty sure that this is a safe assumption.
-            for (name, pid) in &m.player_name_to_player_id {
-                let eid = m.player_id_to_entity_id.get(pid).unwrap_or(&0);
-                players_sql.push(format!("(
-                    '{snapshot_id}',
-                    '{player_name}',
-                    {player_id},
-                    {entity_id}
-                )",
-                    snapshot_id=m.uuid,
-                    player_name=&name,
-                    player_id=pid,
-                    entity_id=eid
-                ));
-                players_sql.push(String::from(","));
+        {
+            let snapshots = &logs.read()?.snapshots;
+            if snapshots.is_empty() {
+                return Ok(());
             }
+            snapshots_sql.push(String::from("
+                INSERT INTO squadov.hearthstone_snapshots (
+                    snapshot_id,
+                    match_uuid,
+                    user_id,
+                    last_action_id,
+                    tm,
+                    game_entity_id,
+                    current_turn,
+                    step,
+                    current_player_id
+                )
+                VALUES
+            "));
 
-            for (eid, entity) in &m.entities {
-                entities_sql.push(format!("(
+            players_sql.push(String::from("
+                INSERT INTO squadov.hearthstone_snapshots_player_map (
+                    snapshot_id,
+                    player_name,
+                    player_id,
+                    entity_id
+                )
+                VALUES
+            "));
+
+            entities_sql.push(String::from("
+                INSERT INTO squadov.hearthstone_snapshots_entities (
+                    snapshot_id,
+                    entity_id,
+                    tags,
+                    attributes
+                )
+                VALUES
+            "));
+
+            for m in snapshots {
+                let aux = m.aux_data.as_ref().unwrap();
+                snapshots_sql.push(format!("(
                     '{snapshot_id}',
-                    {entity_id},
-                    '{tags}',
-                    '{attributes}'
+                    '{match_uuid}',
+                    {user_id},
+                    {last_action_id},
+                    {tm},
+                    {game_entity_id},
+                    {current_turn},
+                    {step},
+                    {current_player_id}
                 )",
                     snapshot_id=m.uuid,
-                    entity_id=eid,
-                    tags=squadov_common::sql_format_json(&entity.tags)?,
-                    attributes=squadov_common::sql_format_json(&entity.attributes)?
+                    match_uuid=uuid,
+                    user_id=user_id,
+                    last_action_id=aux.last_action_index,
+                    tm=squadov_common::sql_format_option_some_time(m.tm.as_ref()),
+                    game_entity_id=m.game_entity_id,
+                    current_turn=aux.current_turn,
+                    step=aux.step as i32,
+                    current_player_id=aux.current_player_id
                 ));
-                entities_sql.push(String::from(","));
+                snapshots_sql.push(String::from(","));
+
+                // Going to assume that player_name_to_player_id hashmap is the same size as the
+                // player_id_to_entity_id hashmap. Pretty sure that this is a safe assumption.
+                for (name, pid) in &m.player_name_to_player_id {
+                    let eid = m.player_id_to_entity_id.get(pid).unwrap_or(&0);
+                    players_sql.push(format!("(
+                        '{snapshot_id}',
+                        '{player_name}',
+                        {player_id},
+                        {entity_id}
+                    )",
+                        snapshot_id=m.uuid,
+                        player_name=&name,
+                        player_id=pid,
+                        entity_id=eid
+                    ));
+                    players_sql.push(String::from(","));
+                }
+
+                for (eid, entity) in &m.entities {
+                    entities_sql.push(format!("(
+                        '{snapshot_id}',
+                        {entity_id},
+                        '{tags}',
+                        '{attributes}'
+                    )",
+                        snapshot_id=m.uuid,
+                        entity_id=eid,
+                        tags=squadov_common::sql_format_json(&entity.tags)?,
+                        attributes=squadov_common::sql_format_json(&entity.attributes)?
+                    ));
+                    entities_sql.push(String::from(","));
+                }
             }
         }
 
@@ -393,51 +403,56 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_match_game_blocks(&self, tx: &mut Transaction<'_, Postgres> , blocks: &HashMap<Uuid, HearthstoneGameBlock>, uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
-        if blocks.is_empty() {
-            return Ok(());
-        }
-
+    pub async fn store_hearthstone_match_game_blocks(&self, tx: &mut Transaction<'_, Postgres> , logs: Arc<RwLock<HearthstoneGameLog>>, uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
         // Each snapshot contains information that needs to be inserted into 3 different tables:
         // 1) hearthstone_snapshots: Contains general information about the snapshot (time, turn, etc)
         // 2) hearthstone_snapshots_player_map: Contains information about what we know about the player name -> player id -> entity id map at that point in time.
         // 3) hearthstone_snapshots_entities: Contains information about what we know about all the entities on the board at that time.
         let mut sql : Vec<String> = Vec::new();
-        sql.push("
-            INSERT INTO squadov.hearthstone_blocks(
-                match_uuid,
-                user_id,
-                block_id,
-                start_action_index,
-                end_action_index,
-                block_type,
-                parent_block,
-                entity_id
-            )
-            VALUES
-        ".to_string());
 
-        for (_, block) in blocks {
-            sql.push(format!("(
-                '{match_uuid}',
-                {user_id},
-                '{block_id}',
-                {start_action_index},
-                {end_action_index},
-                {block_type},
-                {parent_block},
-                {entity_id}
-            )",
-                match_uuid=uuid,
-                user_id=user_id,
-                block_id=block.block_id,
-                start_action_index=block.start_action_index,
-                end_action_index=block.end_action_index,
-                block_type=block.block_type as i32,
-                parent_block=squadov_common::sql_format_option_string(&block.parent_block),
-                entity_id=block.entity_id
-            ));
-            sql.push(", ".to_string());
+        {
+            let blocks = &logs.read()?.blocks;
+            if blocks.is_empty() {
+                return Ok(());
+            }
+
+            
+            sql.push("
+                INSERT INTO squadov.hearthstone_blocks(
+                    match_uuid,
+                    user_id,
+                    block_id,
+                    start_action_index,
+                    end_action_index,
+                    block_type,
+                    parent_block,
+                    entity_id
+                )
+                VALUES
+            ".to_string());
+
+            for (_, block) in blocks {
+                sql.push(format!("(
+                    '{match_uuid}',
+                    {user_id},
+                    '{block_id}',
+                    {start_action_index},
+                    {end_action_index},
+                    {block_type},
+                    {parent_block},
+                    {entity_id}
+                )",
+                    match_uuid=uuid,
+                    user_id=user_id,
+                    block_id=block.block_id,
+                    start_action_index=block.start_action_index,
+                    end_action_index=block.end_action_index,
+                    block_type=block.block_type as i32,
+                    parent_block=squadov_common::sql_format_option_string(&block.parent_block),
+                    entity_id=block.entity_id
+                ));
+                sql.push(", ".to_string());
+            }
         }
 
         sql.truncate(sql.len() - 1);
@@ -445,10 +460,10 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_match_game_log(&self, tx: &mut Transaction<'_, Postgres> , logs: &HearthstoneGameLog, uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
-        self.store_hearthstone_match_game_blocks(tx, &logs.blocks, uuid, user_id).await?;
-        self.store_hearthstone_match_game_actions(tx, &logs.actions, uuid, user_id).await?;
-        self.store_hearthstone_match_game_snapshots(tx, &logs.snapshots, uuid, user_id).await?;
+    pub async fn store_hearthstone_match_game_log(&self, tx: &mut Transaction<'_, Postgres> , logs: Arc<RwLock<HearthstoneGameLog>>, uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+        self.store_hearthstone_match_game_blocks(tx, logs.clone(), uuid, user_id).await?;
+        self.store_hearthstone_match_game_actions(tx, logs.clone(), uuid, user_id).await?;
+        self.store_hearthstone_match_game_snapshots(tx, logs.clone(), uuid, user_id).await?;
         tx.execute(
             sqlx::query!(
                 "
@@ -519,33 +534,71 @@ pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstone
     Ok(HttpResponse::Ok().json(&uuid))
 }
 
-pub async fn upload_hearthstone_logs_handler(data : web::Json<Vec<hearthstone::HearthstoneRawLog>>, path : web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
+// Note that we don't parse directly into the expected data structures immediately as that can happen in an async thread so we can return to the user faster.
+pub async fn upload_hearthstone_logs_handler(mut body : web::Payload, path : web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
     let extensions = request.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(x) => x,
         None => return Err(squadov_common::SquadOvError::BadRequest)
     };
+    let user_id = session.user.id;
 
-    let mut tx = app.pool.begin().await?;
-    app.store_hearthstone_raw_power_logs(&mut tx, &data, &path.match_uuid, session.user.id).await?;
-    tx.commit().await?;
-
-    // Handle the parsed logs in a separate transaction so that we have the raw logs even if this parsing fails.
-    // Idealy we'd throw this onto a thread pool via Tokio or something.
-    let mut tx = app.pool.begin().await?;
-    let mut parser = HearthstonePowerLogParser::new(false);
-    parser.parse(&data)?;
-
-    app.store_hearthstone_match_metadata(&mut tx, &parser.state, &path.match_uuid).await?;
-
-    // If the match is for the Arena then we must associate the match with the right match collection
-    // using the stored deck ID.
-    if parser.state.game_type == GameType::Arena {
-        app.associate_hearthstone_match_with_arena_run(&mut tx, &path.match_uuid, session.user.id).await?;
+    // This grabs the raw byte data (it may be compressed or uncompressed!).
+    // Uncompressed this could be really large (and thus take awhile to uncompress)
+    // so we uncompress in a separate thread so that the user doesn't have to wait
+    // for that to happen.
+    let mut data = web::BytesMut::new();
+    while let Some(item) = body.next().await {
+        data.extend_from_slice(&item?);
     }
 
-    app.store_hearthstone_match_game_log(&mut tx, &parser.fsm.game.borrow(), &path.match_uuid, session.user.id).await?;
-    tx.commit().await?;
+    let app = app.clone();
+    {
+        let mut tx = app.pool.begin().await?;
+        app.store_hearthstone_raw_power_logs(&mut tx, &data, &path.match_uuid, session.user.id).await?;
+        tx.commit().await?;
+    }
+
+    // Do the log parsing in a separate thread because it's potentially a fairly lengthy process.
+    tokio::task::spawn(async move {
+        // Need to try to uncompress using GZIP. If that fails we'll assume that the input data is raw JSON data.
+        // TODO: Use the HTTP headers instead?
+        let data = data.to_vec();
+        let mut gz = flate2::read::GzDecoder::new(&data[..]);
+        let mut uncompressed_data: Vec<u8> = Vec::new();
+        gz.read_to_end(&mut uncompressed_data)?;
+        let data: Vec<HearthstoneRawLog> = match gz.read_to_end(&mut uncompressed_data) {
+            Ok(_) => serde_json::from_slice(&uncompressed_data)?,
+            Err(_) => serde_json::from_slice(&data)? 
+        };
+
+        let mut tx = app.pool.begin().await?;
+        let parser = Arc::new(RwLock::new(HearthstonePowerLogParser::new(false)));
+
+        // This needs to be a match otherwise Rustc gives us an type annotations needed error?
+        match parser.write()?.parse(&data) {
+            Ok(_) => (),
+            Err(e) => return Err(e)
+        };
+
+        {
+            let state = parser.read()?.state.clone();
+            app.store_hearthstone_match_metadata(&mut tx, &state, &path.match_uuid).await?;
+        }
+
+        // If the match is for the Arena then we must associate the match with the right match collection
+        // using the stored deck ID.
+        if parser.read()?.state.game_type == GameType::Arena {
+            app.associate_hearthstone_match_with_arena_run(&mut tx, &path.match_uuid, user_id).await?;
+        }
+
+        {
+            let game = parser.read()?.fsm.game.clone();
+            app.store_hearthstone_match_game_log(&mut tx, game, &path.match_uuid, user_id).await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    });
 
     Ok(HttpResponse::Ok().finish())
 }

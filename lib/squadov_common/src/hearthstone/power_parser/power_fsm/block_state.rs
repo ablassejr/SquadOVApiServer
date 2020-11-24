@@ -1,12 +1,11 @@
 use crate::hearthstone::game_state::{HearthstoneGameAction, EntityId, HearthstoneGameLog, BlockType};
 use crate::hearthstone::power_parser::power_fsm::{PowerFsmState, PowerFsmStateInfo, PowerFsmAction, is_fsm_action_block_end};
 use uuid::Uuid;
-use std::rc::Rc;
-use std::cell::RefCell;
+use std::sync::{Arc, RwLock};
 
 pub struct BlockState {
     info: PowerFsmStateInfo,
-    game: Rc<RefCell<HearthstoneGameLog>>,
+    game: Arc<RwLock<HearthstoneGameLog>>,
     block_type: BlockType,
     entity_id: EntityId,
     has_actions: bool,
@@ -14,18 +13,19 @@ pub struct BlockState {
 }
 
 impl PowerFsmState for BlockState {
-    fn on_enter_state_from_parent(&mut self, _previous: &mut Box<dyn PowerFsmState>) {
+    fn on_enter_state_from_parent(&mut self, _previous: &mut Box<dyn PowerFsmState + Send + Sync>) -> Result<(), crate::SquadOvError> {
         // Start Block
-        self.game.borrow_mut().push_block(self.block_type, &self.entity_id);
+        self.game.write()?.push_block(self.block_type, &self.entity_id);
+        Ok(())
     }
 
-    fn on_enter_state_from_child(&mut self, previous: &mut Box<dyn PowerFsmState>) {
+    fn on_enter_state_from_child(&mut self, previous: &mut Box<dyn PowerFsmState + Send + Sync>) -> Result<(), crate::SquadOvError> {
         // Need to immediately pass actions from the child to the game log.
         // Note that this is similar to the default state, in fact the default state can
         // be thought of as just a stripped block state.
         let action = previous.generate_hearthstone_game_actions();
         if action.is_some() {
-            self.game.borrow_mut().advance(action.unwrap());
+            self.game.write()?.advance(action.unwrap());
         }
 
         // Blocks clean themselves up so if we come from a block we don't have an
@@ -35,11 +35,13 @@ impl PowerFsmState for BlockState {
         } else {
             self.has_actions = false;
         }
+        Ok(())
     }
 
-    fn on_leave_state_to_parent(&mut self) {
+    fn on_leave_state_to_parent(&mut self) -> Result<(), crate::SquadOvError> {
         // End Block
-        self.game.borrow_mut().pop_block();
+        self.game.write()?.pop_block();
+        Ok(())
     }
 
     fn generate_hearthstone_game_actions(&self) -> Option<Vec<HearthstoneGameAction>> {
@@ -75,7 +77,7 @@ impl PowerFsmState for BlockState {
     }
 }
 impl BlockState {
-    pub fn new(info: PowerFsmStateInfo, st: Rc<RefCell<HearthstoneGameLog>>, indent_level: i32) -> Self {
+    pub fn new(info: PowerFsmStateInfo, st: Arc<RwLock<HearthstoneGameLog>>, indent_level: i32) -> Self {
         let block_type = match &info.attrs.get("BlockType") {
             Some(x) => x.parse().unwrap_or(BlockType::Invalid),
             None => BlockType::Invalid,

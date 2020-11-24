@@ -33,15 +33,15 @@ fn main() {
     writeln!(&mut writer, "=================== BASIC STATE ====================").unwrap();
     writeln!(&mut writer, "{}", parser.state).unwrap();
     writeln!(&mut writer, "=================== SNAPSHOTS ====================").unwrap();
-    for snap in &parser.fsm.game.borrow().snapshots {
+    for snap in &parser.fsm.game.read().unwrap().snapshots {
         writeln!(&mut writer, "{}", snap).unwrap();
     }
     writeln!(&mut writer, "=================== ACTIONS ====================").unwrap();
-    for action in &parser.fsm.game.borrow().actions {
+    for action in &parser.fsm.game.read().unwrap().actions {
         writeln!(&mut writer, "{}", action).unwrap();
     }
     writeln!(&mut writer, "=================== BLOCKS ====================").unwrap();
-    for (_bid, block) in &parser.fsm.game.borrow().blocks {
+    for (_bid, block) in &parser.fsm.game.read().unwrap().blocks {
         writeln!(&mut writer, "{}", block).unwrap();
     }
 }
