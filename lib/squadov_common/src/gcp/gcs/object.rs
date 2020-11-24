@@ -1,5 +1,14 @@
 use crate::SquadOvError;
-use reqwest::StatusCode;
+use reqwest::{StatusCode, header::HeaderMap};
+use serde::Serialize;
+use byteorder::{ByteOrder, BigEndian};
+
+#[derive(Serialize)]
+struct GCSObjectMetadata {
+    crc32c: String,
+    md5_hash: String,
+    name: String
+}
 
 impl super::GCSClient {
     pub async fn get_object(&self, bucket_id: &str, path: &str) -> Result<(), SquadOvError> {
@@ -13,6 +22,77 @@ impl super::GCSClient {
                 bucket_id,
                 crate::url_encode(path),
             ))
+            .send()
+            .await?;
+
+        if resp.status() != StatusCode::OK {
+            return Err(SquadOvError::NotFound);
+        }
+        Ok(())
+    }
+
+    
+    pub async fn download_object(&self, bucket_id: &str, path: &str) -> Result<Vec<u8>, SquadOvError> {
+        let client = self.http.create_http_client()?;
+
+        let resp = client.get(
+            &format!(
+                "{}/b/{}/o/{}?alt=media",
+                super::STORAGE_BASE_URL,
+                bucket_id,
+                crate::url_encode(path),
+            ))
+            .send()
+            .await?;
+
+        if resp.status() != StatusCode::OK {
+            return Err(SquadOvError::NotFound);
+        }
+
+        Ok(resp.bytes().await?.into_iter().collect())
+    }
+
+    pub async fn upload_object(&self, bucket_id: &str, path: &str, data: &[u8]) -> Result<(), SquadOvError> {
+        let client = self.http.create_http_client()?;
+        let boundary = "squadov_gcs";
+        let mut send_data: Vec<String> = Vec::new();
+        send_data.push(format!("--{}", boundary));
+        send_data.push(String::from("Content-Type: application/json; charset=UTF-8"));
+        send_data.push(String::new());
+
+        let crc32c = crc32c::crc32c(data);
+        let mut crc32c_bytes = [0; 4];
+        BigEndian::write_u32(&mut crc32c_bytes, crc32c);
+
+        let metadata = GCSObjectMetadata{
+            crc32c: base64::encode(crc32c_bytes),
+            md5_hash: format!("{:x}", md5::compute(data)),
+            name: crate::url_encode(path),
+        };
+        send_data.push(serde_json::to_string_pretty(&metadata)?);
+
+        send_data.push(format!("--{}", boundary));
+        send_data.push(String::from("Content-Type: application/octet-stream"));
+        send_data.push(String::from("Content-Transfer-Encoding: base64"));
+        send_data.push(String::new());
+        send_data.push(base64::encode(data));
+
+        send_data.push(format!("--{}--", boundary));
+
+        let final_send_data = send_data.join("\n");
+
+        let mut addtl_headers = HeaderMap::new();
+        addtl_headers.insert("Content-Type", format!("multipart/related; boundary={}", &boundary).parse()?);
+        addtl_headers.insert("Content-Length", format!("{}", final_send_data.len()).parse()?);
+
+        let resp = client.post(
+            &format!(
+                "{}/b/{}/o?uploadType=multipart",
+                super::STORAGE_UPLOAD_URL,
+                bucket_id
+            ))
+            .headers(addtl_headers)
+            .body(final_send_data)
             .send()
             .await?;
 

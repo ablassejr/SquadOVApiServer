@@ -1,6 +1,6 @@
 use squadov_common::SquadOvError;
 use squadov_common::hearthstone::{HearthstonePlayer, HearthstonePlayerMedalInfo, FormatType, GameType};
-use squadov_common::hearthstone::game_state::{HearthstoneGameBlock, HearthstoneGameSnapshot, HearthstoneGameSnapshotAuxData, HearthstoneGameAction, HearthstoneEntity, game_step::GameStep, EntityId, ActionType};
+use squadov_common::hearthstone::game_state::{HearthstoneGameBlock, HearthstoneGameSnapshot, HearthstoneGameSnapshotAuxData, HearthstoneGameAction, HearthstoneEntity, game_step::GameStep};
 use squadov_common::hearthstone::game_packet::{HearthstoneMatchMetadata, HearthstoneGamePacket, HearthstoneSerializedGameLog};
 use crate::api;
 use actix_web::{web, HttpResponse, HttpRequest};
@@ -223,15 +223,15 @@ impl api::ApiApplication {
                 hm.match_time,
                 COALESCE(EXTRACT(EPOCH FROM (
                     SELECT tm
-                    FROM squadov.hearthstone_actions
+                    FROM squadov.hearthstone_snapshots
                     WHERE match_uuid = $1
-                    ORDER BY action_id DESC
+                    ORDER BY last_action_id DESC
                     LIMIT 1
                 )) - EXTRACT(EPOCH FROM (
                     SELECT tm
-                    FROM squadov.hearthstone_actions
+                    FROM squadov.hearthstone_snapshots
                     WHERE match_uuid = $1
-                    ORDER BY action_id ASC
+                    ORDER BY last_action_id ASC
                     LIMIT 1
                 )), 0) AS \"elapsed_seconds!\"
             FROM squadov.hearthstone_matches AS hm
@@ -289,39 +289,20 @@ impl api::ApiApplication {
             snapshots.push(self.get_hearthstone_snapshot(&id).await?);
         }
 
-        let raw_actions = sqlx::query!(
+        let action_blob_uuid: Uuid = sqlx::query_scalar(
             "
-            SELECT
-                action_id,
-                action_type,
-                tm,
-                entity_id,
-                tags,
-                attributes,
-                parent_block
-            FROM squadov.hearthstone_actions
-            WHERE match_uuid = $1
-                AND user_id = $2
-            ORDER BY action_id ASC
+            SELECT actions_blob_uuid
+            FROM squadov.hearthstone_match_action_blobs
+            WHERE match_uuid = $1 AND user_id = $2
             ",
-            match_uuid,
-            user_id
         )
-            .fetch_all(&*self.pool)
+            .bind(match_uuid)
+            .bind(user_id)
+            .fetch_one(&*self.pool)
             .await?;
-        let mut actions : Vec<HearthstoneGameAction> = Vec::new();
-        for ra in raw_actions {
-            actions.push(HearthstoneGameAction{
-                tm: ra.tm,
-                action_type: ActionType::try_from(ra.action_type)?,
-                entity_id: EntityId::None,
-                current_block_id: ra.parent_block,
-                real_entity_id: Some(ra.entity_id),
-                tags: serde_json::from_value(ra.tags)?,
-                attributes: serde_json::from_value(ra.attributes)?
-            });
-        }
 
+        let raw_actions = self.blob.get_json_blob(&action_blob_uuid).await?;
+        let actions : Vec<HearthstoneGameAction> = serde_json::from_value(raw_actions)?;
         Ok(HearthstoneSerializedGameLog{
             snapshots,
             actions,

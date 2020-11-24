@@ -9,8 +9,7 @@ use serde::{Deserialize};
 use sqlx::postgres::{PgPool};
 use actix_web::{HttpRequest};
 use squadov_common;
-use squadov_common::SquadOvError;
-use squadov_common::HalResponse;
+use squadov_common::{SquadOvError, HalResponse, BlobManagementClient};
 use url::Url;
 use std::vec::Vec;
 use std::sync::Arc;
@@ -112,7 +111,8 @@ pub struct ApiApplication {
     session: auth::SessionManager,
     vod: Arc<dyn v1::VodManager + Send + Sync>,
     pool: Arc<PgPool>,
-    schema: Arc<graphql::GraphqlSchema>
+    schema: Arc<graphql::GraphqlSchema>,
+    blob: Arc<BlobManagementClient>
 }
 
 impl ApiApplication {
@@ -133,6 +133,7 @@ impl ApiApplication {
             }
         );
 
+        let blob = Arc::new(BlobManagementClient::new(gcp.clone(), pool.clone()));
         ApiApplication{
             config: config.clone(),
             clients: ApiClients{
@@ -145,7 +146,8 @@ impl ApiApplication {
                 v1::VodManagerType::FileSystem => Arc::new(v1::FilesystemVodManager::new().unwrap()) as Arc<dyn v1::VodManager + Send + Sync>
             },
             pool: pool,
-            schema: Arc::new(graphql::create_schema())
+            schema: Arc::new(graphql::create_schema()),
+            blob: blob,
         }
     }
 }

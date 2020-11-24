@@ -8,6 +8,7 @@ pub mod encode;
 pub mod sql;
 pub mod stats;
 pub mod hearthstone;
+pub mod blob;
 
 pub use error::*;
 pub use parse::*;
@@ -17,6 +18,7 @@ pub use gcp::*;
 pub use oauth::*;
 pub use encode::*;
 pub use sql::*;
+pub use blob::*;
 
 #[macro_use]
 extern crate lazy_static;

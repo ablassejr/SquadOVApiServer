@@ -3,6 +3,7 @@ mod object;
 mod signed_url;
 
 const STORAGE_BASE_URL : &'static str = "https://storage.googleapis.com/storage/v1";
+const STORAGE_UPLOAD_URL : &'static str = "https://storage.googleapis.com/upload/storage/v1";
 
 use std::sync::Arc;
 

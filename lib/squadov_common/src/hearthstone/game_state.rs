@@ -8,8 +8,8 @@ use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use regex::Regex;
 use uuid::Uuid;
-use serde::Serialize;
-use serde_repr::Serialize_repr;
+use serde::{Serialize, Deserialize};
+use serde_repr::{Serialize_repr, Deserialize_repr};
 use num_enum::TryFromPrimitive;
 use std::str::FromStr;
 
@@ -33,6 +33,12 @@ pub enum EntityId {
     None
 }
 
+impl std::default::Default for EntityId {
+    fn default() -> Self {
+        EntityId::None
+    }
+}
+
 #[derive(sqlx::Type, Display, Clone, Copy, Serialize_repr)]
 #[repr(i32)]
 pub enum BlockType {
@@ -50,7 +56,7 @@ pub enum BlockType {
     MoveMinion = 12
 }
 
-#[derive(sqlx::Type, Display, Clone, Copy, Serialize_repr, TryFromPrimitive)]
+#[derive(sqlx::Type, Display, Clone, Copy, Serialize_repr, Deserialize_repr, TryFromPrimitive)]
 #[repr(i32)]
 pub enum ActionType {
     CreateGame,
@@ -102,7 +108,7 @@ pub struct HearthstoneGameBlock {
 }
 
 // Generally actions are just a matter of creating or modifying an "entity".
-#[derive(Clone,Display, Serialize)]
+#[derive(Clone,Display, Serialize, Deserialize)]
 #[display(fmt="HearthstoneGameAction[TM: {}\tType: {}\tBlock: {:?}\tEntityId: {}\tTags: {:#?}\tAttributes: {:#?}]", tm, action_type, current_block_id, entity_id, tags, attributes)]
 pub struct HearthstoneGameAction {
     // Time at which this action was performed
@@ -111,7 +117,7 @@ pub struct HearthstoneGameAction {
     pub action_type: ActionType,
     // Which entity is this action referring to. It's either the
     // GameEntity (modifying game state), a player, a new entity, or an existing entity.
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub entity_id: EntityId,
     #[serde(rename = "currentBlockId")]
     pub current_block_id: Option<Uuid>,
@@ -124,6 +130,20 @@ pub struct HearthstoneGameAction {
     // Generally attributes are found on the same line as the action though it's generally
     // up to the action to determine what's a tag and what's an attribute.
     pub attributes: HashMap<String, String>
+}
+
+impl std::default::Default for HearthstoneGameAction {
+    fn default() -> Self {
+        Self {
+            tm: Utc::now(),
+            action_type: ActionType::TagChange,
+            entity_id: EntityId::None,
+            current_block_id: None,
+            real_entity_id: None,
+            tags: HashMap::new(),
+            attributes: HashMap::new()
+        }
+    }
 }
 
 #[derive(Clone,Display,Debug,Serialize)]

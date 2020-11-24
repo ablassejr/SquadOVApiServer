@@ -197,28 +197,29 @@ impl api::ApiApplication {
 
     pub async fn store_hearthstone_raw_power_logs(&self, tx : &mut Transaction<'_, Postgres>, logs: &[hearthstone::HearthstoneRawLog], match_uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
         let raw = serde_json::to_value(logs)?;
-        sqlx::query!(
-            "
-            INSERT INTO squadov.hearthstone_raw_power_logs (
+        let blob_uuid = self.blob.store_new_json_blob(tx, &raw).await?;
+        tx.execute(
+            sqlx::query!(
+                "
+                INSERT INTO squadov.hearthstone_raw_power_logs (
+                    user_id,
+                    match_uuid,
+                    parsed,
+                    raw_logs_blob_uuid
+                )
+                VALUES (
+                    $1,
+                    $2,
+                    $3,
+                    $4
+                )
+                ",
                 user_id,
                 match_uuid,
-                raw_logs,
-                parsed
+                false,
+                blob_uuid
             )
-            VALUES (
-                $1,
-                $2,
-                $3,
-                $4
-            )
-            ",
-            user_id,
-            match_uuid,
-            raw,
-            false
-        )
-            .execute(tx)
-            .await?;
+        ).await?;
         Ok(())
     }
 
@@ -253,50 +254,27 @@ impl api::ApiApplication {
             return Ok(());
         }
 
-        let mut sql : Vec<String> = Vec::new();
-        sql.push(String::from("
-            INSERT INTO squadov.hearthstone_actions (
+        let raw_data = serde_json::to_value(actions)?;
+        let blob_uuid = self.blob.store_new_json_blob(tx, &raw_data).await?;
+        sqlx::query!(
+            "
+            INSERT INTO squadov.hearthstone_match_action_blobs (
                 match_uuid,
                 user_id,
-                action_id,
-                tm,
-                entity_id,
-                tags,
-                attributes,
-                parent_block,
-                action_type
+                actions_blob_uuid
             )
-            VALUES
-        "));
-        for (idx, m) in actions.iter().enumerate() {
-            sql.push(format!("(
-                '{match_uuid}',
-                {user_id},
-                {action_id},
-                {tm},
-                {entity_id},
-                '{tags}',
-                '{attributes}',
-                {parent_block},
-                {action_type}
-            )",
-                match_uuid=uuid,
-                user_id=user_id,
-                action_id=idx,
-                tm=squadov_common::sql_format_time(&m.tm),
-                entity_id=m.real_entity_id.unwrap_or(0),
-                tags=squadov_common::sql_format_json(&m.tags)?,
-                attributes=squadov_common::sql_format_json(&m.attributes)?,
-                parent_block=squadov_common::sql_format_option_string(&m.current_block_id),
-                action_type=m.action_type as i32,
-            ));
-
-            if idx != actions.len() - 1 {
-                sql.push(String::from(","));
-            }
-        }
-
-        sqlx::query(&sql.join("")).execute(tx).await?;
+            VALUES (
+                $1,
+                $2,
+                $3
+            )
+            ",
+            uuid,
+            user_id,
+            blob_uuid
+        )
+            .execute(tx)
+            .await?;
         Ok(())
     }
 
