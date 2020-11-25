@@ -130,7 +130,10 @@ impl api::ApiApplication {
                 arena_wins,
                 arena_loss,
                 tavern_brawl_wins,
-                tavern_brawl_loss
+                tavern_brawl_loss,
+                battlegrounds_rating,
+                duels_casual_rating,
+                duels_heroic_rating
             FROM squadov.hearthstone_match_players
             WHERE match_uuid = $1
             ",
@@ -170,6 +173,9 @@ impl api::ApiApplication {
                 tavern_brawl_wins: rmp.tavern_brawl_wins as u32,
                 tavern_brawl_loss: rmp.tavern_brawl_loss as u32,
                 medal_info: HearthstonePlayerMedalInfo::new(),
+                battlegrounds_rating: rmp.battlegrounds_rating,
+                duels_casual_rating: rmp.duels_casual_rating,
+                duels_heroic_rating: rmp.duels_heroic_rating,
             };
 
             ret_map.insert(rmp.player_match_id, new_player);

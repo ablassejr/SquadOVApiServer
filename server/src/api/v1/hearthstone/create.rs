@@ -150,7 +150,10 @@ impl api::ApiApplication {
                     arena_wins,
                     arena_loss,
                     tavern_brawl_wins,
-                    tavern_brawl_loss
+                    tavern_brawl_loss,
+                    battlegrounds_rating,
+                    duels_casual_rating,
+                    duels_heroic_rating
                 )
                 VALUES (
                     $1,
@@ -161,7 +164,10 @@ impl api::ApiApplication {
                     $6,
                     $7,
                     $8,
-                    $9
+                    $9,
+                    $10,
+                    $11,
+                    $12
                 )
                 ON CONFLICT (match_uuid, player_match_id) DO UPDATE SET
                     user_id = COALESCE(squadov.hearthstone_match_players.user_id, EXCLUDED.user_id),
@@ -172,7 +178,13 @@ impl api::ApiApplication {
                     tavern_brawl_wins = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.tavern_brawl_wins
                                         ELSE squadov.hearthstone_match_players.tavern_brawl_wins END,
                     tavern_brawl_loss = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.tavern_brawl_loss
-                                        ELSE squadov.hearthstone_match_players.tavern_brawl_loss END
+                                        ELSE squadov.hearthstone_match_players.tavern_brawl_loss END,
+                    battlegrounds_rating = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.battlegrounds_rating
+                                           ELSE squadov.hearthstone_match_players.battlegrounds_rating END,
+                    duels_casual_rating = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.duels_casual_rating
+                                          ELSE squadov.hearthstone_match_players.duels_casual_rating END,
+                    duels_heroic_rating = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.duels_heroic_rating
+                                          ELSE squadov.hearthstone_match_players.duels_heroic_rating END
                 ",
                 // *ONLY* The local player should be associated with the user we pulled from the session.
                 // Ideally we'd get them to OAuth with Blizzard to verify account ownership instead?
@@ -188,7 +200,10 @@ impl api::ApiApplication {
                 player.arena_wins as i32,
                 player.arena_loss as i32,
                 player.tavern_brawl_wins as i32,
-                player.tavern_brawl_loss as i32
+                player.tavern_brawl_loss as i32,
+                player.battlegrounds_rating,
+                player.duels_casual_rating,
+                player.duels_heroic_rating
             )
         ).await?;
 

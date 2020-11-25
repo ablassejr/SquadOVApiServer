@@ -163,7 +163,13 @@ pub struct HearthstonePlayer {
     #[serde(rename = "tavernBrawlWins")]
     pub tavern_brawl_wins: u32,
     #[serde(rename = "tavernBrawlLoss")]
-    pub tavern_brawl_loss: u32
+    pub tavern_brawl_loss: u32,
+    #[serde(rename = "battlegroundsRating")]
+    pub battlegrounds_rating: Option<i32>,
+    #[serde(rename = "duelsCasualRating")]
+    pub duels_casual_rating: Option<i32>,
+    #[serde(rename = "duelsHeroicRating")]
+    pub duels_heroic_rating: Option<i32>
 }
 
 #[derive(Serialize,Deserialize)]
