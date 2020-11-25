@@ -11,6 +11,39 @@ use std::convert::TryFrom;
 use std::collections::HashMap;
 
 impl api::ApiApplication {
+    pub async fn get_player_hero_entity_from_hearthstone_snapshot(&self, snapshot_uuid: &Uuid, user_id: i64) -> Result<HearthstoneEntity, SquadOvError> {
+        let raw_entity = sqlx::query!(
+            "
+            SELECT
+                hse.entity_id,
+                hse.tags,
+                hse.attributes
+            FROM squadov.hearthstone_snapshots AS hs
+            INNER JOIN squadov.hearthstone_match_players AS hmp
+                ON hmp.match_uuid = hs.match_uuid
+            INNER JOIN squadov.hearthstone_snapshots_player_map AS pm
+                ON pm.player_id = hmp.player_match_id AND pm.snapshot_id = hs.snapshot_id
+            INNER JOIN squadov.hearthstone_snapshots_entities AS hse
+                ON hse.snapshot_id = hs.snapshot_id
+            WHERE hse.snapshot_id = $1
+                AND hmp.user_id = $2
+                AND (hse.tags->>'CONTROLLER')::INTEGER = pm.player_id
+                AND (hse.tags->>'CARDTYPE') = 'HERO'
+            ORDER BY hse.entity_id ASC
+            ",
+            snapshot_uuid,
+            user_id
+        )
+            .fetch_one(&*self.pool)
+            .await?;
+        
+        Ok(HearthstoneEntity{
+            entity_id: raw_entity.entity_id,
+            tags: serde_json::from_value(raw_entity.tags)?,
+            attributes: serde_json::from_value(raw_entity.attributes)?
+        })
+    }
+
     pub async fn get_hearthstone_snapshot(&self, snapshot_uuid: &Uuid) -> Result<HearthstoneGameSnapshot, SquadOvError> {
         let raw_metadata = sqlx::query!(
             "

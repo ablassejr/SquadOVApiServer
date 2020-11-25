@@ -1,8 +1,11 @@
+use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
 use chrono::{DateTime, Utc};
 use squadov_common::SquadOvError;
+use squadov_common::hearthstone::HearthstoneDuelRun;
 use uuid::Uuid;
 use sqlx::{Transaction, Postgres};
+use std::sync::Arc;
 
 impl api::ApiApplication {
     pub async fn create_hearthstone_duels_run(&self, tx: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, user_id: i64, start_time: &DateTime<Utc>) -> Result<Uuid, SquadOvError> {
@@ -30,4 +33,135 @@ impl api::ApiApplication {
             .await?;
         Ok(mc.uuid)
     }
+
+    async fn list_duel_runs_for_user(&self, user_id: i64, start: i64, end: i64) -> Result<Vec<Uuid>, SquadOvError> {
+        Ok(sqlx::query_scalar(
+            "
+            SELECT collection_uuid
+            FROM squadov.hearthstone_duels
+            WHERE user_id = $1
+            ORDER BY creation_time DESC
+            LIMIT $2 OFFSET $3
+            ",
+        )
+            .bind(user_id)
+            .bind(end - start)
+            .bind(start)
+            .fetch_all(&*self.pool)
+            .await?
+        )
+    }
+
+    async fn list_matches_for_duel_run(&self, collection_uuid: &Uuid, user_id: i64) -> Result<Vec<Uuid>, SquadOvError> {
+        Ok(sqlx::query_scalar(
+            "
+            SELECT mmc.match_uuid
+            FROM squadov.match_to_match_collection AS mmc
+            INNER JOIN squadov.hearthstone_duels AS had
+                ON had.collection_uuid = mmc.collection_uuid AND had.user_id = $2
+            INNER JOIN squadov.hearthstone_matches AS hm
+                ON hm.match_uuid = mmc.match_uuid
+            WHERE mmc.collection_uuid = $1
+            ORDER BY hm.match_time DESC
+            ",
+        )
+            .bind(collection_uuid)
+            .bind(user_id)
+            .fetch_all(&*self.pool)
+            .await?
+        )
+    }
+
+    async fn get_hearthstone_duel_run(&self, collection_uuid: &Uuid, user_id: i64)  -> Result<HearthstoneDuelRun, SquadOvError> {
+        let basic_data = sqlx::query!(
+            r#"
+            WITH duel_matches AS (
+                SELECT hmm.*
+                FROM squadov.hearthstone_match_metadata AS hmm
+                INNER JOIN squadov.match_to_match_collection AS mmc
+                    ON mmc.match_uuid = hmm.match_uuid
+                WHERE mmc.collection_uuid = $1
+            )
+            SELECT
+                collection_uuid AS "duel_uuid",
+                deck_id,
+                creation_time AS "timestamp",
+                (
+                    SELECT COUNT(dm.match_uuid)
+                    FROM duel_matches AS dm
+                    INNER JOIN squadov.hearthstone_match_players AS hmp
+                        ON hmp.match_uuid = dm.match_uuid AND hmp.player_match_id = dm.match_winner_player_id
+                    WHERE hmp.user_id = $2
+                ) AS "wins!",
+                (
+                    SELECT COUNT(dm.match_uuid)
+                    FROM duel_matches AS dm
+                    INNER JOIN squadov.hearthstone_match_players AS hmp
+                        ON hmp.match_uuid = dm.match_uuid AND hmp.player_match_id = dm.match_winner_player_id
+                    WHERE hmp.user_id != $2
+                ) AS "loss!"
+            FROM squadov.hearthstone_duels
+            WHERE collection_uuid = $1 AND user_id = $2
+            "#,
+            collection_uuid,
+            user_id
+        )
+            .fetch_one(&*self.pool)
+            .await?;
+
+        let deck = self.get_latest_hearthstone_deck(basic_data.deck_id, user_id).await?;
+
+        // Note that for duels the hero card stored in the deck isn't what we want to display to the user
+        // as to what the duel run's hero is. Instead, look at the latest game and grab the hero entity from that.
+        // If there's no matches (which technically is impossible since we only create a duel run upon uploading a match)
+        // then we fall back to the deck's hero card.
+        let matches = self.list_matches_for_duel_run(collection_uuid, user_id).await?;
+        let hero_card = if matches.len() > 0 {
+            let snapshot_ids = self.get_hearthstone_snapshots_for_match(&matches[0], user_id).await?;
+            let player_entity = match snapshot_ids.last() {
+                Some(x) => Some(self.get_player_hero_entity_from_hearthstone_snapshot(x, user_id).await?),
+                None => None
+            };
+
+            if player_entity.is_some() {
+                player_entity.unwrap().card_id()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Ok(HearthstoneDuelRun{
+            duel_uuid: basic_data.duel_uuid,
+            hero_card,
+            deck,
+            wins: basic_data.wins,
+            loss: basic_data.loss,
+            timestamp: basic_data.timestamp
+        })
+    }
+}
+
+pub async fn list_duel_runs_for_user_handler(data : web::Path<super::HearthstoneUserMatchInput>, query: web::Query<api::PaginationParameters>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let query = query.into_inner();
+    let runs = app.list_duel_runs_for_user(
+        data.user_id,
+        query.start,
+        query.end,
+    ).await?;
+
+    let expected_total = query.end - query.start;
+    let got_total = runs.len() as i64;
+    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(runs, &req, &query, expected_total == got_total)?)) 
+}
+
+pub async fn list_matches_for_duel_run_handler(data : web::Path<super::HearthstoneCollectionGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
+    let matches = app.list_matches_for_duel_run(&data.collection_uuid, data.user_id).await?;
+    Ok(HttpResponse::Ok().json(&matches))
+}
+
+pub async fn get_hearthstone_duel_run_handler(data : web::Path<super::HearthstoneCollectionGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
+    let duel_run = app.get_hearthstone_duel_run(&data.collection_uuid, data.user_id).await?;
+    Ok(HttpResponse::Ok().json(&duel_run))
 }

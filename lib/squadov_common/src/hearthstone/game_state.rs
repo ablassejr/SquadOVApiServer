@@ -162,6 +162,10 @@ impl HearthstoneEntity {
             None => play_state::PlayState::Invalid
         }
     }
+
+    pub fn card_id(&self) -> Option<String> {
+        self.attributes.get("CardID").cloned()
+    }
 }
 
 #[derive(Clone,Display,Debug,Serialize)]

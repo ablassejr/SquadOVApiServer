@@ -182,3 +182,15 @@ pub struct HearthstoneArenaRun {
     pub loss: u32,
     pub timestamp: DateTime<Utc>
 }
+
+#[derive(Serialize)]
+pub struct HearthstoneDuelRun {
+    #[serde(rename = "duelUuid")]
+    pub duel_uuid: Uuid,
+    #[serde(rename = "heroCard")]
+    pub hero_card: Option<String>,
+    pub deck: Option<HearthstoneDeck>,
+    pub wins: i64,
+    pub loss: i64,
+    pub timestamp: DateTime<Utc>
+}
