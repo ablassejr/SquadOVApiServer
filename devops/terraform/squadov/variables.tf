@@ -13,3 +13,7 @@ variable "postgres_instance_name" {
 variable "vod_storage_bucket" {
     type = string
 }
+
+variable "blob_storage_bucket" {
+    type = string
+}

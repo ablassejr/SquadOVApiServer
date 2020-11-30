@@ -21,8 +21,8 @@ impl super::GCSClient {
         )
     }
 
-    fn create_required_query_parameters(&self, dt: &DateTime<Utc>, headers: &BTreeMap<String, Vec<String>>) -> BTreeMap<String, String> {
-        let encoded_email = crate::url_encode(&self.http.credentials.client_email);
+    fn create_required_query_parameters(&self, dt: &DateTime<Utc>, headers: &BTreeMap<String, Vec<String>>) -> Result<BTreeMap<String, String>, SquadOvError> {
+        let encoded_email = crate::url_encode(&self.http.read()?.credentials.client_email);
         let encoded_scope = crate::url_encode(&self.create_credential_scope(dt));
 
         let mut ret: BTreeMap<String, String> = BTreeMap::new();
@@ -40,7 +40,7 @@ impl super::GCSClient {
         ret.insert("X-Goog-Date".to_string(), dt.format("%Y%m%dT%H%M%SZ").to_string());
         ret.insert("X-Goog-Expires".to_string(), "43200".to_string());
         ret.insert("X-Goog-SignedHeaders".to_string(), headers.keys().map(|x| x.clone()).collect::<Vec<String>>().join("%3B"));
-        ret
+        Ok(ret)
     }
 
     fn create_canonical_base_url(&self, dt: &DateTime<Utc>, uri: Url, headers: &BTreeMap<String, Vec<String>>) -> Result<Url, SquadOvError> {
@@ -56,7 +56,7 @@ impl super::GCSClient {
             }
         }
 
-        for (key, value) in self.create_required_query_parameters(dt, headers).into_iter() {
+        for (key, value) in self.create_required_query_parameters(dt, headers)?.into_iter() {
             all_query_params.insert(key, vec![value]);
         }
 
@@ -112,7 +112,7 @@ impl super::GCSClient {
     }
 
     fn create_request_signature(&self, dt: &DateTime<Utc>, canonical_request: &str) -> Result<String, SquadOvError> {
-        let pkey = PKey::private_key_from_pem(self.http.credentials.private_key.as_bytes())?;
+        let pkey = PKey::private_key_from_pem(self.http.read()?.credentials.private_key.as_bytes())?;
         let mut signer = Signer::new(MessageDigest::sha256(), &pkey)?;
         let string_to_sign = self.create_string_to_sign(dt, canonical_request);
         signer.update(string_to_sign.as_bytes())?;

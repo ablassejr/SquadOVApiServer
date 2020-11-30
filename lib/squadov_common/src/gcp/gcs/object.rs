@@ -13,7 +13,7 @@ struct GCSObjectMetadata {
 
 impl super::GCSClient {
     pub async fn get_object(&self, bucket_id: &str, path: &str) -> Result<(), SquadOvError> {
-        let client = self.http.create_http_client()?;
+        let client = self.http.read()?.create_http_client()?;
 
         // TODO: Parse this response if we ever need it.
         let resp = client.get(
@@ -27,14 +27,14 @@ impl super::GCSClient {
             .await?;
 
         if resp.status() != StatusCode::OK {
-            return Err(SquadOvError::NotFound);
+            return Err(SquadOvError::InternalError(format!("GCS Get Object Error: {} - {}", resp.status(), resp.text().await?)));
         }
         Ok(())
     }
 
     
     pub async fn download_object(&self, bucket_id: &str, path: &str) -> Result<Vec<u8>, SquadOvError> {
-        let client = self.http.create_http_client()?;
+        let client = self.http.read()?.create_http_client()?;
 
         let resp = client.get(
             &format!(
@@ -47,7 +47,7 @@ impl super::GCSClient {
             .await?;
 
         if resp.status() != StatusCode::OK {
-            return Err(SquadOvError::NotFound);
+            return Err(SquadOvError::InternalError(format!("GCS Download Object Error: {} - {}", resp.status(), resp.text().await?)));
         }
 
         Ok(resp.bytes().await?.into_iter().collect())
@@ -60,7 +60,8 @@ impl super::GCSClient {
 
         let mut i: i32 = 0;
         while i < 10 {
-            let client = self.http.create_http_client()?;
+            log::info!("Trying to GCS Upload Object: {}", i);
+            let client = self.http.read()?.create_http_client()?;
             let boundary = "squadov_gcs";
             let mut send_data: Vec<String> = Vec::new();
             send_data.push(format!("--{}", boundary));
@@ -107,17 +108,17 @@ impl super::GCSClient {
             if resp.status() != StatusCode::OK {
                 status = Some(resp.status());
                 body = Some(resp.text().await?);
+                let mut sleep_ms: u64 = 500;
                 // 400 errors should result in a retry w/o exponential backoff. 
                 // 500 errors should result in a retry with exponential backoff.
                 if status.unwrap().as_u16() > 500 {
-                    std::thread::sleep(std::time::Duration::from_millis(2u64.pow(backoff_tick) + rand::thread_rng().gen_range(0, 1000)));
+                    sleep_ms = 2u64.pow(backoff_tick) + rand::thread_rng().gen_range(0, 1000);
                     backoff_tick += 1;
-                } else if status.unwrap().as_u16() > 400 {
-                    // While we don't do exponential backoff - still wait a little before trying again.
-                    std::thread::sleep(std::time::Duration::from_millis(500));
                 }
                 
-                continue
+                log::info!("(Retry) Failed to upload GCS Upload Object: {:?} - {:?}", status, body);
+                async_std::task::sleep(std::time::Duration::from_millis(sleep_ms)).await;
+                continue;
             }
 
             return Ok(())
@@ -127,7 +128,7 @@ impl super::GCSClient {
     }
 
     pub async fn delete_object(&self, bucket_id: &str, path: &str) -> Result<(), SquadOvError> {
-        let client = self.http.create_http_client()?;
+        let client = self.http.read()?.create_http_client()?;
 
         let resp = client.delete(
             &format!(
@@ -140,7 +141,7 @@ impl super::GCSClient {
             .await?;
 
         if resp.status() != StatusCode::NO_CONTENT {
-            return Err(SquadOvError::InternalError(format!("GCS Error: {} - {}", resp.status(), resp.text().await?)));
+            return Err(SquadOvError::InternalError(format!("GCS Delete Object Error: {} - {}", resp.status(), resp.text().await?)));
         }
         Ok(())
     }

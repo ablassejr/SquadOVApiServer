@@ -2,10 +2,11 @@ use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
 use chrono::{DateTime, Utc};
 use squadov_common::SquadOvError;
-use squadov_common::hearthstone::HearthstoneDuelRun;
+use squadov_common::hearthstone::{HearthstoneDuelRun, GameType};
 use uuid::Uuid;
 use sqlx::{Transaction, Postgres};
 use std::sync::Arc;
+use std::convert::TryFrom;
 
 impl api::ApiApplication {
     pub async fn create_hearthstone_duels_run(&self, tx: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, user_id: i64, start_time: &DateTime<Utc>) -> Result<Uuid, SquadOvError> {
@@ -81,6 +82,13 @@ impl api::ApiApplication {
                 INNER JOIN squadov.match_to_match_collection AS mmc
                     ON mmc.match_uuid = hmm.match_uuid
                 WHERE mmc.collection_uuid = $1
+            ), duel_ratings AS (
+                SELECT MAX(duels_casual_rating) AS "casual", MAX(duels_heroic_rating) AS "heroic"
+                FROM duel_matches AS dm
+                INNER JOIN squadov.hearthstone_match_players AS hmp
+                    ON hmp.match_uuid = dm.match_uuid
+                WHERE hmp.user_id = $2
+                GROUP BY hmp.user_id
             )
             SELECT
                 collection_uuid AS "duel_uuid",
@@ -99,7 +107,24 @@ impl api::ApiApplication {
                     INNER JOIN squadov.hearthstone_match_players AS hmp
                         ON hmp.match_uuid = dm.match_uuid AND hmp.player_match_id = dm.match_winner_player_id
                     WHERE hmp.user_id != $2
-                ) AS "loss!"
+                ) AS "loss!",
+                (
+                    SELECT casual
+                    FROM duel_ratings
+                    LIMIT 1
+                ) AS "casual_rating",
+                (
+                    SELECT heroic
+                    FROM duel_ratings
+                    LIMIT 1
+                ) AS "heroic_rating",
+                (
+                    SELECT DISTINCT hmm.game_type
+                    FROM duel_matches AS dm
+                    INNER JOIN squadov.hearthstone_match_metadata AS hmm
+                        ON hmm.match_uuid = dm.match_uuid
+                    LIMIT 1
+                ) AS "game_type!"
             FROM squadov.hearthstone_duels
             WHERE collection_uuid = $1 AND user_id = $2
             "#,
@@ -132,13 +157,21 @@ impl api::ApiApplication {
             None
         };
 
+        let game_type = GameType::try_from(basic_data.game_type)?;
+        let rating = if game_type == GameType::PvpDr {
+            basic_data.casual_rating
+        } else {
+            basic_data.heroic_rating
+        };
+
         Ok(HearthstoneDuelRun{
             duel_uuid: basic_data.duel_uuid,
             hero_card,
             deck,
             wins: basic_data.wins,
             loss: basic_data.loss,
-            timestamp: basic_data.timestamp
+            timestamp: basic_data.timestamp,
+            rating
         })
     }
 }

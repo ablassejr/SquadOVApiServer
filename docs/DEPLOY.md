@@ -21,6 +21,7 @@ We'll be using the following tools to deploy:
 You will need to ensure that you have a few Debian packages installed to complete this guide (list may not be comprehensive)
 * curl
 * unzip
+* python3 (pip, sqlaclhemy, psycopg2)
 
 ## New Deployment Guide
 
@@ -57,6 +58,7 @@ You will need to ensure that you have a few Debian packages installed to complet
     * `DEPLOYMENT_DOMAIN` to the domain you wish to deploy to (e.g. `staging.squadov.gg`).
     * `DEPLOYMENT_DOMAIN_EMAIL` to the email address that you wish to register the Let's Encrypt certificate with.
     * `VOD_BUCKET` to a unique bucket name to store VODs in.
+    * `BLOB_BUCKET` to a unique bucket name to store binary blobs in.
 
    We'll setup the other environment variables later.
    Save the file and verify that the contents of the `$ENV_vars.json` file is encrypted (i.e. `cat $ENV_vars.json`).
@@ -163,7 +165,8 @@ You should now see the `SquadOV.exe` executable in `$CLIENT\client_ui\package\wi
 6. `sops exec-env ../../env/$ENV_vars.json './build.sh'`
 7. `cd $SRC/devops/build`
 8. `sops exec-env ../env/$ENV_vars.json './build.sh'`
-9. (Optionally): `cd $APP && ./devops/build.sh $ENV`
-10. `cd $SRC/devops/ansible`
-11. (Optionally): `sops exec-env ../env/$ENV_vars.json 'ansible-playbook -e "shosts=$ENV" -v deploy_supporting_infra.yml'`
-12. `sops exec-env ../env/$ENV_vars.json 'ansible-playbook -e "shosts=$ENV" -v deploy_web_api_app.yml'`
+9. (Optionally): `cd $SRC/scripts && sops exec-env ../devops/env/$ENV_vars.json './sync_hearthstone_metadata.sh $HSD'` where `$HSD` is the directy of the static Hearthstone assets.
+10. (Optionally): `cd $APP && ./devops/build.sh $ENV`
+11. `cd $SRC/devops/ansible`
+12. (Optionally): `sops exec-env ../env/$ENV_vars.json 'ansible-playbook -e "shosts=$ENV" -v deploy_supporting_infra.yml'`
+13. `sops exec-env ../env/$ENV_vars.json 'ansible-playbook -e "shosts=$ENV" -v deploy_web_api_app.yml'`

@@ -198,5 +198,6 @@ pub struct HearthstoneDuelRun {
     pub deck: Option<HearthstoneDeck>,
     pub wins: i64,
     pub loss: i64,
+    pub rating: Option<i32>,
     pub timestamp: DateTime<Utc>
 }

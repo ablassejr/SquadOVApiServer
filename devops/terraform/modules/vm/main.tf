@@ -82,6 +82,12 @@ resource "google_storage_bucket" "vod-storage-bucket" {
     storage_class   = "STANDARD"
 }
 
+resource "google_storage_bucket" "blob-storage-bucket" {
+    name            = var.blob_storage_bucket
+    location        = "US-CENTRAL1"
+    storage_class   = "STANDARD"
+}
+
 resource "google_project_iam_custom_role" "api-service-custom-role" {
     role_id     = "apiServiceAccountRole"
     title       = "API Service Account Role"

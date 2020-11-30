@@ -11,11 +11,12 @@ RUN mkdir -p /squadov/config
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-COPY src /squadov/src
+COPY lib /squadov/lib
+COPY server /squadov/server
+COPY tools /squadov/tools
 COPY deps /squadov/deps
 COPY config/$GCP_PROJECT.toml /squadov/config/config.toml
 COPY Cargo.toml /squadov/
-COPY sqlx-data.json /squadov/
 COPY devops/gcp /squadov/gcp
 
 WORKDIR /squadov

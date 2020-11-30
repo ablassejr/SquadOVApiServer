@@ -10,6 +10,7 @@
 	"DEPLOYMENT_DOMAIN": "ENC[AES256_GCM,data:KKtfOmsAv1KtJg==,iv:QcqZySmSJKC5cHd7F8RXw38VuRmFqXE754Czqa7F9ZQ=,tag:Yy2LdktBStdFq/IPZkp6Fg==,type:str]",
 	"DEPLOYMENT_DOMAIN_EMAIL": "ENC[AES256_GCM,data:Gj1D+kanAxuoBkZyLt5I,iv:n6uRKBBbnUTHc7X137PjuM6sO4XcXh8y3ApmYEHWR38=,tag:wiG8IpafJCdSFbN07TAyzA==,type:str]",
 	"VOD_BUCKET": "ENC[AES256_GCM,data:DCEXQK9GuFS+IG4ypI3Cxo6F,iv:aV1BN5TxuBrOjw9Amj0nXAugB4Wuw8Eut8pSIm7fMyA=,tag:p4dDo+QXTYW47rjSbz/YQQ==,type:str]",
+	"BLOB_BUCKET": "ENC[AES256_GCM,data:AN6SEmYTMaLpiKdGC9aZEli9lA==,iv:oWBft67iHF4k6fmQRbVoB6HpRKVvOLrTT0aL1Ds9ggo=,tag:vPJXQ6gEZFv9bzdNYMWFow==,type:str]",
 	"FUSIONAUTH_HOST": "ENC[AES256_GCM,data:RTXFHsuwRETB/Q==,iv:PzgQRy1kUp7Wn6IVshjc2QWBMSVJYdReI7RxgZziUxM=,tag:usqx5r3bk93OT+ws57axmw==,type:str]",
 	"FUSIONAUTH_DB_USER": "ENC[AES256_GCM,data:DKae2Ciqa4mZ,iv:JTvawIzONl+3DA9rUhja+W0S1mjqRwsEcMRi1dg9tqE=,tag:NsK0bs6GbGH9Y7m12oGFxg==,type:str]",
 	"FUSIONAUTH_DB_PASSWORD": "ENC[AES256_GCM,data:Ex4UWQCG/lp2MZm1dFOG7ffL+80=,iv:4D43DugglTbdcgKygJEb/sjtWcn1CFJLk4K64MbaI+0=,tag:5bkYM+BhKg2bCBXOC17jmA==,type:str]",
@@ -28,8 +29,8 @@
 		],
 		"azure_kv": null,
 		"hc_vault": null,
-		"lastmodified": "2020-10-28T17:50:33Z",
-		"mac": "ENC[AES256_GCM,data:FKBefkiEWv8xTRYB8b7FXWd7hBxFOiKltYcdc+lpE0rCXFz/pNjxCkcjQCvh/vcfvgWybOIRnSb+BSSmMkrnxmDgAiqCyGlz9DyMb2jX3fZHedVe7oZ8fCoVwOfTqpEllsumTSNnjy6XYz4CWzKb2YZPQHex+KyYjobvdJ/bBjw=,iv:7wGwR1c56jtRMReg5UhkK/nrRz4X2CGvfqEeLZ9pIF4=,tag:15uIjiSJrpC4NIalGQGZ4Q==,type:str]",
+		"lastmodified": "2020-11-25T20:23:07Z",
+		"mac": "ENC[AES256_GCM,data:l0IW2OrsejzV+CPkPoBwLYUAjfT9ZhzPtar4Zo6hCrBDPFlzy3vbPk6JZ5YC19NdO2I69t0ACxn+QNqQ3GxfgwknhpGXbsrS4uPgJDZqRD1Amp8PYkZXTFhjpQKuDFPJSYry+joYX0IFDjEb6kdnSv30TPCJHxpBQNPXGE+JuVg=,iv:7XEKcd85wT+wBcq3YyL6GxLKZmSkzk3SST0l69lbLc4=,tag:j9TnZWZOj55FHdws6r3KjA==,type:str]",
 		"pgp": null,
 		"unencrypted_suffix": "_unencrypted",
 		"version": "3.6.1"

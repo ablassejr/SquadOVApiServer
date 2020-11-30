@@ -34,4 +34,5 @@ module "vm" {
 
     service_account_key_filename = "../../gcp/squadov.json"
     vod_storage_bucket = var.vod_storage_bucket
+    blob_storage_bucket = var.blob_storage_bucket
 }

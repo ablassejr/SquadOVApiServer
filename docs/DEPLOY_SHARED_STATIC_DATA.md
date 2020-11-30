@@ -64,4 +64,4 @@ In each `CARD_BACK_ID` folder, you should see an additional `back.png`.
 ## Upload Metadata to Database
 
 1. `cd $SRC/scripts`
-2. `python mass_pull_hearthstone_data.py --folder $HSD --jdbc $JDBC` where `$JDBC` is a JDBC URL to connect to the database (whether it's a local one or one you connect to via Cloud SQL Proxy).
+2. `python sync_hearthstone_metadata.py --folder $HSD --jdbc $JDBC` where `$JDBC` is a JDBC URL to connect to the database (whether it's a local one or one you connect to via Cloud SQL Proxy).
