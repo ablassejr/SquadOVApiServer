@@ -283,7 +283,7 @@ impl api::ApiApplication {
             "
             SELECT true
             FROM squadov.hearthstone_match_metadata AS hmm
-            INNER JOIN squadov.hearethstone_match_players AS hmp
+            INNER JOIN squadov.hearthstone_match_players AS hmp
                 ON hmp.match_uuid = hmm.match_uuid AND hmm.match_winner_player_id = hmp.player_match_id
             WHERE hmm.match_uuid = $1
                 AND hmp.user_id = $2
