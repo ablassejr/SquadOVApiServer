@@ -164,6 +164,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/cards")
                                 .route("", web::post().to(v1::bulk_get_hearthstone_cards_metadata_handler))
+                                .route("/battlegrounds/tavern/{tavern_level}", web::get().to(v1::get_battleground_tavern_level_cards_handler))
                         )
                 )
                 .service(

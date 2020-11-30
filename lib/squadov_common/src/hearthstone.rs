@@ -81,6 +81,15 @@ pub struct HearthstoneCardMetadata {
     pub rarity: i32
 }
 
+#[derive(Serialize)]
+pub struct HearthstoneBattlegroundsCardMetadata {
+    pub base: HearthstoneCardMetadata,
+    #[serde(rename = "tavernLevel")]
+    pub tavern_level: i32,
+    #[serde(rename = "cardRace")]
+    pub card_race: Option<i32>
+}
+
 #[derive(Deserialize,Serialize)]
 pub struct HearthstoneDeck {
     pub name: String,
