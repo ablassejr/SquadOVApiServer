@@ -11,3 +11,10 @@ pub struct SquadOvSquad {
     #[serde(rename="creationTime")]
     pub creation_time: DateTime<Utc>
 }
+
+#[derive(sqlx::Type, PartialEq)]
+#[sqlx(rename="squad_role")]
+pub enum SquadRole {
+    Owner,
+    Member
+}

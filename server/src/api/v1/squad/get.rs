@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse};
 use crate::api;
 use std::sync::Arc;
-use squadov_common::{SquadOvError, SquadOvSquad};
+use squadov_common::{SquadOvError, SquadOvSquad, SquadRole};
 
 impl api::ApiApplication {
     async fn get_squad(&self, squad_id: i64) -> Result<SquadOvSquad, SquadOvError> {
@@ -22,6 +22,20 @@ impl api::ApiApplication {
         } else {
             Ok(squad.unwrap())
         }
+    }
+
+    pub async fn get_squad_user_role(&self, squad_id: i64, user_id: i64) -> Result<SquadRole, SquadOvError> {
+        Ok(sqlx::query_scalar(
+            "
+            SELECT squad_role
+            FROM squadov.squad_role_assignments
+            WHERE squad_id = $1 AND user_id = $2
+            "
+        )
+            .bind(squad_id)
+            .bind(user_id)
+            .fetch_one(&*self.pool)
+            .await?)
     }
 }
 
