@@ -1,4 +1,3 @@
-use squadov_common;
 use actix_web::{web, HttpResponse, HttpRequest};
 use serde::Deserialize;
 use crate::api;
