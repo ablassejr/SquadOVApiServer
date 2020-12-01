@@ -27,7 +27,11 @@ impl super::GCSClient {
             .await?;
 
         if resp.status() != StatusCode::OK {
-            return Err(SquadOvError::InternalError(format!("GCS Get Object Error: {} - {}", resp.status(), resp.text().await?)));
+            let status = resp.status().as_u16();
+            return Err(match status {
+                404 => SquadOvError::NotFound,
+                _ => SquadOvError::InternalError(format!("GCS Get Object Error: {} - {}", status, resp.text().await?))
+            });
         }
         Ok(())
     }
@@ -47,7 +51,11 @@ impl super::GCSClient {
             .await?;
 
         if resp.status() != StatusCode::OK {
-            return Err(SquadOvError::InternalError(format!("GCS Download Object Error: {} - {}", resp.status(), resp.text().await?)));
+            let status = resp.status().as_u16();
+            return Err(match status {
+                404 => SquadOvError::NotFound,
+                _ => SquadOvError::InternalError(format!("GCS Download Object Error: {} - {}", status, resp.text().await?))
+            });
         }
 
         Ok(resp.bytes().await?.into_iter().collect())
