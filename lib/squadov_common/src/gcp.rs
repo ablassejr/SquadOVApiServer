@@ -149,8 +149,12 @@ impl GCPClient {
         let http = Arc::new(RwLock::new(GCPHttpAuthClient::new(config).await));
 
         // Spawn a thread that takes care of refreshing the HTTP auth client's access token.
+        // TODO: Need to be able to exit cleanly out of the spawn_blocking thread. Since we don't, we
+        // get an error if we Ctrl+C out of the server (which is honestly whatever). Ideally we'd
+        // store the JoinHandle returned by spawn_blocking and instaed of having a loop, we'd have a check
+        // on some external condition that gets triggered when the GCPClient is dropped.
         let thread_http = http.clone();
-        std::thread::spawn(move || {
+        tokio::task::spawn_blocking(move || {
             let fn_get_token_sleep_time = || {
                 let sleep_duration: Duration;
                 let mut refresh_token: bool = false;
