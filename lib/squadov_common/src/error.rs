@@ -7,8 +7,15 @@ use std::io;
 use jsonwebtoken;
 use reqwest;
 use openssl;
+use serde::Serialize;
 
-#[derive(Debug, Display)]
+#[derive(Serialize)]
+struct ErrorBody {
+    #[serde(rename="duplicateFlag")]
+    duplicate_flag: bool
+}
+
+#[derive(Debug, Display, PartialEq)]
 pub enum SquadOvError {
     #[display(fmt = "[SquadovError] Invalid credentials.")]
     Credentials,
@@ -20,11 +27,17 @@ pub enum SquadOvError {
     NotFound,
     #[display(fmt = "[SquadovError] Internal Error: {}", _0)]
     InternalError(String),
+    #[display(fmt = "[SquadovError] Duplicate Error")]
+    Duplicate
 }
 
 impl error::ResponseError for SquadOvError {
     fn error_response(&self) -> HttpResponse {
-        HttpResponseBuilder::new(self.status_code()).finish()
+        let body = ErrorBody{
+            duplicate_flag: *self == SquadOvError::Duplicate
+        };
+
+        HttpResponseBuilder::new(self.status_code()).json(&body)
     }
 
     fn status_code(&self) -> StatusCode {
@@ -34,13 +47,33 @@ impl error::ResponseError for SquadOvError {
             SquadOvError::BadRequest => StatusCode::BAD_REQUEST,
             SquadOvError::NotFound => StatusCode::NOT_FOUND,
             SquadOvError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            SquadOvError::Duplicate => StatusCode::BAD_REQUEST
         }
     }
 }
 
 impl From<sqlx::Error> for SquadOvError {
     fn from(err: sqlx::Error) -> Self {
-        return Self::InternalError(format!("Database Error {}", err))
+        let generic_error = Self::InternalError(format!("Database Error {}", err));
+        match err {
+            sqlx::Error::Database(db_err) => {
+                let code = db_err.code();
+                // Check for the Postgres duplicate key violates unique constraint error
+                // so that we can return a "Duplicate" error instead so that we can give
+                // more context to the user.
+                if code.is_some() {
+                    let code = code.unwrap();
+                    if code == "23505" {
+                        Self::Duplicate
+                    } else {
+                        generic_error
+                    }
+                } else {
+                    generic_error
+                }
+            },
+            _ => generic_error
+        }
     }
 }
 

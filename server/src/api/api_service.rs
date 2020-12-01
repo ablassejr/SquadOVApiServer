@@ -194,6 +194,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 )
                         )
                 )
+                .service(
+                    web::scope("/squad")
+                        .route("", web::post().to(v1::create_squad_handler))
+                )
         );
 
     if graphql_debug {
