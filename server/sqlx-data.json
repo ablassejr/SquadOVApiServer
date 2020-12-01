@@ -133,6 +133,18 @@
       "nullable": []
     }
   },
+  "0d326a270e2b8fba22495fdb4a347cc1ff752d4e12ecbd29012a3abb6af78ca4": {
+    "query": "\n            DELETE FROM squadov.squads\n            WHERE id = $1\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "0daedc6f68e17adf61b60c0bf322ff97494e0aa51fbdc0643840f4939195467f": {
     "query": "\n            SELECT *\n            FROM squadov.valorant_player_match_metadata\n            WHERE match_id = $1\n                AND puuid = $2\n            ",
     "describe": {
@@ -320,6 +332,19 @@
       ]
     }
   },
+  "1bf8e0da3d6e8c44c16ff7bc7ce70360249e58fe32ba017c2d5d331dd059ddf9": {
+    "query": "\n                INSERT INTO squadov.squad_role_assignments (\n                    squad_id,\n                    user_id,\n                    squad_role\n                )\n                VALUES (\n                    $1,\n                    $2,\n                    'Owner'\n                )\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "1e0c3ba8e3bc47a3421f58857f449752b039cd626f34329b57970f7197a023a9": {
     "query": "\n            INSERT INTO squadov.hearthstone_match_user_deck (\n                deck_version_id,\n                user_id,\n                match_uuid\n            )\n            SELECT version_id, $2, $3\n            FROM squadov.hearthstone_deck_versions\n            WHERE deck_id = $1\n            ORDER BY version_id DESC\n            LIMIT 1\n            ",
     "describe": {
@@ -392,6 +417,28 @@
         false,
         false,
         false,
+        false
+      ]
+    }
+  },
+  "23c16c20df08d8c7bf9ebf46725160c05e8d034e46aa7a532a728c5b72eb34dd": {
+    "query": "\n                INSERT INTO squadov.squads (\n                    squad_group,\n                    squad_name,\n                    creation_time\n                )\n                VALUES (\n                    $1,\n                    $2,\n                    $3\n                )\n                RETURNING id\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Varchar",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
         false
       ]
     }
@@ -480,6 +527,44 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "48e794f64ae85ca29756bfb47c3cfaafa9c873ad8dc00936f7d7310c88ac47f7": {
+    "query": "\n            SELECT *\n            FROM squadov.squads\n            WHERE id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "squad_name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "squad_group",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "creation_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "4a8b75b192c62bfd29c006c6f84b46613d3d5a9d8fb3d51a568b2eceaa386c1c": {
@@ -619,6 +704,19 @@
         null,
         null
       ]
+    }
+  },
+  "4c8d614e3ffba4ee3de3814d6d3076bea6f5ce2205046407286fe97b3c520bed": {
+    "query": "\n            UPDATE squadov.squads\n            SET squad_name = $2\n            WHERE id = $1\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Varchar"
+        ]
+      },
+      "nullable": []
     }
   },
   "4d654232655dc70e8934c88436efef4ab2a2059254246b03447b2b380de2ae09": {

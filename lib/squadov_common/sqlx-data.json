@@ -133,6 +133,18 @@
       "nullable": []
     }
   },
+  "0d326a270e2b8fba22495fdb4a347cc1ff752d4e12ecbd29012a3abb6af78ca4": {
+    "query": "\n            DELETE FROM squadov.squads\n            WHERE id = $1\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "0daedc6f68e17adf61b60c0bf322ff97494e0aa51fbdc0643840f4939195467f": {
     "query": "\n            SELECT *\n            FROM squadov.valorant_player_match_metadata\n            WHERE match_id = $1\n                AND puuid = $2\n            ",
     "describe": {
@@ -165,50 +177,6 @@
         ]
       },
       "nullable": [
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "104ea82121d7adce76205e9a283408582830cd2d68afd78b56e9bc80f2f1a2ac": {
-    "query": "\n            SELECT\n                hc.card_id,\n                hcn.string AS \"name\",\n                hct_cost.val AS \"cost\",\n                hct_rare.val AS \"rarity\",\n                hct_race.val AS \"race\"\n            FROM squadov.hearthstone_cards AS hc\n            INNER JOIN squadov.hearthstone_card_names AS hcn\n                ON hcn.card_id = hc.card_id AND hcn.locale = 'en_US'\n            INNER JOIN squadov.hearthstone_card_tags AS hct_cost\n                ON hct_cost.card_id = hc.card_id AND hct_cost.tag = 48\n            INNER JOIN squadov.hearthstone_card_tags AS hct_rare\n                ON hct_rare.card_id = hc.card_id AND hct_rare.tag = 203\n            INNER JOIN squadov.hearthstone_card_tags AS hct_bacon\n                ON hct_bacon.card_id = hc.card_id AND hct_bacon.tag = 1456\n            INNER JOIN squadov.hearthstone_card_tags AS hct_tech\n                ON hct_tech.card_id = hc.card_id AND hct_tech.tag = 1440\n            INNER JOIN squadov.hearthstone_card_tags AS hct_race\n                ON hct_race.card_id = hc.card_id AND hct_race.tag = 200\n            WHERE hct_tech.val = $1 AND hct_bacon.val = 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "card_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "cost",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "rarity",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "race",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
         false,
         false,
         false,
@@ -364,6 +332,19 @@
       ]
     }
   },
+  "1bf8e0da3d6e8c44c16ff7bc7ce70360249e58fe32ba017c2d5d331dd059ddf9": {
+    "query": "\n                INSERT INTO squadov.squad_role_assignments (\n                    squad_id,\n                    user_id,\n                    squad_role\n                )\n                VALUES (\n                    $1,\n                    $2,\n                    'Owner'\n                )\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "1e0c3ba8e3bc47a3421f58857f449752b039cd626f34329b57970f7197a023a9": {
     "query": "\n            INSERT INTO squadov.hearthstone_match_user_deck (\n                deck_version_id,\n                user_id,\n                match_uuid\n            )\n            SELECT version_id, $2, $3\n            FROM squadov.hearthstone_deck_versions\n            WHERE deck_id = $1\n            ORDER BY version_id DESC\n            LIMIT 1\n            ",
     "describe": {
@@ -436,6 +417,28 @@
         false,
         false,
         false,
+        false
+      ]
+    }
+  },
+  "23c16c20df08d8c7bf9ebf46725160c05e8d034e46aa7a532a728c5b72eb34dd": {
+    "query": "\n                INSERT INTO squadov.squads (\n                    squad_group,\n                    squad_name,\n                    creation_time\n                )\n                VALUES (\n                    $1,\n                    $2,\n                    $3\n                )\n                RETURNING id\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Varchar",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
         false
       ]
     }
@@ -524,6 +527,44 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "48e794f64ae85ca29756bfb47c3cfaafa9c873ad8dc00936f7d7310c88ac47f7": {
+    "query": "\n            SELECT *\n            FROM squadov.squads\n            WHERE id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "squad_name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "squad_group",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "creation_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "4a8b75b192c62bfd29c006c6f84b46613d3d5a9d8fb3d51a568b2eceaa386c1c": {
@@ -665,6 +706,19 @@
       ]
     }
   },
+  "4c8d614e3ffba4ee3de3814d6d3076bea6f5ce2205046407286fe97b3c520bed": {
+    "query": "\n            UPDATE squadov.squads\n            SET squad_name = $2\n            WHERE id = $1\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "4d654232655dc70e8934c88436efef4ab2a2059254246b03447b2b380de2ae09": {
     "query": "\n                    INSERT INTO squadov.hearthstone_arena_drafts (\n                        collection_uuid,\n                        user_id,\n                        draft_deck_id,\n                        creation_time\n                    )\n                    VALUES (\n                        $1,\n                        $2,\n                        $3,\n                        $4\n                    )\n                    ",
     "describe": {
@@ -675,6 +729,19 @@
           "Int8",
           "Int8",
           "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "4deb4967186fcc36d2cc67af3819b5859692f890c5df4bd94456c82ac951d76b": {
+    "query": "\n            INSERT INTO squadov.squad_role_assignments (\n                squad_id,\n                user_id,\n                squad_role\n            )\n            VALUES (\n                $1,\n                $2,\n                'Owner'\n            )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
         ]
       },
       "nullable": []
@@ -828,44 +895,6 @@
       "parameters": {
         "Left": [
           "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "5b06e0ddc79ab5bb6c4d38d1ed7b46d5ac5b48ae4b607d132ace6d058b363b73": {
-    "query": "\n            SELECT\n                hc.card_id,\n                hcn.string AS \"name\",\n                hct_cost.val AS \"cost\",\n                hct_rare.val AS \"rarity\"\n            FROM squadov.hearthstone_cards AS hc\n            INNER JOIN squadov.hearthstone_card_names AS hcn\n                ON hcn.card_id = hc.card_id AND hcn.locale = 'en_US'\n            INNER JOIN squadov.hearthstone_card_tags AS hct_cost\n                ON hct_cost.card_id = hc.card_id AND hct_cost.tag = 48\n                INNER JOIN squadov.hearthstone_card_tags AS hct_rare\n                ON hct_rare.card_id = hc.card_id AND hct_rare.tag = 203\n            WHERE hc.card_id = any($1)\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "card_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "cost",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "rarity",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "TextArray"
         ]
       },
       "nullable": [
@@ -1085,88 +1114,6 @@
       "nullable": [
         true,
         false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "7c3f0e8d166f0673243a9d4c72d25f30f645b91e501714843be3419006fde556": {
-    "query": "\n            SELECT\n                hc.card_id,\n                hcn.string AS \"name\",\n                hct_cost.val AS \"cost\",\n                0 AS \"rarity\",\n                hct_race.val AS \"race\"\n            FROM squadov.hearthstone_cards AS hc\n            INNER JOIN squadov.hearthstone_card_names AS hcn\n                ON hcn.card_id = hc.card_id AND hcn.locale = 'en_US'\n            INNER JOIN squadov.hearthstone_card_tags AS hct_cost\n                ON hct_cost.card_id = hc.card_id AND hct_cost.tag = 48\n            INNER JOIN squadov.hearthstone_card_tags AS hct_bacon\n                ON hct_bacon.card_id = hc.card_id AND hct_bacon.tag = 1456\n            INNER JOIN squadov.hearthstone_card_tags AS hct_tech\n                ON hct_tech.card_id = hc.card_id AND hct_tech.tag = 1440\n            INNER JOIN squadov.hearthstone_card_tags AS hct_race\n                ON hct_race.card_id = hc.card_id AND hct_race.tag = 200\n            WHERE hct_tech.val = $1 AND hct_bacon.val = 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "card_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "cost",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "rarity",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "race",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        null,
-        false
-      ]
-    }
-  },
-  "819b628f38d13044f0333a007c1f40dcee1716388e69494d40a83709f6ce5cef": {
-    "query": "\n            SELECT\n                hc.card_id,\n                hcn.string AS \"name\",\n                hct_cost.val AS \"cost\",\n                hct_race.val AS \"race\"\n            FROM squadov.hearthstone_cards AS hc\n            INNER JOIN squadov.hearthstone_card_names AS hcn\n                ON hcn.card_id = hc.card_id AND hcn.locale = 'en_US'\n            INNER JOIN squadov.hearthstone_card_tags AS hct_cost\n                ON hct_cost.card_id = hc.card_id AND hct_cost.tag = 48\n            INNER JOIN squadov.hearthstone_card_tags AS hct_bacon\n                ON hct_bacon.card_id = hc.card_id AND hct_bacon.tag = 1456\n            INNER JOIN squadov.hearthstone_card_tags AS hct_tech\n                ON hct_tech.card_id = hc.card_id AND hct_tech.tag = 1440\n            LEFT JOIN squadov.hearthstone_card_tags AS hct_race\n                ON hct_race.card_id = hc.card_id AND hct_race.tag = 200\n            WHERE hct_tech.val = $1 AND hct_bacon.val = 1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "card_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "cost",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "race",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
         false,
         false,
         false,
@@ -2052,6 +1999,28 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "c3bcb9b3ce166a03c42dc6c325cb4180e60753da26229b2baf3213c05178a55a": {
+    "query": "\n            INSERT INTO squadov.squads (\n                squad_group,\n                squad_name,\n                creation_time\n            )\n            VALUES (\n                $1,\n                $2,\n                $3\n            )\n            RETURNING id\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Varchar",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "c4639f5d27fd3438c1e655a5e6199f493fe8621943b9dd93df77ce9433707cbb": {
