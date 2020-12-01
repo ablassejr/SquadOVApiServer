@@ -7,6 +7,7 @@ use serde::Deserialize;
 use chrono::Utc;
 use std::collections::HashSet;
 use std::iter::FromIterator;
+use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct CreateSquadInviteInput {
@@ -78,25 +79,27 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn accept_reject_invite(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, user_id: i64, accepted: bool) -> Result<(), SquadOvError> {
+    pub async fn accept_reject_invite(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, invite_uuid: &Uuid, accepted: bool) -> Result<(), SquadOvError> {
         sqlx::query!(
             "
             UPDATE squadov.squad_membership_invites
             SET joined = $3,
                 response_time = $4
-            WHERE squad_id = $1 AND user_id = $2 AND response_time IS NULL
+            WHERE squad_id = $1 AND invite_uuid = $2 AND response_time IS NULL
+            RETURNING invite_uuid
             ",
             squad_id,
-            user_id,
+            invite_uuid,
             accepted,
             Utc::now(),
         )
-            .execute(tx)
+            // Do a fetch one here to error if we try to accept/reject an already used invite.
+            .fetch_one(tx)
             .await?;
         Ok(())
     }
 
-    pub async fn add_user_to_squad(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, user_id: i64) -> Result<(), SquadOvError> {
+    pub async fn add_user_to_squad_from_invite(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, invite_uuid: &Uuid) -> Result<(), SquadOvError> {
         sqlx::query!(
             "
             INSERT INTO squadov.squad_role_assignments (
@@ -104,14 +107,12 @@ impl api::ApiApplication {
                 user_id,
                 squad_role
             )
-            VALUES (
-                $1,
-                $2,
-                'Member'
-            )
+            SELECT $1, user_id, 'Member'
+            FROM squadov.squad_membership_invites
+            WHERE squad_id = $1 AND invite_uuid = $2
             ",
             squad_id,
-            user_id
+            invite_uuid
         )
             .execute(tx)
             .await?;
@@ -128,15 +129,15 @@ pub async fn create_squad_invite_handler(app : web::Data<Arc<api::ApiApplication
 
 pub async fn accept_squad_invite_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadInviteInput>) -> Result<HttpResponse, SquadOvError> {
     let mut tx = app.pool.begin().await?;
-    app.accept_reject_invite(&mut tx, path.squad_id, path.user_id, true).await?;
-    app.add_user_to_squad(&mut tx, path.squad_id, path.user_id).await?;
+    app.accept_reject_invite(&mut tx, path.squad_id, &path.invite_uuid, true).await?;
+    app.add_user_to_squad_from_invite(&mut tx, path.squad_id, &path.invite_uuid).await?;
     tx.commit().await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 pub async fn reject_squad_invite_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadInviteInput>) -> Result<HttpResponse, SquadOvError> {
     let mut tx = app.pool.begin().await?;
-    app.accept_reject_invite(&mut tx, path.squad_id, path.user_id, false).await?;
+    app.accept_reject_invite(&mut tx, path.squad_id, &path.invite_uuid, false).await?;
     tx.commit().await?;
     Ok(HttpResponse::Ok().finish())
 }

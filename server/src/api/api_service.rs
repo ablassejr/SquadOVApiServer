@@ -202,12 +202,12 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .route("", web::delete().to(v1::delete_squad_handler))
                                 .route("", web::put().to(v1::edit_squad_handler))
                                 .route("", web::get().to(v1::get_squad_handler))
-                                .route("leave", web::post().to(v1::leave_squad_handler))
+                                .route("/leave", web::post().to(v1::leave_squad_handler))
                                 .service(
                                     web::scope("/invite")
                                         .route("", web::post().to(v1::create_squad_invite_handler))
                                         .service(
-                                            web::scope("/{user_id}")
+                                            web::scope("/{invite_uuid}")
                                                 .route("/accept", web::post().to(v1::accept_squad_invite_handler))
                                                 .route("/reject", web::post().to(v1::reject_squad_invite_handler))
                                         )
