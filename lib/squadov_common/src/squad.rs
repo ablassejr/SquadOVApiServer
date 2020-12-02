@@ -11,13 +11,16 @@ pub struct SquadOvSquad {
     #[serde(rename="creationTime")]
     pub creation_time: DateTime<Utc>,
     #[serde(rename="memberCount")]
-    pub member_count: i64
+    pub member_count: i64,
+    #[serde(rename="pendingInviteCount")]
+    pub pending_invite_count: i64
 }
 
 #[derive(Serialize)]
 pub struct SquadOvSquadMembership {
     pub squad: SquadOvSquad,
-    pub role: SquadRole
+    pub role: SquadRole,
+    pub username: String
 }
 
 #[derive(Serialize, sqlx::Type, PartialEq, Debug)]
@@ -33,6 +36,7 @@ pub struct SquadInvite {
     pub squad_id: i64,
     #[serde(rename="userId")]
     pub user_id: i64,
+    pub username: String,
     pub joined: bool,
     #[serde(rename="responseTime")]
     pub response_time: Option<DateTime<Utc>>,

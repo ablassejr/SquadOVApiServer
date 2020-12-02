@@ -3,6 +3,7 @@ use crate::api;
 use crate::api::v1::UserResourcePath;
 use std::sync::Arc;
 use squadov_common::{SquadOvError, SquadOvSquad, SquadRole, SquadOvSquadMembership};
+use serde::Deserialize;
 
 impl api::ApiApplication {
     async fn get_squad(&self, squad_id: i64) -> Result<SquadOvSquad, SquadOvError> {
@@ -14,7 +15,8 @@ impl api::ApiApplication {
                 sq.squad_name AS "squad_name!",
                 sq.squad_group AS "squad_group!",
                 sq.creation_time AS "creation_time!",
-                sq.member_count AS "member_count!"
+                sq.member_count AS "member_count!",
+                sq.pending_invite_count AS "pending_invite_count!"
             FROM squadov.squad_overview AS sq
             WHERE id = $1
             "#,
@@ -53,10 +55,14 @@ impl api::ApiApplication {
                 sq.squad_group AS "squad_group!",
                 sq.creation_time AS "creation_time!",
                 sq.member_count AS "member_count!",
-                sra.squad_role AS "squad_role: SquadRole"
+                sq.pending_invite_count AS "pending_invite_count!",
+                sra.squad_role AS "squad_role: SquadRole",
+                us.username AS "username"
             FROM squadov.squad_overview AS sq
             INNER JOIN squadov.squad_role_assignments AS sra
                 ON sra.squad_id = sq.id
+            INNER JOIN squadov.users AS us
+                ON us.id = sra.user_id
             WHERE sra.user_id = $1
             ORDER BY sq.squad_name
             "#,
@@ -72,10 +78,97 @@ impl api::ApiApplication {
                     squad_group: x.squad_group,
                     creation_time: x.creation_time,
                     member_count: x.member_count,
+                    pending_invite_count: x.pending_invite_count,
                 },
-                role: x.squad_role
+                role: x.squad_role,
+                username: x.username,
             }
         }).collect())
+    }
+
+    pub async fn get_squad_users(&self, squad_id: i64) -> Result<Vec<SquadOvSquadMembership>, SquadOvError> {
+        let raw = sqlx::query!(
+            r#"
+            SELECT
+                sq.id AS "id!",
+                sq.squad_name AS "squad_name!",
+                sq.squad_group AS "squad_group!",
+                sq.creation_time AS "creation_time!",
+                sq.member_count AS "member_count!",
+                sq.pending_invite_count AS "pending_invite_count!",
+                sra.squad_role AS "squad_role: SquadRole",
+                us.username AS "username"
+            FROM squadov.squad_overview AS sq
+            INNER JOIN squadov.squad_role_assignments AS sra
+                ON sra.squad_id = sq.id
+            INNER JOIN squadov.users AS us
+                ON us.id = sra.user_id
+            WHERE sra.squad_id = $1
+            ORDER BY sq.squad_name
+            "#,
+            squad_id
+        )
+            .fetch_all(&*self.pool)
+            .await?;
+        Ok(raw.into_iter().map(|x| {
+            SquadOvSquadMembership{
+                squad: SquadOvSquad{
+                    id: x.id,
+                    squad_name: x.squad_name,
+                    squad_group: x.squad_group,
+                    creation_time: x.creation_time,
+                    member_count: x.member_count,
+                    pending_invite_count: x.pending_invite_count,
+                },
+                role: x.squad_role,
+                username: x.username,
+            }
+        }).collect())
+    }
+
+    pub async fn get_user_squad_membership(&self, squad_id: i64, user_id: i64) -> Result<SquadOvSquadMembership, SquadOvError> {
+        let raw = sqlx::query!(
+            r#"
+            SELECT
+                sq.id AS "id!",
+                sq.squad_name AS "squad_name!",
+                sq.squad_group AS "squad_group!",
+                sq.creation_time AS "creation_time!",
+                sq.member_count AS "member_count!",
+                sq.pending_invite_count AS "pending_invite_count!",
+                sra.squad_role AS "squad_role: SquadRole",
+                us.username AS "username"
+            FROM squadov.squad_overview AS sq
+            INNER JOIN squadov.squad_role_assignments AS sra
+                ON sra.squad_id = sq.id
+            INNER JOIN squadov.users AS us
+                ON us.id = sra.user_id
+            WHERE sra.user_id = $1 AND sra.squad_id = $2
+            ORDER BY sq.squad_name
+            "#,
+            user_id,
+            squad_id
+        )
+            .fetch_optional(&*self.pool)
+            .await?;
+
+        if raw.is_none() {
+            return Err(SquadOvError::NotFound)
+        }
+
+        let x = raw.unwrap();
+        Ok(SquadOvSquadMembership{
+            squad: SquadOvSquad{
+                id: x.id,
+                squad_name: x.squad_name,
+                squad_group: x.squad_group,
+                creation_time: x.creation_time,
+                member_count: x.member_count,
+                pending_invite_count: x.pending_invite_count,
+            },
+            role: x.squad_role,
+            username: x.username,
+        })
     }
 }
 
@@ -87,4 +180,20 @@ pub async fn get_squad_handler(app : web::Data<Arc<api::ApiApplication>>, path: 
 pub async fn get_user_squads_handler(app : web::Data<Arc<api::ApiApplication>>, path : web::Path<UserResourcePath>) -> Result<HttpResponse, SquadOvError> {
     let squads = app.get_user_squads(path.user_id).await?;
     Ok(HttpResponse::Ok().json(&squads))
+}
+
+#[derive(Deserialize)]
+pub struct SquadMembershipPathInput {
+    squad_id: i64,
+    user_id: i64
+}
+
+pub async fn get_squad_user_membership_handler(app : web::Data<Arc<api::ApiApplication>>, path : web::Path<SquadMembershipPathInput>) -> Result<HttpResponse, SquadOvError> {
+    let membership = app.get_user_squad_membership(path.squad_id, path.user_id).await?;
+    Ok(HttpResponse::Ok().json(&membership))
+}
+
+pub async fn get_all_squad_user_memberships_handler(app : web::Data<Arc<api::ApiApplication>>, path : web::Path<super::SquadSelectionInput>) -> Result<HttpResponse, SquadOvError> {
+    let memberships = app.get_squad_users(path.squad_id).await?;
+    Ok(HttpResponse::Ok().json(&memberships))
 }

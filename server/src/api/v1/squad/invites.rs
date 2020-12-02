@@ -148,13 +148,42 @@ impl api::ApiApplication {
                 smi.response_time,
                 smi.invite_time,
                 smi.invite_uuid,
+                ur.username AS "username",
                 us.username AS "inviter_username"
             FROM squadov.squad_membership_invites AS smi
             INNER JOIN squadov.users AS us
                 ON us.id = smi.inviter_user_id
+            INNER JOIN squadov.users AS ur
+                ON ur.id = smi.user_id
             WHERE user_id = $1 AND response_time IS NULL
             "#,
             user_id
+        )
+            .fetch_all(&*self.pool)
+            .await?)
+    }
+
+    pub async fn get_squad_invites(&self, squad_id: i64) -> Result<Vec<SquadInvite>, SquadOvError> {
+        Ok(sqlx::query_as!(
+            SquadInvite,
+            r#"
+            SELECT
+                smi.squad_id,
+                smi.user_id,
+                smi.joined,
+                smi.response_time,
+                smi.invite_time,
+                smi.invite_uuid,
+                ur.username AS "username",
+                us.username AS "inviter_username"
+            FROM squadov.squad_membership_invites AS smi
+            INNER JOIN squadov.users AS us
+                ON us.id = smi.inviter_user_id
+            INNER JOIN squadov.users AS ur
+                ON ur.id = smi.user_id
+            WHERE smi.squad_id = $1 AND response_time IS NULL
+            "#,
+            squad_id
         )
             .fetch_all(&*self.pool)
             .await?)
@@ -191,5 +220,10 @@ pub async fn reject_squad_invite_handler(app : web::Data<Arc<api::ApiApplication
 
 pub async fn get_user_squad_invites_handler(app : web::Data<Arc<api::ApiApplication>>, path : web::Path<UserResourcePath>) -> Result<HttpResponse, SquadOvError> {
     let invites = app.get_user_squad_invites(path.user_id).await?;
+    Ok(HttpResponse::Ok().json(&invites))
+}
+
+pub async fn  get_all_squad_invites_handler(app : web::Data<Arc<api::ApiApplication>>, path : web::Path<super::SquadSelectionInput>) -> Result<HttpResponse, SquadOvError> {
+    let invites = app.get_squad_invites(path.squad_id).await?;
     Ok(HttpResponse::Ok().json(&invites))
 }

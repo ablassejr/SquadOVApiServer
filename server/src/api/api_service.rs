@@ -249,6 +249,12 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .service(
                                             web::scope("/invite")
                                                 .route("", web::post().to(v1::create_squad_invite_handler))
+                                                .route("", web::get().to(v1::get_all_squad_invites_handler))
+                                        )
+                                        .service(
+                                            web::scope("/membership")
+                                                .route("/{user_id}", web::get().to(v1::get_squad_user_membership_handler))
+                                                .route("", web::get().to(v1::get_all_squad_user_memberships_handler))
                                         )
                                 )
                         )
