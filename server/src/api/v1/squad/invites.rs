@@ -1,7 +1,9 @@
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
+use crate::api::v1::UserResourcePath;
+use crate::api::auth::SquadOVSession;
 use std::sync::Arc;
-use squadov_common::{SquadOvError};
+use squadov_common::{SquadOvError, SquadInvite};
 use sqlx::{Transaction, Executor, Postgres, Row};
 use serde::Deserialize;
 use chrono::Utc;
@@ -28,7 +30,7 @@ impl api::ApiApplication {
             .await?)
     }
 
-    async fn create_squad_invite(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, user_ids: &[i64]) -> Result<(), SquadOvError> {
+    async fn create_squad_invite(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, inviter_user_id: i64, user_ids: &[i64]) -> Result<(), SquadOvError> {
         if user_ids.is_empty() {
             return Ok(());
         }
@@ -64,7 +66,8 @@ impl api::ApiApplication {
             INSERT INTO squadov.squad_membership_invites(
                 squad_id,
                 user_id,
-                invite_time
+                invite_time,
+                inviter_user_id
             ) VALUES
             "
         ));
@@ -74,11 +77,13 @@ impl api::ApiApplication {
                 (
                     {},
                     {},
+                    {},
                     {}
                 )",
                 squad_id,
                 uid,
                 squadov_common::sql_format_time(&now),
+                inviter_user_id,
             ));
             sql.push(String::from(","));
         }
@@ -131,11 +136,40 @@ impl api::ApiApplication {
             .await?;
         Ok(())
     }
+
+    pub async fn get_user_squad_invites(&self, user_id: i64) -> Result<Vec<SquadInvite>, SquadOvError> {
+        Ok(sqlx::query_as!(
+            SquadInvite,
+            r#"
+            SELECT
+                smi.squad_id,
+                smi.user_id,
+                smi.joined,
+                smi.response_time,
+                smi.invite_time,
+                smi.invite_uuid,
+                us.username AS "inviter_username"
+            FROM squadov.squad_membership_invites AS smi
+            INNER JOIN squadov.users AS us
+                ON us.id = smi.inviter_user_id
+            WHERE user_id = $1 AND response_time IS NULL
+            "#,
+            user_id
+        )
+            .fetch_all(&*self.pool)
+            .await?)
+    }
 }
 
-pub async fn create_squad_invite_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadSelectionInput>, data: web::Json<CreateSquadInviteInput>) -> Result<HttpResponse, SquadOvError> {
+pub async fn create_squad_invite_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadSelectionInput>, data: web::Json<CreateSquadInviteInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(x) => x,
+        None => return Err(SquadOvError::BadRequest)
+    };
+
     let mut tx = app.pool.begin().await?;
-    app.create_squad_invite(&mut tx, path.squad_id, &data.users).await?;
+    app.create_squad_invite(&mut tx, path.squad_id, session.user.id, &data.users).await?;
     tx.commit().await?;
     Ok(HttpResponse::Ok().finish())
 }
@@ -153,4 +187,9 @@ pub async fn reject_squad_invite_handler(app : web::Data<Arc<api::ApiApplication
     app.accept_reject_invite(&mut tx, path.squad_id, &path.invite_uuid, false).await?;
     tx.commit().await?;
     Ok(HttpResponse::Ok().finish())
+}
+
+pub async fn get_user_squad_invites_handler(app : web::Data<Arc<api::ApiApplication>>, path : web::Path<UserResourcePath>) -> Result<HttpResponse, SquadOvError> {
+    let invites = app.get_user_squad_invites(path.user_id).await?;
+    Ok(HttpResponse::Ok().json(&invites))
 }

@@ -52,6 +52,11 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::resource("/profile")
                                         .route(web::get().to(v1::get_user_profile_handler))
                                 )
+                                .service(
+                                    web::scope("/squads")
+                                        .route("", web::get().to(v1::get_user_squads_handler))
+                                        .route("/invites", web::get().to(v1::get_user_squad_invites_handler))
+                                )
                         )
                 )
                 .service(
@@ -226,6 +231,9 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route("/accept", web::post().to(v1::accept_squad_invite_handler))
                                         .route("/reject", web::post().to(v1::reject_squad_invite_handler))
                                 )
+                                // Metadata about the squad should be public (without access checks besides being logged in
+                                // so that people can know what squads they're being invited to.
+                                .route("/profile", web::get().to(v1::get_squad_handler))
                                 // Member-only endpoints
                                 .service(
                                     web::scope("")
@@ -237,7 +245,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                 },
                                             }))),
                                         })
-                                        .route("", web::get().to(v1::get_squad_handler))
                                         .route("/leave", web::post().to(v1::leave_squad_handler))
                                         .service(
                                             web::scope("/invite")

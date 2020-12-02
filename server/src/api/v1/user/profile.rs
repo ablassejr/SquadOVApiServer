@@ -1,16 +1,10 @@
 use squadov_common;
 use actix_web::{web, HttpResponse, HttpRequest};
-use serde::Deserialize;
 use crate::api;
 use crate::api::auth::SquadOVSession;
 use std::sync::Arc;
 
-#[derive(Deserialize)]
-pub struct ProfileResource {
-    user_id: i64,
-}
-
-pub async fn get_user_profile_handler(data : web::Path<ProfileResource>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, squadov_common::SquadOvError> {
+pub async fn get_user_profile_handler(data : web::Path<super::UserResourcePath>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, squadov_common::SquadOvError> {
     match app.users.get_stored_user_from_id(data.user_id, &app.pool).await {
         Ok(x) => match x {
             Some(x) => Ok(HttpResponse::Ok().json(&x)),
