@@ -15,6 +15,19 @@ pub struct CreateSquadInviteInput {
 }
 
 impl api::ApiApplication {
+    pub async fn get_squad_invite_user(&self, invite_uuid: &Uuid) -> Result<i64, SquadOvError> {
+        Ok(sqlx::query_scalar(
+            "
+            SELECT user_id
+            FROM squadov.squad_membership_invites
+            WHERE invite_uuid = $1
+            "
+        )
+            .bind(invite_uuid)
+            .fetch_one(&*self.pool)
+            .await?)
+    }
+
     async fn create_squad_invite(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, user_ids: &[i64]) -> Result<(), SquadOvError> {
         if user_ids.is_empty() {
             return Ok(());

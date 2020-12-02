@@ -1,9 +1,13 @@
 mod user_specific_access;
+mod squad_access;
+mod squad_invite_access;
 
 pub use user_specific_access::*;
+pub use squad_access::*;
+pub use squad_invite_access::*;
 
 use squadov_common;
-use actix_web::{HttpRequest};
+use actix_web::{web, HttpRequest};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::rc::Rc;
@@ -13,22 +17,28 @@ use actix_web::{dev::ServiceRequest, dev::ServiceResponse, Error};
 use futures::future::{ok, Ready};
 use futures::Future;
 use super::auth::SquadOVSession;
+use crate::api::ApiApplication;
+use std::sync::Arc;
+use std::boxed::Box;
+use async_trait::async_trait;
 
 /// This trait is used by the access middleware to check to see
 /// whether the current user has access to whatever the checker is
 /// protecting.
-pub trait AccessChecker {
+#[async_trait]
+pub trait AccessChecker<T: Send + Sync> {
     /// Checks whether or not the current request should have
     /// access to whatever path is being requested. This needs to
     /// be an instance method instead of a static method so that the
     /// instance can be made by the user to hold parameters specific
     /// to that path (e.g. checking whether the user has access to some
     /// resource specifically).
-    fn check(&self, session: &SquadOVSession, req: &HttpRequest) -> Result<bool, squadov_common::SquadOvError>;
+    async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: T) -> Result<bool, squadov_common::SquadOvError>;
+    fn generate_aux_metadata(&self, req: &HttpRequest) -> Result<T, squadov_common::SquadOvError>;
 }
 
-pub struct ApiAccess<T : AccessChecker> {
-    pub checker: Rc<RefCell<T>>
+pub struct ApiAccess<T : Send + Sync> {
+    pub checker: Rc<RefCell<Box<dyn AccessChecker<T>>>>
 }
 
 impl<S, B, T> Transform<S> for ApiAccess<T>
@@ -36,7 +46,7 @@ where
     S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
-    T: AccessChecker + 'static,
+    T: Send + Sync + 'static,
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
@@ -53,9 +63,9 @@ where
     }
 }
 
-pub struct ApiAccessMiddleware<S, T : AccessChecker> {
+pub struct ApiAccessMiddleware<S, T : Send + Sync> {
     service: Rc<RefCell<S>>,
-    checker: Rc<RefCell<T>>
+    checker: Rc<RefCell<Box<dyn AccessChecker<T>>>>
 }
 
 impl<S, B, T> Service for ApiAccessMiddleware<S, T>
@@ -63,7 +73,7 @@ where
     S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
-    T: AccessChecker + 'static,
+    T: Send + Sync + 'static,
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
@@ -90,7 +100,17 @@ where
                     None => return Err(actix_web::error::ErrorUnauthorized("No session"))
                 };
 
-                match checker.borrow().check(session, &request) {
+                let app = request.app_data::<web::Data<Arc<ApiApplication>>>();
+                if app.is_none() {
+                    return Err(actix_web::error::ErrorInternalServerError("No app data."));
+                }
+
+                let borrowed_checker = checker.borrow();
+
+                // Obtain aux data from the request necessary for the checker to perform an access check.
+                // This is necessary because HttpRequest is not send/sync so we can't pass it to an async call.
+                let aux_data = borrowed_checker.generate_aux_metadata(&request)?;
+                match checker.borrow().check(app.unwrap().get_ref().clone(), session, aux_data).await {
                     Ok(x) => if x { () } else {  return Err(actix_web::error::ErrorUnauthorized("Access check fail")) },
                     Err(_) => return Err(actix_web::error::ErrorInternalServerError("Failed to perform access check")),
                 };

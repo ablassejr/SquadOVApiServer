@@ -2,6 +2,9 @@ use actix_web::{HttpRequest};
 use squadov_common;
 use std::collections::HashSet;
 use crate::api::auth::SquadOVSession;
+use crate::api::ApiApplication;
+use std::sync::Arc;
+use async_trait::async_trait;
 
 /// This trait is used by the UserSpecificAccessChecker to obtain a set of users
 /// that should be granted to a particular path/resource.
@@ -29,15 +32,25 @@ impl UserIdSetObtainer for UserIdPathSetObtainer {
     }
 }
 
+pub struct UserAccessSetBasicData {
+    access_set: HashSet<i64>
+}
+
 /// An access checker to check that the given user's ID is in
 /// some set of user IDs as obtained by the object that implements the trait T : UserIdSetObtainer.
-pub struct UserSpecificAccessChecker<T : UserIdSetObtainer> {
+pub struct UserSpecificAccessChecker<T> {
     pub obtainer: T
 }
 
-impl<T: UserIdSetObtainer> super::AccessChecker for UserSpecificAccessChecker<T> {
-    fn check(&self, session: &SquadOVSession, req: &HttpRequest) -> Result<bool, squadov_common::SquadOvError> {
-        let access_set = self.obtainer.obtain(req)?;
-        return Ok(access_set.contains(&session.user.id));
+#[async_trait]
+impl super::AccessChecker<UserAccessSetBasicData> for UserSpecificAccessChecker<UserIdPathSetObtainer> {
+    fn generate_aux_metadata(&self, req: &HttpRequest) -> Result<UserAccessSetBasicData, squadov_common::SquadOvError> {
+        Ok(UserAccessSetBasicData{
+            access_set: self.obtainer.obtain(req)?
+        })
+    }
+
+    async fn check(&self, _app: Arc<ApiApplication>, session: &SquadOVSession, data: UserAccessSetBasicData) -> Result<bool, squadov_common::SquadOvError> {
+        return Ok(data.access_set.contains(&session.user.id));
     }
 }

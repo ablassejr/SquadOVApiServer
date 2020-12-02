@@ -7,6 +7,7 @@ use super::graphql;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::vec::Vec;
+use std::boxed::Box;
 
 pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
     let mut scope = web::scope("")
@@ -41,11 +42,11 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/{user_id}")
                                 .wrap(access::ApiAccess{
-                                    checker: Rc::new(RefCell::new(access::UserSpecificAccessChecker{
+                                    checker: Rc::new(RefCell::new(Box::new(access::UserSpecificAccessChecker{
                                         obtainer: access::UserIdPathSetObtainer{
                                             key: "user_id"
                                         },
-                                    })),
+                                    }))),
                                 })
                                 .service(
                                     web::resource("/profile")
@@ -93,11 +94,11 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/user/{user_id}")
                                 .wrap(access::ApiAccess{
-                                    checker: Rc::new(RefCell::new(access::UserSpecificAccessChecker{
+                                    checker: Rc::new(RefCell::new(Box::new(access::UserSpecificAccessChecker{
                                         obtainer: access::UserIdPathSetObtainer{
                                             key: "user_id"
                                         },
-                                    })),
+                                    }))),
                                 })
                                 .route("", web::get().to(v1::list_aimlab_matches_for_user_handler))
                         )
@@ -132,11 +133,11 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/user/{user_id}")
                                 .wrap(access::ApiAccess{
-                                    checker: Rc::new(RefCell::new(access::UserSpecificAccessChecker{
+                                    checker: Rc::new(RefCell::new(Box::new(access::UserSpecificAccessChecker{
                                         obtainer: access::UserIdPathSetObtainer{
                                             key: "user_id"
                                         },
-                                    })),
+                                    }))),
                                 })
                                 .route("/match", web::get().to(v1::list_hearthstone_matches_for_user_handler))
                                 .service(
@@ -199,17 +200,48 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("", web::post().to(v1::create_squad_handler))
                         .service(
                             web::scope("/{squad_id}")
-                                .route("", web::delete().to(v1::delete_squad_handler))
-                                .route("", web::put().to(v1::edit_squad_handler))
-                                .route("", web::get().to(v1::get_squad_handler))
-                                .route("/leave", web::post().to(v1::leave_squad_handler))
+                                // Owner-only endpoints
                                 .service(
-                                    web::scope("/invite")
-                                        .route("", web::post().to(v1::create_squad_invite_handler))
+                                    web::scope("/admin")
+                                        .wrap(access::ApiAccess{
+                                            checker: Rc::new(RefCell::new(Box::new(access::SquadAccessChecker{
+                                                requires_owner: true,
+                                                obtainer: access::SquadIdPathSetObtainer{
+                                                    key: "squad_id"
+                                                },
+                                            }))),
+                                        })
+                                        .route("", web::delete().to(v1::delete_squad_handler))
+                                        .route("", web::put().to(v1::edit_squad_handler))
+                                )                                
+                                .service(
+                                    web::scope("/invite/{invite_uuid}")
+                                        .wrap(access::ApiAccess{
+                                            checker: Rc::new(RefCell::new(Box::new(access::UserSpecificAccessChecker{
+                                                obtainer: access::SquadInvitePathObtainer{
+                                                    key: "invite_uuid"
+                                                },
+                                            }))),
+                                        })
+                                        .route("/accept", web::post().to(v1::accept_squad_invite_handler))
+                                        .route("/reject", web::post().to(v1::reject_squad_invite_handler))
+                                )
+                                // Member-only endpoints
+                                .service(
+                                    web::scope("")
+                                        .wrap(access::ApiAccess{
+                                            checker: Rc::new(RefCell::new(Box::new(access::SquadAccessChecker{
+                                                requires_owner: false,
+                                                obtainer: access::SquadIdPathSetObtainer{
+                                                    key: "squad_id"
+                                                },
+                                            }))),
+                                        })
+                                        .route("", web::get().to(v1::get_squad_handler))
+                                        .route("/leave", web::post().to(v1::leave_squad_handler))
                                         .service(
-                                            web::scope("/{invite_uuid}")
-                                                .route("/accept", web::post().to(v1::accept_squad_invite_handler))
-                                                .route("/reject", web::post().to(v1::reject_squad_invite_handler))
+                                            web::scope("/invite")
+                                                .route("", web::post().to(v1::create_squad_invite_handler))
                                         )
                                 )
                         )

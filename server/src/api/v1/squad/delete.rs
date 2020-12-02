@@ -52,7 +52,7 @@ pub async fn leave_squad_handler(app : web::Data<Arc<api::ApiApplication>>, data
     // get this to be represented as a PostgreSQL constraint so that DB
     // operation just fails instead?
     let role = app.get_squad_user_role(data.squad_id, session.user.id).await?;
-    if role == SquadRole::Owner {
+    if role.is_some() && role.unwrap() == SquadRole::Owner {
         return Err(SquadOvError::BadRequest);
     }
 

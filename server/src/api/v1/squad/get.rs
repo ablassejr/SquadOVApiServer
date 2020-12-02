@@ -24,7 +24,7 @@ impl api::ApiApplication {
         }
     }
 
-    pub async fn get_squad_user_role(&self, squad_id: i64, user_id: i64) -> Result<SquadRole, SquadOvError> {
+    pub async fn get_squad_user_role(&self, squad_id: i64, user_id: i64) -> Result<Option<SquadRole>, SquadOvError> {
         Ok(sqlx::query_scalar(
             "
             SELECT squad_role
@@ -34,7 +34,7 @@ impl api::ApiApplication {
         )
             .bind(squad_id)
             .bind(user_id)
-            .fetch_one(&*self.pool)
+            .fetch_optional(&*self.pool)
             .await?)
     }
 }
