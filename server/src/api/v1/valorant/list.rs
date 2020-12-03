@@ -16,6 +16,7 @@ impl api::ApiApplication {
             r#"
             SELECT
                 vm.match_id,
+                vm.match_uuid,
                 vm.server_start_time_utc,
                 vm.game_mode,
                 vm.map,
@@ -46,8 +47,7 @@ impl api::ApiApplication {
                 COALESCE(vvpms.total_damage, 0) AS "total_damage!",
                 COALESCE(vvpms.headshots, 0) AS "headshots!",
                 COALESCE(vvpms.bodyshots, 0) AS "bodyshots!",
-                COALESCE(vvpms.legshots, 0) AS "legshots!",
-                vods.end_time IS NOT NULL AS "has_vod!"
+                COALESCE(vvpms.legshots, 0) AS "legshots!"
             FROM squadov.valorant_matches AS vm
             INNER JOIN squadov.valorant_match_players AS vmp
                 ON vmp.match_id = vm.match_id
@@ -56,8 +56,6 @@ impl api::ApiApplication {
                     AND vmt.match_id = vm.match_id
             INNER JOIN squadov.view_valorant_player_match_stats AS vvpms
                 ON vvpms.puuid = vmp.puuid AND vvpms.match_id = vm.match_id
-            LEFT JOIN squadov.vods AS vods
-                ON vods.match_uuid = vm.match_uuid
             WHERE vmp.puuid = $1
             ORDER BY server_start_time_utc DESC
             LIMIT $2 OFFSET $3

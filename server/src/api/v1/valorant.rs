@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 use squadov_common;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Serialize,Deserialize)]
 pub struct ValorantMatchMetadata {
@@ -75,7 +75,7 @@ pub struct ValorantMatchPlayerData {
     stats: ValorantMatchPlayerStats
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize,Clone)]
 pub struct ValorantMatchDamageData {
     receiver: String,
     damage: i32,
@@ -125,8 +125,9 @@ pub struct ValorantMatchRoundData {
 type ValorantAllPlayerRoundStatsData<'a> = HashMap<i32, &'a Vec<ValorantMatchPlayerRoundStatsData>>;
 type ValorantAllPlayerRoundEconomyData<'a> = HashMap<i32, &'a Vec<ValorantMatchPlayerRoundEconomyData>>;
 
-type ValorantPerRoundPlayerDamageData<'a> = HashMap<String, &'a Vec<ValorantMatchDamageData>>;
-type ValorantAllPlayerDamageData<'a> = HashMap<i32, ValorantPerRoundPlayerDamageData<'a>>;
+// Do not change this from a BTreeMap to a HashMap. Insertion into the database RELIES on this being ordered for the uniqueness check!!!!!!
+type ValorantPerRoundPlayerDamageData<'a> = BTreeMap<String, &'a Vec<ValorantMatchDamageData>>;
+type ValorantAllPlayerDamageData<'a> = BTreeMap<i32, ValorantPerRoundPlayerDamageData<'a>>;
 
 #[derive(Serialize,Deserialize)]
 pub struct ValorantMatchKillFinishingDamage {
@@ -210,6 +211,8 @@ pub struct ValorantPlayerMatchMetadata {
 pub struct ValorantPlayerMatchSummary {
     #[serde(rename = "matchId")]
     match_id: String,
+    #[serde(rename = "matchUuid")]
+    match_uuid: Uuid,
     #[serde(rename = "serverStartTimeUtc")]
     server_start_time_utc: Option<DateTime<Utc>>,
     #[serde(rename = "gameMode")]
@@ -243,9 +246,7 @@ pub struct ValorantPlayerMatchSummary {
     total_damage: i64,
     headshots: i64,
     bodyshots: i64,
-    legshots: i64,
-    #[serde(rename = "hasVod")]
-    has_vod: bool
+    legshots: i64
 }
 
 #[derive(Serialize)]

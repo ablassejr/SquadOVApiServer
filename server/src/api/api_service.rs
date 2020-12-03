@@ -71,7 +71,16 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                             }))
                         .route("/backfill", web::post().to(v1::obtain_valorant_matches_to_backfill))
                         .service(
-                            web::scope("/accounts/{puuid}")
+                            // Need to include the user here for us to verify that that the user
+                            // is associated with this valorant account.
+                            web::scope("/user/{user_id}/accounts/{puuid}")
+                                .wrap(access::ApiAccess{
+                                    checker: Rc::new(RefCell::new(Box::new(access::UserSpecificAccessChecker{
+                                        obtainer: access::UserIdPathSetObtainer{
+                                            key: "user_id"
+                                        },
+                                    }))),
+                                })
                                 .service(
                                     web::resource("/matches")
                                         .route(web::get().to(v1::list_valorant_matches_for_user_handler))

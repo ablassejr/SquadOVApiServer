@@ -5,8 +5,9 @@ use uuid::Uuid;
 use sqlx::{Transaction, Executor, Postgres};
 use std::sync::Arc;
 use serde::{Serialize,Deserialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use crate::api::v1;
+use std::cmp::Ordering;
 
 #[derive(Deserialize)]
 pub struct InputValorantMatch {
@@ -30,7 +31,10 @@ struct CreateValorantMatchResponse<'a> {
 }
 
 impl api::ApiApplication {
-    pub async fn check_if_valorant_match_exists(&self, match_id : &str) -> Result<Option<v1::Match>, squadov_common::SquadOvError> {
+    pub async fn check_if_valorant_match_exists<'a, T>(&self, ex: T, match_id : &str) -> Result<Option<v1::Match>, squadov_common::SquadOvError>
+    where
+        T: Executor<'a, Database = sqlx::Postgres>
+    {
         Ok(sqlx::query_as!(
             v1::Match,
             "
@@ -40,7 +44,7 @@ impl api::ApiApplication {
             ",
             match_id
         )
-            .fetch_optional(&*self.pool)
+            .fetch_optional(ex)
             .await?)
     }
 
@@ -199,6 +203,20 @@ impl api::ApiApplication {
 
     async fn insert_valorant_match_damage<'a>(&self, tx : &mut Transaction<'_, Postgres>, match_id: &str, damage: &super::ValorantAllPlayerDamageData<'a>) -> Result<(), squadov_common::SquadOvError> {
         let mut sql : Vec<String> = Vec::new();
+
+        // Duplicate comment from the V0012.1__ValorantDuplicateDamage.sql migration:actix_web
+        // This sequence ID is LOW KEY INSANE. Effectively we're assuming that we're going to be inserting
+        // player damage into the table in the same order EVERY TIME so that the 5th damage insertion is going
+        // to be the same assuming we parse the same match history JSON multiple times. Why do we need to do that?
+        // Because Valorant's damage information is NOT UNIQUE. It's possible for the game to give us multiple
+        // damage dealt objects from one player to another in a single round. Thus we need to find some way of being
+        // able to detect if we're trying to insert the same damage element. Hence this sequence_id. It'll be up
+        // to the application to create a temporary sequence AND USE IT in the insertion. Y I K E S.
+        let random_sequence_name = format!("dmgseq{}", Uuid::new_v4().to_simple().to_string());
+        tx.execute(
+            sqlx::query(&format!("CREATE TEMPORARY SEQUENCE {}", &random_sequence_name))
+        ).await?;
+
         sql.push(String::from("
             INSERT INTO squadov.valorant_match_damage (
                 match_id,
@@ -208,7 +226,8 @@ impl api::ApiApplication {
                 damage,
                 legshots,
                 bodyshots,
-                headshots
+                headshots,
+                sequence_id
             )
             VALUES
         "));
@@ -216,7 +235,46 @@ impl api::ApiApplication {
         let mut added = 0;
         for (round_num, per_player) in damage {
             for (puuid, data) in per_player {
-                for dmg in *data {
+                // Player damage vector needs to be sorted properly to match the migration from before we used
+                // a sequence to identify unique damage. Sort order: round num (handled by BTreeMap), 
+                // instigator_puuid (handled by BTreeMap), receiver_puuid, damage, legshots, bodyshots, headshots.
+                // All in ascending order.
+                let mut sorted_data = (**data).clone();
+                sorted_data.sort_by(|a, b| {
+                    if a.receiver < b.receiver {
+                        return Ordering::Less;
+                    } else if a.receiver > b.receiver {
+                        return Ordering::Greater;
+                    }
+
+                    if a.damage < b.damage {
+                        return Ordering::Less;
+                    } else if a.damage > b.damage {
+                        return Ordering::Greater;
+                    }
+
+                    if a.legshots < b.legshots {
+                        return Ordering::Less;
+                    } else if a.legshots > b.legshots {
+                        return Ordering::Greater;
+                    }
+
+                    if a.bodyshots < b.bodyshots {
+                        return Ordering::Less;
+                    } else if a.bodyshots > b.bodyshots {
+                        return Ordering::Greater;
+                    }
+
+                    if a.headshots < b.headshots {
+                        return Ordering::Less;
+                    } else if a.headshots > b.headshots {
+                        return Ordering::Greater;
+                    }
+
+                    return Ordering::Equal;
+                });
+
+                for dmg in sorted_data {
                     sql.push(format!("(
                         '{match_id}',
                         {round_num},
@@ -225,7 +283,8 @@ impl api::ApiApplication {
                         {damage},
                         {legshots},
                         {bodyshots},
-                        {headshots}
+                        {headshots},
+                        NEXTVAL('{seq}')
                     )",
                         match_id=match_id,
                         round_num=round_num,
@@ -234,7 +293,8 @@ impl api::ApiApplication {
                         damage=dmg.damage,
                         legshots=dmg.legshots,
                         bodyshots=dmg.bodyshots,
-                        headshots=dmg.headshots
+                        headshots=dmg.headshots,
+                        seq=&random_sequence_name,
                     ));
 
                     sql.push(String::from(","));
@@ -351,7 +411,7 @@ impl api::ApiApplication {
         // so we can insert them all in one go.
         let mut all_player_round_stats : super::ValorantAllPlayerRoundStatsData = HashMap::new();
         let mut all_player_round_econs : super::ValorantAllPlayerRoundEconomyData = HashMap::new();
-        let mut all_player_damage : super::ValorantAllPlayerDamageData = HashMap::new();
+        let mut all_player_damage : super::ValorantAllPlayerDamageData = BTreeMap::new();
 
         let mut sql : Vec<String> = Vec::new();
         sql.push(String::from("
@@ -391,7 +451,7 @@ impl api::ApiApplication {
                 sql.push(String::from(","));
             }
 
-            let mut round_damage : super::ValorantPerRoundPlayerDamageData = HashMap::new();
+            let mut round_damage : super::ValorantPerRoundPlayerDamageData = BTreeMap::new();
             for ps in &m.player_stats {
                 round_damage.insert(
                     ps.subject.clone(),
@@ -589,7 +649,7 @@ pub async fn create_new_valorant_match_handler(data : web::Json<InputValorantMat
     // Create a new match ID and then create the match.
     // Note that we only create a new match if it's needed because
     // we could be doing a backfill.
-    let internal_match = match app.check_if_valorant_match_exists(&raw_data.match_id).await? {
+    let internal_match = match app.check_if_valorant_match_exists(&mut tx, &raw_data.match_id).await? {
         Some(x) => x,
         None => app.create_new_match(&mut tx).await?
     };

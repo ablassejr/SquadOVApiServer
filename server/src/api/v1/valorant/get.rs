@@ -233,7 +233,15 @@ impl api::ApiApplication {
         Ok(sqlx::query_as!(
             RawValorantMatchDamage,
             r#"
-            SELECT *
+            SELECT
+                match_id,
+                round_num,
+                instigator_puuid,
+                receiver_puuid,
+                damage,
+                legshots,
+                bodyshots,
+                headshots
             FROM squadov.valorant_match_damage
             WHERE match_id = $1
             "#,
@@ -321,7 +329,7 @@ impl api::ApiApplication {
 
     async fn get_valorant_match_details(&self, match_id: &str) -> Result<super::FullValorantMatchData, squadov_common::SquadOvError> {
         let mut match_data = super::FullValorantMatchData{..Default::default()};
-        match_data.match_uuid = match self.check_if_valorant_match_exists(match_id).await? {
+        match_data.match_uuid = match self.check_if_valorant_match_exists(&*self.pool, match_id).await? {
             Some(x) => x.uuid,
             None => return Err(squadov_common::SquadOvError::NotFound)
         };
