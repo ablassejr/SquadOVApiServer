@@ -3,7 +3,6 @@ use crate::api;
 use crate::api::v1::UserResourcePath;
 use std::sync::Arc;
 use squadov_common::{SquadOvError, SquadOvSquad, SquadRole, SquadOvSquadMembership};
-use serde::Deserialize;
 
 impl api::ApiApplication {
     async fn get_squad(&self, squad_id: i64) -> Result<SquadOvSquad, SquadOvError> {
@@ -57,7 +56,8 @@ impl api::ApiApplication {
                 sq.member_count AS "member_count!",
                 sq.pending_invite_count AS "pending_invite_count!",
                 sra.squad_role AS "squad_role: SquadRole",
-                us.username AS "username"
+                us.username AS "username",
+                us.id AS "user_id"
             FROM squadov.squad_overview AS sq
             INNER JOIN squadov.squad_role_assignments AS sra
                 ON sra.squad_id = sq.id
@@ -82,6 +82,7 @@ impl api::ApiApplication {
                 },
                 role: x.squad_role,
                 username: x.username,
+                user_id: x.user_id,
             }
         }).collect())
     }
@@ -97,7 +98,8 @@ impl api::ApiApplication {
                 sq.member_count AS "member_count!",
                 sq.pending_invite_count AS "pending_invite_count!",
                 sra.squad_role AS "squad_role: SquadRole",
-                us.username AS "username"
+                us.username AS "username",
+                us.id AS "user_id"
             FROM squadov.squad_overview AS sq
             INNER JOIN squadov.squad_role_assignments AS sra
                 ON sra.squad_id = sq.id
@@ -122,6 +124,7 @@ impl api::ApiApplication {
                 },
                 role: x.squad_role,
                 username: x.username,
+                user_id: x.user_id,
             }
         }).collect())
     }
@@ -137,7 +140,8 @@ impl api::ApiApplication {
                 sq.member_count AS "member_count!",
                 sq.pending_invite_count AS "pending_invite_count!",
                 sra.squad_role AS "squad_role: SquadRole",
-                us.username AS "username"
+                us.username AS "username",
+                us.id AS "user_id"
             FROM squadov.squad_overview AS sq
             INNER JOIN squadov.squad_role_assignments AS sra
                 ON sra.squad_id = sq.id
@@ -168,6 +172,7 @@ impl api::ApiApplication {
             },
             role: x.squad_role,
             username: x.username,
+            user_id: x.user_id,
         })
     }
 }
@@ -182,13 +187,7 @@ pub async fn get_user_squads_handler(app : web::Data<Arc<api::ApiApplication>>, 
     Ok(HttpResponse::Ok().json(&squads))
 }
 
-#[derive(Deserialize)]
-pub struct SquadMembershipPathInput {
-    squad_id: i64,
-    user_id: i64
-}
-
-pub async fn get_squad_user_membership_handler(app : web::Data<Arc<api::ApiApplication>>, path : web::Path<SquadMembershipPathInput>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_squad_user_membership_handler(app : web::Data<Arc<api::ApiApplication>>, path : web::Path<super::SquadMembershipPathInput>) -> Result<HttpResponse, SquadOvError> {
     let membership = app.get_user_squad_membership(path.squad_id, path.user_id).await?;
     Ok(HttpResponse::Ok().json(&membership))
 }

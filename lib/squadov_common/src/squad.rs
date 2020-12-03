@@ -20,7 +20,9 @@ pub struct SquadOvSquad {
 pub struct SquadOvSquadMembership {
     pub squad: SquadOvSquad,
     pub role: SquadRole,
-    pub username: String
+    pub username: String,
+    #[serde(rename="userId")]
+    pub user_id: i64
 }
 
 #[derive(Serialize, sqlx::Type, PartialEq, Debug)]

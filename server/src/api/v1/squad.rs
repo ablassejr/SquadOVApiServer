@@ -23,3 +23,9 @@ pub struct SquadInviteInput {
     squad_id: i64,
     invite_uuid: Uuid
 }
+
+#[derive(Deserialize)]
+pub struct SquadMembershipPathInput {
+    squad_id: i64,
+    user_id: i64
+}

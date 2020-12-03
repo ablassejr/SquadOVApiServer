@@ -7,13 +7,12 @@ use squadov_common::{SquadOvError, SquadInvite};
 use sqlx::{Transaction, Executor, Postgres, Row};
 use serde::Deserialize;
 use chrono::Utc;
-use std::collections::HashSet;
-use std::iter::FromIterator;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct CreateSquadInviteInput {
-    users: Vec<i64>
+    usernames: Vec<String>
 }
 
 impl api::ApiApplication {
@@ -30,32 +29,38 @@ impl api::ApiApplication {
             .await?)
     }
 
-    async fn create_squad_invite(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, inviter_user_id: i64, user_ids: &[i64]) -> Result<(), SquadOvError> {
-        if user_ids.is_empty() {
-            return Ok(());
+    async fn create_squad_invite(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, inviter_user_id: i64, usernames: &[String]) -> Result<(), SquadOvError> {
+        if usernames.is_empty() {
+            return Err(SquadOvError::BadRequest);
         }
 
-        // Filter out user ids that already are already part of the Squad.
-        let existing_user_ids: Vec<i64> = tx.fetch_all(
+        // For every username, we grab their user ID and every squad they're in.
+        // For each squad, we check to see if they're in the squad in question.
+        // We do not send invites to users who are alreayd in the squad.
+        let user_ids_usernames: HashMap<String, (i64, bool)> = tx.fetch_all(
             sqlx::query(
                 "
-                SELECT user_id
-                FROM squadov.squad_role_assignments
-                WHERE squad_id = $1 AND user_id = any($2)
+                SELECT us.id, us.username, sra.squad_id
+                FROM squadov.users AS us
+                LEFT JOIN squadov.squad_role_assignments AS sra
+                    ON sra.user_id = us.id
+                WHERE us.username = any($1)
                 "
             )
-                .bind(squad_id)
-                .bind(user_ids)
+                .bind(usernames)
         ).await?.into_iter().map(|x| {
-            x.get(0)
+            (x.get::<String, usize>(1), (x.get::<i64, usize>(0), x.get::<Option<i64>, usize>(2).unwrap_or(-1) == squad_id))
         }).collect();
-        let existing_user_ids: HashSet<i64> = HashSet::from_iter(existing_user_ids.into_iter());
-        let user_ids: Vec<i64> = user_ids.iter().cloned().filter(|x| {
-            !existing_user_ids.contains(x)
+
+        let user_ids: Vec<i64> = usernames.iter().filter(|x| {
+            user_ids_usernames.contains_key(&x[..]) &&
+                !user_ids_usernames.get(&x[..]).unwrap().1
+        }).map(|x| {
+            user_ids_usernames.get(x).unwrap().0
         }).collect();
 
         if user_ids.is_empty() {
-            return Ok(());
+            return Err(SquadOvError::BadRequest);
         }
 
         let mut sql: Vec<String> = Vec::new();
@@ -94,6 +99,20 @@ impl api::ApiApplication {
         // Any invite that doesn't get sent (e.g. an error occurs during sending) should be ignored as
         // we should just force the user to deal with an unreceived invite (email) and resending the invite
         // if necessary.
+        Ok(())
+    }
+
+    pub async fn delete_squad_invite(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, invite_uuid: &Uuid) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            "
+            DELETE FROM squadov.squad_membership_invites
+            WHERE squad_id = $1 AND invite_uuid = $2 AND response_time IS NULL
+            ",
+            squad_id,
+            invite_uuid
+        )
+            .execute(tx)
+            .await?;
         Ok(())
     }
 
@@ -198,7 +217,7 @@ pub async fn create_squad_invite_handler(app : web::Data<Arc<api::ApiApplication
     };
 
     let mut tx = app.pool.begin().await?;
-    app.create_squad_invite(&mut tx, path.squad_id, session.user.id, &data.users).await?;
+    app.create_squad_invite(&mut tx, path.squad_id, session.user.id, &data.usernames).await?;
     tx.commit().await?;
     Ok(HttpResponse::Ok().finish())
 }
@@ -226,4 +245,11 @@ pub async fn get_user_squad_invites_handler(app : web::Data<Arc<api::ApiApplicat
 pub async fn  get_all_squad_invites_handler(app : web::Data<Arc<api::ApiApplication>>, path : web::Path<super::SquadSelectionInput>) -> Result<HttpResponse, SquadOvError> {
     let invites = app.get_squad_invites(path.squad_id).await?;
     Ok(HttpResponse::Ok().json(&invites))
+}
+
+pub async fn revoke_squad_invite_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadInviteInput>) -> Result<HttpResponse, SquadOvError> {
+    let mut tx = app.pool.begin().await?;
+    app.delete_squad_invite(&mut tx, path.squad_id, &path.invite_uuid).await?;
+    tx.commit().await?;
+    Ok(HttpResponse::Ok().finish())
 }

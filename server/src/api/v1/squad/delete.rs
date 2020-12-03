@@ -41,23 +41,34 @@ pub async fn delete_squad_handler(app : web::Data<Arc<api::ApiApplication>>, dat
     Ok(HttpResponse::Ok().finish())
 }
 
-pub async fn leave_squad_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Path<super::SquadSelectionInput>, request: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+async fn generic_remove_user_from_squad_handler(app : web::Data<Arc<api::ApiApplication>>, user_id: i64, squad_id: i64) -> Result<(), SquadOvError> {
+    // Ensure that the owner user isn't trying to leave/be kicked. Is there a way to
+    // get this to be represented as a PostgreSQL constraint so that DB
+    // operation just fails instead?
+    let role = app.get_squad_user_role(squad_id, user_id).await?;
+    if role.is_some() && role.unwrap() == SquadRole::Owner {
+        return Err(SquadOvError::BadRequest);
+    }
+
+    let mut tx = app.pool.begin().await?;
+    app.leave_squad(&mut tx, squad_id, user_id).await?;
+    tx.commit().await?;
+
+    Ok(())
+}
+
+pub async fn leave_squad_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadSelectionInput>, request: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = request.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(x) => x,
         None => return Err(squadov_common::SquadOvError::BadRequest)
     };
 
-    // Ensure that the owner user isn't trying to leave. Is there a way to
-    // get this to be represented as a PostgreSQL constraint so that DB
-    // operation just fails instead?
-    let role = app.get_squad_user_role(data.squad_id, session.user.id).await?;
-    if role.is_some() && role.unwrap() == SquadRole::Owner {
-        return Err(SquadOvError::BadRequest);
-    }
+    generic_remove_user_from_squad_handler(app, session.user.id, path.squad_id).await?;
+    Ok(HttpResponse::Ok().finish())
+}
 
-    let mut tx = app.pool.begin().await?;
-    app.leave_squad(&mut tx, data.squad_id, session.user.id).await?;
-    tx.commit().await?;
+pub async fn kick_squad_member_handler(app : web::Data<Arc<api::ApiApplication>>, path : web::Path<super::SquadMembershipPathInput>) -> Result<HttpResponse, SquadOvError> {   
+    generic_remove_user_from_squad_handler(app, path.user_id, path.squad_id).await?;
     Ok(HttpResponse::Ok().finish())
 }
