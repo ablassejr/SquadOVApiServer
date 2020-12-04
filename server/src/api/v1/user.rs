@@ -1,6 +1,8 @@
 mod profile;
+mod accounts;
 
 pub use profile::*;
+pub use accounts::*;
 
 use serde::Deserialize;
 

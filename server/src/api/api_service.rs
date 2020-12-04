@@ -57,6 +57,13 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route("", web::get().to(v1::get_user_squads_handler))
                                         .route("/invites", web::get().to(v1::get_user_squad_invites_handler))
                                 )
+                                .service(
+                                    web::scope("/accounts")
+                                        .service(
+                                            web::scope("/riot")
+                                                .route("", web::post().to(v1::link_new_riot_account_handler))
+                                        )
+                                )
                         )
                 )
                 .service(
