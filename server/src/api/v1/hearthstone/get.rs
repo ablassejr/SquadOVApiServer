@@ -3,10 +3,9 @@ use squadov_common::hearthstone::{HearthstonePlayer, HearthstonePlayerMedalInfo,
 use squadov_common::hearthstone::game_state::{HearthstoneGameBlock, HearthstoneGameSnapshot, HearthstoneGameSnapshotAuxData, HearthstoneGameAction, HearthstoneEntity, game_step::GameStep};
 use squadov_common::hearthstone::game_packet::{HearthstoneMatchMetadata, HearthstoneGamePacket, HearthstoneSerializedGameLog};
 use crate::api;
-use actix_web::{web, HttpResponse, HttpRequest};
+use actix_web::{web, HttpResponse};
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::api::auth::SquadOVSession;
 use std::convert::TryFrom;
 use std::collections::HashMap;
 
@@ -356,24 +355,12 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn get_hearthstone_match_handler(path : web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
-    let extensions = req.extensions();
-    let session = match extensions.get::<SquadOVSession>() {
-        Some(x) => x,
-        None => return Err(squadov_common::SquadOvError::BadRequest)
-    };
-
-    let packet = app.get_hearthstone_match_for_user(&path.match_uuid, session.user.id).await?;
+pub async fn get_hearthstone_match_handler(path : web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
+    let packet = app.get_hearthstone_match_for_user(&path.match_uuid, path.user_id).await?;
     Ok(HttpResponse::Ok().json(&packet))
 }
 
-pub async fn get_hearthstone_match_logs_handler(path : web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
-    let extensions = req.extensions();
-    let session = match extensions.get::<SquadOVSession>() {
-        Some(x) => x,
-        None => return Err(squadov_common::SquadOvError::BadRequest)
-    };
-
-    let logs = app.get_hearthstone_match_logs_for_user(&path.match_uuid, session.user.id).await?;
+pub async fn get_hearthstone_match_logs_handler(path : web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
+    let logs = app.get_hearthstone_match_logs_for_user(&path.match_uuid, path.user_id).await?;
     Ok(HttpResponse::Ok().json(&logs))
 }

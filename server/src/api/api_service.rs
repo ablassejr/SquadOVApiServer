@@ -144,11 +144,11 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/user/{user_id}")
                                 .wrap(access::ApiAccess::new(
-                                    Box::new(access::UserSpecificAccessChecker{
+                                    Box::new(access::SameSquadAccessChecker{
                                         obtainer: access::UserIdPathSetObtainer{
                                             key: "user_id"
                                         },
-                                    }),
+                                    })
                                 ))
                                 .route("", web::get().to(v1::list_aimlab_matches_for_user_handler))
                         )
@@ -167,20 +167,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 .service(
                     web::scope("/hearthstone")
                         .service(
-                            web::scope("/match")
-                                .route("", web::post().to(v1::create_hearthstone_match_handler))
-                                .service(
-                                    web::scope("/{match_uuid}")
-                                        .route("", web::post().to(v1::upload_hearthstone_logs_handler))
-                                            .data(web::Payload::configure(|cfg| {
-                                                // Note that we should be submitting GZIP here so this shouldn't get super super large.
-                                                cfg.limit(5 * 1024 * 1024)
-                                            }))
-                                        .route("", web::get().to(v1::get_hearthstone_match_handler))
-                                        .route("/logs", web::get().to(v1::get_hearthstone_match_logs_handler))
-                                )
-                        )
-                        .service(
                             web::scope("/user/{user_id}")
                                 .wrap(access::ApiAccess::new(
                                     Box::new(access::UserSpecificAccessChecker{
@@ -188,8 +174,29 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                             key: "user_id"
                                         },
                                     }),
+                                ).verb_override(
+                                    "GET",
+                                    Box::new(access::SameSquadAccessChecker{
+                                        obtainer: access::UserIdPathSetObtainer{
+                                            key: "user_id"
+                                        },
+                                    })
                                 ))
-                                .route("/match", web::get().to(v1::list_hearthstone_matches_for_user_handler))
+                                .service(
+                                    web::scope("/match")
+                                        .route("", web::post().to(v1::create_hearthstone_match_handler))
+                                        .route("", web::get().to(v1::list_hearthstone_matches_for_user_handler))
+                                        .service(
+                                            web::scope("/{match_uuid}")
+                                                .route("", web::post().to(v1::upload_hearthstone_logs_handler))
+                                                    .data(web::Payload::configure(|cfg| {
+                                                        // Note that we should be submitting GZIP here so this shouldn't get super super large.
+                                                        cfg.limit(5 * 1024 * 1024)
+                                                    }))
+                                                .route("", web::get().to(v1::get_hearthstone_match_handler))
+                                                .route("/logs", web::get().to(v1::get_hearthstone_match_logs_handler))
+                                        )
+                                )
                                 .service(
                                     web::scope("/arena")
                                         .route("", web::get().to(v1::list_arena_runs_for_user_handler))
@@ -224,10 +231,14 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/match/{match_uuid}")
                                 .service(
-                                    web::scope("/user/{user_uuid}")
+                                    web::scope("/user")
                                         .service(
-                                            web::resource("")
-                                                .route(web::get().to(v1::find_vod_from_match_user_handler))
+                                            web::resource("/uuid/{user_uuid}")
+                                                .route(web::get().to(v1::find_vod_from_match_user_uuid_handler))
+                                        )
+                                        .service(
+                                            web::resource("/id/{user_id}")
+                                                .route(web::get().to(v1::find_vod_from_match_user_id_handler))
                                         )
                                 )
                         )

@@ -4,7 +4,7 @@ use squadov_common::hearthstone::{HearthstoneRawLog, power_parser::{HearthstoneP
 use squadov_common::hearthstone::game_state::{HearthstoneGameLog};
 use squadov_common::hearthstone::GameType;
 use crate::api;
-use actix_web::{web, HttpResponse, HttpRequest};
+use actix_web::{web, HttpResponse};
 use serde::{Deserialize};
 use sqlx::{Transaction, Executor, Postgres};
 use std::collections::HashMap;
@@ -13,7 +13,6 @@ use uuid::Uuid;
 use futures_util::StreamExt;
 use chrono::{DateTime, Utc};
 use std::io::Read;
-use crate::api::auth::SquadOVSession;
 use crate::api::v1;
 
 #[derive(Deserialize)]
@@ -608,13 +607,12 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstoneMatchInput>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
-    let extensions = request.extensions();
-    let session = match extensions.get::<SquadOVSession>() {
-        Some(x) => x,
-        None => return Err(squadov_common::SquadOvError::BadRequest)
-    };
+#[derive(Deserialize)]
+pub struct CreateHearthstoneMatchPathInput {
+    user_id: i64
+}
 
+pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstoneMatchInput>, app : web::Data<Arc<api::ApiApplication>>, path: web::Path<CreateHearthstoneMatchPathInput>) -> Result<HttpResponse, squadov_common::SquadOvError> {
     let mut tx = app.pool.begin().await?;
     let uuid = app.create_hearthstone_match(&mut tx, &data.timestamp, &data.info).await?;
     match &data.deck {
@@ -624,8 +622,8 @@ pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstone
             // to associate with the match. So if associate_deck_with_match_user is called before
             // store_hearthstone_deck, it'll be possible for us to associate an older version of the deck
             // with the match incorrectly.
-            app.store_hearthstone_deck(&mut tx, &x, session.user.id).await?;
-            app.associate_deck_with_match_user(&mut tx, x.deck_id, &uuid, session.user.id).await?;
+            app.store_hearthstone_deck(&mut tx, &x, path.user_id).await?;
+            app.associate_deck_with_match_user(&mut tx, x.deck_id, &uuid, path.user_id).await?;
         },
         None => (),
     };
@@ -633,7 +631,7 @@ pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstone
     // Handle each player separately instead of batching for ease of us. There's only 2 players in any
     // given call anyway so it's not too expensive.
     for (player_id, player) in &data.players {
-        app.store_hearthstone_match_player(&mut tx, *player_id, &player, &uuid, session.user.id).await?;
+        app.store_hearthstone_match_player(&mut tx, *player_id, &player, &uuid, path.user_id).await?;
     }
     
     tx.commit().await?;
@@ -641,13 +639,8 @@ pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstone
 }
 
 // Note that we don't parse directly into the expected data structures immediately as that can happen in an async thread so we can return to the user faster.
-pub async fn upload_hearthstone_logs_handler(mut body : web::Payload, path : web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
-    let extensions = request.extensions();
-    let session = match extensions.get::<SquadOVSession>() {
-        Some(x) => x,
-        None => return Err(squadov_common::SquadOvError::BadRequest)
-    };
-    let user_id = session.user.id;
+pub async fn upload_hearthstone_logs_handler(mut body : web::Payload, path : web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, squadov_common::SquadOvError> {
+    let user_id = path.user_id;
 
     // This grabs the raw byte data (it may be compressed or uncompressed!).
     // Uncompressed this could be really large (and thus take awhile to uncompress)
@@ -661,7 +654,7 @@ pub async fn upload_hearthstone_logs_handler(mut body : web::Payload, path : web
     let app = app.clone();
     {
         let mut tx = app.pool.begin().await?;
-        app.store_hearthstone_raw_power_logs(&mut tx, &data, &path.match_uuid, session.user.id).await?;
+        app.store_hearthstone_raw_power_logs(&mut tx, &data, &path.match_uuid, user_id).await?;
         tx.commit().await?;
     }
 

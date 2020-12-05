@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct HearthstoneMatchGetInput {
+    user_id: i64,
     match_uuid: Uuid
 }
 
