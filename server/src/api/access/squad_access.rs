@@ -4,6 +4,9 @@ use crate::api::ApiApplication;
 use std::sync::Arc;
 use squadov_common::SquadRole;
 use async_trait::async_trait;
+use super::UserIdSetObtainer;
+use std::collections::HashSet;
+use std::iter::FromIterator;
 
 pub trait SquadIdSetObtainer {
     fn obtain(&self, req: &HttpRequest) -> Result<i64, squadov_common::SquadOvError>;
@@ -26,7 +29,6 @@ impl SquadIdSetObtainer for SquadIdPathSetObtainer {
         }
     }
 }
-
 
 pub struct SquadAccessBasicData {
     squad_id: i64
@@ -61,5 +63,24 @@ impl<T: SquadIdSetObtainer + Send + Sync> super::AccessChecker<SquadAccessBasicD
         } else {
             Ok(true)
         }
+    }
+}
+
+pub struct SameSquadAccessChecker<T> {
+    pub obtainer: T
+}
+
+#[async_trait]
+impl super::AccessChecker<super::UserAccessSetBasicData> for SameSquadAccessChecker<super::UserIdPathSetObtainer> {
+    fn generate_aux_metadata(&self, req: &HttpRequest) -> Result<super::UserAccessSetBasicData, squadov_common::SquadOvError> {
+        Ok(super::UserAccessSetBasicData{
+            access_set: self.obtainer.obtain(req)?
+        })
+    }
+
+    async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: super::UserAccessSetBasicData) -> Result<bool, squadov_common::SquadOvError> {
+        let user_ids: Vec<i64> = data.access_set.into_iter().collect();
+        let same_squad_user_ids: HashSet<i64> = HashSet::from_iter(app.get_user_ids_in_same_squad_as_users(&user_ids).await?.into_iter());
+        Ok(same_squad_user_ids.contains(&session.user.id))
     }
 }

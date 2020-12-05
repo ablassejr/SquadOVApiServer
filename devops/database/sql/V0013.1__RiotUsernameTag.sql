@@ -1,0 +1,3 @@
+ALTER TABLE riot_account_links
+ADD COLUMN username VARCHAR,
+ADD COLUMN tag VARCHAR;

@@ -175,6 +175,25 @@ impl api::ApiApplication {
             user_id: x.user_id,
         })
     }
+
+    pub async fn get_user_ids_in_same_squad_as_users(&self, user_ids: &[i64]) -> Result<Vec<i64>, SquadOvError> {
+        Ok(sqlx::query_scalar(
+            "
+            WITH user_squads AS (
+                SELECT squad_id
+                FROM squadov.squad_role_assignments
+                WHERE user_id = any($1)
+            )
+            SELECT DISTINCT sra.user_id
+            FROM squadov.squad_role_assignments AS sra
+            INNER JOIN user_squads AS us
+                ON us.squad_id = sra.squad_id
+            "
+        )
+            .bind(user_ids)
+            .fetch_all(&*self.pool)
+            .await?)
+    }
 }
 
 pub async fn get_squad_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadSelectionInput>) -> Result<HttpResponse, SquadOvError> {

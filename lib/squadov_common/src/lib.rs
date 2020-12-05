@@ -10,6 +10,7 @@ pub mod stats;
 pub mod hearthstone;
 pub mod blob;
 pub mod squad;
+pub mod riot;
 
 pub use error::*;
 pub use parse::*;
@@ -21,6 +22,7 @@ pub use encode::*;
 pub use sql::*;
 pub use blob::*;
 pub use squad::*;
+pub use riot::*;
 
 #[macro_use]
 extern crate lazy_static;

@@ -4,8 +4,6 @@ use super::auth;
 use super::v1;
 use super::access;
 use super::graphql;
-use std::rc::Rc;
-use std::cell::RefCell;
 use std::vec::Vec;
 use std::boxed::Box;
 
@@ -41,19 +39,26 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         )
                         .service(
                             web::scope("/{user_id}")
-                                .wrap(access::ApiAccess{
-                                    checker: Rc::new(RefCell::new(Box::new(access::UserSpecificAccessChecker{
-                                        obtainer: access::UserIdPathSetObtainer{
-                                            key: "user_id"
-                                        },
-                                    }))),
-                                })
                                 .service(
-                                    web::resource("/profile")
-                                        .route(web::get().to(v1::get_user_profile_handler))
+                                    web::scope("/profile")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::SameSquadAccessChecker{
+                                                obtainer: access::UserIdPathSetObtainer{
+                                                    key: "user_id"
+                                                },
+                                            }),
+                                        ))
+                                        .route("", web::get().to(v1::get_user_profile_handler))
                                 )
                                 .service(
                                     web::scope("/squads")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::UserSpecificAccessChecker{
+                                                obtainer: access::UserIdPathSetObtainer{
+                                                    key: "user_id"
+                                                },
+                                            }),
+                                        ))
                                         .route("", web::get().to(v1::get_user_squads_handler))
                                         .route("/invites", web::get().to(v1::get_user_squad_invites_handler))
                                 )
@@ -61,7 +66,23 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::scope("/accounts")
                                         .service(
                                             web::scope("/riot")
+                                                .wrap(access::ApiAccess::new(
+                                                    Box::new(access::UserSpecificAccessChecker{
+                                                        obtainer: access::UserIdPathSetObtainer{
+                                                            key: "user_id"
+                                                        },
+                                                    }),
+                                                ).verb_override(
+                                                    "GET",
+                                                    Box::new(access::SameSquadAccessChecker{
+                                                        obtainer: access::UserIdPathSetObtainer{
+                                                            key: "user_id"
+                                                        },
+                                                    })
+                                                ))
                                                 .route("", web::post().to(v1::link_new_riot_account_handler))
+                                                .route("", web::get().to(v1::list_riot_accounts_handler))
+                                                .route("/{puuid}", web::get().to(v1::get_riot_account_handler))
                                         )
                                 )
                         )
@@ -81,13 +102,21 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                             // Need to include the user here for us to verify that that the user
                             // is associated with this valorant account.
                             web::scope("/user/{user_id}/accounts/{puuid}")
-                                .wrap(access::ApiAccess{
-                                    checker: Rc::new(RefCell::new(Box::new(access::UserSpecificAccessChecker{
+                                .wrap(access::ApiAccess::new(
+                                    Box::new(access::SameSquadAccessChecker{
                                         obtainer: access::UserIdPathSetObtainer{
                                             key: "user_id"
                                         },
-                                    }))),
-                                })
+                                    }),
+                                ))
+                                .wrap(access::ApiAccess::new(
+                                    Box::new(access::RiotAccountAccessChecker{
+                                        obtainer: access::RiotAccountPathObtainer{
+                                            user_id_key: "user_id",
+                                            puuid_key: "puuid",
+                                        },
+                                    }),
+                                ))
                                 .service(
                                     web::resource("/matches")
                                         .route(web::get().to(v1::list_valorant_matches_for_user_handler))
@@ -114,13 +143,13 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("", web::post().to(v1::create_new_aimlab_task_handler))
                         .service(
                             web::scope("/user/{user_id}")
-                                .wrap(access::ApiAccess{
-                                    checker: Rc::new(RefCell::new(Box::new(access::UserSpecificAccessChecker{
+                                .wrap(access::ApiAccess::new(
+                                    Box::new(access::UserSpecificAccessChecker{
                                         obtainer: access::UserIdPathSetObtainer{
                                             key: "user_id"
                                         },
-                                    }))),
-                                })
+                                    }),
+                                ))
                                 .route("", web::get().to(v1::list_aimlab_matches_for_user_handler))
                         )
                         .route("/bulk", web::post().to(v1::bulk_create_aimlab_task_handler))
@@ -153,13 +182,13 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         )
                         .service(
                             web::scope("/user/{user_id}")
-                                .wrap(access::ApiAccess{
-                                    checker: Rc::new(RefCell::new(Box::new(access::UserSpecificAccessChecker{
+                                .wrap(access::ApiAccess::new(
+                                    Box::new(access::UserSpecificAccessChecker{
                                         obtainer: access::UserIdPathSetObtainer{
                                             key: "user_id"
                                         },
-                                    }))),
-                                })
+                                    }),
+                                ))
                                 .route("/match", web::get().to(v1::list_hearthstone_matches_for_user_handler))
                                 .service(
                                     web::scope("/arena")
@@ -224,14 +253,14 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 // Owner-only endpoints
                                 .service(
                                     web::scope("/admin")
-                                        .wrap(access::ApiAccess{
-                                            checker: Rc::new(RefCell::new(Box::new(access::SquadAccessChecker{
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::SquadAccessChecker{
                                                 requires_owner: true,
                                                 obtainer: access::SquadIdPathSetObtainer{
                                                     key: "squad_id"
                                                 },
-                                            }))),
-                                        })
+                                            }),
+                                        ))
                                         .route("", web::delete().to(v1::delete_squad_handler))
                                         .route("", web::put().to(v1::edit_squad_handler))
                                         .route("/invite/{invite_uuid}/revoke", web::post().to(v1::revoke_squad_invite_handler))
@@ -239,13 +268,13 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 )                                
                                 .service(
                                     web::scope("/invite/{invite_uuid}")
-                                        .wrap(access::ApiAccess{
-                                            checker: Rc::new(RefCell::new(Box::new(access::UserSpecificAccessChecker{
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::UserSpecificAccessChecker{
                                                 obtainer: access::SquadInvitePathObtainer{
                                                     key: "invite_uuid"
                                                 },
-                                            }))),
-                                        })
+                                            }),
+                                        ))
                                         .route("/accept", web::post().to(v1::accept_squad_invite_handler))
                                         .route("/reject", web::post().to(v1::reject_squad_invite_handler))
                                 )
@@ -255,14 +284,14 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 // Member-only endpoints
                                 .service(
                                     web::scope("")
-                                        .wrap(access::ApiAccess{
-                                            checker: Rc::new(RefCell::new(Box::new(access::SquadAccessChecker{
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::SquadAccessChecker{
                                                 requires_owner: false,
                                                 obtainer: access::SquadIdPathSetObtainer{
                                                     key: "squad_id"
                                                 },
-                                            }))),
-                                        })
+                                            }),
+                                        ))
                                         .route("/leave", web::post().to(v1::leave_squad_handler))
                                         .service(
                                             web::scope("/invite")

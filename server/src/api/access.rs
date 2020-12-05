@@ -1,10 +1,12 @@
 mod user_specific_access;
 mod squad_access;
 mod squad_invite_access;
+mod riot_access;
 
 pub use user_specific_access::*;
 pub use squad_access::*;
 pub use squad_invite_access::*;
+pub use riot_access::*;
 
 use squadov_common;
 use actix_web::{web, HttpRequest};
@@ -21,6 +23,9 @@ use crate::api::ApiApplication;
 use std::sync::Arc;
 use std::boxed::Box;
 use async_trait::async_trait;
+use std::collections::HashMap;
+
+type TChecker<T> = Rc<RefCell<Box<dyn AccessChecker<T>>>>;
 
 /// This trait is used by the access middleware to check to see
 /// whether the current user has access to whatever the checker is
@@ -38,7 +43,24 @@ pub trait AccessChecker<T: Send + Sync> {
 }
 
 pub struct ApiAccess<T : Send + Sync> {
-    pub checker: Rc<RefCell<Box<dyn AccessChecker<T>>>>
+    // Default checker when no other matches exist.
+    pub checker: TChecker<T>,
+    // Checker to use for specific HTTP verbs
+    pub verb_checkers: HashMap<String, TChecker<T>>
+}
+
+impl<T: Send + Sync> ApiAccess<T> {
+    pub fn new(input: Box<dyn AccessChecker<T>>) -> Self {
+        Self {
+            checker: Rc::new(RefCell::new(input)),
+            verb_checkers: HashMap::new()
+        }
+    }
+
+    pub fn verb_override(mut self, v: &str, c: Box<dyn AccessChecker<T>>) -> Self {
+        self.verb_checkers.insert(String::from(v), Rc::new(RefCell::new(c)));
+        self
+    }
 }
 
 impl<S, B, T> Transform<S> for ApiAccess<T>
@@ -59,13 +81,15 @@ where
         ok(ApiAccessMiddleware { 
             service: Rc::new(RefCell::new(service)),
             checker: self.checker.clone(),
+            verb_checkers: self.verb_checkers.clone(),
         })
     }
 }
 
 pub struct ApiAccessMiddleware<S, T : Send + Sync> {
     service: Rc<RefCell<S>>,
-    checker: Rc<RefCell<Box<dyn AccessChecker<T>>>>
+    checker: TChecker<T>,
+    verb_checkers: HashMap<String, TChecker<T>>
 }
 
 impl<S, B, T> Service for ApiAccessMiddleware<S, T>
@@ -86,7 +110,12 @@ where
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
         let mut srv = self.service.clone();
-        let checker = self.checker.clone();
+        let method = String::from(req.method().as_str());
+        let checker = if self.verb_checkers.contains_key(&method) {
+            self.verb_checkers.get(&method).unwrap().clone()
+        } else {
+            self.checker.clone()
+        };
 
         Box::pin(async move {
             let (request, payload) = req.into_parts();

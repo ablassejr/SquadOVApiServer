@@ -33,7 +33,7 @@ impl UserIdSetObtainer for UserIdPathSetObtainer {
 }
 
 pub struct UserAccessSetBasicData {
-    access_set: HashSet<i64>
+    pub access_set: HashSet<i64>
 }
 
 /// An access checker to check that the given user's ID is in

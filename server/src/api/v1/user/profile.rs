@@ -14,7 +14,6 @@ pub async fn get_user_profile_handler(data : web::Path<super::UserResourcePath>,
     }
 }
 
-
 pub async fn get_current_user_profile_handler(app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
     let extensions = request.extensions();
     let session = match extensions.get::<SquadOVSession>() {
