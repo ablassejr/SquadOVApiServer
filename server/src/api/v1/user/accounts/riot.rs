@@ -1,3 +1,7 @@
+mod valorant;
+
+pub use valorant::*;
+
 use actix_web::{web, HttpResponse};
 use sqlx::{Executor, Postgres};
 use crate::api;

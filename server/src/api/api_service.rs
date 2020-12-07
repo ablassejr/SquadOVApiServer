@@ -128,6 +128,13 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         )
                         .service(
                             web::scope("/match/{match_id}")
+                                .wrap(access::ApiAccess::new(
+                                    Box::new(access::ValorantMatchAccessChecker{
+                                        obtainer: access::ValorantMatchUuidPathObtainer{
+                                            match_id_key: "match_id",
+                                        },
+                                    }),
+                                ))
                                 .service(
                                     web::resource("")
                                         .route(web::get().to(v1::get_valorant_match_details_handler))
@@ -151,18 +158,18 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     })
                                 ))
                                 .route("", web::get().to(v1::list_aimlab_matches_for_user_handler))
+                                .service(
+                                    web::scope("/match/{match_uuid}")
+                                        .service(
+                                            web::resource("/task")
+                                                .route(web::get().to(v1::get_aimlab_task_data_handler))
+                                        )
+                                )
                         )
                         .route("/bulk", web::post().to(v1::bulk_create_aimlab_task_handler))
                             .data(web::Json::<Vec<v1::AimlabTask>>::configure(|cfg| {
                                 cfg.limit(1 * 1024 * 1024)
                             }))
-                        .service(
-                            web::scope("/match/{match_uuid}")
-                                .service(
-                                    web::resource("/task")
-                                        .route(web::get().to(v1::get_aimlab_task_data_handler))
-                                )
-                        )
                 )
                 .service(
                     web::scope("/hearthstone")

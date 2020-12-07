@@ -1,12 +1,12 @@
-mod user_specific_access;
-mod squad_access;
-mod squad_invite_access;
-mod riot_access;
+mod user_specific;
+mod squad;
+mod squad_invite;
+mod riot;
 
-pub use user_specific_access::*;
-pub use squad_access::*;
-pub use squad_invite_access::*;
-pub use riot_access::*;
+pub use user_specific::*;
+pub use squad::*;
+pub use squad_invite::*;
+pub use riot::*;
 
 use squadov_common;
 use actix_web::{web, HttpRequest};

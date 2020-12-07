@@ -1,3 +1,7 @@
+mod valorant;
+
+pub use valorant::*;
+
 use actix_web::{HttpRequest};
 use squadov_common::SquadOvError;
 use crate::api::auth::SquadOVSession;
