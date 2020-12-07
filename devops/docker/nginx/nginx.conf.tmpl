@@ -5,6 +5,7 @@ server {
     server_name api.${DEPLOYMENT_DOMAIN};
 
     include /etc/nginx/conf.d/common-tls-options.conf;
+    client_max_body_size 10m;
 
     if ($scheme = http) {
         return 301 https://$host$request_uri;
