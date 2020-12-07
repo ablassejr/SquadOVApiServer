@@ -240,17 +240,36 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .service(
                                     web::scope("/user")
                                         .service(
-                                            web::resource("/uuid/{user_uuid}")
-                                                .route(web::get().to(v1::find_vod_from_match_user_uuid_handler))
-                                        )
-                                        .service(
                                             web::resource("/id/{user_id}")
+                                                .wrap(access::ApiAccess::new(
+                                                    Box::new(access::SameSquadAccessChecker{
+                                                        obtainer: access::UserIdPathSetObtainer{
+                                                            key: "user_id"
+                                                        },
+                                                    })
+                                                ))
                                                 .route(web::get().to(v1::find_vod_from_match_user_id_handler))
                                         )
                                 )
                         )
                         .service(
                             web::scope("/{video_uuid}")
+                                .wrap(access::ApiAccess::new(
+                                    Box::new(access::VodAccessChecker{
+                                        must_be_vod_owner: true,
+                                        obtainer: access::VodPathObtainer{
+                                            video_uuid_key: "video_uuid"
+                                        },
+                                    }),
+                                ).verb_override(
+                                    "GET",
+                                    Box::new(access::VodAccessChecker{
+                                        must_be_vod_owner: false,
+                                        obtainer: access::VodPathObtainer{
+                                            video_uuid_key: "video_uuid"
+                                        },
+                                    }),
+                                ))
                                 .service(
                                     web::resource("")
                                         .route(web::delete().to(v1::delete_vod_handler))
