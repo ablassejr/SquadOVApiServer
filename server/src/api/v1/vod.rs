@@ -28,15 +28,15 @@ pub fn get_current_vod_manager_type() -> VodManagerType {
 #[derive(Serialize,Deserialize)]
 pub struct VodAssociation {
     #[serde(rename = "matchUuid")]
-    match_uuid: Option<Uuid>,
+    pub match_uuid: Option<Uuid>,
     #[serde(rename = "userUuid")]
-    user_uuid: Option<Uuid>,
+    pub user_uuid: Option<Uuid>,
     #[serde(rename = "videoUuid")]
-    video_uuid: Uuid,
+    pub video_uuid: Uuid,
     #[serde(rename = "startTime")]
-    start_time: Option<DateTime<Utc>>,
+    pub start_time: Option<DateTime<Utc>>,
     #[serde(rename = "endTime")]
-    end_time: Option<DateTime<Utc>>
+    pub end_time: Option<DateTime<Utc>>
 }
 
 #[async_trait]

@@ -143,6 +143,17 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::resource("/metadata/{puuid}")
                                         .route(web::get().to(v1::get_valorant_player_match_metadata_handler))
                                 )
+                                .service(
+                                    web::scope("/user/{user_id}")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::UserSpecificAccessChecker{
+                                                obtainer: access::UserIdPathSetObtainer{
+                                                    key: "user_id"
+                                                },
+                                            }),
+                                        ))
+                                        .route("/vods", web::get().to(v1::get_valorant_match_user_accessible_vod_handler))
+                                )
                         )
                 )
                 .service(

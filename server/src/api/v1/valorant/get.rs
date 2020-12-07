@@ -1,10 +1,14 @@
 use squadov_common;
 use crate::api;
+use crate::api::v1::VodAssociation;
 use actix_web::{web, HttpResponse};
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use std::vec::Vec;
+use std::collections::HashMap;
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
+use std::iter::FromIterator;
 
 #[derive(Deserialize)]
 pub struct GetValorantMatchDetailsInput {
@@ -378,6 +382,40 @@ impl api::ApiApplication {
             None => Ok(None)
         }
     }
+
+    async fn get_valorant_match_uuid_from_id(&self, match_id: &str) -> Result<Uuid, squadov_common::SquadOvError> {
+        Ok(sqlx::query_scalar(
+            "
+            SELECT match_uuid
+            FROM squadov.valorant_matches
+            WHERE match_id = $1
+            "
+        )
+            .bind(match_id)
+            .fetch_one(&*self.pool)
+            .await?)
+    }
+
+    async fn get_puuids_in_valorant_match_from_user_uuids(&self, match_id: &str, uuids: &[Uuid]) -> Result<Vec<(Uuid, String)>, squadov_common::SquadOvError> {
+        let raw = sqlx::query!(
+            "
+            SELECT u.uuid, vmp.puuid
+            FROM squadov.valorant_match_players AS vmp
+            INNER JOIN squadov.riot_account_links AS ral
+                ON ral.puuid = vmp.puuid
+            INNER JOIN squadov.users AS u
+                ON u.id = ral.user_id
+            WHERE vmp.match_id = $1 AND u.uuid = any($2)
+            ",
+            match_id,
+            uuids,
+        )
+            .fetch_all(&*self.pool)
+            .await?;
+        Ok(raw.into_iter().map(|x| {
+            (x.uuid, x.puuid)
+        }).collect())
+    }
 }
 
 pub async fn get_valorant_match_details_handler(data : web::Path<GetValorantMatchDetailsInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, squadov_common::SquadOvError> {
@@ -391,4 +429,36 @@ pub async fn get_valorant_player_match_metadata_handler(data: web::Path<GetValor
         None => return Err(squadov_common::SquadOvError::NotFound)
     };
     Ok(HttpResponse::Ok().json(&metadata))
+}
+
+#[derive(Deserialize)]
+pub struct ValorantMatchUserVodAccessInput {
+    pub match_id: String,
+    pub user_id: i64
+}
+
+#[derive(Serialize)]
+struct ValorantUserAccessibleVodOutput {
+    pub vods: Vec<VodAssociation>,
+    #[serde(rename="userMapping")]
+    pub user_mapping: HashMap<Uuid, String>
+}
+
+pub async fn get_valorant_match_user_accessible_vod_handler(data: web::Path<ValorantMatchUserVodAccessInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, squadov_common::SquadOvError> {
+    // We need to get a list of VOD information for each player in the match filtered by
+    // the users that the input user has access to. We assume that the ACL on the user_id is
+    // appropriate and taken care of externally.
+    let match_uuid = app.get_valorant_match_uuid_from_id(&data.match_id).await?;
+    let vods = app.find_accessible_vods_in_match_for_user(&match_uuid, data.user_id).await?;
+
+    // Note that for each VOD we also need to figure out the mapping from user uuid to puuid.
+    let user_uuids: Vec<Uuid> = vods.iter()
+        .filter(|x| { x.user_uuid.is_some() })
+        .map(|x| { x.user_uuid.unwrap().clone() })
+        .collect();
+
+    Ok(HttpResponse::Ok().json(ValorantUserAccessibleVodOutput{
+        vods,
+        user_mapping: HashMap::from_iter(app.get_puuids_in_valorant_match_from_user_uuids(&data.match_id, &user_uuids).await?)
+    }))
 }

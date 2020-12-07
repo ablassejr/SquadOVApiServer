@@ -29,6 +29,28 @@ impl api::ApiApplication {
             .fetch_optional(&*self.pool)
             .await?)
     }
+
+    pub async fn find_accessible_vods_in_match_for_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<super::VodAssociation>, squadov_common::SquadOvError> {
+        Ok(sqlx::query_as!(
+            super::VodAssociation,
+            "
+            SELECT DISTINCT v.*
+            FROM squadov.vods AS v
+            INNER JOIN squadov.users AS u
+                ON u.uuid = v.user_uuid
+            LEFT JOIN squadov.squad_role_assignments AS sra
+                ON sra.user_id = u.id
+            LEFT JOIN squadov.squad_role_assignments AS ora
+                ON ora.squad_id = sra.squad_id
+            WHERE v.match_uuid = $1 
+                AND (u.id = $2 OR ora.user_id = $2)
+            ",
+            match_uuid,
+            user_id,
+        )
+            .fetch_all(&*self.pool)
+            .await?)
+    }
 }
 
 pub async fn find_vod_from_match_user_id_handler(data : web::Path<VodMatchFindFromMatchUserId>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, squadov_common::SquadOvError> {

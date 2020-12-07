@@ -47,15 +47,18 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn reserve_vod_uuid(&self, vod_uuid: &Uuid) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn reserve_vod_uuid(&self, vod_uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
         let mut tx = self.pool.begin().await?;
 
         sqlx::query!(
             "
-            INSERT INTO squadov.vods (video_uuid)
-            VALUES ($1)
+            INSERT INTO squadov.vods (video_uuid, user_uuid)
+            SELECT $1, u.uuid
+            FROM squadov.users AS u
+            WHERE u.id = $2
             ",
-            vod_uuid
+            vod_uuid,
+            user_id,
         )
             .execute(&mut tx)
             .await?;
@@ -141,10 +144,16 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
     return Ok(HttpResponse::Ok().finish());
 }
 
-pub async fn create_vod_destination_handler(data : web::Json<VodCreateDestinationUriInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, squadov_common::SquadOvError> {
+pub async fn create_vod_destination_handler(data : web::Json<VodCreateDestinationUriInput>, app : web::Data<Arc<api::ApiApplication>>, request: HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
     // First we need to make sure this vod UUID is available in the database before
     // giving the user a path to upload the file.
-    app.reserve_vod_uuid(&data.video_uuid).await?;
+    let extensions = request.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(x) => x,
+        None => return Err(squadov_common::SquadOvError::BadRequest)
+    };
+    
+    app.reserve_vod_uuid(&data.video_uuid, session.user.id).await?;
 
     let path = app.vod.get_segment_upload_uri(&squadov_common::VodSegmentId{
         video_uuid: data.video_uuid.clone(),
