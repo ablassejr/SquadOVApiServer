@@ -213,6 +213,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                     }))
                                                 .route("", web::get().to(v1::get_hearthstone_match_handler))
                                                 .route("/logs", web::get().to(v1::get_hearthstone_match_logs_handler))
+                                                .route("/vods", web::get().to(v1::get_hearthstone_match_user_accessible_vod_handler))
                                         )
                                 )
                                 .service(

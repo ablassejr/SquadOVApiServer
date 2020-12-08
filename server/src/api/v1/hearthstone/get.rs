@@ -3,11 +3,13 @@ use squadov_common::hearthstone::{HearthstonePlayer, HearthstonePlayerMedalInfo,
 use squadov_common::hearthstone::game_state::{HearthstoneGameBlock, HearthstoneGameSnapshot, HearthstoneGameSnapshotAuxData, HearthstoneGameAction, HearthstoneEntity, game_step::GameStep};
 use squadov_common::hearthstone::game_packet::{HearthstoneMatchMetadata, HearthstoneGamePacket, HearthstoneSerializedGameLog};
 use crate::api;
+use crate::api::v1::VodAssociation;
 use actix_web::{web, HttpResponse};
 use std::sync::Arc;
 use uuid::Uuid;
 use std::convert::TryFrom;
 use std::collections::HashMap;
+use serde::Serialize;
 
 impl api::ApiApplication {
     pub async fn get_player_hero_entity_from_hearthstone_snapshot(&self, snapshot_uuid: &Uuid, user_id: i64) -> Result<HearthstoneEntity, SquadOvError> {
@@ -26,10 +28,14 @@ impl api::ApiApplication {
                 ON pm.player_id = hmp.player_match_id AND pm.snapshot_id = hs.snapshot_id
             INNER JOIN squadov.hearthstone_snapshots_entities AS hse
                 ON hse.snapshot_id = hs.snapshot_id
+            INNER JOIN squadov.hearthstone_match_metadata AS hmm
+                ON hmm.view_uuid = hmv.view_uuid
             WHERE hse.snapshot_id = $1
                 AND hmp.user_id = $2
                 AND (hse.tags->>'CONTROLLER')::INTEGER = pm.player_id
                 AND (hse.tags->>'CARDTYPE') = 'HERO'
+                AND ((hse.tags->>'ZONE') = 'PLAY' OR (hse.tags->>'ZONE') = 'GRAVEYARD')
+                AND ((hmm.game_type = 23 AND (hse.tags->>'PLAYER_ID') IS NOT NULL) OR hmm.game_type != 23) 
             ORDER BY hse.entity_id ASC
             ",
             snapshot_uuid,
@@ -366,6 +372,23 @@ impl api::ApiApplication {
                 .await?
         })
     }
+
+    pub async fn get_hearthstone_match_hero_cards_for_user_uuids(&self, match_uuid: &Uuid, view_user_ids: &[i64]) -> Result<HashMap<i64, String>, SquadOvError> {
+        // It's tempting to write a single SQL query to grab this info but I don't think it's worth the complexity versus just using what already exists.
+        let mut user_id_to_hero_card : HashMap<i64, String> = HashMap::new();
+        for uid in view_user_ids {
+            let snapshot_ids = self.get_hearthstone_snapshots_for_match(match_uuid, *uid).await?;
+            let latest_snapshot = match snapshot_ids.last() {
+                Some(x) => x,
+                None => return Err(SquadOvError::NotFound)
+            };
+
+            let entity = self.get_player_hero_entity_from_hearthstone_snapshot(&latest_snapshot, *uid).await?;
+            user_id_to_hero_card.insert(*uid, entity.card_id().unwrap_or(String::from("<UNKNOWN>")));
+        }
+
+        Ok(user_id_to_hero_card)
+    }
 }
 
 pub async fn get_hearthstone_match_handler(path : web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
@@ -376,4 +399,34 @@ pub async fn get_hearthstone_match_handler(path : web::Path<super::HearthstoneMa
 pub async fn get_hearthstone_match_logs_handler(path : web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
     let logs = app.get_hearthstone_match_logs_for_user(&path.match_uuid, path.user_id).await?;
     Ok(HttpResponse::Ok().json(&logs))
+}
+
+#[derive(Serialize)]
+struct HearthstoneUserAccessibleVodOutput {
+    pub vods: Vec<VodAssociation>,
+    #[serde(rename="userToHero")]
+    pub user_to_hero: HashMap<i64, String>,
+    #[serde(rename="userToId")]
+    pub user_to_id: HashMap<Uuid, i64>,
+}
+
+
+pub async fn get_hearthstone_match_user_accessible_vod_handler(data: web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, squadov_common::SquadOvError> {
+    let vods = app.find_accessible_vods_in_match_for_user(&data.match_uuid, data.user_id).await?;
+
+    let user_uuids: Vec<Uuid> = vods.iter()
+        .filter(|x| { x.user_uuid.is_some() })
+        .map(|x| { x.user_uuid.unwrap().clone() })
+        .collect();
+
+    let user_uuid_to_id = app.get_user_uuid_to_user_id_map(&user_uuids).await?;
+    let user_ids: Vec<i64> = user_uuids.iter().map(|x| { user_uuid_to_id.get(x).cloned().unwrap_or(-1) }).filter(|x| { *x != -1 }).collect();
+
+    // We need to tell the user the hero card for each VOD so the UI knows what to display (note that we can identify VODs uniquely by user uuid at this point).
+    // Additionally, need to match the user UUID to user ID since the UI generally works with user IDs instead of user UUIDs.
+    Ok(HttpResponse::Ok().json(HearthstoneUserAccessibleVodOutput{
+        vods,
+        user_to_hero: app.get_hearthstone_match_hero_cards_for_user_uuids(&data.match_uuid, &user_ids).await?,
+        user_to_id: user_uuid_to_id,
+    }))
 }
