@@ -1,0 +1,2 @@
+ALTER TABLE hearthstone_match_players
+ADD CONSTRAINT hearthstone_match_players_view_uuid_player_match_id_key UNIQUE(view_uuid, player_match_id);

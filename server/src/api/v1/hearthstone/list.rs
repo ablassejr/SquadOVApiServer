@@ -27,10 +27,12 @@ impl api::ApiApplication {
             "
             SELECT hm.match_uuid
             FROM squadov.hearthstone_matches AS hm
+            INNER JOIN squadov.hearthstone_match_view AS hmv
+                ON hmv.match_uuid = hm.match_uuid
             INNER JOIN squadov.hearthstone_match_players AS hmp
-                ON hmp.match_uuid = hm.match_uuid
+                ON hmp.view_uuid = hmv.view_uuid
             INNER JOIN squadov.hearthstone_match_metadata AS hmm
-                ON hmm.match_uuid = hm.match_uuid
+                ON hmm.view_uuid = hmv.view_uuid
             WHERE hmp.user_id = $1
                 AND hmm.game_type = any($4)
             ORDER BY hm.id DESC

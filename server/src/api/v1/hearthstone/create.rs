@@ -94,11 +94,35 @@ impl api::ApiApplication {
         Ok(current_match.uuid)
     }
 
-    pub async fn store_hearthstone_player_medal_info(&self, tx : &mut Transaction<'_, Postgres>, player_match_id: i32, match_uuid: &Uuid, info: &hearthstone::HearthstoneMedalInfo, is_standard: bool) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn create_hearthstone_match_view(&self,  tx : &mut Transaction<'_, Postgres>, match_uuid: &Uuid, user_id: i64) -> Result<Uuid, squadov_common::SquadOvError> {
+        let view_uuid = Uuid::new_v4();
+        sqlx::query!(
+            "
+            INSERT INTO squadov.hearthstone_match_view (
+                view_uuid,
+                match_uuid,
+                user_id
+            )
+            VALUES (
+                $1,
+                $2,
+                $3
+            )
+            ",
+            &view_uuid,
+            match_uuid,
+            user_id,
+        )
+            .execute(tx)
+            .await?;
+        Ok(view_uuid)
+    }
+
+    pub async fn store_hearthstone_player_medal_info(&self, tx : &mut Transaction<'_, Postgres>, player_match_id: i32, view_uuid: &Uuid, info: &hearthstone::HearthstoneMedalInfo, is_standard: bool) -> Result<(), squadov_common::SquadOvError> {
         sqlx::query!(
             "
             INSERT INTO squadov.hearthstone_match_player_medals (
-                match_uuid,
+                view_uuid,
                 player_match_id,
                 league_id,
                 earned_stars,
@@ -121,7 +145,7 @@ impl api::ApiApplication {
             )
             ON CONFLICT DO NOTHING
             ",
-            match_uuid,
+            view_uuid,
             player_match_id,
             info.league_id,
             info.earned_stars,
@@ -136,13 +160,13 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_match_player(&self, tx : &mut Transaction<'_, Postgres>, player_match_id: i32, player: &hearthstone::HearthstonePlayer, match_uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn store_hearthstone_match_player(&self, tx : &mut Transaction<'_, Postgres>, player_match_id: i32, player: &hearthstone::HearthstonePlayer, view_uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
         tx.execute(
             sqlx::query!(
                 "
                 INSERT INTO squadov.hearthstone_match_players (
                     user_id,
-                    match_uuid,
+                    view_uuid,
                     player_match_id,
                     player_name,
                     card_back_id,
@@ -168,7 +192,7 @@ impl api::ApiApplication {
                     $11,
                     $12
                 )
-                ON CONFLICT (match_uuid, player_match_id) DO UPDATE SET
+                ON CONFLICT (view_uuid, player_match_id) DO UPDATE SET
                     user_id = COALESCE(squadov.hearthstone_match_players.user_id, EXCLUDED.user_id),
                     arena_wins = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.arena_wins
                                       ELSE squadov.hearthstone_match_players.arena_wins END,
@@ -192,7 +216,7 @@ impl api::ApiApplication {
                 } else {
                     None
                 },
-                match_uuid,
+                view_uuid,
                 player_match_id,
                 player.name,
                 player.card_back_id,
@@ -206,8 +230,8 @@ impl api::ApiApplication {
             )
         ).await?;
 
-        self.store_hearthstone_player_medal_info(tx, player_match_id, match_uuid, &player.medal_info.standard, true).await?;
-        self.store_hearthstone_player_medal_info(tx, player_match_id, match_uuid, &player.medal_info.wild, false).await?;
+        self.store_hearthstone_player_medal_info(tx, player_match_id, view_uuid, &player.medal_info.standard, true).await?;
+        self.store_hearthstone_player_medal_info(tx, player_match_id, view_uuid, &player.medal_info.wild, false).await?;
         Ok(())
     }
 
@@ -238,25 +262,27 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_match_metadata(&self, tx : &mut Transaction<'_, Postgres>, st: &HearthstoneGameState, uuid: &Uuid) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn store_hearthstone_match_metadata(&self, tx : &mut Transaction<'_, Postgres>, st: &HearthstoneGameState, uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
         sqlx::query!(
             "
             INSERT INTO squadov.hearthstone_match_metadata (
-                match_uuid,
+                view_uuid,
                 game_type,
                 format_type,
                 scenario_id,
                 match_winner_player_id
             )
-            VALUES (
-                $1,
-                $2,
+            SELECT
+                hmv.view_uuid,
                 $3,
                 $4,
-                $5
-            )
+                $5,
+                $6
+            FROM squadov.hearthstone_match_view AS hmv
+            WHERE hmv.match_uuid = $1 AND hmv.user_id = $2
             ",
             uuid,
+            user_id,
             st.game_type as i32,
             st.format_type as i32,
             st.scenario_id,
@@ -582,7 +608,7 @@ impl api::ApiApplication {
 
         {
             let state = parser.read()?.state.clone();
-            self.store_hearthstone_match_metadata(&mut tx, &state, match_uuid).await?;
+            self.store_hearthstone_match_metadata(&mut tx, &state, match_uuid, user_id).await?;
         }
 
         {
@@ -614,7 +640,14 @@ pub struct CreateHearthstoneMatchPathInput {
 
 pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstoneMatchInput>, app : web::Data<Arc<api::ApiApplication>>, path: web::Path<CreateHearthstoneMatchPathInput>) -> Result<HttpResponse, squadov_common::SquadOvError> {
     let mut tx = app.pool.begin().await?;
-    let uuid = app.create_hearthstone_match(&mut tx, &data.timestamp, &data.info).await?;
+    let match_uuid = app.create_hearthstone_match(&mut tx, &data.timestamp, &data.info).await?;
+
+    // Need to also create a VIEW associated with this match. As the data is collected by each user locally
+    // and not by a singular central source, we have to assume that each view may have some conflicting data.
+    // Thus, all data is generally associated with a match view and we use the match only as a way to allow
+    // users to see different views (assuming they have permissions to do so).
+    let view_uuid = app.create_hearthstone_match_view(&mut tx, &match_uuid, path.user_id).await?;
+
     match &data.deck {
         Some(x) => {
             // store_hearthstone_deck MUST be called before associate_deck_with_match_user because
@@ -623,7 +656,7 @@ pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstone
             // store_hearthstone_deck, it'll be possible for us to associate an older version of the deck
             // with the match incorrectly.
             app.store_hearthstone_deck(&mut tx, &x, path.user_id).await?;
-            app.associate_deck_with_match_user(&mut tx, x.deck_id, &uuid, path.user_id).await?;
+            app.associate_deck_with_match_user(&mut tx, x.deck_id, &match_uuid, path.user_id).await?;
         },
         None => (),
     };
@@ -631,11 +664,14 @@ pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstone
     // Handle each player separately instead of batching for ease of us. There's only 2 players in any
     // given call anyway so it's not too expensive.
     for (player_id, player) in &data.players {
-        app.store_hearthstone_match_player(&mut tx, *player_id, &player, &uuid, path.user_id).await?;
+        app.store_hearthstone_match_player(&mut tx, *player_id, &player, &view_uuid, path.user_id).await?;
     }
     
     tx.commit().await?;
-    Ok(HttpResponse::Ok().json(&uuid))
+
+    // We don't need to send the view_uuid back to the user since the combination of the match_uuid
+    // along with the given user id is enough to identify the view.
+    Ok(HttpResponse::Ok().json(&match_uuid))
 }
 
 // Note that we don't parse directly into the expected data structures immediately as that can happen in an async thread so we can return to the user faster.

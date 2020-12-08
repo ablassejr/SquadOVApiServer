@@ -79,14 +79,16 @@ impl api::ApiApplication {
             WITH duel_matches AS (
                 SELECT hmm.*
                 FROM squadov.hearthstone_match_metadata AS hmm
+                INNER JOIN squadov.hearthstone_match_view AS hmv
+                    ON hmv.view_uuid = hmm.view_uuid
                 INNER JOIN squadov.match_to_match_collection AS mmc
-                    ON mmc.match_uuid = hmm.match_uuid
-                WHERE mmc.collection_uuid = $1
+                    ON mmc.match_uuid = hmv.match_uuid
+                WHERE mmc.collection_uuid = $1 AND hmv.user_id = $2
             ), duel_ratings AS (
                 SELECT MAX(duels_casual_rating) AS "casual", MAX(duels_heroic_rating) AS "heroic"
                 FROM duel_matches AS dm
                 INNER JOIN squadov.hearthstone_match_players AS hmp
-                    ON hmp.match_uuid = dm.match_uuid
+                    ON hmp.view_uuid = dm.view_uuid
                 WHERE hmp.user_id = $2
                 GROUP BY hmp.user_id
             )
@@ -95,17 +97,17 @@ impl api::ApiApplication {
                 deck_id,
                 creation_time AS "timestamp",
                 (
-                    SELECT COUNT(dm.match_uuid)
+                    SELECT COUNT(dm.view_uuid)
                     FROM duel_matches AS dm
                     INNER JOIN squadov.hearthstone_match_players AS hmp
-                        ON hmp.match_uuid = dm.match_uuid AND hmp.player_match_id = dm.match_winner_player_id
+                        ON hmp.view_uuid = dm.view_uuid AND hmp.player_match_id = dm.match_winner_player_id
                     WHERE hmp.user_id = $2
                 ) AS "wins!",
                 (
-                    SELECT COUNT(dm.match_uuid)
+                    SELECT COUNT(dm.view_uuid)
                     FROM duel_matches AS dm
                     INNER JOIN squadov.hearthstone_match_players AS hmp
-                        ON hmp.match_uuid = dm.match_uuid AND hmp.player_match_id = dm.match_winner_player_id
+                        ON hmp.view_uuid = dm.view_uuid AND hmp.player_match_id = dm.match_winner_player_id
                     WHERE hmp.user_id != $2
                 ) AS "loss!",
                 (
@@ -122,7 +124,7 @@ impl api::ApiApplication {
                     SELECT DISTINCT hmm.game_type
                     FROM duel_matches AS dm
                     INNER JOIN squadov.hearthstone_match_metadata AS hmm
-                        ON hmm.match_uuid = dm.match_uuid
+                        ON hmm.view_uuid = dm.view_uuid
                     LIMIT 1
                 ) AS "game_type!"
             FROM squadov.hearthstone_duels

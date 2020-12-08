@@ -18,8 +18,10 @@ impl api::ApiApplication {
                 hse.tags,
                 hse.attributes
             FROM squadov.hearthstone_snapshots AS hs
+            INNER JOIN squadov.hearthstone_match_view AS hmv
+                ON hmv.match_uuid = hs.match_uuid AND hmv.user_id = hs.user_id
             INNER JOIN squadov.hearthstone_match_players AS hmp
-                ON hmp.match_uuid = hs.match_uuid
+                ON hmp.view_uuid = hmv.view_uuid
             INNER JOIN squadov.hearthstone_snapshots_player_map AS pm
                 ON pm.player_id = hmp.player_match_id AND pm.snapshot_id = hs.snapshot_id
             INNER JOIN squadov.hearthstone_snapshots_entities AS hse
@@ -122,21 +124,24 @@ impl api::ApiApplication {
         let raw_match_players = sqlx::query!(
             "
             SELECT
-                user_id,
-                player_match_id,
-                player_name,
-                card_back_id,
-                arena_wins,
-                arena_loss,
-                tavern_brawl_wins,
-                tavern_brawl_loss,
-                battlegrounds_rating,
-                duels_casual_rating,
-                duels_heroic_rating
-            FROM squadov.hearthstone_match_players
-            WHERE match_uuid = $1
+                hmp.user_id,
+                hmp.player_match_id,
+                hmp.player_name,
+                hmp.card_back_id,
+                hmp.arena_wins,
+                hmp.arena_loss,
+                hmp.tavern_brawl_wins,
+                hmp.tavern_brawl_loss,
+                hmp.battlegrounds_rating,
+                hmp.duels_casual_rating,
+                hmp.duels_heroic_rating
+            FROM squadov.hearthstone_match_players AS hmp
+            INNER JOIN squadov.hearthstone_match_view AS hmv
+                ON hmv.view_uuid = hmp.view_uuid
+            WHERE hmv.match_uuid = $1 AND hmv.user_id = $2
             ",
-            match_uuid
+            match_uuid,
+            user_id
         )
             .fetch_all(&*self.pool)
             .await?;
@@ -144,18 +149,21 @@ impl api::ApiApplication {
         let raw_match_player_medals = sqlx::query!(
             "
             SELECT
-                player_match_id,
-                league_id,
-                earned_stars,
-                star_level,
-                best_star_level,
-                win_streak,
-                legend_index,
-                is_standard
-            FROM squadov.hearthstone_match_player_medals
-            WHERE match_uuid = $1
+                hmpm.player_match_id,
+                hmpm.league_id,
+                hmpm.earned_stars,
+                hmpm.star_level,
+                hmpm.best_star_level,
+                hmpm.win_streak,
+                hmpm.legend_index,
+                hmpm.is_standard
+            FROM squadov.hearthstone_match_player_medals AS hmpm
+            INNER JOIN squadov.hearthstone_match_view AS hmv
+                ON hmv.view_uuid = hmpm.view_uuid
+            WHERE hmv.match_uuid = $1 AND hmv.user_id = $2
             ",
-            match_uuid
+            match_uuid,
+            user_id
         )
             .fetch_all(&*self.pool)
             .await?;
@@ -242,11 +250,14 @@ impl api::ApiApplication {
                     LIMIT 1
                 )), 0) AS \"elapsed_seconds!\"
             FROM squadov.hearthstone_matches AS hm
+            INNER JOIN squadov.hearthstone_match_view AS hmv
+                ON hmv.match_uuid = hm.match_uuid
             INNER JOIN squadov.hearthstone_match_metadata AS hmm
-                ON hmm.match_uuid = hm.match_uuid
-            WHERE hm.match_uuid = $1
+                ON hmm.view_uuid = hmv.view_uuid
+            WHERE hm.match_uuid = $1 AND hmv.user_id = $2
             ",
-            match_uuid
+            match_uuid,
+            user_id,
         )
             .fetch_one(&*self.pool)
             .await?;
@@ -283,9 +294,11 @@ impl api::ApiApplication {
             SELECT true
             FROM squadov.hearthstone_match_metadata AS hmm
             INNER JOIN squadov.hearthstone_match_players AS hmp
-                ON hmp.match_uuid = hmm.match_uuid AND hmm.match_winner_player_id = hmp.player_match_id
-            WHERE hmm.match_uuid = $1
-                AND hmp.user_id = $2
+                ON hmp.view_uuid = hmm.view_uuid AND hmm.match_winner_player_id = hmp.player_match_id
+            INNER JOIN squadov.hearthstone_match_view AS hmv
+                ON hmv.view_uuid = hmp.view_uuid
+            WHERE hmv.match_uuid = $1
+                AND hmv.user_id = $2
             ",
         )
             .bind(match_uuid)
