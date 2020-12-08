@@ -1,0 +1,9 @@
+ALTER TABLE hearthstone_match_metadata
+ADD CONSTRAINT hearthstone_match_metadata_view_uuid_key UNIQUE(view_uuid);
+
+ALTER TABLE hearthstone_blocks
+ADD CONSTRAINT hearthstone_blocks_match_uuid_user_id_fkey FOREIGN KEY (match_uuid, user_id) REFERENCES hearthstone_match_view(match_uuid, user_id) ON DELETE CASCADE;
+
+ALTER TABLE hearthstone_match_action_blobs
+DROP CONSTRAINT hearthstone_match_action_blobs_match_uuid_key,
+ADD CONSTRAINT hearthstone_match_action_blobs_match_uuid_user_id_key UNIQUE(match_uuid, user_id);

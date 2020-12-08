@@ -600,6 +600,7 @@ impl api::ApiApplication {
         let mut tx = self.pool.begin().await?;
         let parser = Arc::new(RwLock::new(HearthstonePowerLogParser::new(false)));
 
+        log::info!("Parse Hearthstone Game Logs");
         // This needs to be a match otherwise Rustc gives us an type annotations needed error?
         match parser.write()?.parse(&data) {
             Ok(_) => (),
@@ -607,11 +608,13 @@ impl api::ApiApplication {
         };
 
         {
+            log::info!("Store Hearthstone Match Metadata");
             let state = parser.read()?.state.clone();
             self.store_hearthstone_match_metadata(&mut tx, &state, match_uuid, user_id).await?;
         }
 
         {
+            log::info!("Store Arena/Duel Match");
             // If the match is for the Arena then we must associate the match with the right match collection
             // using the stored deck ID. If the match is for Duels then we must either associate the match with
             // an already created Duels run or create a new match collection using the current deck's ID.
@@ -625,6 +628,7 @@ impl api::ApiApplication {
         }
 
         {
+            log::info!("Store Game Log");
             let game = parser.read()?.fsm.game.clone();
             self.store_hearthstone_match_game_log(&mut tx, game, match_uuid, user_id).await?;
         }
