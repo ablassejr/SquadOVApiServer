@@ -341,7 +341,7 @@ impl api::ApiApplication {
         match_data.teams = self.get_valorant_match_teams(match_id).await?;
         match_data.players = self.get_valorant_match_players(match_id).await?;
         match_data.rounds = self.get_valorant_match_rounds(match_id).await?;
-        match_data.kills = self.get_valorant_match_kills(match_id).await?;
+        match_data.kills = Some(self.get_valorant_match_kills(match_id).await?);
         Ok(match_data)
     }
 

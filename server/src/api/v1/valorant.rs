@@ -162,7 +162,7 @@ pub struct FullValorantMatchData {
     pub players: Vec<ValorantMatchPlayerData>,
     #[serde(rename = "roundResults")]
     pub rounds: Vec<ValorantMatchRoundData>,
-    pub kills: Vec<ValorantMatchKillData>,
+    pub kills: Option<Vec<ValorantMatchKillData>>,
     #[serde(rename = "rawData", default)]
     pub raw_data: serde_json::Value
 }
@@ -177,7 +177,7 @@ impl Default for FullValorantMatchData {
             teams: Vec::new(),
             players: Vec::new(),
             rounds: Vec::new(),
-            kills: Vec::new(),
+            kills: None,
             raw_data: serde_json::Value::Null,
         }
     }

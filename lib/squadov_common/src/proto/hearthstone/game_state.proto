@@ -1,0 +1,40 @@
+syntax = "proto3";
+package squadov.hearthstone.game_state;
+
+message HearthstoneSerializedGameSnapshotAuxData {
+    int32 current_turn = 1;
+    int32 step = 2;
+    int32 current_player_id = 3;
+    uint64 last_action_index = 4;
+}
+
+message HearthstoneSerializedEntity {
+    int32 entity_id = 1;
+    string tags = 2;
+    string attributes = 3;
+}
+
+message HearthstoneSerializedGameSnapshot {
+    string uuid = 1;
+    int64 tm = 2;
+    int32 game_entity_id = 3;
+    map<string, int32> player_name_to_player_id = 4;
+    map<int32, int32> player_id_to_entity_id = 5;
+    map<int32, HearthstoneSerializedEntity> entities = 6;
+    HearthstoneSerializedGameSnapshotAuxData aux_data = 7;
+}
+
+message HearthstoneSerializedGameBlock {
+    string block_id = 1;
+    int32 start_action_index = 2;
+    int32 end_action_index = 3;
+    int32 block_type = 4;
+    string parent_block = 5;
+    int32 entity_id = 6;
+}
+
+message HearthstoneSerializedGameLog{
+    repeated HearthstoneSerializedGameSnapshot snapshots = 1;
+    string actions = 2;
+    repeated HearthstoneSerializedGameBlock blocks = 3;
+}

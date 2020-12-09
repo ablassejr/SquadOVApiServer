@@ -1,7 +1,15 @@
 use squadov_common::SquadOvError;
 use squadov_common::hearthstone::{HearthstonePlayer, HearthstonePlayerMedalInfo, FormatType, GameType};
-use squadov_common::hearthstone::game_state::{HearthstoneGameBlock, HearthstoneGameSnapshot, HearthstoneGameSnapshotAuxData, HearthstoneGameAction, HearthstoneEntity, game_step::GameStep};
-use squadov_common::hearthstone::game_packet::{HearthstoneMatchMetadata, HearthstoneGamePacket, HearthstoneSerializedGameLog};
+use squadov_common::hearthstone::game_state::{
+    HearthstoneGameSnapshot,
+    HearthstoneGameSnapshotAuxData,
+    HearthstoneEntity,
+    game_step::GameStep
+};
+use squadov_common::hearthstone::game_packet::{
+    HearthstoneMatchMetadata,
+    HearthstoneGamePacket,
+};
 use crate::api;
 use crate::api::v1::VodAssociation;
 use actix_web::{web, HttpResponse};
@@ -9,7 +17,16 @@ use std::sync::Arc;
 use uuid::Uuid;
 use std::convert::TryFrom;
 use std::collections::HashMap;
+use std::iter::FromIterator;
 use serde::Serialize;
+use squadov_common::proto::{
+    HearthstoneSerializedGameSnapshot,
+    HearthstoneSerializedEntity,
+    HearthstoneSerializedGameSnapshotAuxData,
+    HearthstoneSerializedGameBlock,
+    HearthstoneSerializedGameLog
+};
+use prost::Message;
 
 impl api::ApiApplication {
     pub async fn get_player_hero_entity_from_hearthstone_snapshot(&self, snapshot_uuid: &Uuid, user_id: i64) -> Result<HearthstoneEntity, SquadOvError> {
@@ -124,6 +141,112 @@ impl api::ApiApplication {
         }
 
         Ok(snapshot)
+    }
+
+    pub async fn get_bulk_hearthstone_serialized_snapshots(&self, snapshot_uuids: &[Uuid]) -> Result<Vec<HearthstoneSerializedGameSnapshot>, SquadOvError> {
+        let mut all_snapshots: HashMap<Uuid, HearthstoneSerializedGameSnapshot> = HashMap::from_iter(sqlx::query!(
+            "
+            SELECT
+                tm,
+                game_entity_id,
+                current_turn,
+                step,
+                current_player_id,
+                last_action_id,
+                snapshot_id
+            FROM squadov.hearthstone_snapshots
+            WHERE snapshot_id = any($1)
+            ",
+            snapshot_uuids
+        )
+            .fetch_all(&*self.pool)
+            .await?
+            .into_iter()
+            .map(|x| {
+                (x.snapshot_id.clone(), HearthstoneSerializedGameSnapshot{
+                    uuid: x.snapshot_id.to_string(),
+                    tm: match x.tm {
+                        Some(t) => t.timestamp(),
+                        None => 0,
+                    },
+                    game_entity_id: x.game_entity_id,
+                    aux_data: Some(HearthstoneSerializedGameSnapshotAuxData{
+                        current_turn: x.current_turn,
+                        step: GameStep::try_from(x.step).unwrap_or(GameStep::Invalid) as i32,
+                        current_player_id: x.current_player_id,
+                        last_action_index: x.last_action_id as u64
+                    }),
+                    player_name_to_player_id: HashMap::new(),
+                    player_id_to_entity_id: HashMap::new(),
+                    entities: HashMap::new(),
+                })
+            }));
+
+        let all_players = sqlx::query!(
+            "
+            SELECT 
+                player_name,
+                player_id,
+                entity_id,
+                snapshot_id
+            FROM squadov.hearthstone_snapshots_player_map
+            WHERE snapshot_id = any($1)
+            ",
+            snapshot_uuids
+        )
+            .fetch_all(&*self.pool)
+            .await?;
+
+        for sp in all_players {
+            let snapshot = all_snapshots.get_mut(&sp.snapshot_id);
+            if snapshot.is_none() {
+                continue
+            }
+            let snapshot = snapshot.unwrap();
+            snapshot.player_name_to_player_id.insert(sp.player_name, sp.player_id);
+            snapshot.player_id_to_entity_id.insert(sp.player_id, sp.entity_id);
+        }
+
+        let snapshot_entities = sqlx::query!(
+            r#"
+            SELECT
+                entity_id,
+                tags::VARCHAR AS "tags!",
+                attributes::VARCHAR AS "attributes!",
+                snapshot_id
+            FROM squadov.hearthstone_snapshots_entities
+            WHERE snapshot_id = any($1)
+            "#,
+            snapshot_uuids
+        )
+            .fetch_all(&*self.pool)
+            .await?;
+
+        for se in snapshot_entities {
+            let snapshot = all_snapshots.get_mut(&se.snapshot_id);
+            if snapshot.is_none() {
+                continue
+            }
+            let snapshot = snapshot.unwrap();
+            let entity = HearthstoneSerializedEntity{
+                entity_id: se.entity_id,
+                tags: se.tags,
+                attributes: se.attributes
+            };
+
+            snapshot.entities.insert(se.entity_id, entity);
+        }
+
+        let mut ret_snapshots = all_snapshots
+            .into_iter()
+            .map(|(_k, v)|{ v })
+            .collect::<Vec<HearthstoneSerializedGameSnapshot>>();
+
+        ret_snapshots.sort_by(|a, b| {
+            a.aux_data.as_ref().unwrap().last_action_index.cmp(&b.aux_data.as_ref().unwrap().last_action_index)
+        });
+
+        Ok(ret_snapshots)
     }
 
     pub async fn get_hearthstone_players_for_match(&self, match_uuid: &Uuid, user_id: i64) -> Result<HashMap<i32, HearthstonePlayer>, SquadOvError> {
@@ -328,11 +451,7 @@ impl api::ApiApplication {
             .bind(user_id)
             .fetch_all(&*self.pool)
             .await?;
-
-        let mut snapshots: Vec<HearthstoneGameSnapshot> = Vec::new();
-        for id in snapshot_ids {
-            snapshots.push(self.get_hearthstone_snapshot(&id).await?);
-        }
+        let snapshots: Vec<HearthstoneSerializedGameSnapshot> = self.get_bulk_hearthstone_serialized_snapshots(&snapshot_ids).await?;
 
         let action_blob_uuid: Uuid = sqlx::query_scalar(
             "
@@ -346,30 +465,45 @@ impl api::ApiApplication {
             .fetch_one(&*self.pool)
             .await?;
 
-        let raw_actions = self.blob.get_json_blob(&action_blob_uuid).await?;
-        let actions : Vec<HearthstoneGameAction> = serde_json::from_value(raw_actions)?;
+        let raw_actions = self.blob.get_blob(&action_blob_uuid).await?;
+        let blocks: Vec<HearthstoneSerializedGameBlock> = sqlx::query!(
+            r#"
+            SELECT 
+                block_id,
+                start_action_index,
+                end_action_index,
+                block_type,
+                parent_block,
+                entity_id
+            FROM squadov.hearthstone_blocks
+            WHERE match_uuid = $1
+                AND user_id = $2
+            ORDER BY end_action_index ASC
+            "#,
+            match_uuid,
+            user_id
+        )
+            .fetch_all(&*self.pool)
+            .await?
+            .into_iter()
+            .map(|x| {
+                HearthstoneSerializedGameBlock{
+                    block_id: x.block_id.to_string(),
+                    start_action_index: x.start_action_index,
+                    end_action_index: x.end_action_index,
+                    block_type: x.block_type,
+                    parent_block: match x.parent_block {
+                        Some(u) => u.to_string(),
+                        None => String::new(),
+                    },
+                    entity_id: x.entity_id,
+                }
+            })
+            .collect();
         Ok(HearthstoneSerializedGameLog{
             snapshots,
-            actions,
-            blocks: sqlx::query_as::<_,HearthstoneGameBlock>(
-                "
-                SELECT 
-                    block_id,
-                    start_action_index,
-                    end_action_index,
-                    block_type,
-                    parent_block,
-                    entity_id
-                FROM squadov.hearthstone_blocks
-                WHERE match_uuid = $1
-                    AND user_id = $2
-                ORDER BY end_action_index ASC
-                ",
-            )
-                .bind(match_uuid)
-                .bind(user_id)
-                .fetch_all(&*self.pool)
-                .await?
+            actions: String::from(std::str::from_utf8(&raw_actions)?),
+            blocks,
         })
     }
 
@@ -397,8 +531,14 @@ pub async fn get_hearthstone_match_handler(path : web::Path<super::HearthstoneMa
 }
 
 pub async fn get_hearthstone_match_logs_handler(path : web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
+    // The bottleneck in this function is the get_hearthstone_match_logs_for_user function.
+    // Namely the most expensive part is fully the thousands of entities in each snapshot.
     let logs = app.get_hearthstone_match_logs_for_user(&path.match_uuid, path.user_id).await?;
-    Ok(HttpResponse::Ok().json(&logs))
+
+    let mut buf = web::BytesMut::new();
+    logs.encode(&mut buf)?;
+
+    Ok(HttpResponse::Ok().body(buf))
 }
 
 #[derive(Serialize)]

@@ -165,3 +165,9 @@ impl From<actix_web::error::PayloadError> for SquadOvError {
         return Self::InternalError(format!("Payload {}", err))
     }
 }
+
+impl From<prost::EncodeError> for SquadOvError {
+    fn from(err: prost::EncodeError) -> Self {
+        return Self::InternalError(format!("Proto Encode {}", err))
+    }
+}

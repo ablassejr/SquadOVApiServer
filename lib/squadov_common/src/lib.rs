@@ -26,3 +26,7 @@ pub use riot::*;
 
 #[macro_use]
 extern crate lazy_static;
+
+pub mod proto {
+    include!(concat!(env!("OUT_DIR"), "/squadov.hearthstone.game_state.rs"));
+}

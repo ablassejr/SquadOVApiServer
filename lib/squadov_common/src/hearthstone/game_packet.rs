@@ -1,6 +1,6 @@
 use serde::Serialize;
 use chrono::{DateTime, Utc};
-use crate::hearthstone::game_state::{HearthstoneGameBlock, HearthstoneGameSnapshot, HearthstoneGameAction};
+use crate::hearthstone::game_state::{HearthstoneGameSnapshot};
 use crate::hearthstone::{GameType, FormatType, HearthstoneDeck, HearthstonePlayer};
 use uuid::Uuid;
 use std::collections::HashMap;
@@ -19,13 +19,6 @@ pub struct HearthstoneMatchMetadata {
     pub match_time: DateTime<Utc>,
     pub deck: Option<HearthstoneDeck>,
     pub players: HashMap<i32, HearthstonePlayer>
-}
-
-#[derive(Serialize)]
-pub struct HearthstoneSerializedGameLog{
-    pub snapshots: Vec<HearthstoneGameSnapshot>,
-    pub actions: Vec<HearthstoneGameAction>,
-    pub blocks: Vec<HearthstoneGameBlock>
 }
 
 #[derive(Serialize)]

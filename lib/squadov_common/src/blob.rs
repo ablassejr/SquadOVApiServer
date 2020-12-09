@@ -91,7 +91,11 @@ impl BlobManagementClient {
     }
 
     pub async fn get_json_blob(&self, blob_uuid: &Uuid) -> Result<serde_json::Value, crate::SquadOvError> {
+        let timer = std::time::Instant::now();
         let blob = self.get_blob(blob_uuid).await?;
-        Ok(serde_json::from_slice(&blob)?)
+        println!("\tBLOB DOWNLOAD: {:?}", timer.elapsed());
+        let value = serde_json::from_slice(&blob)?;
+        println!("\tJSON FROM SLICE: {:?}", timer.elapsed());
+        Ok(value)
     }
 }

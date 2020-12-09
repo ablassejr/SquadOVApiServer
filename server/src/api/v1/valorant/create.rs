@@ -537,7 +537,10 @@ impl api::ApiApplication {
                 self.insert_valorant_match_teams(tx, match_id, &full_match_data.teams).await?;
                 self.insert_valorant_match_players(tx, match_id, &full_match_data.players).await?;
                 self.insert_valorant_match_rounds(tx, match_id, &full_match_data.rounds).await?;
-                self.insert_valorant_match_kills(tx, match_id, &full_match_data.kills).await?;
+
+                if full_match_data.kills.is_some() {
+                    self.insert_valorant_match_kills(tx, match_id, &full_match_data.kills.unwrap()).await?;
+                }
             }
             None => {
                 sqlx::query!(
