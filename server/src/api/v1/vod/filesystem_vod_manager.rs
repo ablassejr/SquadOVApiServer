@@ -40,6 +40,18 @@ impl v1::VodManager for FilesystemVodManager {
         Ok(String::from(fname.to_str().unwrap_or("")))
     }
 
+    async fn download_vod_to_path(&self, segment: &squadov_common::VodSegmentId, path: &std::path::Path) -> Result<(), squadov_common::SquadOvError> {
+        let fname = self.segment_id_to_path(segment);
+        std::fs::copy(&fname, path)?;
+        Ok(())
+    }
+
+    async fn upload_vod_from_file(&self, segment: &squadov_common::VodSegmentId, path: &std::path::Path) -> Result<(), squadov_common::SquadOvError> {
+        let fname = self.segment_id_to_path(segment);
+        std::fs::copy(path, &fname)?;
+        Ok(())
+    }
+
     async fn get_segment_upload_uri(&self, segment: &squadov_common::VodSegmentId) -> Result<String, squadov_common::SquadOvError> {
         Ok(String::from(self.segment_id_to_path(segment).to_str().unwrap_or("")))
     }

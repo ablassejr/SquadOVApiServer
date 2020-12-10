@@ -171,3 +171,15 @@ impl From<prost::EncodeError> for SquadOvError {
         return Self::InternalError(format!("Proto Encode {}", err))
     }
 }
+
+impl From<std::env::VarError> for SquadOvError {
+    fn from(err: std::env::VarError) -> Self {
+        return Self::InternalError(format!("Env Var {}", err))
+    }
+}
+
+impl<T> From<std::sync::mpsc::SendError<T>> for SquadOvError {
+    fn from(err: std::sync::mpsc::SendError<T>) -> Self {
+        return Self::InternalError(format!("MPSC Send Error {}", err))
+    }
+}

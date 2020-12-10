@@ -1,3 +1,5 @@
+pub mod fastify;
+
 use serde::{Serialize,Deserialize};
 use uuid::Uuid;
 use std::str;
@@ -21,6 +23,8 @@ pub struct VodMetadata {
     pub max_bitrate: i64,
 
     pub id: String,
+    #[serde(skip_serializing)]
+    pub has_fastify: bool,
 }
 
 #[derive(Deserialize,Debug)]

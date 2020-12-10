@@ -16,6 +16,8 @@ use std::sync::Arc;
 struct Options {
     #[structopt(short, long)]
     config: std::path::PathBuf,
+    #[structopt(short, long)]
+    mode: Option<String>,
 }
 
 #[tokio::main]
@@ -28,33 +30,51 @@ async fn main() -> std::io::Result<()> {
     let opts = Options::from_args();
     let raw_cfg = fs::read_to_string(opts.config)?;
     let config : api::ApiConfig = toml::from_str(&raw_cfg).unwrap();
-    let config2 = config.clone();
-
-    let local = tokio::task::LocalSet::new();
-    let sys = actix_rt::System::run_in_tokio("server", &local);
     let app = Arc::new(api::ApiApplication::new(&config).await);
+
+    // A hacky way of doing things related to api::ApiApplication...
+    if opts.mode.is_some() {
+        let mode = opts.mode.unwrap();
+        if mode == "vod_fastify" {
+            let vods = app.find_vods_without_fastify().await.unwrap();
+            for v in vods {
+                log::info!("Enqueue job: {}", &v);
+                app.vod_fastify_jobs.enqueue(api::v1::VodFastifyJob{
+                    video_uuid: v,
+                    app: app.clone(), 
+                }).unwrap();
+            }
+        } else {
+            log::error!("Invalid mode: {}", &mode);
+        }
+        Ok(())
+    } else {
+        let local = tokio::task::LocalSet::new();
+        let sys = actix_rt::System::run_in_tokio("server", &local);
+        let config2 = config.clone();
         
-    // The API service is primarily used for dealing with API calls.actix_web
-    // We're not going to have a web-based interface at the moment (only going to be desktop client-based)
-    // so this server doesn't have to serve javascript or the like.
-    let res = HttpServer::new(move || {
-        App::new()
-            .wrap(Compress::default())
-            .wrap(
-                Cors::new()
-                    .allowed_origin(&config.cors.domain)
-                    .allowed_origin("http://127.0.0.1:8080")
-                    .allowed_methods(vec!["GET", "POST", "OPTIONS"])
-                    .finish()
-            )
-            .wrap(Logger::default())
-            .app_data(web::Data::new(app.clone()))
-            .service(api_service::create_service(config.server.graphql_debug))
-        })
-        .server_hostname(&config2.server.domain)
-        .bind("0.0.0.0:8080")?
-        .run()
-        .await?;
-    sys.await?;
-    Ok(res)
+        // The API service is primarily used for dealing with API calls.actix_web
+        // We're not going to have a web-based interface at the moment (only going to be desktop client-based)
+        // so this server doesn't have to serve javascript or the like.
+        let res = HttpServer::new(move || {
+            App::new()
+                .wrap(Compress::default())
+                .wrap(
+                    Cors::new()
+                        .allowed_origin(&config.cors.domain)
+                        .allowed_origin("http://127.0.0.1:8080")
+                        .allowed_methods(vec!["GET", "POST", "OPTIONS"])
+                        .finish()
+                )
+                .wrap(Logger::default())
+                .app_data(web::Data::new(app.clone()))
+                .service(api_service::create_service(config.server.graphql_debug))
+            })
+            .server_hostname(&config2.server.domain)
+            .bind("0.0.0.0:8080")?
+            .run()
+            .await?;
+        sys.await?;
+        Ok(res)
+    }
 }

@@ -61,14 +61,22 @@ impl super::GCSClient {
         Ok(resp.bytes().await?.into_iter().collect())
     }
 
-    pub async fn upload_object(&self, bucket_id: &str, path: &str, data: &[u8]) -> Result<(), SquadOvError> {
+    pub async fn upload_object(&self, bucket_id: &str, path_parts: &Vec<String>, data: &[u8]) -> Result<(), SquadOvError> {
         let mut backoff_tick = 0;
         let mut status = None;
         let mut body = None;
 
+        let path = path_parts
+            .iter()
+            .map(|x| {
+                crate::url_encode(x)
+            })
+            .collect::<Vec<String>>()
+            .join("/");
+
         let mut i: i32 = 0;
         while i < 10 {
-            log::info!("Trying to GCS Upload Object: {}", i);
+            log::info!("Trying to GCS Upload Object: {} - {} - {}", i, bucket_id, &path);
             let client = self.http.read()?.create_http_client()?;
             let boundary = "squadov_gcs";
             let mut send_data: Vec<String> = Vec::new();
@@ -83,7 +91,7 @@ impl super::GCSClient {
             let metadata = GCSObjectMetadata{
                 crc32c: base64::encode(crc32c_bytes),
                 md5_hash: format!("{:x}", md5::compute(data)),
-                name: crate::url_encode(path),
+                name: path.clone(),
             };
             send_data.push(serde_json::to_string_pretty(&metadata)?);
 

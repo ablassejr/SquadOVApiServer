@@ -12,6 +12,18 @@ pub struct VodMatchFindFromMatchUserId {
 }
 
 impl api::ApiApplication {
+    pub async fn find_vods_without_fastify(&self) -> Result<Vec<Uuid>, squadov_common::SquadOvError> {
+        Ok(sqlx::query_scalar(
+            "
+            SELECT video_uuid
+            FROM squadov.vod_metadata
+            WHERE has_fastify = false
+            "
+        )
+            .fetch_all(&*self.pool)
+            .await?)
+    }
+
     pub async fn find_vod_from_match_user_id(&self, match_uuid: Uuid, user_id: i64) -> Result<Option<super::VodAssociation>, squadov_common::SquadOvError> {
         Ok(sqlx::query_as!(
             super::VodAssociation,

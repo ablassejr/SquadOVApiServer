@@ -9,7 +9,7 @@ use serde::{Deserialize};
 use sqlx::postgres::{PgPool};
 use actix_web::{HttpRequest};
 use squadov_common;
-use squadov_common::{SquadOvError, HalResponse, BlobManagementClient};
+use squadov_common::{SquadOvError, HalResponse, BlobManagementClient, JobQueue};
 use url::Url;
 use std::vec::Vec;
 use std::sync::Arc;
@@ -112,7 +112,10 @@ pub struct ApiApplication {
     vod: Arc<dyn v1::VodManager + Send + Sync>,
     pool: Arc<PgPool>,
     schema: Arc<graphql::GraphqlSchema>,
-    blob: Arc<BlobManagementClient>
+    blob: Arc<BlobManagementClient>,
+    // Various local job queues - these should eventually
+    // probably be switched to something like RabbitMQ + microservices.
+    pub vod_fastify_jobs: Arc<JobQueue<v1::VodFastifyJob>>
 }
 
 impl ApiApplication {
@@ -148,6 +151,8 @@ impl ApiApplication {
             pool: pool,
             schema: Arc::new(graphql::create_schema()),
             blob: blob,
+            // TODO: Configify!
+            vod_fastify_jobs: Arc::new(JobQueue::new::<v1::VodFastifyWorker>(4)),
         }
     }
 }

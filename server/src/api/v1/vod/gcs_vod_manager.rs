@@ -2,6 +2,7 @@ use crate::api::v1;
 use squadov_common;
 use std::sync::Arc;
 use std::collections::BTreeMap;
+use std::io::Write;
 
 use async_trait::async_trait;
 
@@ -36,8 +37,12 @@ impl GCSVodManager {
         (*self.client).as_ref().unwrap()
     }
 
+    fn get_path_parts_from_segment_id(&self, segment: &squadov_common::VodSegmentId) -> Vec<String> {
+        vec![segment.video_uuid.to_string(), segment.quality.clone(), segment.segment_name.clone()]
+    }
+
     fn get_fname_from_segment_id(&self, segment: &squadov_common::VodSegmentId) -> String {
-        String::from(vec![segment.video_uuid.to_string(), segment.quality.clone(), segment.segment_name.clone()].join("/"))
+        self.get_path_parts_from_segment_id(segment).join("/")
     }
 }
 
@@ -51,6 +56,25 @@ impl v1::VodManager for GCSVodManager {
         // The GET request will lag behind the user actually finishing the uploading of the object - just
         // give them the URL and if the download fails then oh well.
         client.create_signed_url("GET", &format!("/{}/{}", &self.bucket, fname), &BTreeMap::new())
+    }
+
+    async fn download_vod_to_path(&self, segment: &squadov_common::VodSegmentId, path: &std::path::Path) -> Result<(), squadov_common::SquadOvError> {
+        let uri = self.get_segment_redirect_uri(segment).await?;
+        let resp = reqwest::get(&uri).await?;
+        let mut output_file = std::fs::File::create(path)?;
+        let body = resp.bytes().await?;
+        output_file.write_all(&body)?;
+        Ok(())
+    }
+
+    async fn upload_vod_from_file(&self, segment: &squadov_common::VodSegmentId, path: &std::path::Path) -> Result<(), squadov_common::SquadOvError> {
+        let client = self.get_gcp_client().gcs();
+        let fname = self.get_path_parts_from_segment_id(segment);
+        // Maybe better to do some kind of streaming upload instead so we don't
+        // have to have the entire VOD in memory at the same time.
+        let vod_data = std::fs::read(path)?;
+        client.upload_object(&self.bucket, &fname, &vod_data).await?;
+        Ok(())
     }
     
     async fn get_segment_upload_uri(&self, segment: &squadov_common::VodSegmentId) -> Result<String, squadov_common::SquadOvError> {

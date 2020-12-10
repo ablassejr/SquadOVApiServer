@@ -55,7 +55,7 @@ impl BlobManagementClient {
             .execute(tx)
             .await?;
 
-        (*self.gcp).as_ref().unwrap().gcs().upload_object(&self.bucket, &local_path, &compressed_bytes).await?;
+        (*self.gcp).as_ref().unwrap().gcs().upload_object(&self.bucket, &vec![local_path.clone()], &compressed_bytes).await?;
         Ok(uuid)
     }
 

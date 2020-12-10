@@ -20,7 +20,7 @@ tokio = { version = "0.2", features = ["full"] }
 toml = "0.5"
 structopt = "0.3"
 uuid = { version = "0.8", features = ["serde", "v4"] }
-sqlx = { path="../deps/cargo/sqlx", version = "0.4.0-beta.1", default-features = false, features = [ "bigdecimal", "runtime-tokio", "macros", "postgres", "json", "ipnetwork", "uuid", "chrono", "offline"] }
+sqlx = { path="../deps/cargo/sqlx", version = "0.4.0-beta.1", default-features = false, features = [ "bigdecimal", "runtime-async-std", "macros", "postgres", "json", "ipnetwork", "uuid", "chrono", "offline"] }
 futures = "0.3.6"
 futures-util = "0.3.6"
 chrono = { version = "0.4.19", features = ["serde"] }
@@ -38,3 +38,4 @@ squadov_common = { path="../lib/squadov_common" }
 flate2 = "1.0"
 bytes = "0.6.0"
 prost = "0.6.1"
+tempfile = "3.1.0"

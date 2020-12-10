@@ -11,6 +11,7 @@ pub mod hearthstone;
 pub mod blob;
 pub mod squad;
 pub mod riot;
+pub mod job;
 
 pub use error::*;
 pub use parse::*;
@@ -23,6 +24,7 @@ pub use sql::*;
 pub use blob::*;
 pub use squad::*;
 pub use riot::*;
+pub use job::*;
 
 #[macro_use]
 extern crate lazy_static;
