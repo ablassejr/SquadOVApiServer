@@ -153,25 +153,22 @@ impl SessionManager {
 }
 
 impl crate::api::ApiApplication {
-    pub async fn refresh_and_obtain_valid_session_from_request(&self, req : &HttpRequest) -> Result<Option<SquadOVSession>, squadov_common::SquadOvError> {
-        let mut session = match self.session.get_session_from_request(req, &self.pool).await {
-            Ok(x) => match x {
-                Some(y) => y,
-                None => return Ok(None),
-            },
-            Err(err) => return logged_error!(squadov_common::SquadOvError::InternalError(format!("Refresh And Obtain Session {}", err))),
-        };
+    pub async fn is_session_valid(&self, session: &SquadOVSession) -> Result<bool, squadov_common::SquadOvError> {
+        match self.clients.fusionauth.validate_jwt(&session.access_token).await {
+            Ok(_) => Ok(true),
+            Err(err) => match err {
+                fusionauth::FusionAuthValidateJwtError::Invalid => Ok(false),
+                _ => Err(squadov_common::SquadOvError::InternalError(format!("Validate JWT {}", err)))
+            }
+        }
+    }
 
+    pub async fn refresh_session_if_necessary(&self, session: SquadOVSession) -> Result<SquadOVSession, squadov_common::SquadOvError> {
         // Check if the session is expired (as determined by FusionAuth).
         // If it is expired (or close to it), generate a new session ID and use the refresh token to get a new access token.
         // If it isn't expired, return the session as is.
-        let expired = match self.clients.fusionauth.validate_jwt(&session.access_token).await {
-            Ok(_) => false,
-            Err(err) => match err {
-                fusionauth::FusionAuthValidateJwtError::Invalid => true,
-                _ => return logged_error!(squadov_common::SquadOvError::InternalError(format!("Validate JWT {}", err))),
-            }
-        };
+        let mut session = session;
+        let expired = !self.is_session_valid(&session).await?;
 
         if expired {
             let new_token = match self.clients.fusionauth.refresh_jwt(&session.refresh_token).await {
@@ -192,6 +189,20 @@ impl crate::api::ApiApplication {
             session.old_session_id = Some(old_id);
         }
 
+        Ok(session)
+    }
+
+    pub async fn refresh_and_obtain_valid_session_from_request(&self, req : &HttpRequest) -> Result<Option<SquadOVSession>, squadov_common::SquadOvError> {
+        let session = match self.session.get_session_from_request(req, &self.pool).await {
+            Ok(x) => match x {
+                Some(y) => y,
+                None => return Ok(None),
+            },
+            Err(err) => return logged_error!(squadov_common::SquadOvError::InternalError(format!("Refresh And Obtain Session {}", err))),
+        };
+
+        let session = self.refresh_session_if_necessary(session).await?;
+        
         return Ok(Some(session));
     }
 

@@ -18,6 +18,12 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 .route("/forgotpw/change", web::post().to(auth::forgot_pw_change_handler))
                 .route("/verify", web::post().to(auth::verify_email_handler))
                 .service(
+                    // This needs to not be protected by the session validator as the session may be
+                    // expired!
+                    web::resource("/session/heartbeat")
+                        .route(web::post().to(v1::refresh_user_session_handler))
+                )
+                .service(
                     // These are the only two endpoints where the user needs to provide a valid session to use.
                     web::scope("")
                         .wrap(auth::ApiSessionValidator{})

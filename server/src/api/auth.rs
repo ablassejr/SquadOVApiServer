@@ -21,7 +21,6 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use actix_service::{Service, Transform};
 use actix_web::{dev::ServiceRequest, dev::ServiceResponse, Error, web};
-use actix_web::http::{HeaderName, HeaderValue};
 use futures::future::{ok, Ready};
 use futures::Future;
 
@@ -57,8 +56,6 @@ pub struct ApiSessionValidatorMiddleware<S> {
     service: Rc<RefCell<S>>,
 }
 
-const SET_SESSION_ID_HEADER_KEY : &str = "x-squadov-set-session-id";
-
 impl<S, B> Service for ApiSessionValidatorMiddleware<S>
 where
     S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
@@ -87,39 +84,33 @@ where
                 Some(x) => x,
                 None => return Err(actix_web::error::ErrorInternalServerError("Bad App Data")),
             };
-    
-            let session = match app.refresh_and_obtain_valid_session_from_request(&request).await {
-                Ok(x) => match x{
-                    Some(y) => y,
-                    None => return Err(actix_web::error::ErrorUnauthorized("Invalid session.")),
+
+            let session = match app.session.get_session_from_request(&request, &app.pool).await {
+                Ok(x) => match x {
+                    Some(s) => s,
+                    None => return Err(actix_web::error::ErrorBadRequest("No Session")),
                 },
-                Err(_) => return Err(actix_web::error::ErrorInternalServerError("Internal error.")),
+                Err(_) => return Err(actix_web::error::ErrorInternalServerError("Could not retrieve session")),
             };
 
-            // Need to clone the session ID so we can relay it back to the user later if needed.
-            let new_session_id = session.session_id.clone();
-            let need_session_response = session.old_session_id.is_some();
+            match app.is_session_valid(&session).await {
+                Ok(b) => {
+                    if !b {
+                        return Err(actix_web::error::ErrorUnauthorized("Invalid session"))
+                    }
+                }
+                Err(_) => return Err(actix_web::error::ErrorInternalServerError("Could not check valid session")),
+            };
 
             {
                 let mut extensions = request.extensions_mut();
                 extensions.insert(session);
             }
 
-            let mut response = match ServiceRequest::from_parts(request, payload) {
+            let response = match ServiceRequest::from_parts(request, payload) {
                 Ok(x) => srv.call(x).await?,
                 Err(_) => return Err(actix_web::error::ErrorInternalServerError("Failed to reconstruct service request"))
             };
-    
-            if need_session_response {
-                let headers = response.headers_mut();
-                headers.insert(
-                    HeaderName::from_static(SET_SESSION_ID_HEADER_KEY),
-                    match HeaderValue::from_str(&new_session_id) {
-                        Ok(v) => v,
-                        Err(_) => return Err(actix_web::error::ErrorInternalServerError("Failed to set change session header"))
-                    },
-                );
-            }
 
             return Ok(response);
         })

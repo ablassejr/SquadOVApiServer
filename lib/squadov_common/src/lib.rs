@@ -12,6 +12,7 @@ pub mod blob;
 pub mod squad;
 pub mod riot;
 pub mod job;
+pub mod session;
 
 pub use error::*;
 pub use parse::*;
@@ -25,6 +26,7 @@ pub use blob::*;
 pub use squad::*;
 pub use riot::*;
 pub use job::*;
+pub use session::*;
 
 #[macro_use]
 extern crate lazy_static;
