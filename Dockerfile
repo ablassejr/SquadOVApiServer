@@ -26,6 +26,7 @@ FROM debian:buster-20200908-slim
 RUN mkdir -p /squadov/config
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /squadov
 COPY --from=builder /squadov/target/release/squadov_api_server .

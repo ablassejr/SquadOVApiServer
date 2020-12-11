@@ -51,7 +51,7 @@ impl api::ApiApplication {
                     segment=if quality.has_fastify {
                         "fastify"
                     } else {
-                        "source"
+                        "video"
                     }
                 ),
                 // Duration is a placeholder - not really needed but will be useful once we get

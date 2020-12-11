@@ -8,6 +8,7 @@ services:
     environment:
       - "SQUADOV_VOD_ROOT=gs://${VOD_BUCKET}"
       - "SQUADOV_BLOB_BUCKET=${BLOB_BUCKET}"
+      - "FFMPEG_BINARY_PATH=ffmpeg"
   app:
     image: "registry.gitlab.com/squadov/squadovapiserver/${GCP_PROJECT}/squadov_webapp:latest"
     networks:

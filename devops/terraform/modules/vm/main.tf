@@ -53,7 +53,7 @@ resource "google_compute_disk" "vm-boot-disk" {
 
 resource "google_compute_instance" "vm" {
     name                        = "squadov-vm-central1-c"
-    machine_type                = "n1-standard-1"
+    machine_type                = "n1-standard-4"
     zone                        = "us-central1-c"
     allow_stopping_for_update   = true
 
@@ -72,7 +72,7 @@ resource "google_compute_instance" "vm" {
     }
 
     service_account {
-        scopes = ["sql-admin"]
+        scopes = ["sql-admin", "monitoring"]
     }
 }
 
