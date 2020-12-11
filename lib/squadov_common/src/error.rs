@@ -28,7 +28,9 @@ pub enum SquadOvError {
     #[display(fmt = "[SquadovError] Internal Error: {}", _0)]
     InternalError(String),
     #[display(fmt = "[SquadovError] Duplicate Error")]
-    Duplicate
+    Duplicate,
+    #[display(fmt = "[SquadovError] Defer")]
+    Defer
 }
 
 impl error::ResponseError for SquadOvError {
@@ -47,7 +49,8 @@ impl error::ResponseError for SquadOvError {
             SquadOvError::BadRequest => StatusCode::BAD_REQUEST,
             SquadOvError::NotFound => StatusCode::NOT_FOUND,
             SquadOvError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            SquadOvError::Duplicate => StatusCode::BAD_REQUEST
+            SquadOvError::Duplicate => StatusCode::BAD_REQUEST,
+            SquadOvError::Defer => StatusCode::SERVICE_UNAVAILABLE,
         }
     }
 }

@@ -3,11 +3,12 @@ use crate::SquadOvError;
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::AtomicBool;
 use std::collections::VecDeque;
+use chrono::{DateTime, Utc};
 
 #[async_trait]
 pub trait JobWorker<TData: Send + Sync> {
     fn new() -> Self;
-    async fn work(&self, data: TData) -> Result<(), SquadOvError>;
+    async fn work(&self, data: &TData) -> Result<(), SquadOvError>;
 }
 
 struct WorkerHandler<TData: Send + Sync, TWorker>
@@ -32,15 +33,24 @@ where
         }
     }
 
-    fn run(&self, data: TData) {
+    fn run(&self, data: TData, queue: Arc<JobQueue<TData>>) {
         self.running.store(true, std::sync::atomic::Ordering::Relaxed);
 
         let running = self.running.clone();
         let worker = self.worker.clone();
         tokio::task::spawn(async move {
-            match worker.work(data).await {
+            match worker.work(&data).await {
                 Ok(_) => (),
-                Err(err) => log::error!("Failed to process job: {:?}", err)
+                Err(err) => match err {
+                    SquadOvError::Defer => {
+                        log::warn!("Not ready to process job - deferring.");
+                        match queue.enqueue_retry(data) {
+                            Ok(_) => (),
+                            Err(e2) => log::error!("Failed to re-enqueue job: {:?}", e2),
+                        }
+                    },
+                    _ => log::error!("Failed to process job: {:?}", err)
+                }
             };
 
             running.store(false, std::sync::atomic::Ordering::Relaxed);
@@ -48,16 +58,21 @@ where
     }
 }
 
+struct TaskWrapper<TData: Send + Sync> {
+    data: TData,
+    threshold: DateTime<Utc>,
+}
+
 pub struct JobQueue<TData: Send + Sync>
 {
-    queue: Arc<RwLock<VecDeque<TData>>>,
+    queue: Arc<RwLock<VecDeque<TaskWrapper<TData>>>>,
 }
 
 impl<TData> JobQueue<TData>
 where
     TData : Send + Sync + 'static,
 {
-    pub fn new<TWorker>(num_workers: i32) -> Self
+    pub fn new<TWorker>(num_workers: i32) -> Arc<Self>
     where
         TWorker: JobWorker<TData> + Send + Sync + 'static
     {
@@ -70,13 +85,14 @@ where
 
         let workers = Arc::new(workers);
 
-        let ret_queue =  Self {
+        let ret_queue = Arc::new(Self{
             queue: queue.clone(),
-        };
+        });
 
         // This thread is the primary thread of the job queue that
         // watches for new jobs and pawns off tasks onto the workers
         // in the pool.
+        let inner_queue = ret_queue.clone();
         std::thread::spawn(move || {
             // We need a tokio runtime only for this thread to handle the job worker.
             // Note that for this to work we need to use sqlx using async std and NOT a tokio runtime.
@@ -109,7 +125,12 @@ where
                         }
     
                         let data = q.pop_front().unwrap();
-                        wk.run(data);
+                        if Utc::now() < data.threshold {
+                            q.push_back(data);
+                            continue;
+                        }
+
+                        wk.run(data.data, inner_queue.clone());
                     }
                 }
             });
@@ -120,7 +141,19 @@ where
 
     pub fn enqueue(&self, data: TData) -> Result<(), SquadOvError> {
         let mut q = self.queue.write()?;
-        q.push_back(data);
+        q.push_back(TaskWrapper{
+            data,
+            threshold: Utc::now(),
+        });
+        Ok(())
+    }
+
+    pub fn enqueue_retry(&self, data: TData) -> Result<(), SquadOvError> {
+        let mut q = self.queue.write()?;
+        q.push_back(TaskWrapper{
+            data,
+            threshold: Utc::now() + chrono::Duration::seconds(1),
+        });
         Ok(())
     }
 }

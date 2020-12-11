@@ -23,7 +23,7 @@ pub struct VodMetadata {
     pub max_bitrate: i64,
 
     pub id: String,
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub has_fastify: bool,
 }
 

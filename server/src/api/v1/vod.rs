@@ -44,6 +44,7 @@ pub trait VodManager {
     async fn get_segment_upload_uri(&self, segment: &squadov_common::VodSegmentId) -> Result<String, squadov_common::SquadOvError>;
     async fn download_vod_to_path(&self, segment: &squadov_common::VodSegmentId, path: &std::path::Path) -> Result<(), squadov_common::SquadOvError>;
     async fn upload_vod_from_file(&self, segment: &squadov_common::VodSegmentId, path: &std::path::Path) -> Result<(), squadov_common::SquadOvError>;
+    async fn is_vod_session_finished(&self, session: &str) -> Result<bool, squadov_common::SquadOvError>;
     async fn get_segment_redirect_uri(&self, segment: &squadov_common::VodSegmentId) -> Result<String, squadov_common::SquadOvError>;
     async fn delete_vod(&self, segment: &squadov_common::VodSegmentId) -> Result<(), squadov_common::SquadOvError>;
 }

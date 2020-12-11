@@ -46,6 +46,10 @@ impl v1::VodManager for FilesystemVodManager {
         Ok(())
     }
 
+    async fn is_vod_session_finished(&self, _session: &str) -> Result<bool, squadov_common::SquadOvError> {
+        Ok(true)
+    }
+
     async fn upload_vod_from_file(&self, segment: &squadov_common::VodSegmentId, path: &std::path::Path) -> Result<(), squadov_common::SquadOvError> {
         let fname = self.segment_id_to_path(segment);
         std::fs::copy(path, &fname)?;

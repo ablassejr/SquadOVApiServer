@@ -25,12 +25,15 @@ pub struct VodAssociatePathInput {
 #[derive(Deserialize)]
 pub struct VodAssociateBodyInput {
     association: super::VodAssociation,
-    metadata: squadov_common::VodMetadata
+    metadata: squadov_common::VodMetadata,
+    #[serde(rename="sessionUri")]
+    session_uri: Option<String>,
 }
 
 pub struct VodFastifyJob {
     pub video_uuid: Uuid,
-    pub app: Arc<api::ApiApplication>
+    pub app: Arc<api::ApiApplication>,
+    pub session_uri: Option<String>,
 }
 
 pub struct VodFastifyWorker {
@@ -43,8 +46,21 @@ impl squadov_common::JobWorker<VodFastifyJob> for VodFastifyWorker {
         Self {}
     }
 
-    async fn work(&self, data: VodFastifyJob) -> Result<(), squadov_common::SquadOvError> {
+    async fn work(&self, data: &VodFastifyJob) -> Result<(), squadov_common::SquadOvError> {
         log::info!("Start Fastifying {:?}", &data.video_uuid);
+
+        // Note that we can only proceed with "fastifying" the VOD if the entire VOD has been uploaded.
+        // We can query GCS's XML API to determine this. If the GCS Session URI is not provided then
+        // we assume that the file has already been fully uploaded. If the file hasn't been fully uploaded
+        // then we want to defer taking care of this task until later.
+        if data.session_uri.is_some() {
+            let session_uri = data.session_uri.as_ref().unwrap();
+            if !data.app.vod.is_vod_session_finished(&session_uri).await? {
+                log::info!("Defer Fastifying {:?}", &data.video_uuid);
+                return Err(squadov_common::SquadOvError::Defer);
+            }
+        }
+
         data.app.fastify_vod(&data.video_uuid).await?;
         log::info!("Finish Fastifying {:?}", &data.video_uuid);
         Ok(())
@@ -173,8 +189,6 @@ impl api::ApiApplication {
         log::info!("Mark DB Fastify (Commit) - {}", vod_uuid);
         tx.commit().await?;
 
-        input_filename.close()?;
-        output_filename.close()?;
         log::info!("Finish Fastify - {}", vod_uuid);
         Ok(())
     }
@@ -228,7 +242,8 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
     // So we toss it to the local job queue so we can better limit the amount of resources we end up using.
     app.vod_fastify_jobs.enqueue(VodFastifyJob{
         video_uuid: data.association.video_uuid.clone(),
-        app: app.get_ref().clone(), 
+        app: app.get_ref().clone(),
+        session_uri: data.session_uri,
     })?;
 
     return Ok(HttpResponse::Ok().finish());

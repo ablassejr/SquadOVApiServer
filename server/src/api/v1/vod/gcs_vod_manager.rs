@@ -76,6 +76,11 @@ impl v1::VodManager for GCSVodManager {
         client.upload_object(&self.bucket, &fname, &vod_data).await?;
         Ok(())
     }
+
+    async fn is_vod_session_finished(&self, session: &str) -> Result<bool, squadov_common::SquadOvError> {
+        let client = self.get_gcp_client().gcs();
+        Ok(client.get_upload_status(session).await?)
+    }
     
     async fn get_segment_upload_uri(&self, segment: &squadov_common::VodSegmentId) -> Result<String, squadov_common::SquadOvError> {
         let fname = self.get_fname_from_segment_id(segment);

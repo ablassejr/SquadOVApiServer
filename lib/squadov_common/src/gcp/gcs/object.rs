@@ -61,6 +61,21 @@ impl super::GCSClient {
         Ok(resp.bytes().await?.into_iter().collect())
     }
 
+    // Returns whether or not the upload is complete or is incomplete.
+    pub async fn get_upload_status(&self, session_uri: &str) -> Result<bool, SquadOvError> {
+        let client = self.http.read()?.create_http_client()?;
+        let mut addtl_headers = HeaderMap::new();
+        addtl_headers.insert("Content-Length", "0".parse()?);
+        addtl_headers.insert("Content-Range", "bytes */*".parse()?);
+        let resp = client.put(session_uri).headers(addtl_headers).send().await?;
+
+        match resp.status().as_u16() {
+            200 | 201 => Ok(true),
+            308 => Ok(false),
+            _ => Err(SquadOvError::NotFound)
+        }
+    }
+
     pub async fn upload_object(&self, bucket_id: &str, path_parts: &Vec<String>, data: &[u8]) -> Result<(), SquadOvError> {
         let mut backoff_tick = 0;
         let mut status = None;

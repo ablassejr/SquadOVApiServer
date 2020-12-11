@@ -152,7 +152,7 @@ impl ApiApplication {
             schema: Arc::new(graphql::create_schema()),
             blob: blob,
             // TODO: Configify!
-            vod_fastify_jobs: Arc::new(JobQueue::new::<v1::VodFastifyWorker>(4)),
+            vod_fastify_jobs: JobQueue::new::<v1::VodFastifyWorker>(4),
         }
     }
 }

@@ -41,7 +41,8 @@ async fn main() -> std::io::Result<()> {
                 log::info!("Enqueue job: {}", &v);
                 app.vod_fastify_jobs.enqueue(api::v1::VodFastifyJob{
                     video_uuid: v,
-                    app: app.clone(), 
+                    app: app.clone(),
+                    session_uri: None,
                 }).unwrap();
             }
         } else {
