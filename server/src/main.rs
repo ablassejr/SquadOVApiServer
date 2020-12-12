@@ -12,6 +12,8 @@ use structopt::StructOpt;
 use actix_cors::{Cors};
 use std::fs;
 use std::sync::Arc;
+use squadov_common::TaskWrapper;
+
 #[derive(StructOpt, Debug)]
 struct Options {
     #[structopt(short, long)]
@@ -39,11 +41,11 @@ async fn main() -> std::io::Result<()> {
             let vods = app.find_vods_without_fastify().await.unwrap();
             for v in vods {
                 log::info!("Enqueue job: {}", &v);
-                app.vod_fastify_jobs.enqueue(api::v1::VodFastifyJob{
+                app.vod_fastify_jobs.enqueue(TaskWrapper::new(api::v1::VodFastifyJob{
                     video_uuid: v,
                     app: app.clone(),
                     session_uri: None,
-                }).unwrap();
+                })).unwrap();
             }
         } else {
             log::error!("Invalid mode: {}", &mode);

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use squadov_common;
-use squadov_common::vod;
+use squadov_common::{vod, TaskWrapper};
 use crate::api;
 use actix_web::{web, HttpResponse, HttpRequest};
 use sqlx::{Executor};
@@ -240,11 +240,11 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
     // Note that we don't want to spawn a task directly here to "fastify" the VOD
     // because it does take a significant amount of memory/disk space to do so.
     // So we toss it to the local job queue so we can better limit the amount of resources we end up using.
-    app.vod_fastify_jobs.enqueue(VodFastifyJob{
+    app.vod_fastify_jobs.enqueue(TaskWrapper::new(VodFastifyJob{
         video_uuid: data.association.video_uuid.clone(),
         app: app.get_ref().clone(),
         session_uri: data.session_uri,
-    })?;
+    }))?;
 
     return Ok(HttpResponse::Ok().finish());
 }

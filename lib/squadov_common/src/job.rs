@@ -5,6 +5,8 @@ use std::sync::atomic::AtomicBool;
 use std::collections::VecDeque;
 use chrono::{DateTime, Utc};
 
+const JOB_RETRY_LIMIT: i32 = 10;
+
 #[async_trait]
 pub trait JobWorker<TData: Send + Sync> {
     fn new() -> Self;
@@ -33,23 +35,34 @@ where
         }
     }
 
-    fn run(&self, data: TData, queue: Arc<JobQueue<TData>>) {
+    fn run(&self, data: TaskWrapper<TData>, queue: Arc<JobQueue<TData>>) {
         self.running.store(true, std::sync::atomic::Ordering::Relaxed);
 
         let running = self.running.clone();
         let worker = self.worker.clone();
         tokio::task::spawn(async move {
-            match worker.work(&data).await {
+            match worker.work(&data.data).await {
                 Ok(_) => (),
                 Err(err) => match err {
                     SquadOvError::Defer => {
                         log::warn!("Not ready to process job - deferring.");
-                        match queue.enqueue_retry(data) {
+                        match queue.enqueue(data) {
                             Ok(_) => (),
                             Err(e2) => log::error!("Failed to re-enqueue job: {:?}", e2),
                         }
                     },
-                    _ => log::error!("Failed to process job: {:?}", err)
+                    _ => {
+                        log::error!("Failed to process job: {:?}", err);
+                        if data.retry_count < JOB_RETRY_LIMIT {
+                            log::warn!("...Retrying job.");
+                            match queue.enqueue(TaskWrapper::new_retry(data.data, data.retry_count+1)) {
+                                Ok(_) => (),
+                                Err(e2) => log::error!("Failed to re-enqueue job: {:?}", e2),
+                            }
+                        } else {
+                            log::warn!("...Job exceeded retry count.");
+                        }
+                    },
                 }
             };
 
@@ -58,9 +71,31 @@ where
     }
 }
 
-struct TaskWrapper<TData: Send + Sync> {
+pub struct TaskWrapper<TData: Send + Sync> {
     data: TData,
     threshold: DateTime<Utc>,
+    retry_count: i32,
+}
+
+impl<TData> TaskWrapper<TData>
+where
+    TData: Send + Sync
+{
+    pub fn new(data: TData) -> Self {
+        Self {
+            data,
+            threshold: Utc::now(),
+            retry_count: 0
+        }
+    }
+
+    pub fn new_retry(data: TData, count: i32) -> Self {
+        Self {
+            data,
+            threshold: Utc::now() + chrono::Duration::seconds(1),
+            retry_count: count,
+        }
+    }
 }
 
 pub struct JobQueue<TData: Send + Sync>
@@ -104,7 +139,7 @@ where
                 loop {
                     // Don't constantly look for a new task so that there's time for the 
                     // queue RwLock to be held by a writer.
-                    async_std::task::sleep(std::time::Duration::from_millis(100)).await;
+                    async_std::task::sleep(std::time::Duration::from_millis(30)).await;
     
                     let mut q = match queue.write() {
                         Ok(x) => x,
@@ -130,7 +165,7 @@ where
                             continue;
                         }
 
-                        wk.run(data.data, inner_queue.clone());
+                        wk.run(data, inner_queue.clone());
                     }
                 }
             });
@@ -139,21 +174,9 @@ where
         ret_queue
     }
 
-    pub fn enqueue(&self, data: TData) -> Result<(), SquadOvError> {
+    pub fn enqueue(&self, data: TaskWrapper<TData>) -> Result<(), SquadOvError> {
         let mut q = self.queue.write()?;
-        q.push_back(TaskWrapper{
-            data,
-            threshold: Utc::now(),
-        });
-        Ok(())
-    }
-
-    pub fn enqueue_retry(&self, data: TData) -> Result<(), SquadOvError> {
-        let mut q = self.queue.write()?;
-        q.push_back(TaskWrapper{
-            data,
-            threshold: Utc::now() + chrono::Duration::seconds(1),
-        });
+        q.push_back(data);
         Ok(())
     }
 }
