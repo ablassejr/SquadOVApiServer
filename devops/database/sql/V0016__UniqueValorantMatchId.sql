@@ -1,0 +1,2 @@
+ALTER TABLE valorant_matches
+ADD CONSTRAINT valorant_matches_match_id_key UNIQUE(match_id);

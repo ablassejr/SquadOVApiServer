@@ -2410,6 +2410,7 @@ dependencies = [
  "actix-rt 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "actix-service 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "actix-web 3.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "async-std 1.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "async-trait 0.1.41 (registry+https://github.com/rust-lang/crates.io-index)",
  "base64 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",

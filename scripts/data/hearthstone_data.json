@@ -1,0 +1,70 @@
+{
+	"info": {
+		"ip": "137.221.107.233",
+		"port": 1119,
+		"gameId": 10680,
+		"clientId": 383920,
+		"spectateKey": "DMPChh",
+		"reconnecting": false
+	},
+    "timestamp": "2020-11-22T00:54:51.573Z",
+	"deck": null,
+	"players": {
+		"1": {
+			"arenaLoss": 0,
+			"arenaWins": 0,
+			"cardBackId": 157,
+			"local": true,
+			"medalInfo": {
+				"standard": {
+					"bestStarLevel": 14,
+					"earnedStars": 2,
+					"leagueId": 5,
+					"legendIndex": 0,
+					"starLevel": 14,
+					"winStreak": 6
+				},
+				"wild": {
+					"bestStarLevel": 1,
+					"earnedStars": 0,
+					"leagueId": 5,
+					"legendIndex": 0,
+					"starLevel": 1,
+					"winStreak": 0
+				}
+			},
+			"name": "b3h47pte",
+			"side": 1,
+			"tavernBrawlLoss": 0,
+			"tavernBrawlWins": 0
+		},
+		"9": {
+			"arenaLoss": 0,
+			"arenaWins": 0,
+			"cardBackId": 58,
+			"local": false,
+			"medalInfo": {
+				"standard": {
+					"bestStarLevel": 0,
+					"earnedStars": 0,
+					"leagueId": 5,
+					"legendIndex": 0,
+					"starLevel": 11,
+					"winStreak": 0
+				},
+				"wild": {
+					"bestStarLevel": 0,
+					"earnedStars": 0,
+					"leagueId": 5,
+					"legendIndex": 0,
+					"starLevel": 1,
+					"winStreak": 0
+				}
+			},
+			"name": "The Innkeeper",
+			"side": 2,
+			"tavernBrawlLoss": 0,
+			"tavernBrawlWins": 0
+		}
+	}
+}

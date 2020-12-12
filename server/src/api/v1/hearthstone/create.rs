@@ -643,9 +643,34 @@ pub struct CreateHearthstoneMatchPathInput {
 }
 
 pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstoneMatchInput>, app : web::Data<Arc<api::ApiApplication>>, path: web::Path<CreateHearthstoneMatchPathInput>) -> Result<HttpResponse, squadov_common::SquadOvError> {
-    let mut tx = app.pool.begin().await?;
-    let match_uuid = app.create_hearthstone_match(&mut tx, &data.timestamp, &data.info).await?;
+    // We need to retry creating the hearthstone match just in case it's a duplicate match and the
+    // create_hearthstone_match function fails on the unique key because of some race condition.
+    let match_uuid = {
+        let mut uuid: Option<Uuid> = None;
+        for _i in 0i32..10 {
+            let mut tx = app.pool.begin().await?;
+            uuid = match app.create_hearthstone_match(&mut tx, &data.timestamp, &data.info).await {
+                Ok(x) => Some(x),
+                Err(err) => match err {
+                    squadov_common::SquadOvError::Duplicate => {
+                        tx.rollback().await?;
+                        continue;
+                    },
+                    _ => return Err(err)
+                }
+            };
+            tx.commit().await?;
+            break;
+        }
+        uuid
+    };
+    
+    if match_uuid.is_none() {
+        return Err(squadov_common::SquadOvError::InternalError(String::from("Failed to obtain Hearthstone match UUID")));
+    }
+    let match_uuid = match_uuid.unwrap();
 
+    let mut tx = app.pool.begin().await?;
     // Need to also create a VIEW associated with this match. As the data is collected by each user locally
     // and not by a singular central source, we have to assume that each view may have some conflicting data.
     // Thus, all data is generally associated with a match view and we use the match only as a way to allow

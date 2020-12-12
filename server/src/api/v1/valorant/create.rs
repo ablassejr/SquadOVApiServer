@@ -488,6 +488,14 @@ impl api::ApiApplication {
                     return Err(squadov_common::SquadOvError::BadRequest);
                 }
                 
+                // This is a DELIBERATE choice to use match_uuid for the conflict
+                // instead of match_id which is similar to the case where raw_data is
+                // None. There's a possibility that due to some race condition, we've
+                // entered a state where we created a new match uuid for the same match id.
+                // In that case, we won't conflict on match_uuid but we WILL conflict on
+                // the match id in which case we DO want the unique constraint violation error.
+                // However, in the case where there's a match_uuid conflict, it means that the
+                // user is more likely trying to update information about the match which is fine.
                 tx.execute(
                     sqlx::query!(
                         "
@@ -513,7 +521,7 @@ impl api::ApiApplication {
                             $8,
                             $9
                         )
-                        ON CONFLICT (match_id) DO UPDATE
+                        ON CONFLICT (match_uuid) DO UPDATE
                             SET game_mode = EXCLUDED.game_mode,
                                 map = EXCLUDED.map,
                                 is_ranked = EXCLUDED.is_ranked,
@@ -543,11 +551,15 @@ impl api::ApiApplication {
                 }
             }
             None => {
+                // Note that we MUST conflict here because we can't have the case
+                // where a user is given an incorrect match UUID. We must handle
+                // the conflict error elsewhere to effectivley just have the user
+                // retry by repulling the correct match UUID.
                 sqlx::query!(
                     "
                     INSERT INTO squadov.valorant_matches ( match_id, match_uuid )
                     VALUES ($1, $2)
-                    ON CONFLICT DO NOTHING
+                    ON CONFLICT ON CONSTRAINT valorant_matches_match_id_match_uuid_key DO NOTHING
                     ",
                     match_id,
                     uuid
@@ -638,7 +650,7 @@ impl api::ApiApplication {
 
     // TODO: When/if we get a production API key we need to have the user enter in the match UUID
     // and pull the data ourselves.
-    pub async fn insert_valorant_match(&self, tx : &mut Transaction<'_, Postgres>, uuid: &Uuid, raw_match : InputValorantMatch) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn insert_valorant_match(&self, tx : &mut Transaction<'_, Postgres>, uuid: &Uuid, raw_match : &InputValorantMatch) -> Result<(), squadov_common::SquadOvError> {
         self.insert_valorant_raw_data(tx, &raw_match.match_id, uuid, &raw_match.raw_data).await?;
         self.insert_valorant_player_data(tx, &raw_match.player_data).await?;
         Ok(())
@@ -648,21 +660,37 @@ impl api::ApiApplication {
 pub async fn create_new_valorant_match_handler(data : web::Json<InputValorantMatch>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, squadov_common::SquadOvError> {
     let raw_data = data.into_inner();
 
-    let mut tx = app.pool.begin().await?;
-    // Create a new match ID and then create the match.
-    // Note that we only create a new match if it's needed because
-    // we could be doing a backfill.
-    let internal_match = match app.check_if_valorant_match_exists(&mut tx, &raw_data.match_id).await? {
-        Some(x) => x,
-        None => app.create_new_match(&mut tx).await?
-    };
-    
-    app.insert_valorant_match(&mut tx, &internal_match.uuid, raw_data).await?;
-    tx.commit().await?;
-
-    return Ok(HttpResponse::Ok().json(
-        &CreateValorantMatchResponse{
-            match_uuid: &internal_match.uuid
+    for _i in 0i32..10 {
+        let mut tx = app.pool.begin().await?;
+        // Create a new match ID and then create the match.
+        // Note that we only create a new match if it's needed because
+        // we could be doing a backfill.
+        let internal_match = match app.check_if_valorant_match_exists(&mut tx, &raw_data.match_id).await? {
+            Some(x) => x,
+            None => app.create_new_match(&mut tx).await?
+        };
+        
+        match app.insert_valorant_match(&mut tx, &internal_match.uuid, &raw_data).await {
+            Ok(_) => (),
+            Err(err) => match err {
+                squadov_common::SquadOvError::Duplicate => {
+                    // This indicates that the match UUID is INVALID because a match with the same
+                    // match ID already exists. Retry!
+                    log::warn!("Caught duplicate Valorant match {}...retrying!", &raw_data.match_id);
+                    tx.rollback().await?;
+                    continue;
+                },
+                _ => return Err(err)
+            }
         }
-    ))
+
+        tx.commit().await?;
+        return Ok(HttpResponse::Ok().json(
+            &CreateValorantMatchResponse{
+                match_uuid: &internal_match.uuid
+            }
+        ));
+    }
+
+    Err(squadov_common::SquadOvError::InternalError(String::from("Valorant Match Retry Threshold")))
 }
