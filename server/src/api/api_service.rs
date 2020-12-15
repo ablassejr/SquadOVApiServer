@@ -42,6 +42,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::resource("/profile")
                                         .route(web::get().to(v1::get_current_user_profile_handler))
                                 )
+                                .service(
+                                    web::resource("/notifications")
+                                        .route(web::get().to(v1::get_current_user_notifications_handler))
+                                )
                         )
                         .service(
                             web::scope("/{user_id}")

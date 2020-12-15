@@ -2,11 +2,13 @@ mod profile;
 mod accounts;
 mod vod;
 mod session;
+mod notification;
 
 pub use profile::*;
 pub use accounts::*;
 pub use vod::*;
 pub use session::*;
+pub use notification::*;
 
 use serde::Deserialize;
 

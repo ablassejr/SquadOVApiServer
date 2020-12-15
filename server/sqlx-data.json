@@ -870,6 +870,19 @@
       "nullable": []
     }
   },
+  "41b0c40859d7612587db41fe571f8a1fe3887ab17b6bda57cd72390ec6647317": {
+    "query": "\n                    INSERT INTO squadov.valorant_matches ( match_id, match_uuid )\n                    VALUES ($1, $2)\n                    ON CONFLICT ON CONSTRAINT valorant_matches_match_id_match_uuid_key DO NOTHING\n                    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Uuid"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "4a8b75b192c62bfd29c006c6f84b46613d3d5a9d8fb3d51a568b2eceaa386c1c": {
     "query": "\n            SELECT *\n            FROM squadov.aimlab_tasks\n            WHERE user_id = $1\n            ORDER BY create_date DESC\n            LIMIT $2 OFFSET $3\n            ",
     "describe": {
@@ -944,6 +957,26 @@
         false,
         false
       ]
+    }
+  },
+  "4ad59113534b8f7b9bc9d27b89bf2705ffac07dc2d667a1e04c6a2e3747248ef": {
+    "query": "\n                        INSERT INTO squadov.valorant_matches (\n                            match_id,\n                            match_uuid,\n                            game_mode,\n                            map,\n                            is_ranked,\n                            provisioning_flow_id,\n                            game_version,\n                            server_start_time_utc,\n                            raw_data\n                        )\n                        VALUES (\n                            $1,\n                            $2,\n                            $3,\n                            $4,\n                            $5,\n                            $6,\n                            $7,\n                            $8,\n                            $9\n                        )\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Uuid",
+          "Varchar",
+          "Varchar",
+          "Bool",
+          "Varchar",
+          "Varchar",
+          "Timestamptz",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
     }
   },
   "4c8d614e3ffba4ee3de3814d6d3076bea6f5ce2205046407286fe97b3c520bed": {
@@ -3119,6 +3152,39 @@
         false,
         false
       ]
+    }
+  },
+  "ed7166ff33959906a1ba4c10dc05ee1780f2fc5e709923b9b0aa2a9aebac69aa": {
+    "query": "\n                        INSERT INTO squadov.valorant_matches (\n                            match_id,\n                            match_uuid,\n                            game_mode,\n                            map,\n                            is_ranked,\n                            provisioning_flow_id,\n                            game_version,\n                            server_start_time_utc,\n                            raw_data\n                        )\n                        VALUES (\n                            $1,\n                            $2,\n                            $3,\n                            $4,\n                            $5,\n                            $6,\n                            $7,\n                            $8,\n                            $9\n                        )\n                        ON CONFLICT (match_uuid) DO UPDATE\n                            SET game_mode = EXCLUDED.game_mode,\n                                map = EXCLUDED.map,\n                                is_ranked = EXCLUDED.is_ranked,\n                                provisioning_flow_id = EXCLUDED.provisioning_flow_id,\n                                game_version = EXCLUDED.game_version,\n                                server_start_time_utc = EXCLUDED.server_start_time_utc,\n                                raw_data = EXCLUDED.raw_data\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Uuid",
+          "Varchar",
+          "Varchar",
+          "Bool",
+          "Varchar",
+          "Varchar",
+          "Timestamptz",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "efea3d4749b1f692ec316097f60e7dc748c2ed13a0e6217a04d382c1d109b3ef": {
+    "query": "\n                    INSERT INTO squadov.valorant_matches ( match_id, match_uuid )\n                    VALUES ($1, $2)\n                    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Uuid"
+        ]
+      },
+      "nullable": []
     }
   },
   "f0f495cd2a0291a3910db4d51f8be25d871cadcc0d242e89504a087e70ba84b4": {
