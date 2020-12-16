@@ -959,26 +959,6 @@
       ]
     }
   },
-  "4ad59113534b8f7b9bc9d27b89bf2705ffac07dc2d667a1e04c6a2e3747248ef": {
-    "query": "\n                        INSERT INTO squadov.valorant_matches (\n                            match_id,\n                            match_uuid,\n                            game_mode,\n                            map,\n                            is_ranked,\n                            provisioning_flow_id,\n                            game_version,\n                            server_start_time_utc,\n                            raw_data\n                        )\n                        VALUES (\n                            $1,\n                            $2,\n                            $3,\n                            $4,\n                            $5,\n                            $6,\n                            $7,\n                            $8,\n                            $9\n                        )\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Varchar",
-          "Uuid",
-          "Varchar",
-          "Varchar",
-          "Bool",
-          "Varchar",
-          "Varchar",
-          "Timestamptz",
-          "Jsonb"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "4c8d614e3ffba4ee3de3814d6d3076bea6f5ce2205046407286fe97b3c520bed": {
     "query": "\n            UPDATE squadov.squads\n            SET squad_name = $2\n            WHERE id = $1\n            ",
     "describe": {
@@ -1188,6 +1168,26 @@
         true,
         true,
         false
+      ]
+    }
+  },
+  "565ae1bce010a768bbd0c726c2628b59320a8230afb601d45381893c3b063c5b": {
+    "query": "\n                SELECT\n                    (\n                        SELECT COUNT(squad_id)\n                        FROM squadov.squad_membership_invites\n                        WHERE user_id = $1 AND response_time IS NULL\n                    ) AS \"num_squad_invites!\"\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "num_squad_invites!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -1755,19 +1755,6 @@
           "Int8",
           "Uuid",
           "Bool",
-          "Uuid"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "923a8ce3c62c65a063b14e8e6502b0d37d2f31b95f30ed05c25ad0be9f27c995": {
-    "query": "\n                    INSERT INTO squadov.valorant_matches ( match_id, match_uuid )\n                    VALUES ($1, $2)\n                    ON CONFLICT DO NOTHING\n                    ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Varchar",
           "Uuid"
         ]
       },
@@ -2782,26 +2769,6 @@
       ]
     }
   },
-  "c2d557e86303615b3b7d3d0c84ae6170edafbf8cccfd0f5dc0dd9fe25f260bdc": {
-    "query": "\n                        INSERT INTO squadov.valorant_matches (\n                            match_id,\n                            match_uuid,\n                            game_mode,\n                            map,\n                            is_ranked,\n                            provisioning_flow_id,\n                            game_version,\n                            server_start_time_utc,\n                            raw_data\n                        )\n                        VALUES (\n                            $1,\n                            $2,\n                            $3,\n                            $4,\n                            $5,\n                            $6,\n                            $7,\n                            $8,\n                            $9\n                        )\n                        ON CONFLICT (match_id) DO UPDATE\n                            SET game_mode = EXCLUDED.game_mode,\n                                map = EXCLUDED.map,\n                                is_ranked = EXCLUDED.is_ranked,\n                                provisioning_flow_id = EXCLUDED.provisioning_flow_id,\n                                game_version = EXCLUDED.game_version,\n                                server_start_time_utc = EXCLUDED.server_start_time_utc,\n                                raw_data = EXCLUDED.raw_data\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Varchar",
-          "Uuid",
-          "Varchar",
-          "Varchar",
-          "Bool",
-          "Varchar",
-          "Varchar",
-          "Timestamptz",
-          "Jsonb"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "c35179df5cb4099675b3113d47056e39bd8a31abca8bb66c517476fbd72a4a3e": {
     "query": "\n            SELECT\n                smi.squad_id,\n                smi.user_id,\n                smi.joined,\n                smi.response_time,\n                smi.invite_time,\n                smi.invite_uuid,\n                ur.username AS \"username\",\n                us.username AS \"inviter_username\"\n            FROM squadov.squad_membership_invites AS smi\n            INNER JOIN squadov.users AS us\n                ON us.id = smi.inviter_user_id\n            INNER JOIN squadov.users AS ur\n                ON ur.id = smi.user_id\n            WHERE smi.squad_id = $1 AND response_time IS NULL\n            ",
     "describe": {
@@ -3169,19 +3136,6 @@
           "Varchar",
           "Timestamptz",
           "Jsonb"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "efea3d4749b1f692ec316097f60e7dc748c2ed13a0e6217a04d382c1d109b3ef": {
-    "query": "\n                    INSERT INTO squadov.valorant_matches ( match_id, match_uuid )\n                    VALUES ($1, $2)\n                    ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Varchar",
-          "Uuid"
         ]
       },
       "nullable": []
