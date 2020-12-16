@@ -151,7 +151,8 @@ Go back into a Powershell terminal.
 2. `cp client_ui\webpack\prod.config.js client_ui\webpack\${ENV}.config.js`
 3. Set `API_URL` to `https://api.${DEPLOYMENT_DOMAIN}`.
 4. `cd .\scripts\windows`
-5. `.\package.ps1 $ENV never`. If this is an offical release, change `never` to `always`. If set to `always` you will need to get the `GH_TOKEN` environment variable (i.e. `$env:GH_TOKEN="TOKEN_HERE"; ...`).
+5. `.\package.ps1 $ENV never`. If this is an offical release, change `never` to `always`.
+6. Upload the `latest.yml` file and the `SquadOV Setup ${VERSION}.exe` file to the `us-central1.content.squadov.gg` bucket in the `builds` folder.
 
 You should now see the `SquadOV.exe` executable in `$CLIENT\client_ui\package\win\x64\$VERSION\win-unpacked` where `$VERSION` is whatever the version is in the `package.json`.
 
