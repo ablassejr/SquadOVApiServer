@@ -1363,6 +1363,18 @@
       "nullable": []
     }
   },
+  "6b2e5a4f53b2b391f00152e679d097876a504432b444db8da17560cbde484ec0": {
+    "query": "\n            DELETE FROM squadov.user_sessions\n            WHERE id = $1 OR old_id = $1\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "6b75d0b86b2777be3835004e191b00192a44ade094a4706412634e9933188801": {
     "query": "\n            SELECT\n                match_id,\n                round_num,\n                instigator_puuid,\n                receiver_puuid,\n                damage,\n                legshots,\n                bodyshots,\n                headshots\n            FROM squadov.valorant_match_damage\n            WHERE match_id = $1\n            ",
     "describe": {
@@ -2666,6 +2678,68 @@
       "nullable": []
     }
   },
+  "bafd85e6dc943094c7232c1db8eae3231882c57fe54fcdbe54d7a6be4b56ad1a": {
+    "query": "\n            SELECT\n                us.id AS \"session_id\",\n                us.access_token,\n                us.refresh_token,\n                u.id AS \"user_id\",\n                u.username AS \"user_username\",\n                u.email AS \"user_email\",\n                u.verified AS \"user_verified\",\n                u.uuid AS \"user_uuid\"\n            FROM squadov.user_sessions AS us\n            INNER JOIN squadov.users AS u\n                ON u.id = us.user_id\n            WHERE us.id = $1 OR us.old_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "session_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "access_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "refresh_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "user_username",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "user_email",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "user_verified",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "user_uuid",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "bd945f834cd91be63a4f3a9cfa07f67bb859769a8e05d31d0251aec6ee58dfd8": {
     "query": "\n            SELECT hmud.deck_version_id, hdv.deck_id\n            FROM squadov.hearthstone_match_user_deck AS hmud\n            INNER JOIN squadov.hearthstone_deck_versions AS hdv\n                ON hdv.version_id = hmud.deck_version_id\n            WHERE hmud.match_uuid = $1 AND hmud.user_id = $2\n            ",
     "describe": {
@@ -2946,6 +3020,21 @@
       ]
     }
   },
+  "d666f15e3c58a7c38039fe7bf13b873c176640d6b13ed0fb37b9d81796550429": {
+    "query": "\n            UPDATE squadov.user_sessions\n            SET id = $1,\n                access_token = $2,\n                refresh_token = $3,\n                old_id = $4\n            WHERE id = $4\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Text",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "d6b31e9c7abd5bbad78ffb76dba8bbc702754e54b06f8d822f89b830e1220db7": {
     "query": "\n                INSERT INTO squadov.match_collections (uuid)\n                VALUES ($1)\n                ",
     "describe": {
@@ -3118,26 +3207,6 @@
       "nullable": [
         false,
         false
-      ]
-    }
-  },
-  "e9db9fc4649aae9d85ff323e9c99f33d6c242e9dbcdfb7bf865cb51d1b4fd559": {
-    "query": "\n                SELECT\n                    (\n                        SELECT COUNT(squad_id)\n                        FROM squadov.squad_membership_invites\n                        WHERE user_id = $1 AND response_time IS NULL\n                    ) AS \"num_squad_invites\"\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "num_squad_invites",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null
       ]
     }
   },

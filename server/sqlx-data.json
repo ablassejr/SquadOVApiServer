@@ -261,68 +261,6 @@
       "nullable": []
     }
   },
-  "169591f07ebb4b07198a94a709a700b9c92d924ac3adfdf4bb5713c374b38242": {
-    "query": "\n            SELECT\n                us.id AS \"session_id\",\n                us.access_token,\n                us.refresh_token,\n                u.id AS \"user_id\",\n                u.username AS \"user_username\",\n                u.email AS \"user_email\",\n                u.verified AS \"user_verified\",\n                u.uuid AS \"user_uuid\"\n            FROM squadov.user_sessions AS us\n            INNER JOIN squadov.users AS u\n                ON u.id = us.user_id\n            WHERE us.id = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "session_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "access_token",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "refresh_token",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "user_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "user_username",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 5,
-          "name": "user_email",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 6,
-          "name": "user_verified",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 7,
-          "name": "user_uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "171f0d1dd232cd04aab1df297df80fe364e8594cfac2b3de02c19a8eae0df077": {
     "query": "\n            SELECT\n                COALESCE((\n                    SELECT vmp.competitive_tier\n                    FROM squadov.valorant_matches AS vm\n                    INNER JOIN squadov.valorant_match_players AS vmp\n                        ON vmp.match_id = vm.match_id\n                    WHERE vmp.puuid = $1\n                        AND vm.is_ranked IS TRUE\n                    ORDER BY vm.server_start_time_utc DESC\n                    LIMIT 1\n                ), 0) AS \"rank!\",\n                SUM(vvpms.kills)::BIGINT AS \"kills!\",\n                SUM(vvpms.deaths)::BIGINT AS \"deaths!\",\n                SUM(vvpms.assists)::BIGINT AS \"assists!\",\n                SUM(vvpms.rounds_played)::BIGINT AS \"rounds!\",\n                SUM(vvpms.total_combat_score)::BIGINT AS \"total_combat_score!\",\n                SUM(vvpms.total_damage)::BIGINT AS \"total_damage!\",\n                SUM(vvpms.headshots)::BIGINT AS \"headshots!\",\n                SUM(vvpms.bodyshots)::BIGINT AS \"bodyshots!\",\n                SUM(vvpms.legshots)::BIGINT AS \"legshots!\",\n                SUM(CASE WHEN vvpms.won THEN 1 END)::BIGINT AS \"wins!\",\n                COUNT(vvpms.match_id) AS \"games!\"\n            FROM squadov.view_valorant_player_match_stats AS vvpms\n            WHERE vvpms.puuid = $1\n            GROUP BY vvpms.puuid\n            ",
     "describe": {
@@ -640,21 +578,6 @@
         true,
         true
       ]
-    }
-  },
-  "3127c81d1b6965a192b713f6182b26e9ad929a3196f90fc9a6fe7eba516b2184": {
-    "query": "\n            UPDATE squadov.user_sessions\n            SET id = $1,\n                access_token = $2,\n                refresh_token = $3\n            WHERE id = $4\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Varchar",
-          "Text",
-          "Text",
-          "Text"
-        ]
-      },
-      "nullable": []
     }
   },
   "318f44f31151f13d5eb6f882a9f5c135162f5b496f942ff6ccd70a5ebfb21a04": {
@@ -1351,8 +1274,8 @@
       ]
     }
   },
-  "69f83dda2867a7129382594dd1c5de7da5569e83c1447256824bb52e10c11c17": {
-    "query": "\n            DELETE FROM squadov.user_sessions\n            WHERE id = $1\n            ",
+  "6b2e5a4f53b2b391f00152e679d097876a504432b444db8da17560cbde484ec0": {
+    "query": "\n            DELETE FROM squadov.user_sessions\n            WHERE id = $1 OR old_id = $1\n            ",
     "describe": {
       "columns": [],
       "parameters": {
@@ -2666,6 +2589,68 @@
       "nullable": []
     }
   },
+  "bafd85e6dc943094c7232c1db8eae3231882c57fe54fcdbe54d7a6be4b56ad1a": {
+    "query": "\n            SELECT\n                us.id AS \"session_id\",\n                us.access_token,\n                us.refresh_token,\n                u.id AS \"user_id\",\n                u.username AS \"user_username\",\n                u.email AS \"user_email\",\n                u.verified AS \"user_verified\",\n                u.uuid AS \"user_uuid\"\n            FROM squadov.user_sessions AS us\n            INNER JOIN squadov.users AS u\n                ON u.id = us.user_id\n            WHERE us.id = $1 OR us.old_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "session_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "access_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "refresh_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "user_username",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "user_email",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "user_verified",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "user_uuid",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "bd945f834cd91be63a4f3a9cfa07f67bb859769a8e05d31d0251aec6ee58dfd8": {
     "query": "\n            SELECT hmud.deck_version_id, hdv.deck_id\n            FROM squadov.hearthstone_match_user_deck AS hmud\n            INNER JOIN squadov.hearthstone_deck_versions AS hdv\n                ON hdv.version_id = hmud.deck_version_id\n            WHERE hmud.match_uuid = $1 AND hmud.user_id = $2\n            ",
     "describe": {
@@ -2944,6 +2929,21 @@
         false,
         false
       ]
+    }
+  },
+  "d666f15e3c58a7c38039fe7bf13b873c176640d6b13ed0fb37b9d81796550429": {
+    "query": "\n            UPDATE squadov.user_sessions\n            SET id = $1,\n                access_token = $2,\n                refresh_token = $3,\n                old_id = $4\n            WHERE id = $4\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Text",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": []
     }
   },
   "d6b31e9c7abd5bbad78ffb76dba8bbc702754e54b06f8d822f89b830e1220db7": {
