@@ -48,7 +48,7 @@ impl SessionManager {
         sqlx::query!(
             "
             DELETE FROM squadov.user_sessions
-            WHERE id = $1
+            WHERE id = $1 OR old_id = $1
             ",
             id,
         )
@@ -73,7 +73,7 @@ impl SessionManager {
             FROM squadov.user_sessions AS us
             INNER JOIN squadov.users AS u
                 ON u.id = us.user_id
-            WHERE us.id = $1
+            WHERE us.id = $1 OR us.old_id = $1
             ",
             id,
         ).fetch_optional(pool).await?;
@@ -137,7 +137,8 @@ impl SessionManager {
             UPDATE squadov.user_sessions
             SET id = $1,
                 access_token = $2,
-                refresh_token = $3
+                refresh_token = $3,
+                old_id = $4
             WHERE id = $4
             ",
             session.session_id,
@@ -163,14 +164,14 @@ impl crate::api::ApiApplication {
         }
     }
 
-    pub async fn refresh_session_if_necessary(&self, session: SquadOVSession) -> Result<SquadOVSession, squadov_common::SquadOvError> {
+    pub async fn refresh_session_if_necessary(&self, session: SquadOVSession, force: bool) -> Result<SquadOVSession, squadov_common::SquadOvError> {
         // Check if the session is expired (as determined by FusionAuth).
         // If it is expired (or close to it), generate a new session ID and use the refresh token to get a new access token.
         // If it isn't expired, return the session as is.
         let mut session = session;
         let expired = !self.is_session_valid(&session).await?;
 
-        if expired {
+        if expired || force {
             let new_token = match self.clients.fusionauth.refresh_jwt(&session.refresh_token).await {
                 Ok(t) => t,
                 Err(err) => return logged_error!(squadov_common::SquadOvError::InternalError(format!("Refresh JWT {}", err)))
@@ -201,7 +202,7 @@ impl crate::api::ApiApplication {
             Err(err) => return logged_error!(squadov_common::SquadOvError::InternalError(format!("Refresh And Obtain Session {}", err))),
         };
 
-        let session = self.refresh_session_if_necessary(session).await?;
+        let session = self.refresh_session_if_necessary(session, false).await?;
         
         return Ok(Some(session));
     }

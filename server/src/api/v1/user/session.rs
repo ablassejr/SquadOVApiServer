@@ -16,7 +16,10 @@ pub async fn refresh_user_session_handler(app : web::Data<Arc<api::ApiApplicatio
     if session.is_none() {
         return Err(SquadOvError::Unauthorized);
     }
-    let session = app.refresh_session_if_necessary(session.unwrap()).await?;
+
+    // We do need to force the refresh here because the client will pre-emptively
+    // request a new session to make sure it doesn't ever have an invalid session.
+    let session = app.refresh_session_if_necessary(session.unwrap(), true).await?;
 
     // Extract expiration from the access token JWT.
     let token = jsonwebtoken::dangerous_insecure_decode::<SessionJwtClaims>(&session.access_token)?;
