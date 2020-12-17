@@ -35,7 +35,12 @@ impl UserManager {
         return sqlx::query_as!(
             SquadOVUser,
             "
-            SELECT *
+            SELECT
+                id,
+                username,
+                email,
+                verified,
+                uuid
             FROM squadov.users
             WHERE email = $1
             ",
@@ -47,7 +52,12 @@ impl UserManager {
         return sqlx::query_as!(
             SquadOVUser,
             "
-            SELECT *
+            SELECT
+                id,
+                username,
+                email,
+                verified,
+                uuid
             FROM squadov.users
             WHERE id = $1
             ",
@@ -59,7 +69,12 @@ impl UserManager {
         return sqlx::query_as!(
             SquadOVUser,
             "
-            SELECT *
+            SELECT
+                id,
+                username,
+                email,
+                verified,
+                uuid
             FROM squadov.users
             WHERE uuid = $1
             ",
@@ -74,14 +89,16 @@ impl UserManager {
             INSERT INTO squadov.users (
                 email,
                 username,
-                verified
+                verified,
+                local_encryption_key
             )
-            VALUES (
-                $1,
-                $2,
-                $3
-            )
-            RETURNING *
+            SELECT $1, $2, $3, encode(digest(gen_random_bytes(16), 'sha256'), 'base64')
+            RETURNING
+                id,
+                username,
+                email,
+                verified,
+                uuid
             ",
             user.email,
             user.username,

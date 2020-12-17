@@ -46,6 +46,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::resource("/notifications")
                                         .route(web::get().to(v1::get_current_user_notifications_handler))
                                 )
+                                .service(
+                                    web::resource("/localenc")
+                                        .route(web::get().to(v1::get_current_user_local_encryption_handler))
+                                )
                         )
                         .service(
                             web::scope("/{user_id}")

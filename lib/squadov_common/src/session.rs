@@ -5,7 +5,8 @@ use chrono::{DateTime, Utc};
 pub struct SerializedUserSession {
     #[serde(rename="sessionId")]
     pub session_id: String,
-    pub expiration: DateTime<Utc>
+    pub expiration: DateTime<Utc>,
+    pub localenc: String
 }
 
 #[derive(Deserialize)]
