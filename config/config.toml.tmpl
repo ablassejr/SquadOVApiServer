@@ -19,3 +19,7 @@ service_account_key = "gcp/${GCP_PROJECT}.json"
 [server]
 domain = "api.${DEPLOYMENT_DOMAIN}"
 graphql_debug = false
+
+[gitlab]
+access_token = "${GITLAB_ACCESS_TOKEN}"
+project_id = ${GITLAB_PROJECT_ID}

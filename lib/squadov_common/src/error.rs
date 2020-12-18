@@ -186,3 +186,9 @@ impl<T> From<std::sync::mpsc::SendError<T>> for SquadOvError {
         return Self::InternalError(format!("MPSC Send Error {}", err))
     }
 }
+
+impl From<actix_multipart::MultipartError> for SquadOvError {
+    fn from(err: actix_multipart::MultipartError) -> Self {
+        return Self::InternalError(format!("Multipart Error {}", err))
+    }
+}

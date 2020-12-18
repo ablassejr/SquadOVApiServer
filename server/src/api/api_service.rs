@@ -35,6 +35,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
             web::scope("/v1")
                 .wrap(auth::ApiSessionValidator{})
                 .service(
+                    web::scope("/bug")
+                        .route("", web::post().to(v1::create_bug_report_handler))
+                )
+                .service(
                     web::scope("/users")
                         .service(
                             web::scope("/me")

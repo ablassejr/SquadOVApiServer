@@ -59,6 +59,8 @@ You will need to ensure that you have a few Debian packages installed to complet
     * `DEPLOYMENT_DOMAIN_EMAIL` to the email address that you wish to register the Let's Encrypt certificate with.
     * `VOD_BUCKET` to a unique bucket name to store VODs in.
     * `BLOB_BUCKET` to a unique bucket name to store binary blobs in.
+    * `GITLAB_ACCESS_TOKEN` is the Gitlab access token for API access.
+    * `GITLAB_PROJECT_ID` is the Gitlab project id to create issues for when a user submits a bug report.
 
    We'll setup the other environment variables later.
    Save the file and verify that the contents of the `$ENV_vars.json` file is encrypted (i.e. `cat $ENV_vars.json`).

@@ -92,12 +92,19 @@ pub struct ServerConfig {
 }
 
 #[derive(Deserialize,Debug,Clone)]
+pub struct GitlabConfig {
+    pub access_token: String,
+    pub project_id: u64
+}
+
+#[derive(Deserialize,Debug,Clone)]
 pub struct ApiConfig {
     fusionauth: fusionauth::FusionAuthConfig,
     pub gcp: squadov_common::GCPConfig,
     pub database: DatabaseConfig,
     pub cors: CorsConfig,
-    pub server: ServerConfig
+    pub server: ServerConfig,
+    pub gitlab: GitlabConfig
 }
 
 struct ApiClients {
