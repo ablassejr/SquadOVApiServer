@@ -1,0 +1,8 @@
+ALTER TABLE wow_encounters
+ADD COLUMN success BOOLEAN NOT NULL;
+
+ALTER TABLE wow_challenges
+ADD COLUMN time_ms BIGINT NOT NULL;
+
+ALTER TABLE wow_challenges
+ADD COLUMN success BOOLEAN NOT NULL;

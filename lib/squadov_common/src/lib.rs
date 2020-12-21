@@ -13,6 +13,7 @@ pub mod squad;
 pub mod riot;
 pub mod job;
 pub mod session;
+pub mod wow;
 
 pub use error::*;
 pub use parse::*;
@@ -27,6 +28,7 @@ pub use squad::*;
 pub use riot::*;
 pub use job::*;
 pub use session::*;
+pub use wow::*;
 
 #[macro_use]
 extern crate lazy_static;

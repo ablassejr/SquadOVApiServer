@@ -6,6 +6,7 @@ mod valorant;
 mod vod;
 mod squad;
 mod bug;
+mod wow;
 
 pub use user::*;
 pub use matches::*;
@@ -15,3 +16,4 @@ pub use valorant::*;
 pub use vod::*;
 pub use squad::*;
 pub use bug::*;
+pub use wow::*;

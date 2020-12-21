@@ -263,6 +263,32 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         )
                 )
                 .service(
+                    web::scope("/wow")
+                        .service(
+                            web::scope("/combatlog")
+                                .route("", web::post().to(v1::create_wow_combat_log_handler))
+                        )
+                        .service(
+                            web::scope("/match")
+                                .service(
+                                    web::scope("/encounter")
+                                        .route("", web::post().to(v1::create_wow_encounter_match_handler))
+                                        .service(
+                                            web::scope("/{match_uuid}")
+                                                .route("", web::post().to(v1::finish_wow_encounter_handler))
+                                        )
+                                )
+                                .service(
+                                    web::scope("/challenge")
+                                        .route("", web::post().to(v1::create_wow_challenge_match_handler))
+                                        .service(
+                                            web::scope("/{match_uuid}")
+                                                .route("", web::post().to(v1::finish_wow_challenge_handler))
+                                        )
+                                )
+                        )
+                )
+                .service(
                     web::scope("/vod")
                         .route("", web::post().to(v1::create_vod_destination_handler))
                         .service(
