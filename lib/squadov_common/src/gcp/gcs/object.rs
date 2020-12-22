@@ -3,6 +3,7 @@ use reqwest::{StatusCode, header::HeaderMap};
 use serde::Serialize;
 use byteorder::{ByteOrder, BigEndian};
 use rand::Rng;
+use actix_web::web::Bytes;
 
 #[derive(Serialize)]
 struct GCSObjectMetadata {
@@ -74,6 +75,83 @@ impl super::GCSClient {
             308 => Ok(false),
             _ => Err(SquadOvError::NotFound)
         }
+    }
+
+    pub async fn initiate_resumable_upload_session(&self, bucket_id: &str, path_parts: &Vec<String>) -> Result<String, SquadOvError> {
+        let client = self.http.read()?.create_http_client()?;
+        let mut addtl_headers = HeaderMap::new();
+        addtl_headers.insert("Content-Length", "0".parse()?);
+        addtl_headers.insert("Content-Type", "application/octet-stream".parse()?);
+        addtl_headers.insert("x-goog-resumable", "start".parse()?);
+        let path = path_parts
+            .iter()
+            .map(|x| {
+                crate::url_encode(x)
+            })
+            .collect::<Vec<String>>()
+            .join("/");
+        let url = format!("{}/{}/{}", super::STORAGE_XML_BASE_URL, bucket_id, &path);
+        let resp = client.post(&url).headers(addtl_headers).send().await?;
+
+        match resp.status().as_u16() {
+            200 | 201 => {
+                let ret_headers = resp.headers();
+                let loc = ret_headers.get("Location");
+                if loc.is_none() {
+                    return Err(SquadOvError::InternalError(String::from("No location")));
+                }
+
+                Ok(String::from(loc.unwrap().to_str()?))
+            },
+            _ => Err(SquadOvError::InternalError(format!("Failed to initiate GCS resumable upload {} - {}", resp.status().as_u16(), resp.text().await?)))
+        }
+    }
+
+    pub async fn upload_resumable_object(&self, session: &str, last_byte: usize, data: Bytes, last: bool) -> Result<(), SquadOvError> {
+        let client = self.http.read()?.create_http_client()?;
+
+        let mut current_first_byte = 0;
+        let mut current_chunk_last_byte = last_byte;
+        let desired_chunk_end_byte = last_byte + data.len() - 1;
+        while current_chunk_last_byte < desired_chunk_end_byte {
+            let mut addtl_headers = HeaderMap::new();
+            addtl_headers.insert("Content-Length", format!("{}", data.len()).parse()?);
+            addtl_headers.insert("Content-Type", "application/octet-stream".parse()?);
+
+            let content_range;
+            if last {
+                content_range = format!("bytes {}-{}/{}", current_chunk_last_byte, desired_chunk_end_byte, desired_chunk_end_byte + 1);
+            } else {
+                content_range = format!("bytes {}-{}/*", current_chunk_last_byte, desired_chunk_end_byte);
+            }
+            println!("Content range: {}", &content_range);
+            addtl_headers.insert("Content-Range", content_range.parse()?);
+            addtl_headers.insert("x-goog-resumable", "start".parse()?);
+            
+            let resp = client.put(session)
+                .headers(addtl_headers)
+                .body(data.slice(current_first_byte..data.len()))
+                .send()
+                .await?;
+
+            match resp.status().as_u16() {
+                200 | 201 => break,
+                308 => {
+                    let ret_headers = resp.headers();
+                    let range = ret_headers.get("Range");
+                    if range.is_none() {
+                        return Err(SquadOvError::InternalError(String::from("No range")));
+                    }
+                    let range = range.unwrap().to_str()?;
+                    let old_last_byte = current_chunk_last_byte;
+                    current_chunk_last_byte = range.split('-').collect::<Vec<&str>>()[1].parse()?;
+                    current_first_byte += current_chunk_last_byte - old_last_byte;
+                },
+                _ => return Err(SquadOvError::InternalError(format!("Failed to GCS resumable upload {} - {}", resp.status().as_u16(), resp.text().await?)))
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn upload_object(&self, bucket_id: &str, path_parts: &Vec<String>, data: &[u8]) -> Result<(), SquadOvError> {

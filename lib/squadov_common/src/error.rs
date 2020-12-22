@@ -192,3 +192,9 @@ impl From<actix_multipart::MultipartError> for SquadOvError {
         return Self::InternalError(format!("Multipart Error {}", err))
     }
 }
+
+impl From<reqwest::header::ToStrError> for SquadOvError {
+    fn from(err: reqwest::header::ToStrError) -> Self {
+        return Self::InternalError(format!("To Str {}", err))
+    }
+}

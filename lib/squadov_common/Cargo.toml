@@ -40,6 +40,7 @@ tokio = { version = "0.2", features = ["full"] }
 futures = "0.3.8"
 prost = "0.6.1"
 crossbeam = "0.8.0"
+bytes = "0.6.0"
 
 [build-dependencies]
 prost-build = "0.6.1"
