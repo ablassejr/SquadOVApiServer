@@ -124,7 +124,6 @@ impl super::GCSClient {
             } else {
                 content_range = format!("bytes {}-{}/*", current_chunk_last_byte, desired_chunk_end_byte);
             }
-            println!("Content range: {}", &content_range);
             addtl_headers.insert("Content-Range", content_range.parse()?);
             addtl_headers.insert("x-goog-resumable", "start".parse()?);
             
