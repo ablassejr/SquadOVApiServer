@@ -23,3 +23,13 @@ graphql_debug = false
 [gitlab]
 access_token = "${GITLAB_ACCESS_TOKEN}"
 project_id = ${GITLAB_PROJECT_ID}
+
+[kafka]
+
+[kafka.client_keypair]
+key = "${KAFKA_CLIENT_KEY}"
+secret= "${KAFKA_CLIENT_SECRET}"
+
+[kafka.server_keypair]
+key = "${KAFKA_SERVER_KEY}"
+secret= "${KAFKA_SERVER_SECRET}"

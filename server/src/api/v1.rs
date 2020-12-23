@@ -7,6 +7,7 @@ mod vod;
 mod squad;
 mod bug;
 mod wow;
+mod kafka;
 
 pub use user::*;
 pub use matches::*;
@@ -17,3 +18,4 @@ pub use vod::*;
 pub use squad::*;
 pub use bug::*;
 pub use wow::*;
+pub use kafka::*;

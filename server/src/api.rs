@@ -9,7 +9,7 @@ use serde::{Deserialize};
 use sqlx::postgres::{PgPool};
 use actix_web::{HttpRequest};
 use squadov_common;
-use squadov_common::{SquadOvError, HalResponse, BlobManagementClient, JobQueue};
+use squadov_common::{SquadOvError, HalResponse, BlobManagementClient, JobQueue, KafkaCredentialKeyPair};
 use url::Url;
 use std::vec::Vec;
 use std::sync::Arc;
@@ -98,13 +98,20 @@ pub struct GitlabConfig {
 }
 
 #[derive(Deserialize,Debug,Clone)]
+pub struct KafkaConfig {
+    pub client_keypair: KafkaCredentialKeyPair,
+    pub server_keypair: KafkaCredentialKeyPair
+}
+
+#[derive(Deserialize,Debug,Clone)]
 pub struct ApiConfig {
     fusionauth: fusionauth::FusionAuthConfig,
     pub gcp: squadov_common::GCPConfig,
     pub database: DatabaseConfig,
     pub cors: CorsConfig,
     pub server: ServerConfig,
-    pub gitlab: GitlabConfig
+    pub gitlab: GitlabConfig,
+    pub kafka: KafkaConfig
 }
 
 struct ApiClients {

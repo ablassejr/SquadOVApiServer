@@ -14,6 +14,7 @@ pub mod riot;
 pub mod job;
 pub mod session;
 pub mod wow;
+pub mod kafka;
 
 pub use error::*;
 pub use parse::*;
@@ -29,6 +30,7 @@ pub use riot::*;
 pub use job::*;
 pub use session::*;
 pub use wow::*;
+pub use kafka::*;
 
 #[macro_use]
 extern crate lazy_static;

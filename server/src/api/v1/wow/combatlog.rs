@@ -38,7 +38,7 @@ impl api::ApiApplication {
             state.advanced_log,
             &state.build_version
         )
-            .fetch_one(ex)
+            .execute(ex)
             .await?;
         Ok(uuid)
     }

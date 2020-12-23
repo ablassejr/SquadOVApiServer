@@ -38,7 +38,7 @@ impl api::ApiApplication {
             sqlx::query_scalar(
                 "
                 SELECT match_uuid
-                FROM wow_encounters
+                FROM squadov.wow_encounters
                 WHERE encounter_id = $1
                     AND difficulty = $2
                     AND combatants_key = $3
@@ -113,7 +113,8 @@ impl api::ApiApplication {
                 encounter_name,
                 difficulty,
                 num_players,
-                instance_id
+                instance_id,
+                success
             )
             VALUES (
                 $1,
@@ -123,7 +124,8 @@ impl api::ApiApplication {
                 $5,
                 $6,
                 $7,
-                $8
+                $8,
+                false
             )
             ",
             uuid,
@@ -169,7 +171,7 @@ impl api::ApiApplication {
             sqlx::query_scalar(
                 "
                 SELECT match_uuid
-                FROM wow_challenges
+                FROM squadov.wow_challenges
                 WHERE instance_id = $1
                     AND keystone_level = $2
                     AND combatants_key = $3
@@ -196,7 +198,9 @@ impl api::ApiApplication {
                 combatants_key,
                 challenge_name,
                 instance_id,
-                keystone_level
+                keystone_level,
+                success,
+                time_ms
             )
             VALUES (
                 $1,
@@ -204,7 +208,9 @@ impl api::ApiApplication {
                 $3,
                 $4,
                 $5,
-                $6
+                $6,
+                false,
+                0
             )
             ",
             uuid,
