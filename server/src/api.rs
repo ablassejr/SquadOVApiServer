@@ -9,7 +9,13 @@ use serde::{Deserialize};
 use sqlx::postgres::{PgPool};
 use actix_web::{HttpRequest};
 use squadov_common;
-use squadov_common::{SquadOvError, HalResponse, BlobManagementClient, JobQueue, KafkaCredentialKeyPair};
+use squadov_common::{
+    SquadOvError,
+    HalResponse,
+    BlobManagementClient,
+    JobQueue,
+    KafkaCredentialKeyPair,
+};
 use url::Url;
 use std::vec::Vec;
 use std::sync::Arc;
@@ -98,7 +104,14 @@ pub struct GitlabConfig {
 }
 
 #[derive(Deserialize,Debug,Clone)]
+pub struct VodConfig {
+    pub fastify_threads: i32
+}
+
+#[derive(Deserialize,Debug,Clone)]
 pub struct KafkaConfig {
+    pub bootstrap_servers: String,
+    pub wow_combat_log_threads: i32,
     pub client_keypair: KafkaCredentialKeyPair,
     pub server_keypair: KafkaCredentialKeyPair
 }
@@ -111,7 +124,8 @@ pub struct ApiConfig {
     pub cors: CorsConfig,
     pub server: ServerConfig,
     pub gitlab: GitlabConfig,
-    pub kafka: KafkaConfig
+    pub kafka: KafkaConfig,
+    pub vod: VodConfig
 }
 
 struct ApiClients {
@@ -124,9 +138,9 @@ pub struct ApiApplication {
     users: auth::UserManager,
     session: auth::SessionManager,
     vod: Arc<dyn v1::VodManager + Send + Sync>,
-    pool: Arc<PgPool>,
+    pub pool: Arc<PgPool>,
     schema: Arc<graphql::GraphqlSchema>,
-    blob: Arc<BlobManagementClient>,
+    pub blob: Arc<BlobManagementClient>,
     // Various local job queues - these should eventually
     // probably be switched to something like RabbitMQ + microservices.
     pub vod_fastify_jobs: Arc<JobQueue<v1::VodFastifyJob>>
@@ -166,7 +180,7 @@ impl ApiApplication {
             schema: Arc::new(graphql::create_schema()),
             blob: blob,
             // TODO: Configify!
-            vod_fastify_jobs: JobQueue::new::<v1::VodFastifyWorker>(4),
+            vod_fastify_jobs: JobQueue::new::<v1::VodFastifyWorker>(config.vod.fastify_threads),
         }
     }
 }

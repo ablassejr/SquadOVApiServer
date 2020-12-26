@@ -12,6 +12,12 @@ struct GCSObjectMetadata {
     name: String
 }
 
+#[derive(PartialEq)]
+pub enum GCSUploadStatus {
+    Complete,
+    Incomplete(usize)
+}
+
 impl super::GCSClient {
     pub async fn get_object(&self, bucket_id: &str, path: &str) -> Result<(), SquadOvError> {
         let client = self.http.read()?.create_http_client()?;
@@ -63,7 +69,7 @@ impl super::GCSClient {
     }
 
     // Returns whether or not the upload is complete or is incomplete.
-    pub async fn get_upload_status(&self, session_uri: &str) -> Result<bool, SquadOvError> {
+    pub async fn get_upload_status(&self, session_uri: &str) -> Result<GCSUploadStatus, SquadOvError> {
         let client = self.http.read()?.create_http_client()?;
         let mut addtl_headers = HeaderMap::new();
         addtl_headers.insert("Content-Length", "0".parse()?);
@@ -71,9 +77,21 @@ impl super::GCSClient {
         let resp = client.put(session_uri).headers(addtl_headers).send().await?;
 
         match resp.status().as_u16() {
-            200 | 201 => Ok(true),
-            308 => Ok(false),
-            _ => Err(SquadOvError::NotFound)
+            200 | 201 => Ok(GCSUploadStatus::Complete),
+            308 => {
+                let ret_headers = resp.headers();
+                let range = ret_headers.get("Range");
+                if range.is_none() {
+                    return Ok(GCSUploadStatus::Incomplete(0));
+                }
+
+                let tokens: Vec<&str> = range.unwrap().to_str()?.split('-').collect();
+                if tokens.is_empty() {
+                    return Err(SquadOvError::InternalError(String::from("No range [no separator found]")));
+                }
+                Ok(GCSUploadStatus::Incomplete(tokens.last().unwrap().parse()?))
+            },
+            _ => Err(SquadOvError::InternalError(format!("GCS Check Upload Status Error: {} - {}", resp.status().as_u16(), resp.text().await?)))
         }
     }
 
@@ -125,7 +143,6 @@ impl super::GCSClient {
                 content_range = format!("bytes {}-{}/*", current_chunk_last_byte, desired_chunk_end_byte);
             }
             addtl_headers.insert("Content-Range", content_range.parse()?);
-            addtl_headers.insert("x-goog-resumable", "start".parse()?);
             
             let resp = client.put(session)
                 .headers(addtl_headers)

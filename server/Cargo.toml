@@ -42,3 +42,4 @@ bytes = "0.6.0"
 prost = "0.6.1"
 tempfile = "3.1.0"
 rand = "0.8.0"
+rdkafka = { version = "0.24", features = ["cmake-build", "ssl"] }

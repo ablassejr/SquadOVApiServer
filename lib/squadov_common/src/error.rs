@@ -198,3 +198,9 @@ impl From<reqwest::header::ToStrError> for SquadOvError {
         return Self::InternalError(format!("To Str {}", err))
     }
 }
+
+impl From<std::array::TryFromSliceError> for SquadOvError {
+    fn from(err: std::array::TryFromSliceError) -> Self {
+        return Self::InternalError(format!("Slice into Array {}", err))
+    }
+}

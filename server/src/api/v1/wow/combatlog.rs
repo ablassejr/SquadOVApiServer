@@ -1,6 +1,8 @@
 use squadov_common::{
     SquadOvError,
-    WoWCombatLogState
+    WoWCombatLogState,
+    FullWoWCombatLogState,
+    BlobResumableIdentifier
 };
 use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
@@ -10,7 +12,39 @@ use uuid::Uuid;
 use sqlx::{Executor, Postgres};
 
 impl api::ApiApplication {
-    async fn create_wow_combat_log<'a, T>(&self, ex: T, user_id: i64, state: &WoWCombatLogState) -> Result<Uuid, SquadOvError>
+    pub async fn get_wow_combat_log(&self, combat_log_id: &Uuid) -> Result<FullWoWCombatLogState, SquadOvError> {
+        let record = sqlx::query!(
+            "
+            SELECT
+                wcl.combat_log_version,
+                wcl.advanced_log,
+                wcl.build_version,
+                wcl.blob_uuid,
+                bls.session_uri
+            FROM squadov.wow_combat_logs AS wcl
+            INNER JOIN squadov.blob_link_storage AS bls
+                ON bls.uuid = wcl.blob_uuid
+            WHERE wcl.uuid = $1
+            ",
+            combat_log_id
+        )
+            .fetch_one(&*self.pool)
+            .await?;
+
+        Ok(FullWoWCombatLogState{
+            state: WoWCombatLogState{
+                combat_log_version: record.combat_log_version,
+                advanced_log: record.advanced_log,
+                build_version: record.build_version,
+            },
+            blob: BlobResumableIdentifier{
+                uuid: record.blob_uuid,
+                session: record.session_uri,
+            },
+        })
+    }
+
+    async fn create_wow_combat_log<'a, T>(&self, ex: T, user_id: i64, state: &WoWCombatLogState, blob_uuid: &Uuid) -> Result<Uuid, SquadOvError>
     where
         T: Executor<'a, Database = Postgres>
     {
@@ -22,21 +56,24 @@ impl api::ApiApplication {
                 user_id,
                 combat_log_version,
                 advanced_log,
-                build_version
+                build_version,
+                blob_uuid
             )
             VALUES (
                 $1,
                 $2,
                 $3,
                 $4,
-                $5
+                $5,
+                $6
             )
             ",
             &uuid,
             user_id,
             &state.combat_log_version,
             state.advanced_log,
-            &state.build_version
+            &state.build_version,
+            blob_uuid
         )
             .execute(ex)
             .await?;
@@ -52,7 +89,8 @@ pub async fn create_wow_combat_log_handler(app : web::Data<Arc<api::ApiApplicati
     };
 
     let mut tx = app.pool.begin().await?;
-    let uuid = app.create_wow_combat_log(&mut tx, session.user.id, &state).await?;
+    let blob = app.blob.begin_new_resumable_blob(&mut tx).await?;
+    let uuid = app.create_wow_combat_log(&mut tx, session.user.id, &state, &blob.uuid).await?;
     tx.commit().await?;
     Ok(HttpResponse::Ok().json(uuid))
 }

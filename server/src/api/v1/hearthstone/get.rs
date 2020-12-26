@@ -465,7 +465,7 @@ impl api::ApiApplication {
             .fetch_one(&*self.pool)
             .await?;
 
-        let raw_actions = self.blob.get_blob(&action_blob_uuid).await?;
+        let raw_actions = self.blob.get_blob(&action_blob_uuid, true).await?;
         let blocks: Vec<HearthstoneSerializedGameBlock> = sqlx::query!(
             r#"
             SELECT 

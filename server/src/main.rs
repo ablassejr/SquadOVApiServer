@@ -2,6 +2,7 @@
 extern crate log;
 
 mod api;
+mod wow_kafka;
 
 use tokio;
 use actix_rt;
@@ -11,8 +12,9 @@ use api::api_service;
 use structopt::StructOpt;
 use actix_cors::{Cors};
 use std::fs;
-use std::sync::Arc;
-use squadov_common::TaskWrapper;
+use rdkafka::config::ClientConfig;
+use async_std::sync::{Arc};
+use squadov_common::{TaskWrapper};
 
 #[derive(StructOpt, Debug)]
 struct Options {
@@ -25,7 +27,7 @@ struct Options {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_BACKTRACE", "1");
-    std::env::set_var("RUST_LOG", "info,squadov_api_server=debug,actix_web=debug,actix_http=debug");
+    std::env::set_var("RUST_LOG", "info,squadov_api_server=debug,actix_web=debug,actix_http=debug,librdkafka=info,rdkafka::client=info");
     std::env::set_var("SQLX_LOG", "0");
     env_logger::init();
 
@@ -33,6 +35,14 @@ async fn main() -> std::io::Result<()> {
     let raw_cfg = fs::read_to_string(opts.config)?;
     let config : api::ApiConfig = toml::from_str(&raw_cfg).unwrap();
     let app = Arc::new(api::ApiApplication::new(&config).await);
+
+    let mut kafka_config = ClientConfig::new();
+    kafka_config.set("bootstrap.servers", &config.kafka.bootstrap_servers);
+    kafka_config.set("security.protocol", "SASL_SSL");
+    kafka_config.set("sasl.mechanisms", "PLAIN");
+    kafka_config.set("sasl.username", &config.kafka.server_keypair.key);
+    kafka_config.set("sasl.password", &config.kafka.server_keypair.secret);
+    kafka_config.set("enable.auto.offset.store", "false");
 
     // A hacky way of doing things related to api::ApiApplication...
     if opts.mode.is_some() {
@@ -47,6 +57,8 @@ async fn main() -> std::io::Result<()> {
                     session_uri: None,
                 })).unwrap();
             }
+        } else if mode == "wow_manual_parsing" {
+            wow_kafka::create_wow_consumer_thread(app.clone(), &kafka_config).await?;
         } else {
             log::error!("Invalid mode: {}", &mode);
         }
@@ -55,6 +67,10 @@ async fn main() -> std::io::Result<()> {
         let local = tokio::task::LocalSet::new();
         let sys = actix_rt::System::run_in_tokio("server", &local);
         let config2 = config.clone();
+
+        for _i in 0..config.kafka.wow_combat_log_threads {
+            wow_kafka::create_wow_consumer_thread(app.clone(), &kafka_config);
+        }
         
         // The API service is primarily used for dealing with API calls.actix_web
         // We're not going to have a web-based interface at the moment (only going to be desktop client-based)

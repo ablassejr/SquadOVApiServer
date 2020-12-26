@@ -423,8 +423,8 @@ impl api::ApiApplication {
                     entities_sql.push(format!("(
                         '{snapshot_id}',
                         {entity_id},
-                        '{tags}',
-                        '{attributes}'
+                        {tags},
+                        {attributes}
                     )",
                         snapshot_id=m.uuid,
                         entity_id=eid,

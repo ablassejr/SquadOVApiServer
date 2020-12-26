@@ -1,5 +1,6 @@
 use crate::api::v1;
 use squadov_common;
+use squadov_common::gcp::gcs::GCSUploadStatus;
 use std::sync::Arc;
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -123,7 +124,7 @@ impl v1::VodManager for GCSVodManager {
 
     async fn is_vod_session_finished(&self, session: &str) -> Result<bool, squadov_common::SquadOvError> {
         let client = self.get_gcp_client().gcs();
-        Ok(client.get_upload_status(session).await?)
+        Ok(client.get_upload_status(session).await? == GCSUploadStatus::Complete)
     }
     
     async fn get_segment_upload_uri(&self, segment: &squadov_common::VodSegmentId) -> Result<String, squadov_common::SquadOvError> {

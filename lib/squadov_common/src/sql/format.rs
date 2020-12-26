@@ -44,8 +44,22 @@ where T: chrono::TimeZone,
 }
 
 pub fn sql_format_json<T>(v: &T) -> Result<String, crate::SquadOvError> 
-where T: serde::Serialize {
-    Ok(serde_json::to_string(v)?
-        .replace("'", "''")
+where T: serde::Serialize
+{
+    Ok(format!(
+        "'{}'", 
+        serde_json::to_string(v)?
+            .replace("'", "''")
+    ))
+}
+
+pub fn sql_format_option_json<T>(v: &Option<T>) -> Result<String, crate::SquadOvError> 
+where T: serde::Serialize
+{
+    Ok(
+        match v {
+            Some(x) => sql_format_json(x)?,
+            None => String::from("NULL")
+        }
     )
 }
