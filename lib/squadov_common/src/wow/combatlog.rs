@@ -8,6 +8,7 @@ use std::str::FromStr;
 use crate::SquadOvError;
 use unicode_segmentation::UnicodeSegmentation;
 use serde::Serialize;
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 pub struct WoWCombatLogState {
@@ -125,7 +126,7 @@ impl RawWoWCombatLogPayload {
     pub fn flatten(&self) -> String {
         format!(
             "{} {}\n",
-            self.timestamp.format("%F %T").to_string(),
+            self.timestamp.format("%m/%d %T").to_string(),
             self.parts.join(","),
         )
     }
@@ -143,7 +144,6 @@ impl RawWoWCombatLogPayload {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag="type")]
 pub struct WoWSpellInfo {
     id: i64,
     name: String,
@@ -177,7 +177,6 @@ impl FromStr for WoWSpellAuraType {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag="type")]
 pub struct WoWItemInfo {
     item_id: i64,
     ilvl: i32
@@ -229,7 +228,6 @@ pub enum WoWCombatLogEventType {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag="type")]
 pub struct WoWCombatLogSourceDest {
     guid: String,
     name: String,
@@ -465,6 +463,7 @@ where
         VALUES
     "));
 
+    let mut combatlog_current_players: HashMap<Uuid, String> = HashMap::new();
     for eve in events {
         sql.push(format!("(
             '{uuid}',
@@ -484,11 +483,28 @@ where
             evt=crate::sql_format_json(&eve.event)?,
         ));
         sql.push(String::from(","));
+
+        // If source/dest is not none then we need to check the flags on the
+        // relevant object and extract that information if necessary. In 
+        // particular, we're interested in whether or not this player is the
+        // "current player" for the uploader of the combat log.
+        if eve.source.is_some() {
+            let source = eve.source.as_ref().unwrap();
+            if source.flags & crate::COMBATLOG_FILTER_ME != 0 {
+                combatlog_current_players.insert(eve.combat_log_id.clone(), source.guid.clone());
+            }
+        }
+
+        if eve.dest.is_some() {
+            let dest = eve.source.as_ref().unwrap();
+            if dest.flags & crate::COMBATLOG_FILTER_ME != 0 {
+                combatlog_current_players.insert(eve.combat_log_id.clone(), dest.guid.clone());
+            }
+        }
     }
 
     sql.truncate(sql.len() - 1);
     sql.push(String::from(" ON CONFLICT DO NOTHING"));
-
     sqlx::query(&sql.join("")).execute(ex).await?;
     Ok(())
 }

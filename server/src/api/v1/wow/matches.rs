@@ -4,9 +4,11 @@ use squadov_common::{
     WoWChallengeStart,
     WoWEncounterEnd,
     WoWChallengeEnd,
+    WoWEncounter,
+    WoWChallenge,
     WoWCombatantInfo
 };
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -247,6 +249,58 @@ impl api::ApiApplication {
             .await?;
         Ok(())
     }
+
+    async fn list_wow_encounters_for_character(&self, character_guid: &str, start: i64, end: i64) -> Result<Vec<WoWEncounter>, SquadOvError> {
+        Ok(
+            sqlx::query_as!(
+                WoWEncounter,
+                r#"
+                SELECT DISTINCT we.*, wcl.build_version AS "build"
+                FROM squadov.wow_encounters AS we
+                INNER JOIN squadov.wow_match_combatants AS wmc
+                    ON wmc.match_uuid = we.match_uuid
+                INNER JOIN squadov.wow_match_combat_log_association AS cla
+                    ON cla.match_uuid = we.match_uuid
+                INNER JOIN squadov.wow_combat_logs AS wcl
+                    ON wcl.uuid = cla.combat_log_uuid
+                WHERE wmc.combatant_guid = $1
+                ORDER BY tm DESC
+                LIMIT $2 OFFSET $3
+                "#,
+                character_guid,
+                end - start,
+                start
+            )
+                .fetch_all(&*self.pool)
+                .await?
+        )
+    }
+
+    async fn list_wow_challenges_for_character(&self, character_guid: &str, start: i64, end: i64) -> Result<Vec<WoWChallenge>, SquadOvError> {
+        Ok(
+            sqlx::query_as!(
+                WoWChallenge,
+                r#"
+                SELECT DISTINCT wc.*, wcl.build_version AS "build"
+                FROM squadov.wow_challenges AS wc
+                INNER JOIN squadov.wow_match_combatants AS wmc
+                    ON wmc.match_uuid = wc.match_uuid
+                INNER JOIN squadov.wow_match_combat_log_association AS cla
+                    ON cla.match_uuid = wc.match_uuid
+                INNER JOIN squadov.wow_combat_logs AS wcl
+                    ON wcl.uuid = cla.combat_log_uuid
+                WHERE wmc.combatant_guid = $1
+                ORDER BY tm DESC
+                LIMIT $2 OFFSET $3
+                "#,
+                character_guid,
+                end - start,
+                start
+            )
+                .fetch_all(&*self.pool)
+                .await?
+        )
+    }
 }
 
 pub async fn create_wow_encounter_match_handler(app : web::Data<Arc<api::ApiApplication>>, input_match: web::Json<GenericMatchCreationRequest<WoWEncounterStart>>) -> Result<HttpResponse, SquadOvError> {
@@ -326,4 +380,30 @@ pub async fn finish_wow_challenge_handler(app : web::Data<Arc<api::ApiApplicatio
     app.finish_wow_challenge(&mut tx, &path.match_uuid, &data.timestamp, &data.data).await?;
     tx.commit().await?;
     Ok(HttpResponse::Ok().finish())
+}
+
+pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let query = query.into_inner();
+    let encounters = app.list_wow_encounters_for_character(
+        &path.character_guid,
+        query.start,
+        query.end,
+    ).await?;
+
+    let expected_total = query.end - query.start;
+    let got_total = encounters.len() as i64;
+    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(encounters, &req, &query, expected_total == got_total)?))
+}
+
+pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let query = query.into_inner();
+    let challenges = app.list_wow_challenges_for_character(
+        &path.character_guid,
+        query.start,
+        query.end,
+    ).await?;
+
+    let expected_total = query.end - query.start;
+    let got_total = challenges.len() as i64;
+    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(challenges, &req, &query, expected_total == got_total)?))
 }

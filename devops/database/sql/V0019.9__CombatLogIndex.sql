@@ -1,0 +1,1 @@
+CREATE INDEX ON wow_combat_logs(user_id);

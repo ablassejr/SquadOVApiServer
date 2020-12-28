@@ -291,6 +291,22 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         )
                                 )
                         )
+                        .service(
+                            web::scope("/users/{user_id}")
+                                .service(
+                                    web::scope("/characters")
+                                        .route("", web::get().to(v1::list_wow_characters_for_user_handler))
+                                        .service(
+                                            web::scope("/{character_guid}")
+                                                .route("/encounters", web::get().to(v1::list_wow_encounters_for_character_handler))
+                                                .route("/challenges", web::get().to(v1::list_wow_challenges_for_character_handler))
+                                        )
+                                )
+                                .service(
+                                    web::scope("/match/{match_uuid}")
+                                        .route("/characters", web::get().to(v1::list_wow_characters_for_match_handler))
+                                )
+                        )
                 )
                 .service(
                     web::scope("/vod")
