@@ -304,7 +304,9 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 )
                                 .service(
                                     web::scope("/match/{match_uuid}")
+                                        .route("", web::get().to(v1::get_wow_match_handler))
                                         .route("/characters", web::get().to(v1::list_wow_characters_for_match_handler))
+                                        .route("/events", web::get().to(v1::list_wow_events_for_match_handler))
                                 )
                         )
                 )

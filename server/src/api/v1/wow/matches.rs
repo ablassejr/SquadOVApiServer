@@ -6,14 +6,14 @@ use squadov_common::{
     WoWChallengeEnd,
     WoWEncounter,
     WoWChallenge,
-    WoWCombatantInfo
+    WoWCombatantInfo,
 };
 use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
 use std::sync::Arc;
 use uuid::Uuid;
 use sqlx::{Executor, Postgres};
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 
 #[derive(Deserialize)]
@@ -301,6 +301,50 @@ impl api::ApiApplication {
                 .await?
         )
     }
+
+    async fn find_wow_challenge(&self, match_uuid: &Uuid) -> Result<Option<WoWChallenge>, SquadOvError> {
+        Ok(
+            sqlx::query_as!(
+                WoWChallenge,
+                r#"
+                SELECT DISTINCT wc.*, wcl.build_version AS "build"
+                FROM squadov.wow_challenges AS wc
+                INNER JOIN squadov.wow_match_combatants AS wmc
+                    ON wmc.match_uuid = wc.match_uuid
+                INNER JOIN squadov.wow_match_combat_log_association AS cla
+                    ON cla.match_uuid = wc.match_uuid
+                INNER JOIN squadov.wow_combat_logs AS wcl
+                    ON wcl.uuid = cla.combat_log_uuid
+                WHERE wc.match_uuid = $1
+                "#,
+                match_uuid
+            )
+                .fetch_optional(&*self.pool)
+                .await?
+        )
+    }
+
+    async fn find_wow_encounter(&self, match_uuid: &Uuid) -> Result<Option<WoWEncounter>, SquadOvError> {
+        Ok(
+            sqlx::query_as!(
+                WoWEncounter,
+                r#"
+                SELECT DISTINCT we.*, wcl.build_version AS "build"
+                FROM squadov.wow_encounters AS we
+                INNER JOIN squadov.wow_match_combatants AS wmc
+                    ON wmc.match_uuid = we.match_uuid
+                INNER JOIN squadov.wow_match_combat_log_association AS cla
+                    ON cla.match_uuid = we.match_uuid
+                INNER JOIN squadov.wow_combat_logs AS wcl
+                    ON wcl.uuid = cla.combat_log_uuid
+                WHERE we.match_uuid = $1
+                "#,
+                match_uuid
+            )
+                .fetch_optional(&*self.pool)
+                .await?
+        )
+    }
 }
 
 pub async fn create_wow_encounter_match_handler(app : web::Data<Arc<api::ApiApplication>>, input_match: web::Json<GenericMatchCreationRequest<WoWEncounterStart>>) -> Result<HttpResponse, SquadOvError> {
@@ -406,4 +450,17 @@ pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::
     let expected_total = query.end - query.start;
     let got_total = challenges.len() as i64;
     Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(challenges, &req, &query, expected_total == got_total)?))
+}
+
+pub async fn get_wow_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>) -> Result<HttpResponse, SquadOvError> {
+    #[derive(Serialize)]
+    struct Response {
+        encounter: Option<WoWEncounter>,
+        challenge: Option<WoWChallenge>,
+    }
+
+    Ok(HttpResponse::Ok().json(Response{
+        encounter: app.find_wow_encounter(&path.match_uuid).await?,
+        challenge: app.find_wow_challenge(&path.match_uuid).await?,
+    }))
 }

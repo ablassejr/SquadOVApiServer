@@ -161,7 +161,8 @@ pub enum WoWDamageType {
 #[serde(tag="type")]
 pub enum WoWSpellAuraType {
     Buff,
-    Debuff
+    Debuff,
+    Unknown
 }
 
 impl FromStr for WoWSpellAuraType {
@@ -211,6 +212,7 @@ pub enum WoWCombatLogEventType {
     },
     Resurrect(WoWSpellInfo),
     SpellAura{
+        spell: WoWSpellInfo,
         aura_type: WoWSpellAuraType,
         applied: bool
     },
@@ -223,6 +225,31 @@ pub enum WoWCombatLogEventType {
         armor: i32,
         spec_id: i32,
         items: Vec<WoWItemInfo>,
+    },
+    EncounterStart{
+        encounter_id: i32,
+        encounter_name: String,
+        difficulty: i32,
+        num_players: i32,
+        instance_id: i32
+    },
+    EncounterEnd{
+        encounter_id: i32,
+        encounter_name: String,
+        difficulty: i32,
+        num_players: i32,
+        success: bool
+    },
+    ChallengeModeStart{
+        challenge_name: String,
+        instance_id: i32,
+        keystone: i32
+    },
+    ChallengeModeEnd{
+        instance_id: i32,
+        success: bool,
+        keystone: i32,
+        time_ms: i64
     },
     Unknown
 }
@@ -368,10 +395,12 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                         }),
                         "SPELL_RESURRECT" => Ok((None, WoWCombatLogEventType::Resurrect(spell_info))),
                         "SPELL_AURA_APPLIED" => Ok((None, WoWCombatLogEventType::SpellAura{
+                            spell: spell_info,
                             aura_type: WoWSpellAuraType::from_str(&payload.parts[idx])?,
                             applied: true
                         })),
                         "SPELL_AURA_REMOVED" => Ok((None, WoWCombatLogEventType::SpellAura{
+                            spell: spell_info,
                             aura_type: WoWSpellAuraType::from_str(&payload.parts[idx])?,
                             applied: false
                         })),
@@ -407,6 +436,31 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                 spec_id: payload.parts[24].parse()?,
                 items: parse_wow_item_info_from_str(&payload.parts[28])?,
             })),
+            "ENCOUNTER_START" => Ok((None, WoWCombatLogEventType::EncounterStart{
+                encounter_id: payload.parts[1].parse()?,
+                encounter_name: payload.parts[2].clone(),
+                difficulty: payload.parts[3].parse()?,
+                num_players: payload.parts[4].parse()?,
+                instance_id: payload.parts[5].parse()?,
+            })),
+            "ENCOUNTER_END" => Ok((None, WoWCombatLogEventType::EncounterEnd{
+                encounter_id: payload.parts[1].parse()?,
+                encounter_name: payload.parts[2].clone(),
+                difficulty: payload.parts[3].parse()?,
+                num_players: payload.parts[4].parse()?,
+                success: payload.parts[5] == "1"
+            })),
+            "CHALLENGE_MODE_START" => Ok((None, WoWCombatLogEventType::ChallengeModeStart{
+                challenge_name: payload.parts[1].clone(),
+                instance_id: payload.parts[2].parse()?,
+                keystone: payload.parts[4].parse()?,
+            })),
+            "CHALLENGE_MODE_END" => Ok((None, WoWCombatLogEventType::ChallengeModeEnd{
+                instance_id: payload.parts[1].parse()?,
+                success: payload.parts[2] == "1",
+                keystone: payload.parts[3].parse()?,
+                time_ms: payload.parts[4].parse()?,
+            })),
             _ => Ok((None, WoWCombatLogEventType::Unknown))
         },
     }
@@ -441,12 +495,81 @@ pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, state: &WoWCombatLogState, 
     }))
 }
 
-pub async fn store_wow_combat_log_events<'a, T>(ex: &'a mut T, events: &[WoWCombatLogEvent]) -> Result<(), crate::SquadOvError>
+pub type WowCombatLogUnitOwnershipMapping = HashMap<Uuid, (String, String)>;
+pub type WowCombatLogCharacterOwnershipMapping = HashMap<Uuid, String>;
+
+pub async fn store_combat_log_unit_ownership_mapping<'a, T>(ex: &'a mut T, mapping: &WowCombatLogUnitOwnershipMapping) -> Result<(), crate::SquadOvError>
+where
+    &'a mut T: Executor<'a, Database = Postgres>
+{
+    if mapping.is_empty() {
+        return Ok(());
+    }
+
+    let mut values: Vec<String> = Vec::new();
+    for (combatlog, (unit_guid, owner_guid)) in mapping {
+        values.push(format!(
+            "('{combat_log_uuid}', '{unit_guid}', '{owner_guid}')",
+            combat_log_uuid=combatlog.to_string(),
+            unit_guid=unit_guid,
+            owner_guid=owner_guid,
+        ));
+    }
+
+    sqlx::query(&format!(
+        "
+        INSERT INTO squadov.wow_combatlog_unit_ownership (combat_log_uuid, unit_guid, owner_guid)
+        VALUES {values}
+        ON CONFLICT DO NOTHING
+        ",
+        values=values.join(",")
+    ))
+        .execute(ex)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn store_combat_log_user_character_mapping<'a, T>(ex: &'a mut T, mapping: &WowCombatLogCharacterOwnershipMapping) -> Result<(), crate::SquadOvError>
+where
+    &'a mut T: Executor<'a, Database = Postgres>
+{
+    if mapping.is_empty() {
+        return Ok(());
+    }
+
+    let mut values: Vec<String> = Vec::new();
+    for (combatlog, guid) in mapping {
+        values.push(format!(
+            "('{combatlog}', '{guid}')",
+            combatlog=combatlog.to_string(),
+            guid=guid
+        ));
+    }
+
+    sqlx::query(&format!(
+        "
+        INSERT INTO squadov.wow_user_character_association (user_id, guid)
+        SELECT wcl.user_id, v.guid
+        FROM (VALUES {values}) AS v(combatlog_id, guid)
+        INNER JOIN squadov.wow_combat_logs AS wcl
+            ON wcl.uuid = v.combatlog_id::UUID
+        ON CONFLICT DO NOTHING
+        ",
+        values=values.join(",")
+    ))
+        .execute(ex)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn store_wow_combat_log_events<'a, T>(ex: &'a mut T, events: &[WoWCombatLogEvent]) -> Result<(WowCombatLogUnitOwnershipMapping, WowCombatLogCharacterOwnershipMapping), crate::SquadOvError>
 where
     &'a mut T: Executor<'a, Database = Postgres>
 {
     if events.is_empty() {
-        return Ok(());
+        return Ok((HashMap::new(), HashMap::new()));
     }
 
     let mut sql: Vec<String> = Vec::new();
@@ -463,7 +586,9 @@ where
         VALUES
     "));
 
-    let mut combatlog_current_players: HashMap<Uuid, String> = HashMap::new();
+    let mut combatlog_current_players: WowCombatLogCharacterOwnershipMapping = HashMap::new();
+    let mut combatlog_ownership: WowCombatLogUnitOwnershipMapping = HashMap::new();
+
     for eve in events {
         sql.push(format!("(
             '{uuid}',
@@ -490,15 +615,22 @@ where
         // "current player" for the uploader of the combat log.
         if eve.source.is_some() {
             let source = eve.source.as_ref().unwrap();
-            if source.flags & crate::COMBATLOG_FILTER_ME != 0 {
+            if source.flags & crate::COMBATLOG_FILTER_ME == crate::COMBATLOG_FILTER_ME && source.guid != crate::NIL_WOW_GUID {
                 combatlog_current_players.insert(eve.combat_log_id.clone(), source.guid.clone());
             }
         }
 
         if eve.dest.is_some() {
             let dest = eve.source.as_ref().unwrap();
-            if dest.flags & crate::COMBATLOG_FILTER_ME != 0 {
+            if dest.flags & crate::COMBATLOG_FILTER_ME == crate::COMBATLOG_FILTER_ME && dest.guid != crate::NIL_WOW_GUID {
                 combatlog_current_players.insert(eve.combat_log_id.clone(), dest.guid.clone());
+            }
+        }
+
+        if eve.advanced.is_some() {
+            let advanced = eve.advanced.as_ref().unwrap();
+            if advanced.owner_guid != crate::NIL_WOW_GUID && advanced.unit_guid != crate::NIL_WOW_GUID {
+                combatlog_ownership.insert(eve.combat_log_id.clone(), (advanced.unit_guid.clone(), advanced.owner_guid.clone()));
             }
         }
     }
@@ -506,7 +638,7 @@ where
     sql.truncate(sql.len() - 1);
     sql.push(String::from(" ON CONFLICT DO NOTHING"));
     sqlx::query(&sql.join("")).execute(ex).await?;
-    Ok(())
+    Ok((combatlog_ownership, combatlog_current_players))
 }
 
 #[cfg(test)]

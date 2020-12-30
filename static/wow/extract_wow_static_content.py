@@ -124,7 +124,7 @@ def extract_instances_to(data, interface, listfile, output):
     with open(os.path.join(data, 'map.csv')) as maps:
         reader = csv.DictReader(maps)
         for row in reader:
-            if row['InstanceType'] != '1':
+            if row['InstanceType'] != '1' and row['InstanceType'] != '2':
                 continue
 
             allInstances[row['ID']] = {
@@ -164,14 +164,38 @@ def extract_instances_to(data, interface, listfile, output):
                 if not os.path.exists(dst):
                     shutil.copy(src, dst)
 
+def extract_difficulty_to(data, interface, output):
+    if not os.path.exists(output):
+        os.makedirs(output)
+
+    allDiff = {}
+    with open(os.path.join(data, 'difficulty.csv')) as difficulty:
+        reader = csv.DictReader(difficulty)
+        for row in reader:
+            allDiff[row['ID']] = {
+                'id': row['ID'],
+                'name': row['Name_lang']
+            }
+    
+    for diffId, diffData in allDiff.items():
+        diffFolder = os.path.join(output, diffId)
+        if not os.path.exists(diffFolder):
+            os.makedirs(diffFolder)
+
+        diffOutput = os.path.join(diffFolder, 'data.json')
+        if not os.path.exists(diffOutput):
+            with open(diffOutput, 'w') as f:
+                json.dump(diffData, f)
+
 def extract_data_to(data, interface, output):
     if not os.path.exists(output):
         os.makedirs(output)
 
     listfile = load_listfile(os.path.join(data, 'listfile.csv'))
+    extract_difficulty_to(data, interface, os.path.join(output, 'difficulty'))
     extract_classes_to(data, interface, listfile, os.path.join(output, 'class'), os.path.join(output, 'specs'))
-    extract_spells_to(data, interface, listfile, os.path.join(output, 'spells'))
     extract_instances_to(data, interface, listfile, os.path.join(output, 'instances'))
+    extract_spells_to(data, interface, listfile, os.path.join(output, 'spells'))
 
 def main():
     parser = argparse.ArgumentParser()

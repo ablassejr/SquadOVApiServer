@@ -8,7 +8,7 @@ use squadov_common::{
 use uuid::Uuid;
 
 impl api::ApiApplication {
-    async fn list_wow_characters_for_match(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<WoWCharacter>, SquadOvError> {
+    pub async fn list_wow_characters_for_match(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<WoWCharacter>, SquadOvError> {
         let characters = sqlx::query!(
             r#"
             WITH match_start_stop (start, stop) AS (
@@ -53,7 +53,7 @@ impl api::ApiApplication {
             INNER JOIN combat_log_player_flags AS clpf
                 ON clpf.guid = mcl.evt->>'guid'
             WHERE mcl.evt @> '{"type": "CombatantInfo"}'
-            ORDER BY mcl.evt->>'guid', mcl.tm DESC, clpf.name ASC
+            ORDER BY mcl.evt->>'guid', mcl.tm DESC
             "#,
             user_id,
             match_uuid,
@@ -120,7 +120,7 @@ impl api::ApiApplication {
             INNER JOIN combat_log_player_flags AS clpf
                 ON clpf.guid = ucl.evt->>'guid'
             WHERE ucl.evt @> '{"type": "CombatantInfo"}'
-            ORDER BY ucl.evt->>'guid', ucl.tm DESC, clpf.name ASC
+            ORDER BY ucl.evt->>'guid', ucl.tm DESC
             "#,
             user_id,
         )

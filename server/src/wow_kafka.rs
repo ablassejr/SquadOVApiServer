@@ -72,7 +72,9 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, cfg: &ClientCon
                     events.clone()
                 };
                 log::info!("Handling {} WoW Combat Log Events", events.len());
-                squadov_common::store_wow_combat_log_events(&mut tx, &events).await?;
+                let (unit_ownership, char_ownership) = squadov_common::store_wow_combat_log_events(&mut tx, &events).await?;
+                squadov_common::store_combat_log_unit_ownership_mapping(&mut tx, &unit_ownership).await?;
+                squadov_common::store_combat_log_user_character_mapping(&mut tx, &char_ownership).await?;
                 tx.commit().await?;
 
                 let mut events = opaque.events.write().await;
