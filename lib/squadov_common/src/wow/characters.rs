@@ -8,3 +8,10 @@ pub struct WoWCharacter {
     #[serde(rename="specId")]
     pub spec_id: i32
 }
+
+#[derive(Serialize)]
+pub struct WoWCharacterUserAssociation {
+    #[serde(rename="userId")]
+    pub user_id: i64,
+    pub guid: String
+}

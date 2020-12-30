@@ -3,7 +3,8 @@ use crate::api;
 use std::sync::Arc;
 use squadov_common::{
     SquadOvError,
-    WoWCharacter
+    WoWCharacter,
+    WoWCharacterUserAssociation
 };
 use uuid::Uuid;
 
@@ -144,6 +145,30 @@ impl api::ApiApplication {
             }).collect()          
         )
     }
+
+    async fn list_wow_characters_association_for_squad_in_match(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<WoWCharacterUserAssociation>, SquadOvError> {
+        Ok(
+            sqlx::query_as!(
+                WoWCharacterUserAssociation,
+                r#"
+                SELECT DISTINCT wuca.*
+                FROM squadov.wow_user_character_association AS wuca
+                INNER JOIN squadov.wow_match_combatants AS wmc
+                    ON wmc.combatant_guid = wuca.guid
+                LEFT JOIN squadov.squad_role_assignments AS sra
+                    ON sra.user_id = wuca.user_id
+                LEFT JOIN squadov.squad_role_assignments AS ora
+                    ON ora.squad_id = sra.squad_id
+                WHERE wmc.match_uuid = $1 
+                    AND (wuca.user_id = $2 OR ora.user_id = $2)
+                "#,
+                match_uuid,
+                user_id,
+            )
+                .fetch_all(&*self.pool)
+                .await?
+        )
+    }
 }
 
 pub async fn list_wow_characters_for_user_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserPath>) -> Result<HttpResponse, SquadOvError> {
@@ -153,5 +178,10 @@ pub async fn list_wow_characters_for_user_handler(app : web::Data<Arc<api::ApiAp
 
 pub async fn list_wow_characters_for_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>) -> Result<HttpResponse, SquadOvError> {
     let chars = app.list_wow_characters_for_match(&path.match_uuid, path.user_id).await?;
+    Ok(HttpResponse::Ok().json(chars))
+}
+
+pub async fn list_wow_characters_association_for_squad_in_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>) -> Result<HttpResponse, SquadOvError> {
+    let chars = app.list_wow_characters_association_for_squad_in_match(&path.match_uuid, path.user_id).await?;
     Ok(HttpResponse::Ok().json(chars))
 }

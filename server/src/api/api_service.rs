@@ -290,6 +290,13 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                 .route("", web::post().to(v1::finish_wow_challenge_handler))
                                         )
                                 )
+                                .service(
+                                    web::scope("/{match_uuid}")
+                                        .service(
+                                            web::scope("/users/{user_id}")
+                                                .route("/characters", web::get().to(v1::list_wow_characters_association_for_squad_in_match_handler))
+                                        )
+                                )
                         )
                         .service(
                             web::scope("/users/{user_id}")
