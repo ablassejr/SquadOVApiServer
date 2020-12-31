@@ -12,6 +12,26 @@ use uuid::Uuid;
 use sqlx::{Executor, Postgres};
 
 impl api::ApiApplication {
+    pub async fn check_user_has_combat_log_for_match(&self, user_id: i64, match_uuid: &Uuid) -> Result<bool, SquadOvError> {
+        Ok(
+            sqlx::query!(
+                "
+                SELECT TRUE
+                FROM squadov.wow_combat_logs AS wcl
+                INNER JOIN squadov.wow_match_combat_log_association AS wmcla
+                    ON wmcla.combat_log_uuid = wcl.uuid
+                WHERE wcl.user_id = $1
+                    AND wmcla.match_uuid = $2
+                ",
+                user_id,
+                match_uuid
+            )
+                .fetch_optional(&*self.pool)
+                .await?
+                .is_some()
+        )
+    }
+
     pub async fn get_wow_combat_log(&self, combat_log_id: &Uuid) -> Result<FullWoWCombatLogState, SquadOvError> {
         let record = sqlx::query!(
             "

@@ -294,6 +294,21 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::scope("/{match_uuid}")
                                         .service(
                                             web::scope("/users/{user_id}")
+                                                .wrap(access::ApiAccess::new(
+                                                    Box::new(access::WowMatchUserMatchupChecker{
+                                                        obtainer: access::WowMatchUserPathObtainer{
+                                                            match_uuid_key: "match_uuid",
+                                                            user_id_key: "user_id",
+                                                        },
+                                                    })
+                                                ))
+                                                .wrap(access::ApiAccess::new(
+                                                    Box::new(access::UserSpecificAccessChecker{
+                                                        obtainer: access::UserIdPathSetObtainer{
+                                                            key: "user_id"
+                                                        },
+                                                    })
+                                                ))
                                                 .route("/characters", web::get().to(v1::list_wow_characters_association_for_squad_in_match_handler))
                                                 .route("/vods", web::get().to(v1::list_wow_vods_for_squad_in_match_handler))
                                         )
@@ -301,6 +316,13 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         )
                         .service(
                             web::scope("/users/{user_id}")
+                                .wrap(access::ApiAccess::new(
+                                    Box::new(access::SameSquadAccessChecker{
+                                        obtainer: access::UserIdPathSetObtainer{
+                                            key: "user_id"
+                                        },
+                                    })
+                                ))
                                 .service(
                                     web::scope("/characters")
                                         .route("", web::get().to(v1::list_wow_characters_for_user_handler))
@@ -312,6 +334,14 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 )
                                 .service(
                                     web::scope("/match/{match_uuid}")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::WowMatchUserMatchupChecker{
+                                                obtainer: access::WowMatchUserPathObtainer{
+                                                    match_uuid_key: "match_uuid",
+                                                    user_id_key: "user_id",
+                                                },
+                                            })
+                                        ))
                                         .route("", web::get().to(v1::get_wow_match_handler))
                                         .route("/characters", web::get().to(v1::list_wow_characters_for_match_handler))
                                         .route("/events", web::get().to(v1::list_wow_events_for_match_handler))

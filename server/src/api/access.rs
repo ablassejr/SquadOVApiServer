@@ -3,12 +3,14 @@ mod squad;
 mod squad_invite;
 mod riot;
 mod vod;
+mod wow;
 
 pub use user_specific::*;
 pub use squad::*;
 pub use squad_invite::*;
 pub use riot::*;
 pub use vod::*;
+pub use wow::*;
 
 use squadov_common;
 use actix_web::{web, HttpRequest};
