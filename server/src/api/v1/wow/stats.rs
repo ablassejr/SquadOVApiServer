@@ -51,18 +51,20 @@ impl api::ApiApplication {
         let raw_stats = sqlx::query!(
             r#"
             WITH match_combat_logs AS (
-                SELECT wce.*
+                SELECT wce.*, wuco.owner_guid
                 FROM squadov.wow_combat_log_events AS wce
                 INNER JOIN squadov.wow_combat_logs AS wcl
                     ON wcl.uuid = wce.combat_log_uuid
                 INNER JOIN squadov.wow_match_combat_log_association AS wma
                     ON wma.combat_log_uuid = wcl.uuid
+                LEFT JOIN squadov.wow_combatlog_unit_ownership AS wuco
+                    ON wuco.unit_guid = wce.source->>'guid'
                 WHERE wcl.user_id = $1
                     AND wma.match_uuid = $2
             )
             SELECT
                 generate_series AS "xtm",
-                mcl.source->>'guid' AS "guid",
+                COALESCE(mcl.owner_guid, mcl.source->>'guid') AS "guid",
                 SUM((mcl.evt->>'amount')::INTEGER) / CAST($7::BIGINT AS DOUBLE PRECISION) AS "amount"
             FROM generate_series(
                 $3::TIMESTAMPTZ,
@@ -72,7 +74,7 @@ impl api::ApiApplication {
             CROSS JOIN squadov.wow_match_combatants AS wmc
             LEFT JOIN match_combat_logs AS mcl
                 ON mcl.tm BETWEEN (generate_series - $6::INTERVAL) AND (generate_series + $6::INTERVAL)
-                    AND mcl.source->>'guid' = wmc.combatant_guid
+                    AND (mcl.source->>'guid' = wmc.combatant_guid OR mcl.owner_guid = wmc.combatant_guid)
             WHERE mcl.evt @> '{"type": "DamageDone"}'
                 AND wmc.match_uuid = $2
             GROUP BY xtm, guid

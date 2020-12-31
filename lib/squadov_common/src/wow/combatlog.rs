@@ -216,6 +216,7 @@ pub enum WoWCombatLogEventType {
         aura_type: WoWSpellAuraType,
         applied: bool
     },
+    SpellSummon(WoWSpellInfo),
     CombatantInfo{
         guid: String,
         strength: i32,
@@ -404,6 +405,7 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                             aura_type: WoWSpellAuraType::from_str(&payload.parts[idx])?,
                             applied: false
                         })),
+                        "SPELL_SUMMON" => Ok((None, WoWCombatLogEventType::SpellSummon(spell_info))),
                         _ => Ok((None, WoWCombatLogEventType::Unknown)),
                     }
                 }
@@ -632,6 +634,17 @@ where
             if advanced.owner_guid != crate::NIL_WOW_GUID && advanced.unit_guid != crate::NIL_WOW_GUID {
                 combatlog_ownership.insert(eve.combat_log_id.clone(), (advanced.unit_guid.clone(), advanced.owner_guid.clone()));
             }
+        }
+
+        match eve.event {
+            WoWCombatLogEventType::SpellSummon(_) => {
+                if eve.source.is_some() && eve.dest.is_some() {
+                    let source = eve.source.as_ref().unwrap();
+                    let dest = eve.dest.as_ref().unwrap();
+                    combatlog_ownership.insert(eve.combat_log_id.clone(), (dest.guid.clone(), source.guid.clone()));
+                }
+            }
+            _ => ()
         }
     }
 
