@@ -295,6 +295,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .service(
                                             web::scope("/users/{user_id}")
                                                 .route("/characters", web::get().to(v1::list_wow_characters_association_for_squad_in_match_handler))
+                                                .route("/vods", web::get().to(v1::list_wow_vods_for_squad_in_match_handler))
                                         )
                                 )
                         )
@@ -393,7 +394,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route("", web::put().to(v1::edit_squad_handler))
                                         .route("/invite/{invite_uuid}/revoke", web::post().to(v1::revoke_squad_invite_handler))
                                         .route("/membership/{user_id}", web::delete().to(v1::kick_squad_member_handler))
-                                )                                
+                                )
                                 .service(
                                     web::scope("/invite/{invite_uuid}")
                                         .wrap(access::ApiAccess::new(

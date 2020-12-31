@@ -10,11 +10,13 @@ use squadov_common::{
 };
 use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
+use crate::api::v1::VodAssociation;
 use std::sync::Arc;
 use uuid::Uuid;
 use sqlx::{Executor, Postgres};
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 pub struct GenericMatchCreationRequest<T> {
@@ -462,5 +464,29 @@ pub async fn get_wow_match_handler(app : web::Data<Arc<api::ApiApplication>>, pa
     Ok(HttpResponse::Ok().json(Response{
         encounter: app.find_wow_encounter(&path.match_uuid).await?,
         challenge: app.find_wow_challenge(&path.match_uuid).await?,
+    }))
+}
+
+#[derive(Serialize)]
+struct WowUserAccessibleVodOutput {
+    pub vods: Vec<VodAssociation>,
+    #[serde(rename="userToId")]
+    pub user_to_id: HashMap<Uuid, i64>
+}
+
+pub async fn list_wow_vods_for_squad_in_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>) -> Result<HttpResponse, SquadOvError> {
+    let vods = app.find_accessible_vods_in_match_for_user(&path.match_uuid, path.user_id).await?;
+
+    // Note that for each VOD we also need to figure out the mapping from user uuid to puuid.
+    let user_uuids: Vec<Uuid> = vods.iter()
+        .filter(|x| { x.user_uuid.is_some() })
+        .map(|x| { x.user_uuid.unwrap().clone() })
+        .collect();
+
+    let user_uuid_to_id = app.get_user_uuid_to_user_id_map(&user_uuids).await?;
+
+    Ok(HttpResponse::Ok().json(WowUserAccessibleVodOutput{
+        vods,
+        user_to_id: user_uuid_to_id,
     }))
 }
