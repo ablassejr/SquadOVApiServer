@@ -6,6 +6,7 @@ use squadov_common::{
     SerializedWoWDeath,
     SerializedWoWAura,
     SerializedWowEncounter,
+    SerializedWoWResurrection,
     WoWSpellAuraType
 };
 use uuid::Uuid;
@@ -321,6 +322,48 @@ impl api::ApiApplication {
                 .await?
         )
     }
+
+    async fn get_wow_match_resurrection_events(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<SerializedWoWResurrection>, SquadOvError> {
+        Ok(
+            sqlx::query_as!(
+                SerializedWoWResurrection,
+                r#"
+                WITH match_start_stop (start, stop) AS (
+                    SELECT COALESCE(we.tm, wc.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, NOW())
+                    FROM squadov.matches AS m
+                    LEFT JOIN squadov.wow_encounters AS we
+                        ON we.match_uuid = m.uuid
+                    LEFT JOIN squadov.wow_challenges AS wc
+                        ON wc.match_uuid = m.uuid
+                    WHERE m.uuid = $1
+                ), match_combat_logs AS (
+                    SELECT wce.*
+                    FROM squadov.wow_combat_log_events AS wce
+                    INNER JOIN squadov.wow_combat_logs AS wcl
+                        ON wcl.uuid = wce.combat_log_uuid
+                    INNER JOIN squadov.wow_match_combat_log_association AS wma
+                        ON wma.combat_log_uuid = wcl.uuid
+                    CROSS JOIN match_start_stop AS mss
+                    WHERE wma.match_uuid = $1
+                        AND wcl.user_id = $2
+                        AND wce.tm >= mss.start AND wce.tm <= mss.stop
+                )
+                SELECT
+                    mcl.dest->>'guid' AS "guid!",
+                    mcl.dest->>'name' AS "name!",
+                    (mcl.dest->>'flags')::BIGINT AS "flags!",
+                    mcl.tm AS "tm!"
+                FROM match_combat_logs AS mcl
+                WHERE mcl.evt @> '{"type": "Resurrect"}'
+                ORDER BY mcl.tm ASC
+                "#,
+                match_uuid,
+                user_id,
+            )
+                .fetch_all(&*self.pool)
+                .await?
+        )
+    }
 }
 
 pub async fn list_wow_events_for_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>) -> Result<HttpResponse, SquadOvError> {
@@ -328,12 +371,14 @@ pub async fn list_wow_events_for_match_handler(app : web::Data<Arc<api::ApiAppli
     struct Response {
         deaths: Vec<SerializedWoWDeath>,
         auras: Vec<SerializedWoWAura>,
-        encounters: Vec<SerializedWowEncounter>
+        encounters: Vec<SerializedWowEncounter>,
+        resurrections: Vec<SerializedWoWResurrection>
     }
 
     Ok(HttpResponse::Ok().json(Response{
         deaths: app.get_wow_match_death_events(&path.match_uuid, path.user_id).await?,
         auras: app.get_wow_match_aura_events(&path.match_uuid, path.user_id).await?,
         encounters: app.get_wow_match_subencounters(&path.match_uuid, path.user_id).await?,
+        resurrections: app.get_wow_match_resurrection_events(&path.match_uuid, path.user_id).await?,
     }))
 }

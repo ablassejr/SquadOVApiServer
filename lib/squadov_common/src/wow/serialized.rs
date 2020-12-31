@@ -5,6 +5,14 @@ use super::{
 };
 
 #[derive(Serialize)]
+pub struct SerializedWoWResurrection {
+    pub guid: String,
+    pub name: String,
+    pub flags: i64,
+    pub tm: DateTime<Utc>
+}
+
+#[derive(Serialize)]
 pub struct SerializedWoWDeath {
     pub guid: String,
     pub name: String,

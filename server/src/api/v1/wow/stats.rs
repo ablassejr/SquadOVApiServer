@@ -74,6 +74,7 @@ impl api::ApiApplication {
                 ON mcl.tm BETWEEN (generate_series - $6::INTERVAL) AND (generate_series + $6::INTERVAL)
                     AND mcl.source->>'guid' = wmc.combatant_guid
             WHERE mcl.evt @> '{"type": "DamageDone"}'
+                AND wmc.match_uuid = $2
             GROUP BY xtm, guid
             ORDER BY xtm, guid
             "#,
@@ -154,6 +155,7 @@ impl api::ApiApplication {
                 ON mcl.tm BETWEEN (generate_series - $6::INTERVAL) AND (generate_series + $6::INTERVAL)
                     AND mcl.source->>'guid' = wmc.combatant_guid
             WHERE mcl.evt @> '{"type": "Healing"}'
+                AND wmc.match_uuid = $2
             GROUP BY xtm, guid
             ORDER BY xtm, guid
             "#,
@@ -235,6 +237,7 @@ impl api::ApiApplication {
                 ON mcl.tm BETWEEN (generate_series - $6::INTERVAL) AND (generate_series + $6::INTERVAL)
                     AND mcl.dest->>'guid' = wmc.combatant_guid
             WHERE mcl.evt @> '{"type": "DamageDone"}'
+                AND wmc.match_uuid = $2
             GROUP BY xtm, guid
             ORDER BY xtm, guid
             "#,
