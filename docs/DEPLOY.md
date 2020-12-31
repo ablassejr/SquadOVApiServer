@@ -61,6 +61,13 @@ You will need to ensure that you have a few Debian packages installed to complet
     * `BLOB_BUCKET` to a unique bucket name to store binary blobs in.
     * `GITLAB_ACCESS_TOKEN` is the Gitlab access token for API access.
     * `GITLAB_PROJECT_ID` is the Gitlab project id to create issues for when a user submits a bug report.
+    * `KAFKA_BROKERS` to the Kafka config `bootstrap.servers` value.
+    * `KAFKA_WOW_THREADS` to the number of threads to assign to processing WoW combat log events.
+    * `KAFKA_CLIENT_KEY` to the Confluent Cloud key for producers.
+    * `KAFKA_CLIENT_SECRET` to the Confluent Cloud secret for producers.
+    * `KAFKA_SERVER_KEY` to the Confluent Cloud key for consumers.
+    * `KAFKA_SERVER_SECRET` to the Confluent Cloud secret for consumers.
+    * `VOD_FASTIFY_THREADS` to the number of threads to assign to processing VODs.
 
    We'll setup the other environment variables later.
    Save the file and verify that the contents of the `$ENV_vars.json` file is encrypted (i.e. `cat $ENV_vars.json`).
