@@ -314,6 +314,12 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route("", web::get().to(v1::get_wow_match_handler))
                                         .route("/characters", web::get().to(v1::list_wow_characters_for_match_handler))
                                         .route("/events", web::get().to(v1::list_wow_events_for_match_handler))
+                                        .service(
+                                            web::scope("/stats")
+                                                .route("/dps", web::get().to(v1::get_wow_match_dps_handler))
+                                                .route("/hps", web::get().to(v1::get_wow_match_heals_per_second_handler))
+                                                .route("/drps", web::get().to(v1::get_wow_match_damage_received_per_second_handler))
+                                        )
                                 )
                         )
                 )

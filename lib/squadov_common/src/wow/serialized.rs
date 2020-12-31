@@ -20,6 +20,8 @@ pub struct SerializedWoWAura {
     pub target_name: String,
     #[serde(rename="spellId")]
     pub spell_id: i64,
+    #[serde(rename="spellName")]
+    pub spell_name: String,
     #[serde(rename="auraType")]
     pub aura_type: WoWSpellAuraType,
     #[serde(rename="appliedTm")]

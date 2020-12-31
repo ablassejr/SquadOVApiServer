@@ -143,7 +143,8 @@ impl api::ApiApplication {
                 wce.dest->>'guid' AS "guid",
                 wce.dest->>'name' AS "name",
                 (wce.evt#>>'{spell, id}')::BIGINT AS "spell_id",
-                (wce.evt#>'{aura_type}') AS "aura"
+                (wce.evt#>'{aura_type}') AS "aura",
+                wce.evt#>>'{spell, name}' AS "spell_name"
             FROM squadov.wow_combat_log_events AS wce
             INNER JOIN squadov.wow_combat_logs AS wcl
                 ON wcl.uuid = wce.combat_log_uuid
@@ -174,7 +175,10 @@ impl api::ApiApplication {
                     ON wc.match_uuid = m.uuid
                 WHERE m.uuid = $1
             )
-            SELECT wce.tm, wce.dest->>'guid' AS "guid", (wce.evt#>>'{spell, id}')::BIGINT AS "spell_id"
+            SELECT
+                wce.tm,
+                wce.dest->>'guid' AS "guid",
+                (wce.evt#>>'{spell, id}')::BIGINT AS "spell_id"
             FROM squadov.wow_combat_log_events AS wce
             INNER JOIN squadov.wow_combat_logs AS wcl
                 ON wcl.uuid = wce.combat_log_uuid
@@ -238,11 +242,13 @@ impl api::ApiApplication {
                     return x.guid.is_some() &&
                         x.name.is_some() &&
                         x.spell_id.is_some() &&
+                        x.spell_name.is_some() &&
                         x.aura.is_some()
                 })
                 .map(|x| {
                     let guid = x.guid.unwrap();
                     let spell_id = x.spell_id.unwrap();
+                    let spell_name = x.spell_name.unwrap();
 
                     let mut removed_tm: DateTime<Utc> = Utc::now();
                     if removed_aura_hashmap.contains_key(&guid) {
@@ -264,6 +270,7 @@ impl api::ApiApplication {
                         target_guid: guid,
                         target_name: x.name.unwrap(),
                         spell_id: spell_id,
+                        spell_name: spell_name,
                         aura_type: serde_json::from_value(x.aura.unwrap()).unwrap_or(WoWSpellAuraType::Unknown),
                         applied_tm: x.tm,
                         removed_tm,
