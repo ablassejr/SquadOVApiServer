@@ -4,11 +4,20 @@ use super::auth;
 use super::v1;
 use super::access;
 use super::graphql;
+use super::admin;
 use std::vec::Vec;
 use std::boxed::Box;
 
 pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
     let mut scope = web::scope("")
+        .service(
+            web::scope("/admin")
+                .service(
+                    web::scope("/analytics")
+                        .route("/daily", web::get().to(admin::get_daily_analytics_handler))
+                        .route("/monthly", web::get().to(admin::get_monthly_analytics_handler))
+                )
+        )
         .service(
             web::scope("/auth")
                 .route("/login", web::post().to(auth::login_handler))

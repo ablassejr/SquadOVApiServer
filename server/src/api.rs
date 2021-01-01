@@ -4,6 +4,7 @@ pub mod fusionauth;
 pub mod access;
 pub mod v1;
 pub mod graphql;
+pub mod admin;
 
 use serde::{Deserialize};
 use sqlx::postgres::{PgPool};
