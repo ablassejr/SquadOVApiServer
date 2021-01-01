@@ -12,6 +12,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
     let mut scope = web::scope("")
         .service(
             web::scope("/admin")
+                .wrap(access::ApiAccess::new(
+                    Box::new(access::AdminAccessChecker{}),
+                ))
+                .wrap(auth::ApiSessionValidator{})
                 .service(
                     web::scope("/analytics")
                         .route("/daily", web::get().to(admin::get_daily_analytics_handler))

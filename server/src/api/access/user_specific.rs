@@ -54,3 +54,17 @@ impl super::AccessChecker<UserAccessSetBasicData> for UserSpecificAccessChecker<
         return Ok(data.access_set.contains(&session.user.id));
     }
 }
+
+pub struct AdminAccessChecker {
+}
+
+#[async_trait]
+impl super::AccessChecker<()> for AdminAccessChecker {
+    fn generate_aux_metadata(&self, _req: &HttpRequest) -> Result<(), squadov_common::SquadOvError> {
+        Ok(())
+    }
+
+    async fn check(&self, _app: Arc<ApiApplication>, session: &SquadOVSession, _data: ()) -> Result<bool, squadov_common::SquadOvError> {
+        Ok(session.user.is_admin)
+    }
+}
