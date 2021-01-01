@@ -44,6 +44,8 @@ async fn login(fa: &fusionauth::FusionAuthClient, data: LoginData, ip: Option<&s
                         email: result.user.email,
                         verified: result.user.verified,
                         uuid: Uuid::nil(), // We'll pull this later along with the id.
+                        is_test: false,
+                        is_admin: false,
                     },
                     access_token: result.token,
                     refresh_token: result.refresh_token,

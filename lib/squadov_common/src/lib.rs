@@ -15,6 +15,7 @@ pub mod job;
 pub mod session;
 pub mod wow;
 pub mod kafka;
+pub mod analytics;
 
 pub use error::*;
 pub use parse::*;

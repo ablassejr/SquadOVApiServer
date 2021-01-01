@@ -1,0 +1,10 @@
+version: "3.8"
+services:
+  landing:
+    image: "registry.gitlab.com/squadov/squadovapiserver/${GCP_PROJECT}/squadov_landing:latest"
+    networks:
+      squadov_c3p0:
+          ipv4_address: "172.22.0.7"
+networks:
+  squadov_c3p0:
+    external: true

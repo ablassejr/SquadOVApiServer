@@ -69,7 +69,9 @@ impl SessionManager {
                 u.username AS \"user_username\",
                 u.email AS \"user_email\",
                 u.verified AS \"user_verified\",
-                u.uuid AS \"user_uuid\"
+                u.uuid AS \"user_uuid\",
+                u.is_test AS \"is_test\",
+                u.is_admin AS \"is_admin\"
             FROM squadov.user_sessions AS us
             INNER JOIN squadov.users AS u
                 ON u.id = us.user_id
@@ -87,6 +89,8 @@ impl SessionManager {
                     email: x.user_email,
                     verified: x.user_verified,
                     uuid: x.user_uuid,
+                    is_test: x.is_test,
+                    is_admin: x.is_admin,
                 },
                 access_token: x.access_token,
                 refresh_token: x.refresh_token,
@@ -181,6 +185,10 @@ impl crate::api::ApiApplication {
             session.session_id = Uuid::new_v4().to_string();
             session.access_token = new_token.token;
             session.refresh_token = new_token.refresh_token;
+
+            let mut tx = self.pool.begin().await?;
+            squadov_common::analytics::mark_active_user_session(&mut tx, session.user.id).await?;
+            tx.commit().await?;
 
             match self.session.refresh_session(&old_id, &session, &self.pool).await {
                 Ok(_) => (),

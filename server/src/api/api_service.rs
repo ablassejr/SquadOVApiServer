@@ -4,11 +4,24 @@ use super::auth;
 use super::v1;
 use super::access;
 use super::graphql;
+use super::admin;
 use std::vec::Vec;
 use std::boxed::Box;
 
 pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
     let mut scope = web::scope("")
+        .service(
+            web::scope("/admin")
+                .wrap(access::ApiAccess::new(
+                    Box::new(access::AdminAccessChecker{}),
+                ))
+                .wrap(auth::ApiSessionValidator{})
+                .service(
+                    web::scope("/analytics")
+                        .route("/daily", web::get().to(admin::get_daily_analytics_handler))
+                        .route("/monthly", web::get().to(admin::get_monthly_analytics_handler))
+                )
+        )
         .service(
             web::scope("/auth")
                 .route("/login", web::post().to(auth::login_handler))
@@ -58,6 +71,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::resource("/localenc")
                                         .route(web::get().to(v1::get_current_user_local_encryption_handler))
                                 )
+                                .route("/active", web::post().to(v1::mark_user_active_endpoint_handler))
                         )
                         .service(
                             web::scope("/{user_id}")

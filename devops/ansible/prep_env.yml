@@ -15,6 +15,13 @@
         mode: '0755'
         owner: "{{ lookup('env', 'USER') }}"
       become: yes
+    - name: Create Landing Folder
+      file:
+        path: /landing
+        state: directory
+        mode: '0755'
+        owner: "{{ lookup('env', 'USER') }}"
+      become: yes
     - name: Install Docker Prereqs
       apt:
         name:

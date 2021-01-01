@@ -11,6 +11,10 @@ pub struct SquadOVUser {
     pub email: String,
     pub verified: bool,
     pub uuid: Uuid,
+    #[serde(skip_serializing)]
+    pub is_test: bool,
+    #[serde(skip_serializing)]
+    pub is_admin: bool
 }
 
 pub struct UserManager {
@@ -40,7 +44,9 @@ impl UserManager {
                 username,
                 email,
                 verified,
-                uuid
+                uuid,
+                is_test,
+                is_admin
             FROM squadov.users
             WHERE email = $1
             ",
@@ -57,7 +63,9 @@ impl UserManager {
                 username,
                 email,
                 verified,
-                uuid
+                uuid,
+                is_test,
+                is_admin
             FROM squadov.users
             WHERE id = $1
             ",
@@ -74,7 +82,9 @@ impl UserManager {
                 username,
                 email,
                 verified,
-                uuid
+                uuid,
+                is_test,
+                is_admin
             FROM squadov.users
             WHERE uuid = $1
             ",
@@ -98,7 +108,9 @@ impl UserManager {
                 username,
                 email,
                 verified,
-                uuid
+                uuid,
+                is_test,
+                is_admin
             ",
             user.email,
             user.username,
