@@ -182,6 +182,10 @@ impl crate::api::ApiApplication {
             session.access_token = new_token.token;
             session.refresh_token = new_token.refresh_token;
 
+            let mut tx = self.pool.begin().await?;
+            squadov_common::analytics::mark_active_user_session(&mut tx, session.user.id).await?;
+            tx.commit().await?;
+
             match self.session.refresh_session(&old_id, &session, &self.pool).await {
                 Ok(_) => (),
                 Err(err) => return logged_error!(squadov_common::SquadOvError::InternalError(format!("Refresh Session {}", err)))
