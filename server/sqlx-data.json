@@ -1,44 +1,5 @@
 {
   "db": "PostgreSQL",
-  "029ce8d7542d1c47b2d7f81469dd0022132704cd7d9cf5826c9ecb62dcbdca17": {
-    "query": "\n            WITH series(tm) AS (\n                SELECT *\n                FROM generate_series(\n                    DATE_TRUNC('day', $1::TIMESTAMPTZ),\n                    DATE_TRUNC('day', $2::TIMESTAMPTZ),\n                    INTERVAL '1 day'\n                )\n            )\n            SELECT\n                s.tm AS \"tm!\",\n                COALESCE(das.users, 0) AS \"session!\",\n                COALESCE(dae.users, 0) AS \"endpoint!\",\n                COALESCE(dav.users, 0) AS \"vod!\"\n            FROM series AS s\n            LEFT JOIN squadov.view_daily_active_user_sessions AS das\n                ON das.tm = s.tm\n            LEFT JOIN squadov.view_daily_active_user_endpoint AS dae\n                ON dae.tm = s.tm\n            LEFT JOIN squadov.view_daily_active_vod_users AS dav\n                ON dav.tm = s.tm\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tm!",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 1,
-          "name": "session!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "endpoint!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "vod!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Timestamptz",
-          "Timestamptz"
-        ]
-      },
-      "nullable": [
-        null,
-        null,
-        null,
-        null
-      ]
-    }
-  },
   "08be32bc8d64c4a71c557fc59131a6082423211121a33bafb324187013a948e5": {
     "query": "\n                    SELECT *\n                    FROM squadov.valorant_player_round_metadata\n                    WHERE match_id = $1\n                        AND puuid = $2\n                    ",
     "describe": {
@@ -632,52 +593,6 @@
       ]
     }
   },
-  "242bc7b5bade3daa3e22958d2d37b9369e5ec1aa2c6df59601889c27c3d2b5c4": {
-    "query": "\n            INSERT INTO squadov.users (\n                email,\n                username,\n                verified,\n                local_encryption_key\n            )\n            SELECT $1, $2, $3, encode(digest(gen_random_bytes(16), 'sha256'), 'base64')\n            RETURNING\n                id,\n                username,\n                email,\n                verified,\n                uuid\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "username",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "email",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 3,
-          "name": "verified",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 4,
-          "name": "uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Varchar",
-          "Varchar",
-          "Bool"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "24904daecc5ab1ca10c7d92d3cd0a1bc10b96b8078659d6b63a0f26c3b54352d": {
     "query": "\n            WITH match_start_stop (start, stop) AS (\n                SELECT COALESCE(we.tm, wc.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, NOW())\n                FROM squadov.matches AS m\n                LEFT JOIN squadov.wow_encounters AS we\n                    ON we.match_uuid = m.uuid\n                LEFT JOIN squadov.wow_challenges AS wc\n                    ON wc.match_uuid = m.uuid\n                WHERE m.uuid = $1\n            )\n            SELECT\n                wce.tm,\n                wce.dest->>'guid' AS \"guid\",\n                (wce.evt#>>'{spell, id}')::BIGINT AS \"spell_id\"\n            FROM squadov.wow_combat_log_events AS wce\n            INNER JOIN squadov.wow_combat_logs AS wcl\n                ON wcl.uuid = wce.combat_log_uuid\n            INNER JOIN squadov.wow_match_combat_log_association AS wma\n                ON wma.combat_log_uuid = wcl.uuid\n            CROSS JOIN match_start_stop AS mss\n            WHERE wma.match_uuid = $1\n                AND wcl.user_id = $2\n                AND wce.tm >= mss.start AND wce.tm <= mss.stop\n                AND wce.evt @> '{\"type\": \"SpellAura\"}'\n                AND wce.evt @> '{\"applied\": false}'\n            ORDER BY wce.tm ASC\n            ",
     "describe": {
@@ -1157,33 +1072,6 @@
       ]
     }
   },
-  "4ae586f7ebb41db3a114ae4517e457f3917a94c3c0fe0c0eb0c02a9d7846b29e": {
-    "query": "\n            SELECT\n                COUNT(user_id) AS \"users!\",\n                tm::TIMESTAMPTZ\n            FROM squadov.daily_active_sessions\n            WHERE tm BETWEEN $1::TIMESTAMPTZ AND $2::TIMESTAMPTZ\n            GROUP BY tm\n            ORDER BY tm ASC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "users!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "tm",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Timestamptz",
-          "Timestamptz"
-        ]
-      },
-      "nullable": [
-        null,
-        null
-      ]
-    }
-  },
   "4c8d614e3ffba4ee3de3814d6d3076bea6f5ce2205046407286fe97b3c520bed": {
     "query": "\n            UPDATE squadov.squads\n            SET squad_name = $2\n            WHERE id = $1\n            ",
     "describe": {
@@ -1475,33 +1363,6 @@
       ]
     }
   },
-  "5a83743b182c38cb971f44a337e260f377a784ebc1ab5616d90f35fe160b6605": {
-    "query": "\n            SELECT\n                COUNT(user_id) AS \"users\",\n                tm\n            FROM squadov.daily_active_sessions\n            WHERE tm BETWEEN $1::TIMESTAMPTZ AND $2::TIMESTAMPTZ\n            GROUP BY tm\n            ORDER BY tm ASC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "users",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "tm",
-          "type_info": "Date"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Timestamptz",
-          "Timestamptz"
-        ]
-      },
-      "nullable": [
-        null,
-        false
-      ]
-    }
-  },
   "5d823c1032527d06037cd6402f9eb55a1520d4748d46739b3b13901ec323e6cc": {
     "query": "\n            SELECT puuid, username, tag\n            FROM squadov.riot_account_links\n            WHERE user_id = $1 AND puuid = $2\n            ",
     "describe": {
@@ -1639,50 +1500,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "65cd18ce53dace77f82a4b9b40bdf9e2cafb04f21903a39e33a7102a19e6c59f": {
-    "query": "\n            SELECT\n                id,\n                username,\n                email,\n                verified,\n                uuid\n            FROM squadov.users\n            WHERE email = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "username",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "email",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 3,
-          "name": "verified",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 4,
-          "name": "uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
     }
   },
   "67cd886586c8c1ec5130bbf0115f2e94c5557a06145c74e2cc323d9c07082b54": {
@@ -2377,33 +2194,6 @@
       "nullable": []
     }
   },
-  "8addc19dfb61ad8c81a3f97b9efc5d676148e7272d71700bb9093107b072f0be": {
-    "query": "\n            SELECT\n                COUNT(user_id) AS \"users!\",\n                tm\n            FROM squadov.daily_active_sessions\n            WHERE tm BETWEEN $1::TIMESTAMPTZ AND $2::TIMESTAMPTZ\n            GROUP BY tm\n            ORDER BY tm ASC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "users!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "tm",
-          "type_info": "Date"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Timestamptz",
-          "Timestamptz"
-        ]
-      },
-      "nullable": [
-        null,
-        false
-      ]
-    }
-  },
   "8e9ab1841c3cb99fb976958d4deba663061f140f3e58765b9ce3bc143e0e6ccb": {
     "query": "\n            INSERT INTO squadov.users (\n                email,\n                username,\n                verified,\n                local_encryption_key\n            )\n            SELECT $1, $2, $3, encode(digest(gen_random_bytes(16), 'sha256'), 'base64')\n            RETURNING\n                id,\n                username,\n                email,\n                verified,\n                uuid,\n                is_test,\n                is_admin\n            ",
     "describe": {
@@ -2794,50 +2584,6 @@
         false,
         false,
         false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "a34eb6a19ca0a8db65ae25356a42bb7b69f92f398985704cbbc93095793e3a26": {
-    "query": "\n            SELECT\n                id,\n                username,\n                email,\n                verified,\n                uuid\n            FROM squadov.users\n            WHERE id = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "username",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "email",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 3,
-          "name": "verified",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 4,
-          "name": "uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
         false,
         false,
         false,
@@ -3487,68 +3233,6 @@
       "nullable": []
     }
   },
-  "bafd85e6dc943094c7232c1db8eae3231882c57fe54fcdbe54d7a6be4b56ad1a": {
-    "query": "\n            SELECT\n                us.id AS \"session_id\",\n                us.access_token,\n                us.refresh_token,\n                u.id AS \"user_id\",\n                u.username AS \"user_username\",\n                u.email AS \"user_email\",\n                u.verified AS \"user_verified\",\n                u.uuid AS \"user_uuid\"\n            FROM squadov.user_sessions AS us\n            INNER JOIN squadov.users AS u\n                ON u.id = us.user_id\n            WHERE us.id = $1 OR us.old_id = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "session_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "access_token",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "refresh_token",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "user_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "user_username",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 5,
-          "name": "user_email",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 6,
-          "name": "user_verified",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 7,
-          "name": "user_uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "bd945f834cd91be63a4f3a9cfa07f67bb859769a8e05d31d0251aec6ee58dfd8": {
     "query": "\n            SELECT hmud.deck_version_id, hdv.deck_id\n            FROM squadov.hearthstone_match_user_deck AS hmud\n            INNER JOIN squadov.hearthstone_deck_versions AS hdv\n                ON hdv.version_id = hmud.deck_version_id\n            WHERE hmud.match_uuid = $1 AND hmud.user_id = $2\n            ",
     "describe": {
@@ -3614,33 +3298,6 @@
       ]
     }
   },
-  "be16b1545179ca549e13dbe0af9c103092ce265056d6f54260ad9edd75ecec01": {
-    "query": "\n            SELECT\n                COUNT(user_id) AS \"users!\",\n                tm::TIMESTAMPTZ AS \"tm!\"\n            FROM squadov.daily_active_sessions\n            WHERE tm BETWEEN $1::TIMESTAMPTZ AND $2::TIMESTAMPTZ\n            GROUP BY tm\n            ORDER BY tm ASC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "users!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "tm!",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Timestamptz",
-          "Timestamptz"
-        ]
-      },
-      "nullable": [
-        null,
-        null
-      ]
-    }
-  },
   "bea526b210cd45a45437e1f8d870cb392b6c29a7c42ef4b57d37ceca0d2c04cb": {
     "query": "\n            INSERT INTO squadov.blob_link_storage (\n                uuid,\n                bucket,\n                local_path\n            )\n            VALUES (\n                $1,\n                $2,\n                $3\n            )\n            ",
     "describe": {
@@ -3650,18 +3307,6 @@
           "Uuid",
           "Varchar",
           "Varchar"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "bfa5bd0c9be00782a325662163b20c78e2569643256ceeaf5cdef3734f07621f": {
-    "query": "\n            INSERT INTO squadov.daily_active_sessions (\n                user_id,\n                tm\n            )\n            VALUES (\n                $1,\n                CURRENT_DATE\n            )\n            ON CONFLICT DO NOTHING\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
         ]
       },
       "nullable": []
@@ -3847,18 +3492,6 @@
       ]
     }
   },
-  "c84cbba0147e8b0fdb00f44de4cb3993c2d2842645cb96949238ccabe80abf41": {
-    "query": "\n            INSERT INTO squadov.daily_active_endpoint (\n                user_id,\n                tm\n            )\n            VALUES (\n                $1,\n                CURRENT_DATE\n            )\n            ON CONFLICT DO NOTHING\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "d03b1c226f8f41bf3f90d1d5ee00a058e1730a8dcf432ef57f659469e0b2595b": {
     "query": "\n            SELECT\n                match_id,\n                game_mode,\n                map AS \"map_id\",\n                is_ranked,\n                provisioning_flow_id,\n                game_version,\n                server_start_time_utc\n            FROM squadov.valorant_matches\n            WHERE match_id = $1\n            ",
     "describe": {
@@ -3912,33 +3545,6 @@
         true,
         true,
         true
-      ]
-    }
-  },
-  "d0a216a763159227b64e3739af50a30b3b4a080682b37975d22b80d195f7207e": {
-    "query": "\n            SELECT\n                COUNT(user_id) AS \"users\",\n                tm\n            FROM squadov.daily_active_sessions\n            WHERE tm BETWEEN $1 AND $2\n            GROUP BY tm\n            ORDER BY tm ASC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "users",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "tm",
-          "type_info": "Date"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Date",
-          "Date"
-        ]
-      },
-      "nullable": [
-        null,
-        false
       ]
     }
   },
@@ -4147,50 +3753,6 @@
         false,
         false,
         true
-      ]
-    }
-  },
-  "db4cddc8d8ebbf5338d6e90bf43e94c0046744fa3378bcea653e56e0668d6179": {
-    "query": "\n            SELECT\n                id,\n                username,\n                email,\n                verified,\n                uuid\n            FROM squadov.users\n            WHERE uuid = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "username",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "email",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 3,
-          "name": "verified",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 4,
-          "name": "uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
       ]
     }
   },
