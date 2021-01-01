@@ -177,6 +177,8 @@ You should now see the `SquadOV.exe` executable in `$CLIENT\client_ui\package\wi
 8. `sops exec-env ../env/$ENV_vars.json './build.sh'`
 9. (Optionally): `cd $SRC/scripts && sops exec-env ../devops/env/$ENV_vars.json './sync_hearthstone_metadata.sh $HSD'` where `$HSD` is the directy of the static Hearthstone assets.
 10. (Optionally): `cd $APP && ./devops/build.sh $ENV`
-11. `cd $SRC/devops/ansible`
-12. (Optionally): `sops exec-env ../env/$ENV_vars.json 'ansible-playbook -e "shosts=$ENV" -v deploy_supporting_infra.yml'`
-13. `sops exec-env ../env/$ENV_vars.json 'ansible-playbook -e "shosts=$ENV" -v deploy_web_api_app.yml'`
+11. (Optionally): `cd $LANDING && ./build.sh $ENV`
+12. `cd $SRC/devops/ansible`
+13. (Optionally): `sops exec-env ../env/$ENV_vars.json 'ansible-playbook -e "shosts=$ENV" -v deploy_supporting_infra.yml'`
+14. (Optionally): `sops exec-env ../env/$ENV_vars.json 'ansible-playbook -e "shosts=$ENV" -v deploy_landing.yml'`
+15. `sops exec-env ../env/$ENV_vars.json 'ansible-playbook -e "shosts=$ENV" -v deploy_web_api_app.yml'`
