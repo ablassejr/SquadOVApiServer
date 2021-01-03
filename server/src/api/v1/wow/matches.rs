@@ -372,10 +372,12 @@ pub async fn create_wow_encounter_match_handler(app : web::Data<Arc<api::ApiAppl
                 }
 
                 app.add_wow_combatants_to_match(&mut tx, &internal_match.uuid, &input_match.combatants).await?;
-                app.link_wow_combat_log_to_match(&mut tx, &internal_match.uuid, &input_match.combat_log_uuid).await?;
                 internal_match.uuid
             }
         };
+
+        // This needs to be outside the match block as this needs to be done regardless whether or not the incoming match is a duplicate!
+        app.link_wow_combat_log_to_match(&mut tx, &match_uuid, &input_match.combat_log_uuid).await?;
         tx.commit().await?;
         return Ok(HttpResponse::Ok().json(match_uuid));
     }
@@ -404,10 +406,12 @@ pub async fn create_wow_challenge_match_handler(app : web::Data<Arc<api::ApiAppl
                     }
                 }
                 app.add_wow_combatants_to_match(&mut tx, &internal_match.uuid, &input_match.combatants).await?;
-                app.link_wow_combat_log_to_match(&mut tx, &internal_match.uuid, &input_match.combat_log_uuid).await?;
                 internal_match.uuid
             }
         };
+
+        // This needs to be outside the match block as this needs to be done regardless whether or not the incoming match is a duplicate!
+        app.link_wow_combat_log_to_match(&mut tx, &match_uuid, &input_match.combat_log_uuid).await?;
         tx.commit().await?;
         return Ok(HttpResponse::Ok().json(match_uuid));
     }
