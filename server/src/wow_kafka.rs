@@ -48,6 +48,7 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, cfg: &ClientCon
             let mut parsed_payload: RawWoWCombatLogPayload = serde_json::from_str(payload)?;
             parsed_payload.redo_parts();
 
+            let mut manual_handle_flags = false;
             if parsed_payload.is_finish_token() {
                 log::info!("Detect Finish Token for WoW Combat Log: {}", &combat_log_uuid);
                 opaque.app.blob.finish_resumable_blob(&combat_log.blob).await?;
@@ -56,11 +57,21 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, cfg: &ClientCon
                 let parsed_event = squadov_common::parse_raw_wow_combat_log_payload(&combat_log_uuid, &combat_log.state, &parsed_payload)?;
                 if parsed_event.is_some() {
                     let mut events = opaque.events.write().await;
-                    events.push(parsed_event.unwrap());
+                    let new_event = parsed_event.unwrap();
+
+                    // We want to flush logs on ENCOUNTER_END/COMBAT_CHALLENGE_END so that the entire
+                    // match is available as soon as it's finished and not have to rely on more events
+                    // being pushed onto the Kafka queue or waiting for the user to end the game.
+                    manual_handle_flags = match &new_event.event {
+                        squadov_common::WoWCombatLogEventType::ChallengeModeEnd{..} | squadov_common::WoWCombatLogEventType::EncounterEnd{..} => true,
+                        _ => false
+                    };
+
+                    events.push(new_event);
                 }
             }
 
-            let handle_events = parsed_payload.is_finish_token() ||{
+            let handle_events = manual_handle_flags || parsed_payload.is_finish_token() ||{
                 let events = opaque.events.read().await;
                 events.len() >= WOW_COMBAT_LOG_BUFFER_CAPACITY
             };

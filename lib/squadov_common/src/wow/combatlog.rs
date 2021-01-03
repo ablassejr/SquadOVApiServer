@@ -344,7 +344,7 @@ pub struct WoWCombatLogEvent {
     source: Option<WoWCombatLogSourceDest>,
     dest: Option<WoWCombatLogSourceDest>,
     advanced: Option<WoWCombatLogAdvancedCVars>,
-    event: WoWCombatLogEventType
+    pub event: WoWCombatLogEventType
 }
 
 pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogState, payload: &RawWoWCombatLogPayload) -> Result<(Option<WoWCombatLogAdvancedCVars>, WoWCombatLogEventType), crate::SquadOvError> {
