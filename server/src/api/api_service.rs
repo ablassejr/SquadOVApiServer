@@ -53,7 +53,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 )
                 .service(
                     web::scope("/kafka")
-                        .route("/credentials", web::get().to(v1::get_kafka_credentials_handler))
+                        .route("/info", web::get().to(v1::get_kafka_info_handler))
                 )
                 .service(
                     web::scope("/users")
