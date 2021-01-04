@@ -305,11 +305,20 @@ impl PowerFsm {
             // A new action means we go to a new state. The only question at this point
             // is whether or not we need to leave the current state.
             let can_receive = current_state.can_receive_action(&parsed_action.action, parsed_action.indent_level);
-            let is_implicit_end = current_state.is_implicit_block_end(&parsed_action.action, parsed_action.indent_level);
             if !can_receive && self.states.len() > 1 {
                 self.pop_current_state()?;
             }
 
+            // We need to re-grab the current state and check for an implicit block end AGAIN just in case can_receive is
+            // false and we popped off the most recent state. Take for example a hypothetical situation where we have
+            // BLOCK_START (a)...
+            //      TAG_CHANGE (b) 
+            // TAG_CHANGE (c)
+            // When we get to procesing (c), we check if (b) "can_receive_action" (c). This will return false in which case
+            // we pop off to go to BLOCK_START. If "is_implicit_block_end" is called on the old current_state (b), then it will
+            // return false. However, "is_implicit_block_end" will be true on (a), hence why current_state needs to be refreshed.
+            let current_state = self.states.last_mut().unwrap();
+            let is_implicit_end = current_state.is_implicit_block_end(&parsed_action.action, parsed_action.indent_level);
             if  is_implicit_end && self.states.len() > 1 {
                 self.pop_current_state()?;
             }
@@ -340,23 +349,20 @@ impl PowerFsm {
             }
         }
 
-        if !parsed {
-            // At this point we've encountered an unknown line. Oh well!
-            log::warn!("Unknown Power Log Line: {}", log.log);
-        }
+        if parsed {
+            if self.start_time.is_none() {
+                self.start_time = Some(tm.clone());
+            }
 
-        if self.start_time.is_none() {
-            self.start_time = Some(tm.clone());
-        }
-
-        if self.store_raw {
-            let current_state = self.states.last_mut().unwrap();
-            self.raw.push(RawLog{
-                tm: tm.clone(),
-                log: log.log.clone(),
-                state_name: current_state.get_state_action().to_string(),
-                state_uuid: current_state.get_state_uuid()
-            });
+            if self.store_raw {
+                let current_state = self.states.last_mut().unwrap();
+                self.raw.push(RawLog{
+                    tm: tm.clone(),
+                    log: log.log.clone(),
+                    state_name: current_state.get_state_action().to_string(),
+                    state_uuid: current_state.get_state_uuid()
+                });
+            }
         }
         
         Ok(())
