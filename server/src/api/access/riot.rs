@@ -8,6 +8,7 @@ use crate::api::auth::SquadOVSession;
 use crate::api::ApiApplication;
 use std::sync::Arc;
 use async_trait::async_trait;
+use squadov_common::riot::db;
 
 pub struct RiotAccountAccessBasicData {
     pub user_id: i64,
@@ -39,7 +40,7 @@ impl super::AccessChecker<RiotAccountAccessBasicData> for RiotAccountAccessCheck
     }
 
     async fn check(&self, app: Arc<ApiApplication>, _session: &SquadOVSession, data: RiotAccountAccessBasicData) -> Result<bool, SquadOvError> {
-        match app.get_riot_account(data.user_id, &data.puuid).await {
+        match db::get_user_riot_account(&*app.pool, data.user_id, &data.puuid).await {
             Ok(_) => Ok(true),
             Err(_) => Ok(false)
         }

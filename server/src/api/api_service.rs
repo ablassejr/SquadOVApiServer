@@ -133,7 +133,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 // limit here. This should be about 10 MB.
                                 cfg.limit(10 * 1024 * 1024)
                             }))
-                        .route("/backfill", web::post().to(v1::obtain_valorant_matches_to_backfill))
                         .service(
                             // Need to include the user here for us to verify that that the user
                             // is associated with this valorant account.
@@ -161,6 +160,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::resource("/stats")
                                         .route(web::get().to(v1::get_player_stats_summary_handler))
                                 )
+                                .route("/backfill", web::post().to(v1::request_valorant_match_backfill_handler))
                         )
                         .service(
                             web::scope("/match/{match_id}")
