@@ -1,5 +1,8 @@
 use squadov_common::{
-    riot::db,
+    riot::{
+        db,
+        games::ValorantMatchDto
+    },
     SquadOvError,
 };
 use crate::api;
@@ -92,9 +95,20 @@ impl api::ApiApplication {
     }
 }
 
+#[derive(Serialize)]
+pub struct ValorantMatchDetails {
+    uuid: Uuid,
+    data: ValorantMatchDto
+}
+
 pub async fn get_valorant_match_details_handler(data : web::Path<GetValorantMatchDetailsInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
+    let match_uuid = db::get_valorant_match_uuid_if_exists(&*app.pool, &data.match_id).await?.ok_or(SquadOvError::NotFound)?;
+
     let match_data = db::get_valorant_match(&*app.pool, &data.match_id).await?;
-    Ok(HttpResponse::Ok().json(&match_data))
+    Ok(HttpResponse::Ok().json(ValorantMatchDetails{
+        uuid: match_uuid,
+        data: match_data,
+    }))
 }
 
 pub async fn get_valorant_player_match_metadata_handler(data: web::Path<GetValorantPlayerMatchMetadataInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {

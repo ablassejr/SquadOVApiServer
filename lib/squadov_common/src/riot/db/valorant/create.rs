@@ -120,6 +120,7 @@ async fn store_valorant_match_player_dto(ex: &mut Transaction<'_, Postgres>, mat
             deaths=m.stats.deaths,
             assists=m.stats.assists
         ));
+        sql.push(String::from(","));
     }
 
     sql.truncate(sql.len() - 1);
@@ -158,6 +159,7 @@ async fn store_valorant_match_team_dto(ex: &mut Transaction<'_, Postgres>, match
             rounds_played=m.rounds_played,
             num_points=m.num_points
         ));
+        sql.push(String::from(","));
     }
 
     sql.truncate(sql.len() - 1);
@@ -208,6 +210,7 @@ async fn store_valorant_match_round_result_dto(ex: &mut Transaction<'_, Postgres
             defuser_puuid=crate::sql_format_option_string(&m.bomb_defuser),
             team_round_winner=&m.winning_team
         ));
+        sql.push(String::from(","));
 
         let (s, k, d, e) = m.flatten(m.round_num);
         round_stats.extend(s.into_iter());
@@ -359,8 +362,7 @@ async fn store_valorant_match_flat_valorant_match_damage_dto(ex: &mut Transactio
     // a sequence to identify unique damage. Sort order: round num, 
     // instigator_puuid, receiver_puuid, damage, legshots, bodyshots, headshots.
     // All in ascending order.
-    let mut sorted_data: Vec<FlatValorantMatchDamageDto> = Vec::new();
-    sorted_data.clone_from_slice(all_damage);
+    let mut sorted_data: Vec<FlatValorantMatchDamageDto> = all_damage.iter().cloned().collect();
     sorted_data.sort_by(|a, b| {
         if a.round_num < b.round_num {
             return Ordering::Less;
@@ -492,8 +494,11 @@ async fn store_valorant_match_flat_valorant_match_economy_dto(ex: &mut Transacti
 
 pub async fn store_valorant_match_dto(ex: &mut Transaction<'_, Postgres>, valorant_match: &ValorantMatchDto) -> Result<(), SquadOvError> {
     store_valorant_match_info_dto(ex, &valorant_match.match_info).await?;
-    store_valorant_match_player_dto(ex, &valorant_match.match_info.match_id, &valorant_match.players).await?;
+    // The order here must be 1) Teams 2) Players and 3) Round Results.
+    // Players have a reference to what team they're on and round results have references to which player is relevant it's for.
+    // These references are enforced in the database.
     store_valorant_match_team_dto(ex, &valorant_match.match_info.match_id, &valorant_match.teams).await?;
+    store_valorant_match_player_dto(ex, &valorant_match.match_info.match_id, &valorant_match.players).await?;
     store_valorant_match_round_result_dto(ex, &valorant_match.match_info.match_id, &valorant_match.round_results).await?;
     Ok(())
 }

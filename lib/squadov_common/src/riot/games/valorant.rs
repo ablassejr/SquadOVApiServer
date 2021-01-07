@@ -33,7 +33,7 @@ pub struct ValorantMatchInfoDto {
     pub game_length_millis: i32,
     #[serde(rename(serialize="serverStartTimeUtc", deserialize="gameStartMillis"), deserialize_with="crate::parse_utc_time_from_milliseconds")]
     pub server_start_time_utc: Option<DateTime<Utc>>,
-    #[serde(rename="provisioningFlowID")]
+    #[serde(rename="provisioningFlowId")]
     pub provisioning_flow_id: Option<String>,
     #[serde(rename="gameMode")]
     pub game_mode: Option<String>,
@@ -226,7 +226,7 @@ pub struct ValorantPlayerMatchSummary {
     pub map_id: Option<String>,
     #[serde(rename = "isRanked")]
     pub is_ranked: Option<bool>,
-    #[serde(rename = "provisioningFlowID")]
+    #[serde(rename = "provisioningFlowId")]
     pub provisioning_flow_id: Option<String>,
     #[serde(rename = "characterId")]
     pub character_id: String,

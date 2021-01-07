@@ -17,19 +17,15 @@ where
     T: Executor<'a, Database = Postgres>
 {
     let matches: Vec<String> = sqlx::query_scalar(
-        &format!(
-            "
-            SELECT t.id
-            FROM (
-                VALUES {request}
-            ) AS t(id)
-            LEFT JOIN squadov.valorant_matches AS vm
-                ON vm.match_id = t.id
-            WHERE vm.raw_data IS NULL
-            ",
-            request=match_ids.iter().map(|x| format!("('{}')", x)).collect::<Vec<String>>().join(",")
-        )
+        "
+        SELECT t.id
+        FROM UNNEST($1) AS t(id)
+        LEFT JOIN squadov.valorant_matches AS vm
+            ON vm.match_id = t.id
+        WHERE vm.match_id IS NULL
+        "
     )
+        .bind(match_ids)
         .fetch_all(ex)
         .await?;
     Ok(matches)
@@ -49,6 +45,26 @@ where
         )
             .bind(match_id)
             .fetch_optional(ex)
+            .await?
+    )
+}
+
+pub async fn check_valorant_match_details_exist<'a, T>(ex: T, match_id: &str) -> Result<bool, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_scalar(
+            "
+            SELECT EXISTS (
+                SELECT 1
+                FROM squadov.valorant_matches
+                WHERE match_id = $1
+            )
+            "
+        )
+            .bind(match_id)
+            .fetch_one(ex)
             .await?
     )
 }

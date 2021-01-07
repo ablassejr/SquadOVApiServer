@@ -35,11 +35,18 @@ pub struct RiotApiHandler {
 #[serde(tag = "type")]
 pub enum RiotApiTask {
     // puuid
-    Account(String),
+    Account{
+        puuid: String
+    },
     // puuid
-    ValorantBackfill(String),
+    ValorantBackfill{
+        puuid: String
+    },
     // match id
-    ValorantMatch(String)
+    ValorantMatch{
+        match_id: String,
+        shard: String,
+    }
 }
 
 impl RiotApiHandler {
@@ -130,9 +137,9 @@ impl RabbitMqListener for RiotApiApplicationInterface {
     async fn handle(&self, data: &[u8]) -> Result<(), SquadOvError> {
         let task: RiotApiTask = serde_json::from_slice(data)?;
         match task {
-            RiotApiTask::Account(puuid) => self.obtain_riot_account_from_puuid(&puuid).await?,
-            RiotApiTask::ValorantBackfill(puuid) => self.backfill_user_valorant_matches(&puuid).await?,
-            RiotApiTask::ValorantMatch(match_id) => self.obtain_valorant_match_info(&match_id).await?,
+            RiotApiTask::Account{puuid} => self.obtain_riot_account_from_puuid(&puuid).await?,
+            RiotApiTask::ValorantBackfill{puuid} => self.backfill_user_valorant_matches(&puuid).await?,
+            RiotApiTask::ValorantMatch{match_id, shard} => self.obtain_valorant_match_info(&match_id, &shard).await?,
         };
         Ok(())
     }

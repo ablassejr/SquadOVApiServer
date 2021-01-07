@@ -54,7 +54,7 @@ impl RabbitMqConnectionBundle {
     pub async fn connect(config: &RabbitMqConfig, num_channels: i32) -> Result<Self, SquadOvError> {
         let connection = Connection::connect(
             &config.amqp_url,
-            ConnectionProperties::default().with_default_executor(4)
+            ConnectionProperties::default()
         ).await?;
 
         let mut channels: Vec<Channel> = Vec::new();
@@ -116,7 +116,7 @@ impl RabbitMqConnectionBundle {
                         continue;
                     }
 
-                    let (_, msg) = msg.unwrap();
+                    let msg = msg.unwrap();
                     let current_listeners = listeners.read().await.clone();
                     let topic_listeners = current_listeners.get(&queue);
                     if topic_listeners.is_some() {

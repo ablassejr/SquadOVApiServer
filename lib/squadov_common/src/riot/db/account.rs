@@ -4,6 +4,29 @@ use crate::{
 };
 use sqlx::{Executor, Postgres};
 
+pub async fn get_user_riot_account_gamename_tagline<'a, T>(ex: T, user_id: i64, game_name: &str, tag_line: &str) -> Result<RiotAccount, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(sqlx::query_as!(
+        RiotAccount,
+        "
+        SELECT ra.*
+        FROM squadov.riot_accounts AS ra
+        INNER JOIN squadov.riot_account_links AS ral
+            ON ral.puuid = ra.puuid
+        WHERE ral.user_id = $1
+            AND ra.game_name = $2
+            AND ra.tag_line = $3
+        ",
+        user_id,
+        game_name,
+        tag_line
+    )
+        .fetch_one(ex)
+        .await?)
+}
+
 pub async fn get_user_riot_account<'a, T>(ex: T, user_id: i64, puuid: &str) -> Result<RiotAccount, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>

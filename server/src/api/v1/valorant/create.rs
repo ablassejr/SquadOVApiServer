@@ -1,6 +1,9 @@
 use squadov_common::{
     SquadOvError,
-    riot::db
+    riot::{
+        db,
+        games
+    }
 };
 use crate::api;
 use actix_web::{web, HttpResponse};
@@ -13,6 +16,7 @@ pub struct InputValorantMatch {
     // Valorant unique ID
     #[serde(rename = "matchId")]
     pub match_id: String,
+    pub puuid: String,
     #[serde(rename = "playerData")]
     pub player_data: super::ValorantPlayerMatchMetadata
 }
@@ -107,7 +111,8 @@ pub async fn create_new_valorant_match_handler(data : web::Json<InputValorantMat
         app.insert_valorant_player_data(&mut tx, &data.player_data).await?;
         tx.commit().await?;
 
-        app.valorant_itf.request_obtain_valorant_match_info(&data.match_id, true).await?;
+        let shard = db::get_user_account_shard(&*app.pool, &data.puuid, games::VALORANT_SHORTHAND).await?;
+        app.valorant_itf.request_obtain_valorant_match_info(&data.match_id, &shard, true).await?;
         return Ok(HttpResponse::Ok().json(match_uuid));
     }
     
