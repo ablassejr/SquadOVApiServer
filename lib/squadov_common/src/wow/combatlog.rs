@@ -499,6 +499,41 @@ pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, state: &WoWCombatLogState, 
 
 pub type WowCombatLogUnitOwnershipMapping = HashMap<Uuid, (String, String)>;
 pub type WowCombatLogCharacterOwnershipMapping = HashMap<Uuid, String>;
+pub struct WowCombatLogCharacterPresence {
+    combatlog: Uuid,
+    guid: String
+}
+
+pub async fn store_combat_log_character_presence<'a, T>(ex: &'a mut T, present: &[WowCombatLogCharacterPresence]) -> Result<(), crate::SquadOvError>
+where
+    &'a mut T: Executor<'a, Database = Postgres>
+{
+    if present.is_empty() {
+        return Ok(());
+    }
+
+    let mut values: Vec<String> = Vec::new();
+    for p in present {
+        values.push(format!(
+            "('{combat_log_uuid}', '{guid}')",
+            combat_log_uuid=p.combatlog.clone(),
+            guid=p.guid.clone(),
+        ));
+    }
+
+    sqlx::query(&format!(
+        "
+        INSERT INTO squadov.wow_combat_log_character_presence (combat_log_uuid, guid)
+        VALUES {values}
+        ON CONFLICT DO NOTHING
+        ",
+        values=values.join(",")
+    ))
+        .execute(ex)
+        .await?;
+
+    Ok(())
+}
 
 pub async fn store_combat_log_unit_ownership_mapping<'a, T>(ex: &'a mut T, mapping: &WowCombatLogUnitOwnershipMapping) -> Result<(), crate::SquadOvError>
 where
@@ -566,12 +601,12 @@ where
     Ok(())
 }
 
-pub async fn store_wow_combat_log_events<'a, T>(ex: &'a mut T, events: &[WoWCombatLogEvent]) -> Result<(WowCombatLogUnitOwnershipMapping, WowCombatLogCharacterOwnershipMapping), crate::SquadOvError>
+pub async fn store_wow_combat_log_events<'a, T>(ex: &'a mut T, events: &[WoWCombatLogEvent]) -> Result<(WowCombatLogUnitOwnershipMapping, WowCombatLogCharacterOwnershipMapping, Vec<WowCombatLogCharacterPresence>), crate::SquadOvError>
 where
     &'a mut T: Executor<'a, Database = Postgres>
 {
     if events.is_empty() {
-        return Ok((HashMap::new(), HashMap::new()));
+        return Ok((HashMap::new(), HashMap::new(), Vec::new()));
     }
 
     let mut sql: Vec<String> = Vec::new();
@@ -590,6 +625,7 @@ where
 
     let mut combatlog_current_players: WowCombatLogCharacterOwnershipMapping = HashMap::new();
     let mut combatlog_ownership: WowCombatLogUnitOwnershipMapping = HashMap::new();
+    let mut combatlog_presence: Vec<WowCombatLogCharacterPresence> = Vec::new();
 
     for eve in events {
         sql.push(format!("(
@@ -636,14 +672,18 @@ where
             }
         }
 
-        match eve.event {
+        match &eve.event {
             WoWCombatLogEventType::SpellSummon(_) => {
                 if eve.source.is_some() && eve.dest.is_some() {
                     let source = eve.source.as_ref().unwrap();
                     let dest = eve.dest.as_ref().unwrap();
                     combatlog_ownership.insert(eve.combat_log_id.clone(), (dest.guid.clone(), source.guid.clone()));
                 }
-            }
+            },
+            WoWCombatLogEventType::CombatantInfo{guid, ..} => combatlog_presence.push(WowCombatLogCharacterPresence{
+                combatlog: eve.combat_log_id.clone(),
+                guid: guid.clone(),
+            }),
             _ => ()
         }
     }
@@ -651,7 +691,7 @@ where
     sql.truncate(sql.len() - 1);
     sql.push(String::from(" ON CONFLICT DO NOTHING"));
     sqlx::query(&sql.join("")).execute(ex).await?;
-    Ok((combatlog_ownership, combatlog_current_players))
+    Ok((combatlog_ownership, combatlog_current_players, combatlog_presence))
 }
 
 #[cfg(test)]

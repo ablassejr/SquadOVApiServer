@@ -1,0 +1,1 @@
+CREATE INDEX ON squadov.wow_combat_log_events (combat_log_uuid, (source->>'guid'), tm);

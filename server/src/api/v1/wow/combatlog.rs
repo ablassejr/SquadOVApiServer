@@ -77,7 +77,8 @@ impl api::ApiApplication {
                 combat_log_version,
                 advanced_log,
                 build_version,
-                blob_uuid
+                blob_uuid,
+                tm
             )
             VALUES (
                 $1,
@@ -85,7 +86,8 @@ impl api::ApiApplication {
                 $3,
                 $4,
                 $5,
-                $6
+                $6,
+                NOW()
             )
             ",
             &uuid,

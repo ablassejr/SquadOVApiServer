@@ -7,9 +7,14 @@ use squadov_common::{
     WoWCharacterUserAssociation
 };
 use uuid::Uuid;
+use std::collections::HashMap;
 
 impl api::ApiApplication {
     pub async fn list_wow_characters_for_match(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<WoWCharacter>, SquadOvError> {
+        // There's two queries that need to be done here: get a list if the COMBATANT_INFO events that tell us every character that's
+        // supposed to be in the match along with their character spec and item level. Additionally, we need to retrieve a log line
+        // with that particular character as the source to get the character's name (for display purposes). We combine these two separate
+        // queries to generate our vector of WoWCharacter objects.
         let characters = sqlx::query!(
             r#"
             WITH match_start_stop (start, stop) AS (
@@ -20,7 +25,15 @@ impl api::ApiApplication {
                 LEFT JOIN squadov.wow_challenges AS wc
                     ON wc.match_uuid = m.uuid
                 WHERE m.uuid = $2
-            ), match_combat_logs AS (
+            )
+            SELECT DISTINCT ON (mcl.evt->>'guid')
+                mcl.evt->>'guid' AS "guid!",
+                (mcl.evt->>'spec_id')::INTEGER AS "spec_id!",
+                jsonb_path_query_array(
+                    (mcl.evt->>'items')::jsonb,
+                    '$[*].ilvl'
+                ) AS "items!"
+            FROM (
                 SELECT wce.*
                 FROM squadov.wow_combat_log_events AS wce
                 INNER JOIN squadov.wow_combat_logs AS wcl
@@ -31,36 +44,49 @@ impl api::ApiApplication {
                 WHERE wcl.user_id = $1
                     AND wma.match_uuid = $2
                     AND wce.tm >= mss.start AND wce.tm <= mss.stop
-            ), combat_log_player_flags (guid, name) AS (
-                SELECT DISTINCT source->>'guid', source->>'name'
-                FROM match_combat_logs
-                WHERE source IS NOT NULL
-                    AND NOT source @> '{"name": "nil"}'
-                UNION
-                SELECT DISTINCT dest->>'guid', dest->>'name'
-                FROM match_combat_logs
-                WHERE dest IS NOT NULL
-                    AND NOT dest @> '{"name": "nil"}'
-            )
-            SELECT DISTINCT ON (mcl.evt->>'guid')
-                mcl.evt->>'guid' AS "guid!",
-                clpf.name AS "name!",
-                (mcl.evt->>'spec_id')::INTEGER AS "spec_id!",
-                jsonb_path_query_array(
-                    (mcl.evt->>'items')::jsonb,
-                    '$[*].ilvl'
-                ) AS "items!"
-            FROM match_combat_logs AS mcl
-            INNER JOIN combat_log_player_flags AS clpf
-                ON clpf.guid = mcl.evt->>'guid'
-            WHERE mcl.evt @> '{"type": "CombatantInfo"}'
+                    AND wce.evt @> '{"type": "CombatantInfo"}'
+            ) AS mcl
             ORDER BY mcl.evt->>'guid', mcl.tm DESC
             "#,
             user_id,
-            match_uuid,
+            match_uuid
         )
             .fetch_all(&*self.pool)
             .await?;
+
+        let guids: Vec<String> = characters.iter().map(|x| { x.guid.clone() }).collect();
+
+        // It may be tempting to do an ORDER BY wce.tm DESC here but that 1) is unnecessary
+        // and 2) makes the query MUCH slower. It's unnecessary since the user's name SHOULD
+        // NOT change throughout the duration of a match.
+        let guid_to_name: HashMap<String, String> = sqlx::query!(
+            r#"
+            SELECT pl.guid AS "guid!", t1.name AS "name"
+            FROM UNNEST($1::VARCHAR[]) AS pl(guid)
+            CROSS JOIN LATERAL (
+                SELECT wce.source->>'name'
+                FROM squadov.wow_combat_log_events AS wce
+                INNER JOIN squadov.wow_combat_logs AS wcl
+                    ON wcl.uuid = wce.combat_log_uuid
+                INNER JOIN squadov.wow_match_combat_log_association AS wma
+                    ON wma.combat_log_uuid = wcl.uuid
+                WHERE wcl.user_id = $2
+                    AND wma.match_uuid = $3
+                    AND wce.source->>'guid' = pl.guid
+                LIMIT 1
+            ) AS t1(name)
+            "#,
+            &guids,
+            user_id,
+            match_uuid
+        )
+            .fetch_all(&*self.pool)
+            .await?
+            .into_iter()
+            .map(|x| {
+                (x.guid, x.name.unwrap_or(String::from("<Unknown>")))
+            })
+            .collect();
         
         Ok(
             characters.into_iter().map(|x| {
@@ -70,9 +96,10 @@ impl api::ApiApplication {
                     .filter(|x| { *x > 0 })
                     .collect();
 
+                let nm = guid_to_name.get(&x.guid).unwrap_or(&String::from("<Unknown>")).clone();
                 WoWCharacter{
                     guid: x.guid,
-                    name: x.name,
+                    name: nm,
                     ilvl: (relevant_ilvls.iter().sum::<i32>() as f32 / relevant_ilvls.len() as f32).floor() as i32,
                     spec_id: x.spec_id,
                 }
@@ -81,68 +108,90 @@ impl api::ApiApplication {
     }
 
     async fn list_wow_characters_for_user(&self, user_id: i64) -> Result<Vec<WoWCharacter>, SquadOvError> {
-        // Pretty insane query that's probably pretty slow...once we have more logs. 
-        // TODO: Optimize, maybe?
-        // What this query does is 
-        // 1) Pull all the combat log events that this user uploaded (maybe limit this somehow?)
-        // 2) For every combat log event, analyze the 'source' and 'dest' fields for the COMBATLOG_FILTER_ME (0x511 = 1297) flag to determine
-        //    which player GUID can be considered the "current player".
-        // 3) Then given the player GUID, look for the latest relevant COMBATANT_INFO lines to pull their spec and ilvl.
-        let characters = sqlx::query!(
+        // There's three queries here:
+        // 1) Query what characters the user owns in the wow_user_character_association table.
+        // 2) Determine that character's latest name by finding the latest name in the combat logs.
+        // 3) Determine that character's latest spec ID and ilvl.
+        // TODO: I have a feeling that these two queries can be trivially merged together with no performance loss.
+        let owned_characters = sqlx::query!(
             r#"
-            WITH user_combat_logs AS (
-                SELECT wce.*
-                FROM squadov.wow_combat_log_events AS wce
-                INNER JOIN squadov.wow_combat_logs AS wcl
-                    ON wcl.uuid = wce.combat_log_uuid
-                WHERE wcl.user_id = $1
-            ), combat_log_player_flags (guid, name) AS (
-                SELECT DISTINCT source->>'guid', source->>'name'
-                FROM user_combat_logs
-                WHERE source IS NOT NULL
-                    AND source @> '{"flags": 1297}'
-                    AND NOT source @> '{"name": "nil"}'
-                UNION
-                SELECT DISTINCT dest->>'guid', dest->>'name'
-                FROM user_combat_logs
-                WHERE dest IS NOT NULL
-                    AND dest @> '{"flags": 1297}'
-                    AND NOT dest @> '{"name": "nil"}'
-            )
-            SELECT DISTINCT ON (ucl.evt->>'guid')
-                ucl.evt->>'guid' AS "guid!",
-                clpf.name AS "name!",
-                (ucl.evt->>'spec_id')::INTEGER AS "spec_id!",
-                jsonb_path_query_array(
-                    (ucl.evt->>'items')::jsonb,
-                    '$[*].ilvl'
-                ) AS "items!"
-            FROM user_combat_logs AS ucl
-            INNER JOIN combat_log_player_flags AS clpf
-                ON clpf.guid = ucl.evt->>'guid'
-            WHERE ucl.evt @> '{"type": "CombatantInfo"}'
-            ORDER BY ucl.evt->>'guid', ucl.tm DESC
+            SELECT *
+            FROM squadov.wow_user_character_association
+            WHERE user_id = $1
             "#,
             user_id,
         )
             .fetch_all(&*self.pool)
             .await?;
 
-        Ok(
-            characters.into_iter().map(|x| {
-                let relevant_ilvls: Vec<i32> = serde_json::from_value::<Vec<i32>>(x.items)
-                    .unwrap_or(vec![])
-                    .into_iter()
-                    .filter(|x| { *x > 0 })
-                    .collect();
+        let guids: Vec<String> = owned_characters.iter().map(|x| { x.guid.clone() }).collect();
 
-                WoWCharacter{
-                    guid: x.guid,
-                    name: x.name,
-                    ilvl: (relevant_ilvls.iter().sum::<i32>() as f32 / relevant_ilvls.len() as f32).floor() as i32,
-                    spec_id: x.spec_id,
-                }
-            }).collect()          
+        // Unlike the similar query in list_wow_characters_for_match, we need to filter for the combat log events
+        // based on time. However, it's expensive to sort based on combat log events time (lots of rows). So instead, we
+        // assume that the user's name doesn't change within each combat log and order based combat log time. Note that this
+        // query also handles retrieving spec ID and ilvl because it can for cheap.
+        Ok(
+            sqlx::query!(
+                r#"
+                SELECT
+                    pl.guid AS "guid!",
+                    t1.name AS "name",
+                    (wce.evt->>'spec_id')::INTEGER AS "spec_id!",
+                    jsonb_path_query_array(
+                        (wce.evt->>'items')::jsonb,
+                        '$[*].ilvl'
+                    ) AS "items!"
+                FROM UNNEST($1::VARCHAR[]) AS pl(guid)
+                CROSS JOIN LATERAL (
+                    SELECT wcl.uuid
+                    FROM squadov.wow_combat_logs AS wcl
+                    INNER JOIN squadov.wow_combat_log_character_presence AS wclcp
+                        ON wclcp.combat_log_uuid = wcl.uuid
+                    WHERE wclcp.guid = pl.guid
+                        AND wcl.user_id = $2
+                    ORDER BY wcl.tm DESC
+                    LIMIT 1
+                ) AS cl(id)
+                CROSS JOIN LATERAL (
+                    SELECT wce.source->>'name'
+                    FROM squadov.wow_combat_log_events AS wce
+                    INNER JOIN squadov.wow_combat_logs AS wcl
+                        ON wcl.uuid = wce.combat_log_uuid
+                    WHERE wcl.user_id = $2
+                        AND wcl.uuid = cl.id
+                        AND wce.source->>'guid' = pl.guid
+                    LIMIT 1
+                ) AS t1(name)
+                CROSS JOIN LATERAL (
+                    SELECT wce.*
+                    FROM squadov.wow_combat_log_events AS wce
+                    WHERE wce.combat_log_uuid = cl.id
+                        AND wce.evt @> '{"type": "CombatantInfo"}'
+                        AND wce.evt->>'guid' = pl.guid
+                    LIMIT 1
+                ) AS wce
+                "#,
+                &guids,
+                user_id,
+            )
+                .fetch_all(&*self.pool)
+                .await?
+                .into_iter()
+                .map(|x| {
+                    let relevant_ilvls: Vec<i32> = serde_json::from_value::<Vec<i32>>(x.items)
+                        .unwrap_or(vec![])
+                        .into_iter()
+                        .filter(|x| { *x > 0 })
+                        .collect();
+
+                    WoWCharacter {
+                        guid: x.guid,
+                        name: x.name.unwrap_or(String::from("<Unknown>")),
+                        ilvl: (relevant_ilvls.iter().sum::<i32>() as f32 / relevant_ilvls.len() as f32).floor() as i32,
+                        spec_id: x.spec_id
+                    }
+                })
+                .collect()
         )
     }
 
