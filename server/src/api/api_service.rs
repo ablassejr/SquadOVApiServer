@@ -309,14 +309,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .service(
                                             web::scope("/users/{user_id}")
                                                 .wrap(access::ApiAccess::new(
-                                                    Box::new(access::WowMatchUserMatchupChecker{
-                                                        obtainer: access::WowMatchUserPathObtainer{
-                                                            match_uuid_key: "match_uuid",
-                                                            user_id_key: "user_id",
-                                                        },
-                                                    })
-                                                ))
-                                                .wrap(access::ApiAccess::new(
                                                     Box::new(access::UserSpecificAccessChecker{
                                                         obtainer: access::UserIdPathSetObtainer{
                                                             key: "user_id"
