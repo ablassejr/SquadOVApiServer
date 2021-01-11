@@ -1,0 +1,10 @@
+[
+    {
+        "origin": [
+            "http://localhost:3000",
+            "https://app.squadov.gg"
+        ],
+        "method": ["GET"],
+        "maxAgeSeconds": 3600
+    }
+]

@@ -1,7 +1,7 @@
 use sqlx;
 use sqlx::postgres::PgPool;
 use actix_web::{ HttpRequest, FromRequest, dev, Error };
-use actix_web::error::ErrorBadRequest;
+use actix_web::error::ErrorUnauthorized;
 use futures_util::future::{ok, err, Ready};
 use squadov_common;
 use crate::api::fusionauth;
@@ -28,7 +28,7 @@ impl FromRequest for SquadOVSession {
         let extensions = req.extensions();
         match extensions.get::<SquadOVSession>() {
             Some(x) => ok(x.clone()),
-            None => err(ErrorBadRequest("No session available."))
+            None => err(ErrorUnauthorized("No session available."))
         }
     }
 }

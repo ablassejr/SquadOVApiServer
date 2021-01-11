@@ -88,7 +88,7 @@ where
             let session = match app.session.get_session_from_request(&request, &app.pool).await {
                 Ok(x) => match x {
                     Some(s) => s,
-                    None => return Err(actix_web::error::ErrorBadRequest("No Session")),
+                    None => return Err(actix_web::error::ErrorUnauthorized("No Session")),
                 },
                 Err(_) => return Err(actix_web::error::ErrorInternalServerError("Could not retrieve session")),
             };

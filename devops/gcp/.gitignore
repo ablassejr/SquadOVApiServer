@@ -1,1 +1,3 @@
 *.json
+
+!gcs_cors.json
