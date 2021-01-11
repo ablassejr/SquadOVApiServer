@@ -204,3 +204,9 @@ impl From<std::array::TryFromSliceError> for SquadOvError {
         return Self::InternalError(format!("Slice into Array {}", err))
     }
 }
+
+impl From<lapin::Error> for SquadOvError {
+    fn from(err: lapin::Error) -> Self {
+        return Self::InternalError(format!("AMQP {}", err))
+    }
+}

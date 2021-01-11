@@ -16,6 +16,8 @@ use squadov_common::{
     BlobManagementClient,
     JobQueue,
     KafkaCredentialKeyPair,
+    riot::api::{RiotApiHandler, RiotApiApplicationInterface, RiotConfig},
+    rabbitmq::{RabbitMqInterface, RabbitMqConfig}
 };
 use url::Url;
 use std::vec::Vec;
@@ -126,7 +128,9 @@ pub struct ApiConfig {
     pub server: ServerConfig,
     pub gitlab: GitlabConfig,
     pub kafka: KafkaConfig,
-    pub vod: VodConfig
+    pub vod: VodConfig,
+    pub riot: RiotConfig,
+    pub rabbitmq: RabbitMqConfig,
 }
 
 struct ApiClients {
@@ -144,7 +148,8 @@ pub struct ApiApplication {
     pub blob: Arc<BlobManagementClient>,
     // Various local job queues - these should eventually
     // probably be switched to something like RabbitMQ + microservices.
-    pub vod_fastify_jobs: Arc<JobQueue<v1::VodFastifyJob>>
+    pub vod_fastify_jobs: Arc<JobQueue<v1::VodFastifyJob>>,
+    pub valorant_itf: Arc<RiotApiApplicationInterface>,
 }
 
 impl ApiApplication {
@@ -166,6 +171,13 @@ impl ApiApplication {
         );
 
         let blob = Arc::new(BlobManagementClient::new(gcp.clone(), pool.clone()));
+        
+        let valorant_api = Arc::new(RiotApiHandler::new(config.riot.valorant_api_key.clone()));
+        let rabbitmq = Arc::new(RabbitMqInterface::new(&config.rabbitmq).await.unwrap());
+
+        let valorant_itf = Arc::new(RiotApiApplicationInterface::new(&config.rabbitmq.valorant_queue, valorant_api.clone(), rabbitmq.clone(), pool.clone()));
+        rabbitmq.add_listener(config.rabbitmq.valorant_queue.clone(), valorant_itf.clone()).await;
+
         ApiApplication{
             config: config.clone(),
             clients: ApiClients{
@@ -182,6 +194,7 @@ impl ApiApplication {
             blob: blob,
             // TODO: Configify!
             vod_fastify_jobs: JobQueue::new::<v1::VodFastifyWorker>(config.vod.fastify_threads),
+            valorant_itf: valorant_itf,
         }
     }
 }

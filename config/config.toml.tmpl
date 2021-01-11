@@ -38,3 +38,14 @@ secret= "${KAFKA_SERVER_SECRET}"
 
 [vod]
 fastify_threads = ${VOD_FASTIFY_THREADS}
+
+[riot]
+
+[riot.valorant_api_key]
+key = "${VALORANT_API_KEY}"
+second_limit = 20
+two_minute_limit = 100
+
+[rabbitmq]
+amqp_url = "${RABBITMQ_AMQP_URL}"
+valorant_queue = "valorant_api"

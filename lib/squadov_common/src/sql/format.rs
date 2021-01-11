@@ -63,3 +63,14 @@ where T: serde::Serialize
         }
     )
 }
+
+pub fn sql_format_varchar_array(v: &[String]) -> String {
+    format!(
+        "ARRAY [
+            {}
+        ]::VARCHAR[]",
+        v.iter().map(|x| {
+            format!("'{}'", x)
+        }).collect::<Vec<String>>().join(",")
+    )
+}

@@ -46,6 +46,7 @@ rdkafka = { version = "0.24", features = ["cmake-build", "ssl"] }
 chashmap = "2.2.2"
 unicode-segmentation = "1.7.1"
 env_logger = "0.7.1"
+lapin = "2.0.0-alpha.1"
 
 [build-dependencies]
 prost-build = "0.6.1"

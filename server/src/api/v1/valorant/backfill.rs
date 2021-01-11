@@ -1,34 +1,28 @@
-use squadov_common;
+use squadov_common::{
+    SquadOvError,
+    riot::db,
+};
 use crate::api;
 use actix_web::{web, HttpResponse};
-use std::vec::Vec;
 use std::sync::Arc;
-use sqlx::prelude::Row;
+use serde::Deserialize;
 
-impl api::ApiApplication {
-    pub async fn find_nonexistant_valorant_matches(&self, request_matches: &Vec<String>) -> Result<Vec<String>, squadov_common::SquadOvError> {
-        let matches = sqlx::query(
-            &format!(
-                "
-                SELECT t.id
-                FROM (
-                    VALUES {request}
-                ) AS t(id)
-                LEFT JOIN squadov.valorant_matches AS vm
-                    ON vm.match_id = t.id
-                WHERE vm.raw_data IS NULL
-                ",
-                request=request_matches.iter().map(|x| format!("('{}')", x)).collect::<Vec<String>>().join(",")
-            )
-        )
-            .fetch_all(&*self.pool)
-            .await?;
-
-        Ok(matches.iter().map(|x| x.get(0)).collect())
-    }
+#[derive(Deserialize)]
+pub struct ValorantBackfillPath {
+    user_id: i64
 }
 
-pub async fn obtain_valorant_matches_to_backfill(data : web::Json<Vec<String>>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, squadov_common::SquadOvError> {
-    let ret_matches = app.find_nonexistant_valorant_matches(&data).await?;
-    Ok(HttpResponse::Ok().json(&ret_matches))
+#[derive(Deserialize)]
+pub struct ValorantBackfillData {
+    #[serde(rename="gameName")]
+    game_name: String,
+    #[serde(rename="tagLine")]
+    tag_line: String
+}
+
+pub async fn request_valorant_match_backfill_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<ValorantBackfillPath>, data: web::Json<ValorantBackfillData>) -> Result<HttpResponse, SquadOvError> {
+    // Ensure that the user is linked to this particular account before firing off a backfill request.
+    let account = db::get_user_riot_account_gamename_tagline(&*app.pool, path.user_id, &data.game_name, &data.tag_line).await?;
+    app.valorant_itf.request_backfill_user_valorant_matches(&account.puuid).await?;
+    Ok(HttpResponse::Ok().finish())
 }
