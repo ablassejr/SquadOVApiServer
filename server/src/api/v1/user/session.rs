@@ -42,5 +42,5 @@ pub async fn mark_user_active_endpoint_handler(app : web::Data<Arc<api::ApiAppli
     squadov_common::analytics::mark_active_user_endpoint(&mut tx, session.user.id).await?;
     tx.commit().await?;
 
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::NoContent().finish())
 }
