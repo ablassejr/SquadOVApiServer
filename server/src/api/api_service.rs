@@ -123,8 +123,12 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                         .route("", web::get().to(v1::list_riot_valorant_accounts_handler))
                                                 )
                                                 .service(
-                                                    web::scope("/summoner")
-                                                        .route("/{summoner_name}", web::get().to(v1::get_riot_summoner_account_handler))
+                                                    web::scope("/lol")
+                                                        .route("/{summoner_name}", web::get().to(v1::get_riot_lol_summoner_account_handler))
+                                                )
+                                                .service(
+                                                    web::scope("/tft")
+                                                        .route("/{summoner_name}", web::get().to(v1::get_riot_tft_summoner_account_handler))
                                                 )
                                         )
                                 )
