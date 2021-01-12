@@ -18,7 +18,11 @@ use squadov_common::{
     KafkaCredentialKeyPair,
     riot::{
         api::{RiotApiHandler, RiotApiApplicationInterface, RiotConfig},
-        games::VALORANT_SHORTHAND,
+        games::{
+            VALORANT_SHORTHAND,
+            LOL_SHORTHAND,
+            TFT_SHORTHAND,
+        },
     },
     rabbitmq::{RabbitMqInterface, RabbitMqConfig}
 };
@@ -153,6 +157,8 @@ pub struct ApiApplication {
     // probably be switched to something like RabbitMQ + microservices.
     pub vod_fastify_jobs: Arc<JobQueue<v1::VodFastifyJob>>,
     pub valorant_itf: Arc<RiotApiApplicationInterface>,
+    pub lol_itf: Arc<RiotApiApplicationInterface>,
+    pub tft_itf: Arc<RiotApiApplicationInterface>,
 }
 
 impl ApiApplication {
@@ -176,10 +182,17 @@ impl ApiApplication {
         let blob = Arc::new(BlobManagementClient::new(gcp.clone(), pool.clone()));
         
         let valorant_api = Arc::new(RiotApiHandler::new(config.riot.valorant_api_key.clone()));
+        let lol_api = Arc::new(RiotApiHandler::new(config.riot.lol_api_key.clone()));
+        let tft_api = Arc::new(RiotApiHandler::new(config.riot.tft_api_key.clone()));
         let rabbitmq = Arc::new(RabbitMqInterface::new(&config.rabbitmq).await.unwrap());
 
         let valorant_itf = Arc::new(RiotApiApplicationInterface::new(&config.rabbitmq.valorant_queue, valorant_api.clone(), rabbitmq.clone(), pool.clone(), VALORANT_SHORTHAND));
+        let lol_itf = Arc::new(RiotApiApplicationInterface::new(&config.rabbitmq.lol_queue, lol_api.clone(), rabbitmq.clone(), pool.clone(), LOL_SHORTHAND));
+        let tft_itf = Arc::new(RiotApiApplicationInterface::new(&config.rabbitmq.tft_queue, tft_api.clone(), rabbitmq.clone(), pool.clone(), TFT_SHORTHAND));
+
         rabbitmq.add_listener(config.rabbitmq.valorant_queue.clone(), valorant_itf.clone()).await;
+        rabbitmq.add_listener(config.rabbitmq.lol_queue.clone(), lol_itf.clone()).await;
+        rabbitmq.add_listener(config.rabbitmq.tft_queue.clone(), tft_itf.clone()).await;
 
         ApiApplication{
             config: config.clone(),
@@ -197,7 +210,9 @@ impl ApiApplication {
             blob: blob,
             // TODO: Configify!
             vod_fastify_jobs: JobQueue::new::<v1::VodFastifyWorker>(config.vod.fastify_threads),
-            valorant_itf: valorant_itf,
+            valorant_itf,
+            lol_itf,
+            tft_itf,
         }
     }
 }

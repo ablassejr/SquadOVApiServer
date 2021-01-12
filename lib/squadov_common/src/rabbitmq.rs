@@ -8,6 +8,7 @@ use lapin::{
     Channel,
     options::{QueueDeclareOptions, BasicConsumeOptions, BasicPublishOptions, BasicAckOptions, BasicQosOptions},
     types::FieldTable,
+    Consumer,
 };
 use futures_util::stream::StreamExt;
 use async_std::sync::{Arc, RwLock};
@@ -20,7 +21,9 @@ const RABBITMQ_PREFETCH_COUNT: u16 = 8;
 #[derive(Deserialize,Debug,Clone)]
 pub struct RabbitMqConfig {
     pub amqp_url: String,
-    pub valorant_queue: String
+    pub valorant_queue: String,
+    pub lol_queue: String,
+    pub tft_queue: String,
 }
 
 #[async_trait]
@@ -66,6 +69,18 @@ impl RabbitMqConnectionBundle {
                 FieldTable::default(),
             ).await?;
 
+            ch.queue_declare(
+                &config.lol_queue,
+                QueueDeclareOptions::default(),
+                FieldTable::default(),
+            ).await?;
+
+            ch.queue_declare(
+                &config.tft_queue,
+                QueueDeclareOptions::default(),
+                FieldTable::default(),
+            ).await?;
+
             channels.push(ch);
         }
 
@@ -95,50 +110,76 @@ impl RabbitMqConnectionBundle {
         Ok(())
     }
 
+    fn start_consumer(&self, mut consumer: Consumer) {
+        let queue = self.config.valorant_queue.clone();
+        let listeners = self.listeners.clone();
+        tokio::task::spawn(async move {
+            while let Some(msg) = consumer.next().await {
+                if msg.is_err() {
+                    log::warn!("Failed to consume from RabbitMQ: {:?}", msg.err().unwrap());
+                    continue;
+                }
+
+                let msg = msg.unwrap();
+                let current_listeners = listeners.read().await.clone();
+                let topic_listeners = current_listeners.get(&queue);
+                if topic_listeners.is_some() {
+                    let topic_listeners = topic_listeners.unwrap();
+                    for l in topic_listeners {
+                        match l.handle(&msg.data).await {
+                            Ok(_) => (),
+                            Err(err) => {
+                                log::warn!("Error in handling message: {:?}", err);
+                            }
+                        };
+                    }    
+                }
+
+                // TODO: Maybe nack some stuff too if we failed to parse something?
+                // We need to be able to detect that situation somehow though.
+                match msg.acker.ack(BasicAckOptions::default()).await {
+                    Ok(_) => (),
+                    Err(err) => log::warn!("Failed to ack RabbitMQ message: {:?}", err)
+                };
+            }
+        });
+    }
+
     pub async fn begin_consuming(&self) -> Result<(), SquadOvError> {
         // Each channel gets its own thread to start consuming from every channel.
         // I think we should probably only limit ourselves to having 1 consumer channel anyway.
         for ch in &self.channels {
             ch.basic_qos(RABBITMQ_PREFETCH_COUNT, BasicQosOptions::default()).await?;
-            let mut consumer = ch.basic_consume(
-                &self.config.valorant_queue,
-                "",
-                BasicConsumeOptions::default(),
-                FieldTable::default(),
-            ).await?;
 
-            let queue = self.config.valorant_queue.clone();
-            let listeners = self.listeners.clone();
-            tokio::task::spawn(async move {
-                while let Some(msg) = consumer.next().await {
-                    if msg.is_err() {
-                        log::warn!("Failed to consume from RabbitMQ: {:?}", msg.err().unwrap());
-                        continue;
-                    }
+            {
+                let consumer = ch.basic_consume(
+                    &self.config.valorant_queue,
+                    "",
+                    BasicConsumeOptions::default(),
+                    FieldTable::default(),
+                ).await?;
+                self.start_consumer(consumer);
+            }
 
-                    let msg = msg.unwrap();
-                    let current_listeners = listeners.read().await.clone();
-                    let topic_listeners = current_listeners.get(&queue);
-                    if topic_listeners.is_some() {
-                        let topic_listeners = topic_listeners.unwrap();
-                        for l in topic_listeners {
-                            match l.handle(&msg.data).await {
-                                Ok(_) => (),
-                                Err(err) => {
-                                    log::warn!("Error in handling message: {:?}", err);
-                                }
-                            };
-                        }    
-                    }
+            {
+                let consumer = ch.basic_consume(
+                    &self.config.lol_queue,
+                    "",
+                    BasicConsumeOptions::default(),
+                    FieldTable::default(),
+                ).await?;
+                self.start_consumer(consumer);
+            }
 
-                    // TODO: Maybe nack some stuff too if we failed to parse something?
-                    // We need to be able to detect that situation somehow though.
-                    match msg.acker.ack(BasicAckOptions::default()).await {
-                        Ok(_) => (),
-                        Err(err) => log::warn!("Failed to ack RabbitMQ message: {:?}", err)
-                    };
-                }
-            });
+            {
+                let consumer = ch.basic_consume(
+                    &self.config.tft_queue,
+                    "",
+                    BasicConsumeOptions::default(),
+                    FieldTable::default(),
+                ).await?;
+                self.start_consumer(consumer);
+            }
         }
 
         Ok(())

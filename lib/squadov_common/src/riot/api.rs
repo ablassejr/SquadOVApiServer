@@ -14,21 +14,29 @@ use reqwest::header;
 use tokio::sync::{Semaphore};
 
 #[derive(Deserialize,Debug,Clone)]
+pub struct ApiKeyLimit {
+    pub requests: usize,
+    pub seconds: u64,
+}
+
+#[derive(Deserialize,Debug,Clone)]
 pub struct RiotApiKeyConfig {
     pub key: String,
-    pub second_limit: usize,
-    pub two_minute_limit: usize,
+    pub burst_limit: ApiKeyLimit,
+    pub bulk_limit: ApiKeyLimit,
 }
 
 #[derive(Deserialize,Debug,Clone)]
 pub struct RiotConfig {
-    pub valorant_api_key: RiotApiKeyConfig
+    pub valorant_api_key: RiotApiKeyConfig,
+    pub lol_api_key: RiotApiKeyConfig,
+    pub tft_api_key: RiotApiKeyConfig,
 }
 
 pub struct RiotApiHandler {
     api_key: RiotApiKeyConfig,
-    second_threshold: Arc<Semaphore>,
-    two_minute_threshold: Arc<Semaphore>,
+    burst_threshold: Arc<Semaphore>,
+    bulk_threshold: Arc<Semaphore>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -51,53 +59,53 @@ pub enum RiotApiTask {
 
 impl RiotApiHandler {
     pub fn new(api_key: RiotApiKeyConfig) -> Self {
-        let second_threshold = Arc::new(Semaphore::new(api_key.second_limit));
-        let two_minute_threshold = Arc::new(Semaphore::new(api_key.two_minute_limit));
+        let burst_threshold = Arc::new(Semaphore::new(api_key.burst_limit.requests));
+        let bulk_threshold = Arc::new(Semaphore::new(api_key.bulk_limit.requests));
 
         // Spawn two tasks that will handle refreshing the threshold semaphore permit count.
         // We could theoretically have just one task but having two makes the logic much easier.
         {
             let api_key = api_key.clone();
-            let second_threshold = second_threshold.clone();
+            let burst_threshold = burst_threshold.clone();
             tokio::task::spawn(async move {
                 loop {
-                    async_std::task::sleep(std::time::Duration::from_secs(1)).await;
-                    second_threshold.add_permits(api_key.two_minute_limit - second_threshold.available_permits());
+                    async_std::task::sleep(std::time::Duration::from_secs(api_key.burst_limit.seconds)).await;
+                    burst_threshold.add_permits(api_key.burst_limit.requests - burst_threshold.available_permits());
                 }
             });
         }
 
         {
             let api_key = api_key.clone();
-            let two_minute_threshold = two_minute_threshold.clone();
+            let bulk_threshold = bulk_threshold.clone();
             tokio::task::spawn(async move {
                 loop {
-                    async_std::task::sleep(std::time::Duration::from_secs(120)).await;
-                    two_minute_threshold.add_permits(api_key.two_minute_limit - two_minute_threshold.available_permits());
+                    async_std::task::sleep(std::time::Duration::from_secs(api_key.bulk_limit.seconds)).await;
+                    bulk_threshold.add_permits(api_key.bulk_limit.requests - bulk_threshold.available_permits());
                 }
             });
         }
 
         Self {
             api_key,
-            second_threshold,
-            two_minute_threshold,
+            burst_threshold,
+            bulk_threshold,
         }
     }
 
-    async fn tick_second_threshold(&self) {
-        let permit = self.second_threshold.acquire().await;
+    async fn tick_burst_threshold(&self) {
+        let permit = self.burst_threshold.acquire().await;
         permit.forget();
     }
 
-    async fn tick_two_minute_threshold(&self) {
-        let permit = self.two_minute_threshold.acquire().await;
+    async fn tick_bulk_threshold(&self) {
+        let permit = self.bulk_threshold.acquire().await;
         permit.forget();
     }
 
     async fn tick_thresholds(&self) {
-        self.tick_second_threshold().await;
-        self.tick_two_minute_threshold().await;
+        self.tick_burst_threshold().await;
+        self.tick_bulk_threshold().await;
     }
 
     fn build_api_endpoint(region: &str, endpoint: &str) -> String {

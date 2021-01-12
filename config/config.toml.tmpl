@@ -43,9 +43,39 @@ fastify_threads = ${VOD_FASTIFY_THREADS}
 
 [riot.valorant_api_key]
 key = "${VALORANT_API_KEY}"
-second_limit = ${VALORANT_SECOND_LIMIT}
-two_minute_limit = ${VALORANT_TWO_MINUTE_LIMIT}
+
+[riot.valorant_api_key.burst_limit]
+requests = 20
+seconds = 1
+
+[riot.valorant_api_key.bulk_limit]
+requests = 100
+seconds = 120
+
+[riot.lol_api_key]
+key = "${LOL_API_KEY}"
+
+[riot.lol_api_key.burst_limit]
+requests = 20
+seconds = 1
+
+[riot.lol_api_key.bulk_limit]
+requests = 100
+seconds = 120
+
+[riot.tft_api_key]
+key = "${TFT_API_KEY}"
+
+[riot.tft_api_key.burst_limit]
+requests = 20
+seconds = 1
+
+[riot.tft_api_key.bulk_limit]
+requests = 100
+seconds = 120
 
 [rabbitmq]
 amqp_url = "${RABBITMQ_AMQP_URL}"
 valorant_queue = "valorant_api"
+lol_queue = "lol_api"
+tft_queue = "tft_api"
