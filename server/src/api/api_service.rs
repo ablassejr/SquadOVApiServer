@@ -201,11 +201,11 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .route("/backfill", web::post().to(v1::request_valorant_match_backfill_handler))
                         )
                         .service(
-                            web::scope("/match/{match_id}")
+                            web::scope("/match/{match_uuid}")
                                 .wrap(access::ApiAccess::new(
                                     Box::new(access::ValorantMatchAccessChecker{
                                         obtainer: access::ValorantMatchUuidPathObtainer{
-                                            match_id_key: "match_id",
+                                            match_uuid_key: "match_uuid",
                                         },
                                     }),
                                 ))

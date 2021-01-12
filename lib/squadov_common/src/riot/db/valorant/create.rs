@@ -37,11 +37,11 @@ async fn link_match_uuid_to_valorant_match_id(ex: &mut Transaction<'_, Postgres>
     Ok(())
 }
 
-async fn store_valorant_match_info_dto(ex: &mut Transaction<'_, Postgres>, info: &ValorantMatchInfoDto) -> Result<(), SquadOvError> {
+async fn store_valorant_match_info_dto(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, info: &ValorantMatchInfoDto) -> Result<(), SquadOvError> {
     sqlx::query!(
         "
         INSERT INTO squadov.valorant_matches (
-            match_id,
+            match_uuid,
             map_id,
             game_length_millis,
             server_start_time_utc,
@@ -60,7 +60,7 @@ async fn store_valorant_match_info_dto(ex: &mut Transaction<'_, Postgres>, info:
             $8
         )
         ",
-        info.match_id,
+        match_uuid,
         info.map_id,
         info.game_length_millis,
         info.server_start_time_utc,
@@ -74,7 +74,7 @@ async fn store_valorant_match_info_dto(ex: &mut Transaction<'_, Postgres>, info:
     Ok(())
 }
 
-async fn store_valorant_match_player_dto(ex: &mut Transaction<'_, Postgres>, match_id: &str, info: &[ValorantMatchPlayerDto]) -> Result<(), SquadOvError> {
+async fn store_valorant_match_player_dto(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, info: &[ValorantMatchPlayerDto]) -> Result<(), SquadOvError> {
     if info.is_empty() {
         return Ok(())
     }
@@ -82,7 +82,7 @@ async fn store_valorant_match_player_dto(ex: &mut Transaction<'_, Postgres>, mat
     let mut sql : Vec<String> = Vec::new();
     sql.push(String::from("
         INSERT INTO squadov.valorant_match_players (
-            match_id,
+            match_uuid,
             team_id,
             puuid,
             character_id,
@@ -98,7 +98,7 @@ async fn store_valorant_match_player_dto(ex: &mut Transaction<'_, Postgres>, mat
 
     for m in info {
         sql.push(format!("(
-            '{match_id}',
+            '{match_uuid}',
             '{team_id}',
             '{puuid}',
             '{character_id}',
@@ -109,7 +109,7 @@ async fn store_valorant_match_player_dto(ex: &mut Transaction<'_, Postgres>, mat
             {deaths},
             {assists}
         )",
-            match_id=match_id,
+            match_uuid=match_uuid,
             team_id=&m.team_id,
             puuid=&m.puuid,
             character_id=&m.character_id,
@@ -129,11 +129,11 @@ async fn store_valorant_match_player_dto(ex: &mut Transaction<'_, Postgres>, mat
     Ok(())
 }
 
-async fn store_valorant_match_team_dto(ex: &mut Transaction<'_, Postgres>, match_id: &str, info: &[ValorantMatchTeamDto]) -> Result<(), SquadOvError> {
+async fn store_valorant_match_team_dto(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, info: &[ValorantMatchTeamDto]) -> Result<(), SquadOvError> {
     let mut sql : Vec<String> = Vec::new();
     sql.push(String::from("
         INSERT INTO squadov.valorant_match_teams (
-            match_id,
+            match_uuid,
             team_id,
             won,
             rounds_won,
@@ -145,14 +145,14 @@ async fn store_valorant_match_team_dto(ex: &mut Transaction<'_, Postgres>, match
 
     for m in info {
         sql.push(format!("(
-            '{match_id}',
+            '{match_uuid}',
             '{team_id}',
             {won},
             {rounds_won},
             {rounds_played},
             {num_points}
         )",
-            match_id=match_id,
+            match_uuid=match_uuid,
             team_id=&m.team_id,
             won=crate::sql_format_bool(m.won),
             rounds_won=m.rounds_won,
@@ -168,7 +168,7 @@ async fn store_valorant_match_team_dto(ex: &mut Transaction<'_, Postgres>, match
     Ok(())
 }
 
-async fn store_valorant_match_round_result_dto(ex: &mut Transaction<'_, Postgres>, match_id: &str, info: &[ValorantMatchRoundResultDto]) -> Result<(), SquadOvError> {
+async fn store_valorant_match_round_result_dto(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, info: &[ValorantMatchRoundResultDto]) -> Result<(), SquadOvError> {
     if info.is_empty() {
         return Ok(());
     }
@@ -181,7 +181,7 @@ async fn store_valorant_match_round_result_dto(ex: &mut Transaction<'_, Postgres
     let mut sql : Vec<String> = Vec::new();
     sql.push(String::from("
         INSERT INTO squadov.valorant_match_rounds (
-            match_id,
+            match_uuid,
             round_num,
             plant_round_time,
             planter_puuid,
@@ -194,7 +194,7 @@ async fn store_valorant_match_round_result_dto(ex: &mut Transaction<'_, Postgres
 
     for m in info {
         sql.push(format!("(
-            '{match_id}',
+            '{match_uuid}',
             {round_num},
             {plant_round_time},
             {planter_puuid},
@@ -202,7 +202,7 @@ async fn store_valorant_match_round_result_dto(ex: &mut Transaction<'_, Postgres
             {defuser_puuid},
             '{team_round_winner}'
         )",
-            match_id=match_id,
+            match_uuid=match_uuid,
             round_num=m.round_num,
             plant_round_time=crate::sql_format_option_value(&m.plant_round_time),
             planter_puuid=crate::sql_format_option_string(&m.bomb_planter),
@@ -223,15 +223,15 @@ async fn store_valorant_match_round_result_dto(ex: &mut Transaction<'_, Postgres
     sql.push(String::from(" ON CONFLICT DO NOTHING"));
     sqlx::query(&sql.join("")).execute(&mut *ex).await?;
 
-    store_valorant_match_flat_valorant_match_player_round_stats_dto(ex, match_id, &round_stats).await?;
-    store_valorant_match_flat_valorant_match_kill_dto(ex, match_id, &kills).await?;
-    store_valorant_match_flat_valorant_match_damage_dto(ex, match_id, &damage).await?;
-    store_valorant_match_flat_valorant_match_economy_dto(ex, match_id, &econ).await?;
+    store_valorant_match_flat_valorant_match_player_round_stats_dto(ex, match_uuid, &round_stats).await?;
+    store_valorant_match_flat_valorant_match_kill_dto(ex, match_uuid, &kills).await?;
+    store_valorant_match_flat_valorant_match_damage_dto(ex, match_uuid, &damage).await?;
+    store_valorant_match_flat_valorant_match_economy_dto(ex, match_uuid, &econ).await?;
 
     Ok(())
 }
 
-async fn store_valorant_match_flat_valorant_match_player_round_stats_dto(ex: &mut Transaction<'_, Postgres>, match_id: &str, stats: &[FlatValorantMatchPlayerRoundStatsDto]) -> Result<(), SquadOvError> {
+async fn store_valorant_match_flat_valorant_match_player_round_stats_dto(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, stats: &[FlatValorantMatchPlayerRoundStatsDto]) -> Result<(), SquadOvError> {
     if stats.is_empty() {
         return Ok(())
     }
@@ -239,7 +239,7 @@ async fn store_valorant_match_flat_valorant_match_player_round_stats_dto(ex: &mu
     let mut sql : Vec<String> = Vec::new();
     sql.push(String::from("
         INSERT INTO squadov.valorant_match_round_player_stats (
-            match_id,
+            match_uuid,
             round_num,
             puuid,
             combat_score
@@ -249,12 +249,12 @@ async fn store_valorant_match_flat_valorant_match_player_round_stats_dto(ex: &mu
 
     for st in stats {
         sql.push(format!("(
-            '{match_id}',
+            '{match_uuid}',
             {round_num},
             '{puuid}',
             {combat_score}
         )",
-            match_id=match_id,
+            match_uuid=match_uuid,
             round_num=st.round_num,
             puuid=&st.puuid,
             combat_score=st.score
@@ -269,7 +269,7 @@ async fn store_valorant_match_flat_valorant_match_player_round_stats_dto(ex: &mu
     Ok(())
 }
 
-async fn store_valorant_match_flat_valorant_match_kill_dto(ex: &mut Transaction<'_, Postgres>, match_id: &str, kills: &[FlatValorantMatchKillDto]) -> Result<(), SquadOvError> {
+async fn store_valorant_match_flat_valorant_match_kill_dto(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, kills: &[FlatValorantMatchKillDto]) -> Result<(), SquadOvError> {
     if kills.is_empty() {
         return Ok(());
     }
@@ -277,7 +277,7 @@ async fn store_valorant_match_flat_valorant_match_kill_dto(ex: &mut Transaction<
     let mut sql : Vec<String> = Vec::new();
     sql.push(String::from("
         INSERT INTO squadov.valorant_match_kill (
-            match_id,
+            match_uuid,
             round_num,
             killer_puuid,
             victim_puuid,
@@ -293,7 +293,7 @@ async fn store_valorant_match_flat_valorant_match_kill_dto(ex: &mut Transaction<
 
     for m in kills {
         sql.push(format!("(
-            '{match_id}',
+            '{match_uuid}',
             {round_num},
             {killer_puuid},
             '{victim_puuid}',
@@ -304,7 +304,7 @@ async fn store_valorant_match_flat_valorant_match_kill_dto(ex: &mut Transaction<
             {is_secondary_fire},
             {assistants}
         )",
-            match_id=match_id,
+            match_uuid=match_uuid,
             round_num=m.round_num,
             killer_puuid=crate::sql_format_option_string(&m.base.killer),
             victim_puuid=&m.base.victim,
@@ -325,7 +325,7 @@ async fn store_valorant_match_flat_valorant_match_kill_dto(ex: &mut Transaction<
     Ok(())
 }
 
-async fn store_valorant_match_flat_valorant_match_damage_dto(ex: &mut Transaction<'_, Postgres>, match_id: &str, all_damage: &[FlatValorantMatchDamageDto]) -> Result<(), SquadOvError> {
+async fn store_valorant_match_flat_valorant_match_damage_dto(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, all_damage: &[FlatValorantMatchDamageDto]) -> Result<(), SquadOvError> {
     if all_damage.is_empty() {
         return Ok(());
     }
@@ -345,7 +345,7 @@ async fn store_valorant_match_flat_valorant_match_damage_dto(ex: &mut Transactio
 
     sql.push(String::from("
         INSERT INTO squadov.valorant_match_damage (
-            match_id,
+            match_uuid,
             round_num,
             instigator_puuid,
             receiver_puuid,
@@ -411,7 +411,7 @@ async fn store_valorant_match_flat_valorant_match_damage_dto(ex: &mut Transactio
 
     for dmg in sorted_data {
         sql.push(format!("(
-            '{match_id}',
+            '{match_uuid}',
             {round_num},
             '{instigator_puuid}',
             '{receiver_puuid}',
@@ -421,7 +421,7 @@ async fn store_valorant_match_flat_valorant_match_damage_dto(ex: &mut Transactio
             {headshots},
             NEXTVAL('{seq}')
         )",
-            match_id=match_id,
+            match_uuid=match_uuid,
             round_num=dmg.round_num,
             instigator_puuid=&dmg.instigator,
             receiver_puuid=&dmg.base.receiver,
@@ -442,7 +442,7 @@ async fn store_valorant_match_flat_valorant_match_damage_dto(ex: &mut Transactio
     Ok(())
 }
 
-async fn store_valorant_match_flat_valorant_match_economy_dto(ex: &mut Transaction<'_, Postgres>, match_id: &str, all_econ: &[FlatValorantMatchEconomyDto]) -> Result<(), SquadOvError> {
+async fn store_valorant_match_flat_valorant_match_economy_dto(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, all_econ: &[FlatValorantMatchEconomyDto]) -> Result<(), SquadOvError> {
     if all_econ.is_empty() {
         return Ok(())
     }
@@ -450,7 +450,7 @@ async fn store_valorant_match_flat_valorant_match_economy_dto(ex: &mut Transacti
     let mut sql : Vec<String> = Vec::new();
     sql.push(String::from("
         INSERT INTO squadov.valorant_match_round_player_loadout (
-            match_id,
+            match_uuid,
             round_num,
             puuid,
             loadout_value,
@@ -464,7 +464,7 @@ async fn store_valorant_match_flat_valorant_match_economy_dto(ex: &mut Transacti
 
     for econ in all_econ {
         sql.push(format!("(
-            '{match_id}',
+            '{match_uuid}',
             {round_num},
             '{puuid}',
             {loadout_value},
@@ -473,7 +473,7 @@ async fn store_valorant_match_flat_valorant_match_economy_dto(ex: &mut Transacti
             '{weapon}',
             '{armor}'
         )",
-            match_id=match_id,
+            match_uuid=match_uuid,
             round_num=econ.round_num,
             puuid=&econ.puuid,
             loadout_value=econ.base.loadout_value,
@@ -492,14 +492,14 @@ async fn store_valorant_match_flat_valorant_match_economy_dto(ex: &mut Transacti
     Ok(())
 }
 
-pub async fn store_valorant_match_dto(ex: &mut Transaction<'_, Postgres>, valorant_match: &ValorantMatchDto) -> Result<(), SquadOvError> {
-    store_valorant_match_info_dto(ex, &valorant_match.match_info).await?;
+pub async fn store_valorant_match_dto(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, valorant_match: &ValorantMatchDto) -> Result<(), SquadOvError> {
+    store_valorant_match_info_dto(ex, match_uuid, &valorant_match.match_info).await?;
     // The order here must be 1) Teams 2) Players and 3) Round Results.
     // Players have a reference to what team they're on and round results have references to which player is relevant it's for.
     // These references are enforced in the database.
-    store_valorant_match_team_dto(ex, &valorant_match.match_info.match_id, &valorant_match.teams).await?;
-    store_valorant_match_player_dto(ex, &valorant_match.match_info.match_id, &valorant_match.players).await?;
-    store_valorant_match_round_result_dto(ex, &valorant_match.match_info.match_id, &valorant_match.round_results).await?;
+    store_valorant_match_team_dto(ex, match_uuid,&valorant_match.teams).await?;
+    store_valorant_match_player_dto(ex, match_uuid, &valorant_match.players).await?;
+    store_valorant_match_round_result_dto(ex, match_uuid, &valorant_match.round_results).await?;
     Ok(())
 }
 

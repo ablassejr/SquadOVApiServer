@@ -30,7 +30,7 @@ impl api::ApiApplication {
         let mut sql : Vec<String> = Vec::new();
         sql.push(String::from("
             INSERT INTO squadov.valorant_player_round_metadata (
-                match_id,
+                match_uuid,
                 puuid,
                 round,
                 buy_time,
@@ -41,13 +41,13 @@ impl api::ApiApplication {
 
         for m in data {
             sql.push(format!("(
-                '{match_id}',
+                '{match_uuid}',
                 '{puuid}',
                 {round},
                 {buy_time},
                 {round_time}
             )",
-                match_id=&m.match_id,
+                match_uuid=&m.match_uuid,
                 puuid=&m.puuid,
                 round=m.round,
                 buy_time=squadov_common::sql_format_option_some_time(m.buy_time.as_ref()),
@@ -66,7 +66,7 @@ impl api::ApiApplication {
         sqlx::query!(
             "
             INSERT INTO squadov.valorant_player_match_metadata (
-                match_id,
+                match_uuid,
                 puuid,
                 start_time,
                 end_time
@@ -78,7 +78,7 @@ impl api::ApiApplication {
                 $4
             )
             ",
-            &player_data.match_id,
+            &player_data.match_uuid,
             &player_data.puuid,
             &player_data.start_time,
             &player_data.end_time
@@ -93,6 +93,8 @@ impl api::ApiApplication {
 
 pub async fn create_new_valorant_match_handler(data : web::Json<InputValorantMatch>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
     // Need to try multiple times to create a unique match uuid for the match in question.
+    let shard = db::get_user_account_shard(&*app.pool, &data.puuid, games::VALORANT_SHORTHAND).await?;
+
     for _i in 0..2i32 {
         let mut tx = app.pool.begin().await?;
         let match_uuid = match db::create_or_get_match_uuid_for_valorant_match(&mut tx, &data.match_id).await {
@@ -111,7 +113,6 @@ pub async fn create_new_valorant_match_handler(data : web::Json<InputValorantMat
         app.insert_valorant_player_data(&mut tx, &data.player_data).await?;
         tx.commit().await?;
 
-        let shard = db::get_user_account_shard(&*app.pool, &data.puuid, games::VALORANT_SHORTHAND).await?;
         app.valorant_itf.request_obtain_valorant_match_info(&data.match_id, &shard, true).await?;
         return Ok(HttpResponse::Ok().json(match_uuid));
     }

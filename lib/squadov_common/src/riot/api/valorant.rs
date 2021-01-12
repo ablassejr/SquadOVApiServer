@@ -88,20 +88,20 @@ impl super::RiotApiApplicationInterface {
         // or 2) we're coming from the backfill where the match UUID doesn't exist. We need to handle case #2 by creating the match UUID.
         for _i in 0..2i32 {
             let mut tx = self.db.begin().await?;
-            match db::create_or_get_match_uuid_for_valorant_match(&mut tx, match_id).await {
-                Ok(_) => (),
+            let match_uuid = match db::create_or_get_match_uuid_for_valorant_match(&mut tx, match_id).await {
+                Ok(x) => x,
                 Err(err) => match err {
                     SquadOvError::Duplicate => {
                         // This indicates that the match UUID is INVALID because a match with the same
                         // match ID already exists. Retry!
-                        log::warn!("Caught duplicate Valorant match {}...retrying!", match_id);
+                        log::warn!("Caught duplicate Valorant match {} [{}]...retrying!", match_id, shard);
                         tx.rollback().await?;
                         continue;
                     },
                     _ => return Err(err)
                 }
             };
-            db::store_valorant_match_dto(&mut tx, &valorant_match).await?;
+            db::store_valorant_match_dto(&mut tx, &match_uuid, &valorant_match).await?;
             tx.commit().await?;
             break;
         }

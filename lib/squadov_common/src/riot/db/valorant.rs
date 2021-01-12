@@ -20,9 +20,9 @@ where
         "
         SELECT t.id
         FROM UNNEST($1) AS t(id)
-        LEFT JOIN squadov.valorant_matches AS vm
-            ON vm.match_id = t.id
-        WHERE vm.match_id IS NULL
+        LEFT JOIN squadov.valorant_match_uuid_link AS vmul
+            ON vmul.match_id = t.id
+        WHERE vmul.match_id IS NULL
         "
     )
         .bind(match_ids)
@@ -38,9 +38,9 @@ where
     Ok(
         sqlx::query_scalar(
             "
-            SELECT vm.match_uuid
-            FROM squadov.valorant_match_uuid_link AS vm
-            WHERE vm.match_id = $1
+            SELECT vmul.match_uuid
+            FROM squadov.valorant_match_uuid_link AS vmul
+            WHERE vmul.match_id = $1
             ",
         )
             .bind(match_id)

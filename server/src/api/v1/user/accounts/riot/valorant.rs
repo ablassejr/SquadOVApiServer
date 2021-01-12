@@ -1,8 +1,9 @@
 use crate::api;
 use squadov_common::{SquadOvError};
+use uuid::Uuid;
 
 impl api::ApiApplication {
-    pub async fn list_squadov_accounts_can_access_match(&self, match_id: &str) -> Result<Vec<i64>, SquadOvError> {
+    pub async fn list_squadov_accounts_can_access_valorant_match(&self, match_uuid: &Uuid) -> Result<Vec<i64>, SquadOvError> {
         // We need to go from the puuids of the users in the match to the user IDs stored by us
         // and then go from that to the users in the squads that can access the match.
         Ok(sqlx::query_scalar(
@@ -15,10 +16,10 @@ impl api::ApiApplication {
                 ON sra.user_id = ral.user_id
             LEFT JOIN squadov.squad_role_assignments AS ora
                 ON ora.squad_id = sra.squad_id
-            WHERE vmp.match_id = $1
+            WHERE vmp.match_uuid = $1
             ",
         )
-            .bind(match_id)
+            .bind(match_uuid)
             .fetch_all(&*self.pool)
             .await?)
     }

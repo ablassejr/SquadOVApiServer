@@ -19,25 +19,36 @@ use crate::{
     }
 };
 use sqlx::PgPool;
+use uuid::Uuid;
 use std::collections::HashMap;
 
-async fn get_valorant_match_info_dto(ex: &PgPool, match_id: &str) -> Result<ValorantMatchInfoDto, SquadOvError> {
+async fn get_valorant_match_info_dto(ex: &PgPool, match_uuid: &Uuid) -> Result<ValorantMatchInfoDto, SquadOvError> {
     Ok(
         sqlx::query_as!(
             ValorantMatchInfoDto,
             "
-            SELECT *
-            FROM squadov.valorant_matches
-            WHERE match_id = $1
+            SELECT
+                vmul.match_id,
+                vm.game_mode,
+                vm.map_id,
+                vm.is_ranked,
+                vm.provisioning_flow_id,
+                vm.server_start_time_utc,
+                vm.game_length_millis,
+                vm.season_id
+            FROM squadov.valorant_matches AS vm
+            INNER JOIN squadov.valorant_match_uuid_link AS vmul
+                ON vmul.match_uuid = vm.match_uuid
+            WHERE vm.match_uuid = $1
             ",
-            match_id
+            match_uuid
         )
             .fetch_one(ex)
             .await?
     )
 }
 
-async fn get_valorant_match_players_dto(ex: &PgPool, match_id: &str) -> Result<Vec<ValorantMatchPlayerDto>, SquadOvError> {
+async fn get_valorant_match_players_dto(ex: &PgPool, match_uuid: &Uuid) -> Result<Vec<ValorantMatchPlayerDto>, SquadOvError> {
     Ok(
         sqlx::query!(
             "
@@ -52,9 +63,9 @@ async fn get_valorant_match_players_dto(ex: &PgPool, match_id: &str) -> Result<V
                 deaths,
                 assists
             FROM squadov.valorant_match_players
-            WHERE match_id = $1
+            WHERE match_uuid = $1
             ",
-            match_id
+            match_uuid
         )
             .fetch_all(ex)
             .await?
@@ -78,7 +89,7 @@ async fn get_valorant_match_players_dto(ex: &PgPool, match_id: &str) -> Result<V
     )
 }
 
-async fn get_valorant_match_teams_dto(ex: &PgPool, match_id: &str) -> Result<Vec<ValorantMatchTeamDto>, SquadOvError> {
+async fn get_valorant_match_teams_dto(ex: &PgPool, match_uuid: &Uuid) -> Result<Vec<ValorantMatchTeamDto>, SquadOvError> {
     Ok(
         sqlx::query_as!(
             ValorantMatchTeamDto,
@@ -90,16 +101,16 @@ async fn get_valorant_match_teams_dto(ex: &PgPool, match_id: &str) -> Result<Vec
                 rounds_played,
                 num_points
             FROM squadov.valorant_match_teams
-            WHERE match_id = $1
+            WHERE match_uuid = $1
             ",
-            match_id
+            match_uuid
         )
             .fetch_all(ex)
             .await?
     )
 }
 
-async fn get_valorant_match_kills(ex: &PgPool, match_id: &str) -> Result<Vec<FlatValorantMatchKillDto>, SquadOvError> {
+async fn get_valorant_match_kills(ex: &PgPool, match_uuid: &Uuid) -> Result<Vec<FlatValorantMatchKillDto>, SquadOvError> {
     Ok(
         sqlx::query!(
             "
@@ -114,9 +125,9 @@ async fn get_valorant_match_kills(ex: &PgPool, match_id: &str) -> Result<Vec<Fla
                 is_secondary_fire,
                 assistants
             FROM squadov.valorant_match_kill
-            WHERE match_id = $1
+            WHERE match_uuid = $1
             ",
-            match_id
+            match_uuid
         )
             .fetch_all(ex)
             .await?
@@ -142,7 +153,7 @@ async fn get_valorant_match_kills(ex: &PgPool, match_id: &str) -> Result<Vec<Fla
     )
 }
 
-async fn get_valorant_match_damage(ex: &PgPool, match_id: &str) -> Result<Vec<FlatValorantMatchDamageDto>, SquadOvError> {
+async fn get_valorant_match_damage(ex: &PgPool, match_uuid: &Uuid) -> Result<Vec<FlatValorantMatchDamageDto>, SquadOvError> {
     Ok(
         sqlx::query!(
             "
@@ -155,9 +166,9 @@ async fn get_valorant_match_damage(ex: &PgPool, match_id: &str) -> Result<Vec<Fl
                 bodyshots,
                 headshots
             FROM squadov.valorant_match_damage
-            WHERE match_id = $1
+            WHERE match_uuid = $1
             ",
-            match_id
+            match_uuid
         )
             .fetch_all(ex)
             .await?
@@ -179,7 +190,7 @@ async fn get_valorant_match_damage(ex: &PgPool, match_id: &str) -> Result<Vec<Fl
     )
 }
 
-async fn get_valorant_match_player_round_econ(ex: &PgPool, match_id: &str) -> Result<Vec<FlatValorantMatchEconomyDto>, SquadOvError> {
+async fn get_valorant_match_player_round_econ(ex: &PgPool, match_uuid: &Uuid) -> Result<Vec<FlatValorantMatchEconomyDto>, SquadOvError> {
     Ok(
         sqlx::query!(
             "
@@ -192,9 +203,9 @@ async fn get_valorant_match_player_round_econ(ex: &PgPool, match_id: &str) -> Re
                 weapon,
                 armor
             FROM squadov.valorant_match_round_player_loadout
-            WHERE match_id = $1
+            WHERE match_uuid = $1
             ",
-            match_id
+            match_uuid
         )
             .fetch_all(ex)
             .await?
@@ -216,7 +227,7 @@ async fn get_valorant_match_player_round_econ(ex: &PgPool, match_id: &str) -> Re
     )
 }
 
-async fn get_valorant_match_player_round_stats(ex: &PgPool, match_id: &str) -> Result<Vec<FlatValorantMatchPlayerRoundStatsDto>, SquadOvError> {
+async fn get_valorant_match_player_round_stats(ex: &PgPool, match_uuid: &Uuid) -> Result<Vec<FlatValorantMatchPlayerRoundStatsDto>, SquadOvError> {
     Ok(
         sqlx::query!(
             "
@@ -225,9 +236,9 @@ async fn get_valorant_match_player_round_stats(ex: &PgPool, match_id: &str) -> R
                 puuid,
                 combat_score
             FROM squadov.valorant_match_round_player_stats
-            WHERE match_id = $1
+            WHERE match_uuid = $1
             ",
-            match_id
+            match_uuid
         )
             .fetch_all(ex)
             .await?
@@ -243,7 +254,7 @@ async fn get_valorant_match_player_round_stats(ex: &PgPool, match_id: &str) -> R
     )
 }
 
-async fn get_valorant_match_round_results(ex: &PgPool, match_id: &str) -> Result<Vec<ValorantMatchRoundResultDto>, SquadOvError> {
+async fn get_valorant_match_round_results(ex: &PgPool, match_uuid: &Uuid) -> Result<Vec<ValorantMatchRoundResultDto>, SquadOvError> {
     let base_round_info = sqlx::query!(
         "
         SELECT
@@ -254,17 +265,17 @@ async fn get_valorant_match_round_results(ex: &PgPool, match_id: &str) -> Result
             defuser_puuid,
             team_round_winner
         FROM squadov.valorant_match_rounds
-        WHERE match_id = $1
+        WHERE match_uuid = $1
         ",
-        match_id
+        match_uuid
     )
         .fetch_all(ex)
         .await?;
 
-    let kills = get_valorant_match_kills(ex, match_id).await?;
-    let damage = get_valorant_match_damage(ex, match_id).await?;
-    let econ = get_valorant_match_player_round_econ(ex, match_id).await?;
-    let round_stats = get_valorant_match_player_round_stats(ex, match_id).await?;
+    let kills = get_valorant_match_kills(ex, match_uuid).await?;
+    let damage = get_valorant_match_damage(ex, match_uuid).await?;
+    let econ = get_valorant_match_player_round_econ(ex, match_uuid).await?;
+    let round_stats = get_valorant_match_player_round_stats(ex, match_uuid).await?;
 
     // We can revisit this implementation if we find that the filters are too slow and that
     // it'd be faster to create a HashMap. I'm going to avoid that since that's a lot of added
@@ -308,13 +319,13 @@ async fn get_valorant_match_round_results(ex: &PgPool, match_id: &str) -> Result
     )
 }
 
-pub async fn get_valorant_match(ex: &PgPool, match_id: &str) -> Result<ValorantMatchDto, SquadOvError> {
+pub async fn get_valorant_match(ex: &PgPool, match_uuid: &Uuid) -> Result<ValorantMatchDto, SquadOvError> {
     Ok(
         ValorantMatchDto{
-            match_info: get_valorant_match_info_dto(ex, match_id).await?,
-            players: get_valorant_match_players_dto(ex, match_id).await?,
-            teams: get_valorant_match_teams_dto(ex, match_id).await?,
-            round_results: get_valorant_match_round_results(ex, match_id).await?,
+            match_info: get_valorant_match_info_dto(ex, match_uuid).await?,
+            players: get_valorant_match_players_dto(ex, match_uuid).await?,
+            teams: get_valorant_match_teams_dto(ex, match_uuid).await?,
+            round_results: get_valorant_match_round_results(ex, match_uuid).await?,
         }
     )
 }

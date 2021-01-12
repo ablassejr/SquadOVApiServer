@@ -7,13 +7,14 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use std::collections::HashSet;
 use std::iter::FromIterator;
+use uuid::Uuid;
 
 pub struct ValorantMatchUuidData {
-    pub match_id: String
+    pub match_uuid: Uuid
 }
 
 pub struct ValorantMatchUuidPathObtainer {
-    pub match_id_key: &'static str
+    pub match_uuid_key: &'static str
 }
 
 pub struct ValorantMatchAccessChecker {
@@ -24,8 +25,8 @@ pub struct ValorantMatchAccessChecker {
 impl AccessChecker<ValorantMatchUuidData> for ValorantMatchAccessChecker {
     fn generate_aux_metadata(&self, req: &HttpRequest) -> Result<ValorantMatchUuidData, SquadOvError> {
         Ok(ValorantMatchUuidData{
-            match_id: match req.match_info().get(self.obtainer.match_id_key) {
-                Some(x) => String::from(x),
+            match_uuid: match req.match_info().get(self.obtainer.match_uuid_key) {
+                Some(x) => x.parse()?,
                 None => return Err(squadov_common::SquadOvError::BadRequest),
             },
         })
@@ -33,7 +34,7 @@ impl AccessChecker<ValorantMatchUuidData> for ValorantMatchAccessChecker {
 
     async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: ValorantMatchUuidData) -> Result<bool, SquadOvError> {
         // The user must be either in the match or a squad member of a user in that match.        
-        let access_set: HashSet<i64> = HashSet::from_iter(app.list_squadov_accounts_can_access_match(&data.match_id).await?);
+        let access_set: HashSet<i64> = HashSet::from_iter(app.list_squadov_accounts_can_access_valorant_match(&data.match_uuid).await?);
         Ok(access_set.contains(&session.user.id))
     }
 }

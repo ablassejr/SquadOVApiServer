@@ -19,7 +19,7 @@ impl api::ApiApplication {
                     SELECT vmp.competitive_tier
                     FROM squadov.valorant_matches AS vm
                     INNER JOIN squadov.valorant_match_players AS vmp
-                        ON vmp.match_id = vm.match_id
+                        ON vmp.match_uuid = vm.match_uuid
                     WHERE vmp.puuid = $1
                         AND vm.is_ranked IS TRUE
                     ORDER BY vm.server_start_time_utc DESC
@@ -35,7 +35,7 @@ impl api::ApiApplication {
                 SUM(vvpms.bodyshots)::BIGINT AS "bodyshots!",
                 SUM(vvpms.legshots)::BIGINT AS "legshots!",
                 SUM(CASE WHEN vvpms.won THEN 1 END)::BIGINT AS "wins!",
-                COUNT(vvpms.match_id) AS "games!"
+                COUNT(vvpms.match_uuid) AS "games!"
             FROM squadov.view_valorant_player_match_stats AS vvpms
             WHERE vvpms.puuid = $1
             GROUP BY vvpms.puuid

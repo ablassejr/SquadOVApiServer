@@ -12,7 +12,7 @@ pub async fn list_valorant_match_summaries_for_puuid(ex: &PgPool, puuid: &str, s
             ValorantPlayerMatchSummary,
             r#"
             SELECT
-                vm.match_id,
+                vmul.match_id,
                 vmul.match_uuid,
                 vm.server_start_time_utc,
                 vm.game_mode,
@@ -26,12 +26,12 @@ pub async fn list_valorant_match_summaries_for_puuid(ex: &PgPool, puuid: &str, s
                     SELECT MAX(rounds_won)
                     FROM squadov.valorant_match_teams
                     WHERE team_id != vmp.team_id
-                        AND match_id = vm.match_id
+                        AND match_uuid = vm.match_uuid
                 ) AS "rounds_lost!",
                 (
                     SELECT COUNT(puuid) + 1
                     FROM squadov.valorant_match_players
-                    WHERE match_id = vm.match_id
+                    WHERE match_uuid = vm.match_uuid
                         AND total_combat_score > vmp.total_combat_score
                 ) AS "combat_score_rank!",
                 vvpms.competitive_tier AS "competitive_tier!",
@@ -46,14 +46,14 @@ pub async fn list_valorant_match_summaries_for_puuid(ex: &PgPool, puuid: &str, s
                 COALESCE(vvpms.legshots, 0) AS "legshots!"
             FROM squadov.valorant_matches AS vm
             INNER JOIN squadov.valorant_match_players AS vmp
-                ON vmp.match_id = vm.match_id
+                ON vmp.match_uuid = vm.match_uuid
             INNER JOIN squadov.valorant_match_teams AS vmt
                 ON vmt.team_id = vmp.team_id
-                    AND vmt.match_id = vm.match_id
+                    AND vmt.match_uuid = vm.match_uuid
             INNER JOIN squadov.view_valorant_player_match_stats AS vvpms
-                ON vvpms.puuid = vmp.puuid AND vvpms.match_id = vm.match_id
+                ON vvpms.puuid = vmp.puuid AND vvpms.match_uuid = vm.match_uuid
             INNER JOIN squadov.valorant_match_uuid_link AS vmul
-                ON vmul.match_id = vm.match_id
+                ON vmul.match_uuid = vm.match_uuid
             WHERE vmp.puuid = $1
             ORDER BY server_start_time_utc DESC
             LIMIT $2 OFFSET $3
