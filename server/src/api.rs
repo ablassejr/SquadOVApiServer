@@ -208,7 +208,6 @@ impl ApiApplication {
             pool: pool,
             schema: Arc::new(graphql::create_schema()),
             blob: blob,
-            // TODO: Configify!
             vod_fastify_jobs: JobQueue::new::<v1::VodFastifyWorker>(config.vod.fastify_threads),
             valorant_itf,
             lol_itf,

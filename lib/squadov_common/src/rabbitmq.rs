@@ -192,6 +192,7 @@ impl RabbitMqInterface {
         let publisher = Arc::new(RabbitMqConnectionBundle::connect(&config, 4).await?);
         let publish_queue = Arc::new(RwLock::new(VecDeque::new()));
 
+        log::info!("\tStart Publishing (RabbitMQ)...");
         {
             let publisher = publisher.clone();
             let publish_queue = publish_queue.clone();
@@ -212,9 +213,11 @@ impl RabbitMqInterface {
             });
         }
 
+        log::info!("\tStart Consuming (RabbitMQ)...");
         let consumer = Arc::new(RabbitMqConnectionBundle::connect(&config, 1).await?);
         consumer.begin_consuming().await?;
 
+        log::info!("RabbitMQ Successfully Connected");
         Ok(Self {
             config: config.clone(),
             publish_queue,
