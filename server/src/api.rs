@@ -16,7 +16,10 @@ use squadov_common::{
     BlobManagementClient,
     JobQueue,
     KafkaCredentialKeyPair,
-    riot::api::{RiotApiHandler, RiotApiApplicationInterface, RiotConfig},
+    riot::{
+        api::{RiotApiHandler, RiotApiApplicationInterface, RiotConfig},
+        games::VALORANT_SHORTHAND,
+    },
     rabbitmq::{RabbitMqInterface, RabbitMqConfig}
 };
 use url::Url;
@@ -175,7 +178,7 @@ impl ApiApplication {
         let valorant_api = Arc::new(RiotApiHandler::new(config.riot.valorant_api_key.clone()));
         let rabbitmq = Arc::new(RabbitMqInterface::new(&config.rabbitmq).await.unwrap());
 
-        let valorant_itf = Arc::new(RiotApiApplicationInterface::new(&config.rabbitmq.valorant_queue, valorant_api.clone(), rabbitmq.clone(), pool.clone()));
+        let valorant_itf = Arc::new(RiotApiApplicationInterface::new(&config.rabbitmq.valorant_queue, valorant_api.clone(), rabbitmq.clone(), pool.clone(), VALORANT_SHORTHAND));
         rabbitmq.add_listener(config.rabbitmq.valorant_queue.clone(), valorant_itf.clone()).await;
 
         ApiApplication{

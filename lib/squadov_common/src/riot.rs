@@ -8,7 +8,7 @@ use serde::{Serialize, Deserialize};
 pub struct RiotAccount {
     pub puuid: String,
     #[serde(rename="gameName")]
-    pub game_name: String,
+    pub game_name: Option<String>,
     #[serde(rename="tagLine")]
-    pub tag_line: String
+    pub tag_line: Option<String>
 }

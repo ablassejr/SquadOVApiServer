@@ -116,11 +116,42 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                         },
                                                     })
                                                 ))
-                                                .route("", web::post().to(v1::link_new_riot_account_handler))
-                                                .route("", web::get().to(v1::list_riot_accounts_handler))
-                                                .route("/{puuid}", web::get().to(v1::get_riot_account_handler))
+                                                .service(
+                                                    web::scope("/valorant")
+                                                        .route("/puuid/{puuid}", web::get().to(v1::get_riot_valorant_account_handler))
+                                                        .route("/account/{game_name}/{tag_line}", web::get().to(v1::get_riot_valorant_account_from_gamename_tagline_handler))
+                                                        .route("", web::get().to(v1::list_riot_valorant_accounts_handler))
+                                                )
+                                                .service(
+                                                    web::scope("/summoner")
+                                                        .route("/{summoner_name}", web::get().to(v1::get_riot_summoner_account_handler))
+                                                )
                                         )
                                 )
+                        )
+                )
+                .service(
+                    web::scope("/lol")
+                        .route("", web::post().to(v1::create_lol_match_handler))
+                        .service(
+                            web::scope("/match/{match_uuid}")
+                                .route("", web::post().to(v1::finish_lol_match_handler))
+                        )
+                        .service(
+                            web::scope("/user/{user_id}")
+                                .route("/backfill", web::post().to(v1::request_lol_match_backfill_handler))
+                        )
+                )
+                .service(
+                    web::scope("/tft")
+                        .route("", web::post().to(v1::create_tft_match_handler))
+                        .service(
+                            web::scope("/match/{match_uuid}")
+                                .route("", web::post().to(v1::finish_tft_match_handler))
+                        )
+                        .service(
+                            web::scope("/user/{user_id}")
+                                .route("/backfill", web::post().to(v1::request_tft_match_backfill_handler))
                         )
                 )
                 .service(
@@ -147,8 +178,8 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .service(
                                     web::scope("/accounts/{puuid}")
                                         .wrap(access::ApiAccess::new(
-                                            Box::new(access::RiotAccountAccessChecker{
-                                                obtainer: access::RiotAccountPathObtainer{
+                                            Box::new(access::RiotValorantAccountAccessChecker{
+                                                obtainer: access::RiotValorantAccountPathObtainer{
                                                     user_id_key: "user_id",
                                                     puuid_key: "puuid",
                                                 },

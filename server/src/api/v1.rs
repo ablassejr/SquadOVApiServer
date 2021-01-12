@@ -8,6 +8,8 @@ mod squad;
 mod bug;
 mod wow;
 mod kafka;
+mod lol;
+mod tft;
 
 pub use user::*;
 pub use matches::*;
@@ -19,3 +21,5 @@ pub use squad::*;
 pub use bug::*;
 pub use wow::*;
 pub use kafka::*;
+pub use lol::*;
+pub use tft::*;

@@ -8,26 +8,29 @@ use crate::api::auth::SquadOVSession;
 use crate::api::ApiApplication;
 use std::sync::Arc;
 use async_trait::async_trait;
-use squadov_common::riot::db;
+use squadov_common::riot::{
+    db,
+    games::VALORANT_SHORTHAND,
+};
 
-pub struct RiotAccountAccessBasicData {
+pub struct RiotValorantAccountAccessBasicData {
     pub user_id: i64,
     pub puuid: String
 }
 
-pub struct RiotAccountPathObtainer {
+pub struct RiotValorantAccountPathObtainer {
     pub user_id_key: &'static str,
     pub puuid_key: &'static str
 }
 
-pub struct RiotAccountAccessChecker {
-    pub obtainer: RiotAccountPathObtainer
+pub struct RiotValorantAccountAccessChecker {
+    pub obtainer: RiotValorantAccountPathObtainer
 }
 
 #[async_trait]
-impl super::AccessChecker<RiotAccountAccessBasicData> for RiotAccountAccessChecker {
-    fn generate_aux_metadata(&self, req: &HttpRequest) -> Result<RiotAccountAccessBasicData, SquadOvError> {
-        Ok(RiotAccountAccessBasicData{
+impl super::AccessChecker<RiotValorantAccountAccessBasicData> for RiotValorantAccountAccessChecker {
+    fn generate_aux_metadata(&self, req: &HttpRequest) -> Result<RiotValorantAccountAccessBasicData, SquadOvError> {
+        Ok(RiotValorantAccountAccessBasicData{
             user_id: match req.match_info().get(self.obtainer.user_id_key) {
                 Some(x) => x.parse::<i64>()?,
                 None => return Err(squadov_common::SquadOvError::BadRequest),
@@ -39,8 +42,8 @@ impl super::AccessChecker<RiotAccountAccessBasicData> for RiotAccountAccessCheck
         })
     }
 
-    async fn check(&self, app: Arc<ApiApplication>, _session: &SquadOVSession, data: RiotAccountAccessBasicData) -> Result<bool, SquadOvError> {
-        match db::get_user_riot_account(&*app.pool, data.user_id, &data.puuid).await {
+    async fn check(&self, app: Arc<ApiApplication>, _session: &SquadOVSession, data: RiotValorantAccountAccessBasicData) -> Result<bool, SquadOvError> {
+        match db::get_user_riot_account(&*app.pool, data.user_id, &data.puuid, VALORANT_SHORTHAND).await {
             Ok(_) => Ok(true),
             Err(_) => Ok(false)
         }
