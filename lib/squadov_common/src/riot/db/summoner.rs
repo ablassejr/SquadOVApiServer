@@ -11,7 +11,7 @@ where
     Ok(sqlx::query_as!(
         RiotSummoner,
         "
-        SELECT ra.puuid, ra.account_id, ra.summoner_id, ra.summoner_name
+        SELECT ra.puuid, ra.account_id, ra.summoner_id, ra.summoner_name, ra.last_backfill_time
         FROM squadov.riot_accounts AS ra
         INNER JOIN squadov.riot_account_links AS ral
             ON ral.puuid = ra.puuid
@@ -34,7 +34,7 @@ where
     Ok(sqlx::query_as!(
         RiotSummoner,
         "
-        SELECT ra.puuid, ra.account_id, ra.summoner_id, ra.summoner_name
+        SELECT ra.puuid, ra.account_id, ra.summoner_id, ra.summoner_name, ra.last_backfill_time
         FROM squadov.riot_accounts AS ra
         INNER JOIN squadov.riot_account_links AS ral
             ON ral.puuid = ra.puuid
@@ -57,7 +57,7 @@ where
     Ok(sqlx::query_as!(
         RiotSummoner,
         "
-        SELECT ra.puuid, ra.account_id, ra.summoner_id, ra.summoner_name
+        SELECT ra.puuid, ra.account_id, ra.summoner_id, ra.summoner_name, ra.last_backfill_time
         FROM squadov.riot_accounts AS ra
         INNER JOIN squadov.riot_account_links AS ral
             ON ral.puuid = ra.puuid

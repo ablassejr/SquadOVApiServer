@@ -74,3 +74,14 @@ pub fn sql_format_varchar_array(v: &[String]) -> String {
         }).collect::<Vec<String>>().join(",")
     )
 }
+
+pub fn sql_format_integer_array(v: &[i32]) -> String {
+    format!(
+        "ARRAY [
+            {}
+        ]::INTEGER[]",
+        v.iter().map(|x| {
+            format!("{}", x)
+        }).collect::<Vec<String>>().join(",")
+    )
+}

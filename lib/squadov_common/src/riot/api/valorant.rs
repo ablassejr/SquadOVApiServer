@@ -2,7 +2,6 @@ use crate::{
     SquadOvError,
     rabbitmq::{RABBITMQ_DEFAULT_PRIORITY, RABBITMQ_HIGH_PRIORITY},
     riot::games::{
-        VALORANT_SHORTHAND,
         valorant::{
             ValorantMatchlistDto,
             ValorantMatchDto
@@ -51,8 +50,8 @@ impl super::RiotApiApplicationInterface {
     pub async fn backfill_user_valorant_matches(&self, puuid: &str) -> Result<(), SquadOvError> {
         // Refresh the user's active shard whenever they request a backfill (this corresponds to when
         // they launch the game so it should work nicely).SquadOvError
-        let shard = self.api.get_active_shard_by_game_for_puuid(VALORANT_SHORTHAND, puuid).await?;
-        db::set_user_account_shard(&*self.db, puuid, VALORANT_SHORTHAND, &shard).await?;
+        let shard = self.api.get_active_shard_by_game_for_puuid(&self.game, puuid).await?;
+        db::set_user_account_shard(&*self.db, puuid, &self.game, &shard).await?;
 
         // Obtain a list of matches that the user played from the VALORANT API and then cross check that
         // with the matches we have stored. If the match doesn't exist then go ahead and request a low

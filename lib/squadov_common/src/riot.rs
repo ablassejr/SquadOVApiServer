@@ -3,6 +3,7 @@ pub mod db;
 pub mod games;
 
 use serde::{Serialize, Deserialize};
+use chrono::{DateTime, Utc};
 
 #[derive(Serialize, Deserialize)]
 pub struct RiotAccount {
@@ -22,4 +23,15 @@ pub struct RiotSummoner {
     pub summoner_id: Option<String>,
     #[serde(rename="summonerName")]
     pub summoner_name: Option<String>,
+    #[serde(rename="lastBackfillTime")]
+    pub last_backfill_time: Option<DateTime<Utc>>,
+}
+
+#[derive(Deserialize)]
+pub struct RiotSummonerDto {
+    #[serde(rename="accountId")]
+    pub account_id: String,
+    pub name: String,
+    pub id: String,
+    pub puuid: String
 }

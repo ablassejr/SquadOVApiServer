@@ -32,3 +32,32 @@ where
 
     deserializer.deserialize_u64(UnixTimeVisitor{})
 }
+
+pub fn parse_utc_time_from_seconds<'a, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
+where
+    D: Deserializer<'a>,
+{
+    struct UnixTimeVisitor;
+
+    impl<'a> Visitor<'a> for UnixTimeVisitor {
+        type Value = Option<DateTime<Utc>>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            write!(formatter, "an integer representing the number of seconds since Unix epoch")
+        }
+
+        fn visit_u64<E>(self, v : u64) -> Result<Self::Value, E>
+        where 
+            E: de::Error
+        {
+            let i = match i64::try_from(v) {
+                Ok(i) => i,
+                Err(_) => return Err(de::Error::invalid_value(Unexpected::Unsigned(v), &self)),
+            };
+
+            Ok(Some(Utc.timestamp(i, 0)))
+        }
+    }
+
+    deserializer.deserialize_u64(UnixTimeVisitor{})
+}

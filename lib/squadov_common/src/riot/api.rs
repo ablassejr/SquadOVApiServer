@@ -2,6 +2,9 @@ use async_trait::async_trait;
 
 mod account;
 mod valorant;
+mod lol;
+mod tft;
+mod summoner;
 
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
@@ -42,15 +45,29 @@ pub struct RiotApiHandler {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum RiotApiTask {
-    // puuid
     Account{
         puuid: String
     },
-    // puuid
+    TftBackfill{
+        puuid: String,
+        region: String,
+    },
+    TftMatch{
+        platform: String,
+        region: String,
+        game_id: i64,
+    },
+    LolBackfill{
+        account_id: String,
+        platform: String,
+    },
+    LolMatch{
+        platform: String,
+        game_id: i64,
+    },
     ValorantBackfill{
         puuid: String
     },
-    // match id
     ValorantMatch{
         match_id: String,
         shard: String,
@@ -150,7 +167,22 @@ impl RabbitMqListener for RiotApiApplicationInterface {
             RiotApiTask::Account{puuid} => self.obtain_riot_account_from_puuid(&puuid).await?,
             RiotApiTask::ValorantBackfill{puuid} => self.backfill_user_valorant_matches(&puuid).await?,
             RiotApiTask::ValorantMatch{match_id, shard} => self.obtain_valorant_match_info(&match_id, &shard).await?,
+            RiotApiTask::LolBackfill{account_id, platform} => self.backfill_user_lol_matches(&account_id, &platform).await?,
+            RiotApiTask::LolMatch{platform, game_id} => self.obtain_lol_match_info(&platform, game_id).await?,
+            RiotApiTask::TftBackfill{puuid, region} => self.backfill_user_tft_matches(&puuid, &region).await?,
+            RiotApiTask::TftMatch{platform, region, game_id} => self.obtain_tft_match_info(&platform, &region, game_id).await?,
         };
         Ok(())
     }
+}
+
+pub fn riot_region_to_routing(region: &str) -> Result<String, SquadOvError> {
+    let region = region.to_uppercase();
+
+    Ok(String::from(match region.as_str() {
+        "NA" | "BR" | "LAN" | "LAS" | "OCE" => "americas",
+        "KR" | "JP" => "asia",
+        "EUNE" | "EUW" | "TR" | "RU" => "europe",
+        _ => return Err(SquadOvError::BadRequest)
+    }))
 }

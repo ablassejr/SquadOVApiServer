@@ -1,0 +1,1 @@
+CREATE INDEX ON tft_match_participants(puuid);
