@@ -48,17 +48,17 @@ pub async fn create_or_get_match_uuid_for_tft_match(ex: &mut Transaction<'_, Pos
     })
 }
 
-struct WrappedTftTraitDto {
+struct WrappedTftTraitDto<'a> {
     puuid: String,
-    base: TftTraitDto
+    base: &'a TftTraitDto
 }
 
-struct WrappedTftUnitDto {
+struct WrappedTftUnitDto<'a> {
     puuid: String,
-    base: TftUnitDto
+    base: &'a TftUnitDto
 }
 
-async fn store_tft_match_participant_traits(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, traits: &[WrappedTftTraitDto]) -> Result<(), SquadOvError> {
+async fn store_tft_match_participant_traits<'a>(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, traits: &[WrappedTftTraitDto<'a>]) -> Result<(), SquadOvError> {
     if traits.is_empty() {
         return Ok(());
     }
@@ -108,7 +108,7 @@ async fn store_tft_match_participant_traits(ex: &mut Transaction<'_, Postgres>, 
     Ok(())
 }
 
-async fn store_tft_match_participant_units(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, units: &[WrappedTftUnitDto]) -> Result<(), SquadOvError> {
+async fn store_tft_match_participant_units<'a>(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, units: &[WrappedTftUnitDto<'a>]) -> Result<(), SquadOvError> {
     if units.is_empty() {
         return Ok(());
     }
@@ -234,14 +234,14 @@ pub async fn store_tft_match_participants(ex: &mut Transaction<'_, Postgres>, ma
         traits.extend(p.traits.iter().map(|x| {
             WrappedTftTraitDto{
                 puuid: p.puuid.clone(),
-                base: x.clone()
+                base: x
             }
         }));
 
         units.extend(p.units.iter().map(|x| {
             WrappedTftUnitDto {
                 puuid: p.puuid.clone(),
-                base: x.clone()
+                base: x
             }
         }));
     }

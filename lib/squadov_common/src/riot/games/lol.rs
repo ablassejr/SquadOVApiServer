@@ -1,5 +1,7 @@
 use uuid::Uuid;
 use serde::Deserialize;
+use chrono::{DateTime, Utc};
+use std::collections::HashMap;
 
 pub struct LolMatchLink {
     pub match_uuid: Uuid,
@@ -18,4 +20,236 @@ pub struct LolMatchReferenceDto {
     pub game_id: i64,
     #[serde(rename="platformId")]
     pub platform_id: String
+}
+
+#[derive(Deserialize)]
+pub struct LolMatchDto {
+    #[serde(rename="gameId")]
+    pub game_id: i64,
+    #[serde(rename="queueId")]
+    pub queue_id: i32,
+    #[serde(rename="gameType")]
+    pub game_type: String,
+    #[serde(rename="gameDuration")]
+    pub game_duration: i64, // seconds
+    pub platform_id: String,
+    #[serde(rename="gameCreation", deserialize_with="crate::parse_utc_time_from_seconds")]
+    pub game_creation: Option<DateTime<Utc>>, // timestamp when champ select ended and loading screen appears
+    #[serde(rename="seasonId")]
+    pub season_id: i32,
+    #[serde(rename="gameVersion")]
+    pub game_version: String,
+    #[serde(rename="mapId")]
+    pub map_id: i32,
+    #[serde(rename="gameMode")]
+    pub game_mode: String,
+    #[serde(rename="participantIdentities")]
+    pub participant_identities: Vec<LolParticipantIdentityDto>,
+    pub teams: Vec<LolTeamStatsDto>,
+    pub participants: Vec<LolParticipantDto>,
+}
+
+#[derive(Deserialize)]
+pub struct LolParticipantIdentityDto {
+    pub participant_id: i32,
+    pub player: Option<LolPlayerDto>
+}
+
+#[derive(Deserialize)]
+pub struct LolPlayerDto {
+    #[serde(rename="accountId")]
+    pub account_id: String,
+    #[serde(rename="currentAccountId")]
+    pub current_account_id: String,
+    #[serde(rename="currentPlatformId")]
+    pub current_platform_id: String,
+    #[serde(rename="summonerName")]
+    pub summoner_name: String,
+    #[serde(rename="summonerId")]
+    pub summoner_id: String,
+    #[serde(rename="platformId")]
+    pub platform_id: String,
+}
+
+#[derive(Deserialize)]
+pub struct LolTeamStatsDto {
+    #[serde(rename="towerKills")]
+    pub tower_kills: i32,
+    #[serde(rename="riftHeraldKills")]
+    pub rift_herald_kills: i32,
+    #[serde(rename="firstBlood")]
+    pub first_blood: bool,
+    #[serde(rename="inhibitorKills")]
+    pub inhibitor_kills: i32,
+    #[serde(rename="firstBaron")]
+    pub first_baron: bool,
+    #[serde(rename="firstDragon")]
+    pub first_dragon: bool,
+    #[serde(rename="dragonKills")]
+    pub dragon_kills: i32,
+    #[serde(rename="baronKills")]
+    pub baron_kills: i32,
+    #[serde(rename="firstInhibitor")]
+    pub first_inhibitor: bool,
+    #[serde(rename="firstTower")]
+    pub first_tower: bool,
+    #[serde(rename="firstRiftHerald")]
+    pub first_rift_herald: bool,
+    #[serde(rename="teamId")]
+    pub team_id: i32,
+    pub win: String,
+    pub bans: Vec<LolTeamBansDto>
+}
+
+#[derive(Deserialize)]
+pub struct LolTeamBansDto {
+    #[serde(rename="championId")]
+    pub champion_id: i32,
+    #[serde(rename="pickTurn")]
+    pub pick_turn: i32
+}
+
+#[derive(Deserialize)]
+pub struct LolParticipantDto {
+    #[serde(rename="participantId")]
+    pub participant_id: i32,
+    #[serde(rename="championId")]
+    pub champion_id: i32,
+    #[serde(rename="teamId")]
+    pub team_id: i32,
+    #[serde(rename="spell1Id")]
+    pub spell1_id: i32,
+    #[serde(rename="spell2Id")]
+    pub spell2_id: i32,
+    pub stats: LolParticipantStatsDto,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LolParticipantStatsDto {
+    // Player Identity
+    pub participant_id: i32,
+    pub champ_level: i32,
+    pub win: bool,
+    // KDA
+    pub kills: i32,
+    pub deaths: i32,
+    pub assists: i32,
+    // Items
+    pub item0: i32,
+    pub item1: i32,
+    pub item2: i32,
+    pub item3: i32,
+    pub item4: i32,
+    pub item5: i32,
+    pub item6: i32,
+    // Notable kills
+    pub double_kills: i32,
+    pub triple_kills: i32,
+    pub quadra_kills: i32,
+    pub penta_kills: i32,
+    pub first_blood_kill: bool,
+    // Econ Stats
+    pub gold_earned: i32,
+    pub gold_spent: i32,
+    // Neutral Stats
+    pub neutral_minions_killed_team_jungle: i32,
+    pub neutral_minions_killed_enemy_jungle: i32,
+    pub wards_killed: i32,
+    pub wards_placed: i32,
+    pub vision_wards_bought_in_game: i32,
+    pub sight_wards_bought_in_game: i32,
+    pub neutral_minions_kills: i32,
+    pub total_minions_killed: i32,
+    // Objective Stats
+    pub damage_dealt_to_objectives: i64,
+    pub inhibitor_kills: i32,
+    pub turret_kills: i32,
+    pub damage_dealt_to_turrets: i64,
+    // Score
+    pub total_player_score: i32,
+    pub total_score_rank: i32,
+    pub objective_player_score: i32,
+    pub combat_player_score: i32,
+    pub vision_score: i64,
+    // Damage Dealt to Champions
+    pub total_damage_dealt_to_champions: i64,
+    pub physical_damage_dealt_to_champions: i64,
+    pub magic_damage_dealt_to_champions: i64,
+    pub true_damage_dealt_to_champions: i64,
+    // Damage Dealt
+    pub total_damage_dealt: i64,
+    pub physical_damage_dealt: i64,
+    pub magic_damage_dealt: i64, 
+    pub true_damage_dealt: i64,
+    // Damage Taken
+    pub total_damage_taken: i64, 
+    pub physical_damage_token: i64,
+    pub magical_damage_taken: i64,
+    pub true_damage_taken: i64,
+    // Other Combat    
+    pub total_heal: i64,
+    pub damage_self_mitigated: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LolMatchTimelineDto {
+    pub frames: Vec<LolMatchFrameDto>,
+    pub frame_interval: i64
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LolMatchFrameDto {
+    pub participant_frames: HashMap<String, LolMatchParticipantFrameDto>,
+    pub events: Vec<LolMatchEventDto>,
+    pub timestamp: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LolMatchParticipantFrameDto {
+    pub participant_id: i32,
+    pub minions_killed: i32,
+    pub total_gold: i32,
+    pub level: i32,
+    pub xp: i32,
+    pub current_gold: i32,
+    pub jungle_minions_killed: i32,
+    pub position: LolMatchPositionDto,
+}
+
+#[derive(Deserialize)]
+pub struct LolMatchPositionDto {
+    pub x: i32,
+    pub y: i32,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LolMatchEventDto {
+    pub lane_type: Option<String>,
+    pub skill_slot: Option<i32>,
+    pub ascended_type: Option<String>,
+    pub creator_id: Option<i32>,
+    pub after_id: Option<i32>,
+    pub event_type: Option<String>,
+    #[serde(rename="type")]
+    pub real_type: String,
+    pub level_up_type: Option<String>,
+    pub ward_type: Option<String>,
+    pub participant_id: Option<i32>,
+    pub tower_type: Option<String>,
+    pub item_id: Option<i32>,
+    pub before_id: Option<i32>,
+    pub monster_type: Option<String>,
+    pub monster_sub_type: Option<String>,
+    pub team_id: Option<i32>,
+    pub position: Option<LolMatchPositionDto>,
+    pub killer_id: Option<i32>,
+    pub timestamp: i64,
+    pub assisting_participant_ids: Option<Vec<i32>>,
+    pub building_type: Option<String>,
+    pub victim_id: Option<i32>,
 }

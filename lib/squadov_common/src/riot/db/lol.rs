@@ -81,3 +81,25 @@ where
             .await?
     )
 }
+
+pub async fn check_lol_match_details_exist<'a, T>(ex: T, platform: &str, game_id: i64) -> Result<bool, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_scalar(
+            "
+            SELECT EXISTS (
+                SELECT 1
+                FROM squadov.lol_match_info
+                WHERE platform_id = $1
+                    AND game_id = $2
+            )
+            "
+        )
+            .bind(platform)
+            .bind(game_id)
+            .fetch_one(ex)
+            .await?
+    )
+}

@@ -6,6 +6,8 @@ use crate::{
         games::{
             LolMatchlistDto,
             LolMatchReferenceDto,
+            LolMatchDto,
+            LolMatchTimelineDto,
             LOL_SHORTHAND,
         }
     },
@@ -30,6 +32,38 @@ impl super::RiotApiHandler {
 
         Ok(resp.json::<LolMatchlistDto>().await?.matches)
     }
+
+    pub async fn get_lol_match(&self, platform: &str, game_id: i64) -> Result<LolMatchDto, SquadOvError> {
+        let client = self.create_http_client()?;
+        let endpoint = Self::build_api_endpoint(&platform.to_lowercase(), &format!("lol/match/v4/matches/{}", game_id));
+        self.tick_thresholds().await;
+
+        let resp = client.get(&endpoint)
+            .send()
+            .await?;
+
+        if resp.status() != StatusCode::OK {
+            return Err(SquadOvError::InternalError(format!("Failed to obtain LOL match {} - {}", resp.status().as_u16(), resp.text().await?)));
+        }
+
+        Ok(resp.json::<LolMatchDto>().await?)
+    }
+
+    pub async fn get_lol_match_timeline(&self, platform: &str, game_id: i64) -> Result<LolMatchTimelineDto, SquadOvError> {
+        let client = self.create_http_client()?;
+        let endpoint = Self::build_api_endpoint(&platform.to_lowercase(), &format!("lol/match/v4/timelines/by-match/{}", game_id));
+        self.tick_thresholds().await;
+
+        let resp = client.get(&endpoint)
+            .send()
+            .await?;
+
+        if resp.status() != StatusCode::OK {
+            return Err(SquadOvError::InternalError(format!("Failed to obtain LOL match timeline {} - {}", resp.status().as_u16(), resp.text().await?)));
+        }
+
+        Ok(resp.json::<LolMatchTimelineDto>().await?)
+    }
 }
 
 const LOL_BACKFILL_AMOUNT: i32 = 100;
@@ -50,6 +84,48 @@ impl super::RiotApiApplicationInterface {
     }
 
     pub async fn obtain_lol_match_info(&self, platform: &str, game_id: i64) -> Result<(), SquadOvError> {
+        if db::check_lol_match_details_exist(&*self.db, platform, game_id).await? {
+            return Ok(());
+        }
+
+        // One HTTP request to get the match information and another HTTP request to obtain the timeline.
+        // Note that not every match is guaranteed to have a timeline.
+        let match_info = self.api.get_lol_match(platform, game_id).await?;
+        let match_timeline = self.api.get_lol_match_timeline(platform, game_id).await.ok();
+        
+        for _i in 0..2i32 {
+            let mut tx = self.db.begin().await?;
+            let match_uuid = match db::create_or_get_match_uuid_for_lol_match(&mut tx, platform, game_id).await {
+                Ok(x) => x,
+                Err(err) => match err {
+                    SquadOvError::Duplicate => {
+                        log::warn!("Caught duplicate LoL match...retrying!");
+                        tx.rollback().await?;
+                        continue;
+                    },
+                    _ => return Err(err)
+                }
+            };
+
+            match db::store_lol_match_info(&mut tx, &match_uuid, &match_info).await {
+                Ok(_) => (),
+                Err(err) => match err {
+                    SquadOvError::Duplicate => {
+                        log::warn!("Caught duplicate LoL match details...");
+                        tx.rollback().await?;
+                        break;
+                    },
+                    _ => return Err(err)
+                }
+            };
+
+            if match_timeline.is_some() {
+                db::store_lol_match_timeline_info(&mut tx, &match_uuid, &match_timeline.as_ref().unwrap()).await?;
+            }
+            tx.commit().await?;
+            break;
+        }
+
         Ok(())
     }
 
