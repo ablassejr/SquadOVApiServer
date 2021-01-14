@@ -51,7 +51,7 @@ where
             r#"
             SELECT t.id AS "id!"
             FROM UNNEST($1::VARCHAR[]) AS t(id)
-            INNER JOIN squadov.riot_accounts AS ra
+            LEFT JOIN squadov.riot_accounts AS ra
                 ON ra.puuid = t.id
                     AND ra.game = $2
             WHERE ra.puuid IS NULL

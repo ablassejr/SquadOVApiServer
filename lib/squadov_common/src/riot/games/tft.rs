@@ -21,7 +21,7 @@ pub struct TftInfoDto {
     #[serde(rename(serialize="gameLength"))]
     pub game_length: f32,
     #[serde(rename(serialize="gameVariation"))]
-    pub game_variation: String,
+    pub game_variation: Option<String>,
     #[serde(rename(serialize="gameVersion"))]
     pub game_version: String,
     #[serde(rename(serialize="queueId"))]

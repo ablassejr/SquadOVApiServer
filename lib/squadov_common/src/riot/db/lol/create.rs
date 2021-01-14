@@ -488,7 +488,6 @@ struct WrappedParticipantFrame<'a> {
 }
 
 struct WrappedEvent<'a> {
-    timestamp: i64,
     base: &'a LolMatchEventDto
 }
 
@@ -542,8 +541,8 @@ async fn store_lol_match_timeline_participant_frames<'a>(ex: &mut Transaction<'_
                 xp=f.base.xp,
                 current_gold=f.base.current_gold,
                 jungle_minions_killed=f.base.jungle_minions_killed,
-                x=f.base.position.x,
-                y=f.base.position.y,
+                x=crate::sql_format_option_value(&f.base.position.as_ref().and_then(|x| { Some(x.x) })),
+                y=crate::sql_format_option_value(&f.base.position.as_ref().and_then(|x| { Some(x.x) })),
             )
         );
         sql.push(",".to_string());
@@ -558,6 +557,100 @@ async fn store_lol_match_timeline_events<'a>(ex: &mut Transaction<'_, Postgres>,
     if events.is_empty() {
         return Ok(());
     }
+
+    let mut sql = vec![
+        "
+            INSERT INTO squadov.lol_match_timeline_events (
+                match_uuid,
+                timestamp,
+                real_type,
+                lane_type,
+                skill_slot,
+                ascended_type,
+                creator_id,
+                after_id,
+                event_type,
+                level_up_type,
+                ward_type,
+                participant_id,
+                tower_type,
+                item_id,
+                before_id,
+                monster_type,
+                monster_sub_type,
+                team_id,
+                x,
+                y,
+                killer_id,
+                assisting_participant_ids,
+                building_type,
+                victim_id
+            )
+            VALUES
+        ".to_string()
+    ];
+
+    for e in events {
+        sql.push(
+            format!("
+                (
+                    '{match_uuid}',
+                    {timestamp},
+                    '{real_type}',
+                    {lane_type},
+                    {skill_slot},
+                    {ascended_type},
+                    {creator_id},
+                    {after_id},
+                    {event_type},
+                    {level_up_type},
+                    {ward_type},
+                    {participant_id},
+                    {tower_type},
+                    {item_id},
+                    {before_id},
+                    {monster_type},
+                    {monster_sub_type},
+                    {team_id},
+                    {x},
+                    {y},
+                    {killer_id},
+                    {assisting_participant_ids},
+                    {building_type},
+                    {victim_id}
+                )
+            ",
+                match_uuid=match_uuid,
+                timestamp=e.base.timestamp,
+                real_type=&e.base.real_type,
+                lane_type=crate::sql_format_option_string(&e.base.lane_type),
+                skill_slot=crate::sql_format_option_value(&e.base.skill_slot),
+                ascended_type=crate::sql_format_option_string(&e.base.ascended_type),
+                creator_id=crate::sql_format_option_value(&e.base.creator_id),
+                after_id=crate::sql_format_option_value(&e.base.after_id),
+                event_type=crate::sql_format_option_string(&e.base.event_type),
+                level_up_type=crate::sql_format_option_string(&e.base.level_up_type),
+                ward_type=crate::sql_format_option_string(&e.base.ward_type),
+                participant_id=crate::sql_format_option_value(&e.base.participant_id),
+                tower_type=crate::sql_format_option_string(&e.base.tower_type),
+                item_id=crate::sql_format_option_value(&e.base.item_id),
+                before_id=crate::sql_format_option_value(&e.base.before_id),
+                monster_type=crate::sql_format_option_string(&e.base.monster_type),
+                monster_sub_type=crate::sql_format_option_string(&e.base.monster_sub_type),
+                team_id=crate::sql_format_option_value(&e.base.team_id),
+                x=crate::sql_format_option_value(&e.base.position.as_ref().and_then(|x| { Some(x.x) })),
+                y=crate::sql_format_option_value(&e.base.position.as_ref().and_then(|x| { Some(x.y) })),
+                killer_id=crate::sql_format_option_value(&e.base.killer_id),
+                assisting_participant_ids=crate::sql_format_integer_array(&e.base.assisting_participant_ids.as_ref().unwrap_or(&vec![])),
+                building_type=crate::sql_format_option_string(&e.base.building_type),
+                victim_id=crate::sql_format_option_string(&e.base.victim_id),
+            )
+        );
+        sql.push(",".to_string());
+    }
+
+    sql.truncate(sql.len() - 1);
+    sqlx::query(&sql.join("")).execute(&mut *ex).await?;
     Ok(())
 }
 
@@ -592,7 +685,6 @@ pub async fn store_lol_match_timeline_info(ex: &mut Transaction<'_, Postgres>, m
 
         events.extend(f.events.iter().map(|x| {
             WrappedEvent {
-                timestamp: f.timestamp,
                 base: x,
             }
         }));

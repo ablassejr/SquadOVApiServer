@@ -40,7 +40,7 @@ impl super::RiotApiHandler {
             .await?;
 
         if resp.status() != StatusCode::OK {
-            return Err(SquadOvError::InternalError(format!("Failed to obtain TFT match {} - {}", resp.status().as_u16(), resp.text().await?)));
+            return Err(SquadOvError::InternalError(format!("Failed to obtain TFT match {} - {} [{}]", resp.status().as_u16(), resp.text().await?, &endpoint)));
         }
 
         Ok(resp.json::<TftMatchDto>().await?)

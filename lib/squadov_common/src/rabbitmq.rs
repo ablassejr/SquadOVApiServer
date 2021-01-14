@@ -110,8 +110,8 @@ impl RabbitMqConnectionBundle {
         Ok(())
     }
 
-    fn start_consumer(&self, mut consumer: Consumer) {
-        let queue = self.config.valorant_queue.clone();
+    fn start_consumer(&self, queue: &str, mut consumer: Consumer) {
+        let queue = String::from(queue);
         let listeners = self.listeners.clone();
         tokio::task::spawn(async move {
             while let Some(msg) = consumer.next().await {
@@ -158,7 +158,7 @@ impl RabbitMqConnectionBundle {
                     BasicConsumeOptions::default(),
                     FieldTable::default(),
                 ).await?;
-                self.start_consumer(consumer);
+                self.start_consumer(&self.config.valorant_queue, consumer);
             }
 
             {
@@ -168,7 +168,7 @@ impl RabbitMqConnectionBundle {
                     BasicConsumeOptions::default(),
                     FieldTable::default(),
                 ).await?;
-                self.start_consumer(consumer);
+                self.start_consumer(&self.config.lol_queue, consumer);
             }
 
             {
@@ -178,7 +178,7 @@ impl RabbitMqConnectionBundle {
                     BasicConsumeOptions::default(),
                     FieldTable::default(),
                 ).await?;
-                self.start_consumer(consumer);
+                self.start_consumer(&self.config.tft_queue, consumer);
             }
         }
 

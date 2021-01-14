@@ -18,7 +18,6 @@ pub struct TftCreateMatchInput {
 
 #[derive(Deserialize,Debug)]
 pub struct TftMatchInput {
-    #[serde(rename="matchUuid")]
     match_uuid: Uuid
 }
 

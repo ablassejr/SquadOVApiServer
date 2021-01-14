@@ -279,7 +279,7 @@ pub async fn store_tft_match_info(ex: &mut Transaction<'_, Postgres>, match_uuid
         match_uuid,
         &tft_match.info.game_datetime.ok_or(SquadOvError::BadRequest)?,
         tft_match.info.game_length,
-        &tft_match.info.game_variation,
+        tft_match.info.game_variation,
         &tft_match.info.game_version,
         tft_match.info.queue_id,
         tft_match.info.tft_set_number,

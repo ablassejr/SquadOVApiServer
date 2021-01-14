@@ -17,7 +17,6 @@ pub struct LolCreateMatchInput {
 
 #[derive(Deserialize,Debug)]
 pub struct LolMatchInput {
-    #[serde(rename="matchUuid")]
     match_uuid: Uuid
 }
 

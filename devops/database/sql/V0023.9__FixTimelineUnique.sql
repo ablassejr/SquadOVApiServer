@@ -1,0 +1,5 @@
+ALTER TABLE lol_match_timeline_participant_frames
+DROP CONSTRAINT lol_match_timeline_participant_frames_match_uuid_key;
+
+ALTER TABLE lol_match_timeline_events
+DROP CONSTRAINT lol_match_timeline_events_match_uuid_key;

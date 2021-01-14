@@ -32,6 +32,7 @@ pub struct LolMatchDto {
     pub game_type: String,
     #[serde(rename="gameDuration")]
     pub game_duration: i64, // seconds
+    #[serde(rename="platformId")]
     pub platform_id: String,
     #[serde(rename="gameCreation", deserialize_with="crate::parse_utc_time_from_seconds")]
     pub game_creation: Option<DateTime<Utc>>, // timestamp when champ select ended and loading screen appears
@@ -51,6 +52,7 @@ pub struct LolMatchDto {
 
 #[derive(Deserialize)]
 pub struct LolParticipantIdentityDto {
+    #[serde(rename="participantId")]
     pub participant_id: i32,
     pub player: Option<LolPlayerDto>
 }
@@ -129,66 +131,116 @@ pub struct LolParticipantDto {
 pub struct LolParticipantStatsDto {
     // Player Identity
     pub participant_id: i32,
+    #[serde(default)]
     pub champ_level: i32,
+    #[serde(default)]
     pub win: bool,
     // KDA
+    #[serde(default)]
     pub kills: i32,
+    #[serde(default)]
     pub deaths: i32,
+    #[serde(default)]
     pub assists: i32,
     // Items
+    #[serde(default)]
     pub item0: i32,
+    #[serde(default)]
     pub item1: i32,
+    #[serde(default)]
     pub item2: i32,
+    #[serde(default)]
     pub item3: i32,
+    #[serde(default)]
     pub item4: i32,
+    #[serde(default)]
     pub item5: i32,
+    #[serde(default)]
     pub item6: i32,
     // Notable kills
+    #[serde(default)]
     pub double_kills: i32,
+    #[serde(default)]
     pub triple_kills: i32,
+    #[serde(default)]
     pub quadra_kills: i32,
+    #[serde(default)]
     pub penta_kills: i32,
+    #[serde(default)]
     pub first_blood_kill: bool,
     // Econ Stats
+    #[serde(default)]
     pub gold_earned: i32,
+    #[serde(default)]
     pub gold_spent: i32,
     // Neutral Stats
+    #[serde(default)]
     pub neutral_minions_killed_team_jungle: i32,
+    #[serde(default)]
     pub neutral_minions_killed_enemy_jungle: i32,
+    #[serde(default)]
     pub wards_killed: i32,
+    #[serde(default)]
     pub wards_placed: i32,
+    #[serde(default)]
     pub vision_wards_bought_in_game: i32,
+    #[serde(default)]
     pub sight_wards_bought_in_game: i32,
+    #[serde(default)]
     pub neutral_minions_kills: i32,
+    #[serde(default)]
     pub total_minions_killed: i32,
     // Objective Stats
+    #[serde(default)]
     pub damage_dealt_to_objectives: i64,
+    #[serde(default)]
     pub inhibitor_kills: i32,
+    #[serde(default)]
     pub turret_kills: i32,
+    #[serde(default)]
     pub damage_dealt_to_turrets: i64,
     // Score
+    #[serde(default)]
     pub total_player_score: i32,
+    #[serde(default)]
     pub total_score_rank: i32,
+    #[serde(default)]
     pub objective_player_score: i32,
+    #[serde(default)]
     pub combat_player_score: i32,
+    #[serde(default)]
     pub vision_score: i64,
     // Damage Dealt to Champions
+    #[serde(default)]
     pub total_damage_dealt_to_champions: i64,
+    #[serde(default)]
     pub physical_damage_dealt_to_champions: i64,
+    #[serde(default)]
     pub magic_damage_dealt_to_champions: i64,
+    #[serde(default)]
     pub true_damage_dealt_to_champions: i64,
     // Damage Dealt
+    #[serde(default)]
     pub total_damage_dealt: i64,
+    #[serde(default)]
     pub physical_damage_dealt: i64,
+    #[serde(default)]
     pub magic_damage_dealt: i64, 
+    #[serde(default)]
     pub true_damage_dealt: i64,
     // Damage Taken
+    #[serde(default)]
     pub total_damage_taken: i64, 
+    #[serde(default)]
     pub physical_damage_token: i64,
+    #[serde(default)]
     pub magical_damage_taken: i64,
+    #[serde(default)]
     pub true_damage_taken: i64,
-    // Other Combat    
+    // Other Combat  
+    #[serde(default)]  
     pub total_heal: i64,
+    #[serde(default)]
     pub damage_self_mitigated: i64,
 }
 
@@ -217,7 +269,7 @@ pub struct LolMatchParticipantFrameDto {
     pub xp: i32,
     pub current_gold: i32,
     pub jungle_minions_killed: i32,
-    pub position: LolMatchPositionDto,
+    pub position: Option<LolMatchPositionDto>,
 }
 
 #[derive(Deserialize)]

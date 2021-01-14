@@ -43,7 +43,7 @@ impl super::RiotApiHandler {
             .await?;
 
         if resp.status() != StatusCode::OK {
-            return Err(SquadOvError::InternalError(format!("Failed to obtain LOL match {} - {}", resp.status().as_u16(), resp.text().await?)));
+            return Err(SquadOvError::InternalError(format!("Failed to obtain LOL match {} - {} [{}]", resp.status().as_u16(), resp.text().await?, &endpoint)));
         }
 
         Ok(resp.json::<LolMatchDto>().await?)
@@ -91,7 +91,13 @@ impl super::RiotApiApplicationInterface {
         // One HTTP request to get the match information and another HTTP request to obtain the timeline.
         // Note that not every match is guaranteed to have a timeline.
         let match_info = self.api.get_lol_match(platform, game_id).await?;
-        let match_timeline = self.api.get_lol_match_timeline(platform, game_id).await.ok();
+        let match_timeline = match self.api.get_lol_match_timeline(platform, game_id).await {
+            Ok(x) => Some(x),
+            Err(err) => match err {
+                SquadOvError::NotFound => None,
+                _ => return Err(err)
+            }
+        };
         
         for _i in 0..2i32 {
             let mut tx = self.db.begin().await?;
