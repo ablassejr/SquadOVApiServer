@@ -15,6 +15,7 @@ use crate::{
 use sqlx::postgres::{PgPool};
 use reqwest::header;
 use tokio::sync::{Semaphore};
+use reqwest::{StatusCode, Response};
 
 #[derive(Deserialize,Debug,Clone)]
 pub struct ApiKeyLimit {
@@ -79,29 +80,8 @@ impl RiotApiHandler {
         let burst_threshold = Arc::new(Semaphore::new(api_key.burst_limit.requests));
         let bulk_threshold = Arc::new(Semaphore::new(api_key.bulk_limit.requests));
 
-        // Spawn two tasks that will handle refreshing the threshold semaphore permit count.
-        // We could theoretically have just one task but having two makes the logic much easier.
-        {
-            let api_key = api_key.clone();
-            let burst_threshold = burst_threshold.clone();
-            tokio::task::spawn(async move {
-                loop {
-                    async_std::task::sleep(std::time::Duration::from_secs(api_key.burst_limit.seconds)).await;
-                    burst_threshold.add_permits(api_key.burst_limit.requests - burst_threshold.available_permits());
-                }
-            });
-        }
-
-        {
-            let api_key = api_key.clone();
-            let bulk_threshold = bulk_threshold.clone();
-            tokio::task::spawn(async move {
-                loop {
-                    async_std::task::sleep(std::time::Duration::from_secs(api_key.bulk_limit.seconds)).await;
-                    bulk_threshold.add_permits(api_key.bulk_limit.requests - bulk_threshold.available_permits());
-                }
-            });
-        }
+        log::info!("Riot Burst Limit: {} requests/{} seconds: ", api_key.burst_limit.requests, api_key.burst_limit.seconds);
+        log::info!("Riot Bulk Limit: {} requests/{} seconds: ", api_key.bulk_limit.requests, api_key.bulk_limit.seconds);
 
         Self {
             api_key,
@@ -110,14 +90,34 @@ impl RiotApiHandler {
         }
     }
 
+    // Ticking the semaphore removes an available request and adds it back *_limit.seconds later.
+    // This way we can more accurately ensure that within any *seconds period, we only send
+    // *requests. Originally, this was a single thread that looped every *seconds anad refreshed
+    // the number of requests to the max amount; this resulted in a problem where we'd go over
+    // the rate limit due to the fact that we can use more than the rate limit amount within
+    // a given time period (especially if the time period is low).
     async fn tick_burst_threshold(&self) {
         let permit = self.burst_threshold.acquire().await;
         permit.forget();
+
+        let api_key = self.api_key.clone();
+        let threshold = self.burst_threshold.clone();
+        tokio::task::spawn(async move {
+            async_std::task::sleep(std::time::Duration::from_secs(api_key.burst_limit.seconds)).await;
+            threshold.add_permits(1);
+        });
     }
 
     async fn tick_bulk_threshold(&self) {
         let permit = self.bulk_threshold.acquire().await;
         permit.forget();
+
+        let api_key = self.api_key.clone();
+        let threshold = self.bulk_threshold.clone();
+        tokio::task::spawn(async move {
+            async_std::task::sleep(std::time::Duration::from_secs(api_key.bulk_limit.seconds)).await;
+            threshold.add_permits(1);
+        });
     }
 
     async fn tick_thresholds(&self) {
@@ -136,6 +136,23 @@ impl RiotApiHandler {
         Ok(reqwest::ClientBuilder::new()
             .default_headers(headers)
             .build()?)
+    }
+
+    async fn check_for_response_error(&self, resp: Response, context: &str) -> Result<Response, SquadOvError> {
+        match resp.status() {
+            StatusCode::OK => Ok(resp),
+            StatusCode::TOO_MANY_REQUESTS => Err(SquadOvError::RateLimit),
+            _ => {
+                let url = String::from(resp.url().as_str());
+                Err(SquadOvError::InternalError(format!(
+                    "{context} {status} - {text} [{endpoint}]",
+                    context=context,
+                    status=resp.status().as_u16(),
+                    text=resp.text().await?,
+                    endpoint=url,
+                )))
+            }
+        }
     }
 }
 

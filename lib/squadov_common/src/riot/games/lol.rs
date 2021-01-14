@@ -68,7 +68,7 @@ pub struct LolPlayerDto {
     #[serde(rename="summonerName")]
     pub summoner_name: String,
     #[serde(rename="summonerId")]
-    pub summoner_id: String,
+    pub summoner_id: Option<String>,
     #[serde(rename="platformId")]
     pub platform_id: String,
 }

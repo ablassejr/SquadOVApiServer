@@ -14,7 +14,6 @@ use crate::{
 };
 use super::RiotApiTask;
 use chrono::{Utc, Duration};
-use reqwest::{StatusCode};
 
 impl super::RiotApiHandler {
     pub async fn get_lol_matches_for_user(&self, account_id: &str, platform: &str, begin_index: i32, end_index: i32) -> Result<Vec<LolMatchReferenceDto>, SquadOvError> {
@@ -26,10 +25,7 @@ impl super::RiotApiHandler {
             .send()
             .await?;
 
-        if resp.status() != StatusCode::OK {
-            return Err(SquadOvError::InternalError(format!("Failed to obtain LOL matches for user {} - {}", resp.status().as_u16(), resp.text().await?)));
-        }
-
+        let resp = self.check_for_response_error(resp, "Failed to obtain LOL matches for user").await?;
         Ok(resp.json::<LolMatchlistDto>().await?.matches)
     }
 
@@ -42,10 +38,7 @@ impl super::RiotApiHandler {
             .send()
             .await?;
 
-        if resp.status() != StatusCode::OK {
-            return Err(SquadOvError::InternalError(format!("Failed to obtain LOL match {} - {} [{}]", resp.status().as_u16(), resp.text().await?, &endpoint)));
-        }
-
+        let resp = self.check_for_response_error(resp, "Failed to obtain LOL match").await?;
         Ok(resp.json::<LolMatchDto>().await?)
     }
 
@@ -58,10 +51,7 @@ impl super::RiotApiHandler {
             .send()
             .await?;
 
-        if resp.status() != StatusCode::OK {
-            return Err(SquadOvError::InternalError(format!("Failed to obtain LOL match timeline {} - {}", resp.status().as_u16(), resp.text().await?)));
-        }
-
+        let resp = self.check_for_response_error(resp, "Failed to obtain LOL match timeline").await?;
         Ok(resp.json::<LolMatchTimelineDto>().await?)
     }
 }
@@ -84,6 +74,7 @@ impl super::RiotApiApplicationInterface {
     }
 
     pub async fn obtain_lol_match_info(&self, platform: &str, game_id: i64) -> Result<(), SquadOvError> {
+        log::info!("Obtain LoL Match Info {} [{}]", game_id, platform);
         if db::check_lol_match_details_exist(&*self.db, platform, game_id).await? {
             return Ok(());
         }
@@ -153,6 +144,7 @@ impl super::RiotApiApplicationInterface {
     }
 
     pub async fn backfill_user_lol_matches(&self, account_id: &str, platform: &str) -> Result<(), SquadOvError> {
+        log::info!("Backfill LoL Matches {} [{}]", account_id, platform);
         let matches = self.api.get_lol_matches_for_user(account_id, platform, 0, LOL_BACKFILL_AMOUNT).await?;
         db::tick_riot_account_backfill_time(&*self.db, account_id, LOL_SHORTHAND).await?;
 

@@ -11,7 +11,6 @@ use crate::{
 };
 use super::RiotApiTask;
 use chrono::{Utc, Duration};
-use reqwest::{StatusCode};
 
 impl super::RiotApiHandler {
     pub async fn get_tft_matches_for_user(&self, puuid: &str, region: &str, count: i32) -> Result<Vec<String>, SquadOvError> {
@@ -23,10 +22,7 @@ impl super::RiotApiHandler {
             .send()
             .await?;
 
-        if resp.status() != StatusCode::OK {
-            return Err(SquadOvError::InternalError(format!("Failed to obtain TFT matches for user {} - {}", resp.status().as_u16(), resp.text().await?)));
-        }
-
+        let resp = self.check_for_response_error(resp, "Failed to obtain TFT matches for user").await?;
         Ok(resp.json::<Vec<String>>().await?)
     }
 
@@ -39,10 +35,7 @@ impl super::RiotApiHandler {
             .send()
             .await?;
 
-        if resp.status() != StatusCode::OK {
-            return Err(SquadOvError::InternalError(format!("Failed to obtain TFT match {} - {} [{}]", resp.status().as_u16(), resp.text().await?, &endpoint)));
-        }
-
+        let resp = self.check_for_response_error(resp, "Failed to obtain TFT match").await?;
         Ok(resp.json::<TftMatchDto>().await?)
     }
 }
@@ -68,6 +61,7 @@ impl super::RiotApiApplicationInterface {
     pub async fn obtain_tft_match_info(&self, platform: &str, region: &str, game_id: i64) -> Result<(), SquadOvError> {
         // We should not check for existing TFT match details here as we might be updated with newer information as the match progresses.
         // TODO: Limit this to sometime after the game started?
+        log::info!("Obtain TFT Match Info {} [{}/{}]", game_id, platform, region);
 
         let tft_match = self.api.get_tft_match(region, &format!(
             "{}_{}",
@@ -124,6 +118,7 @@ impl super::RiotApiApplicationInterface {
     }
 
     pub async fn backfill_user_tft_matches(&self, puuid: &str, region: &str) -> Result<(), SquadOvError> {
+        log::info!("Backfill TFT Matches {} [{}]", puuid, region);
         let match_ids = self.api.get_tft_matches_for_user(puuid, region, TFT_BACKFILL_AMOUNT).await?;
         db::tick_riot_puuid_backfill_time(&*self.db, puuid, TFT_SHORTHAND).await?;
 

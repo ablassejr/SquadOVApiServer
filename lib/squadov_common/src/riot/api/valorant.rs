@@ -8,7 +8,6 @@ use crate::{
         }
     }
 };
-use reqwest::{StatusCode};
 use super::RiotApiTask;
 use crate::riot::db;
 
@@ -22,10 +21,7 @@ impl super::RiotApiHandler {
             .send()
             .await?;
 
-        if resp.status() != StatusCode::OK {
-            return Err(SquadOvError::InternalError(format!("Failed to obtain Valorant matches for user {} - {}", resp.status().as_u16(), resp.text().await?)));
-        }
-
+        let resp = self.check_for_response_error(resp, "Failed to obtain Valorant matches for user").await?;
         Ok(resp.json::<ValorantMatchlistDto>().await?)
     }
 
@@ -38,10 +34,7 @@ impl super::RiotApiHandler {
             .send()
             .await?;
 
-        if resp.status() != StatusCode::OK {
-            return Err(SquadOvError::InternalError(format!("Failed to obtain Valorant match {} - {}", resp.status().as_u16(), resp.text().await?)));
-        }
-
+        let resp = self.check_for_response_error(resp, "Failed to obtain Valorant match").await?;
         Ok(resp.json::<ValorantMatchDto>().await?)
     }
 }

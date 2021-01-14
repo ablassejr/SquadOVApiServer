@@ -68,7 +68,7 @@ pub struct TftTraitDto {
     pub style: i32,
     #[serde(rename(serialize="tierCurrent"))]
     pub tier_current: i32,
-    #[serde(rename(serialize="tierTotal"))]
+    #[serde(rename(serialize="tierTotal"), default)]
     pub tier_total: i32
 }
 

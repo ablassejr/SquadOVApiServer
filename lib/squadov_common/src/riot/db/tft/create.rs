@@ -172,7 +172,7 @@ pub async fn store_tft_match_participants(ex: &mut Transaction<'_, Postgres>, ma
     // This information isn't 100% accurate until the game is 100% completed. So as players die
     // and trigger requests to update match history details, we'll need to keep refreshing our
     // store of participant info as they keep coming in.
-    sqlx::query!("DELETE FROM squadov.tft_match_participants").execute(&mut *ex).await?;
+    sqlx::query!("DELETE FROM squadov.tft_match_participants WHERE match_uuid = $1", match_uuid).execute(&mut *ex).await?;
 
     let mut sql = vec![
         "

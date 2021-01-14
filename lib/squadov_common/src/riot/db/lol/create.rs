@@ -91,7 +91,7 @@ async fn store_lol_match_participant_identities(ex: &mut Transaction<'_, Postgre
                 current_account_id=crate::sql_format_option_string(&player_ref.and_then(|x| { Some(x.current_account_id.clone()) })),
                 current_platform_id=crate::sql_format_option_string(&player_ref.and_then(|x| { Some(x.current_platform_id.clone()) })),
                 summoner_name=crate::sql_format_option_string(&player_ref.and_then(|x| { Some(x.summoner_name.clone()) })),
-                summoner_id=crate::sql_format_option_string(&player_ref.and_then(|x| { Some(x.summoner_id.clone()) })),
+                summoner_id=crate::sql_format_option_string(&player_ref.and_then(|x| { x.summoner_id.as_ref() })),
                 platform_id=crate::sql_format_option_string(&player_ref.and_then(|x| { Some(x.platform_id.clone()) })),
             )
         );

@@ -6,7 +6,7 @@ use lapin::{
     Connection,
     ConnectionProperties,
     Channel,
-    options::{QueueDeclareOptions, BasicConsumeOptions, BasicPublishOptions, BasicAckOptions, BasicQosOptions},
+    options::{QueueDeclareOptions, BasicConsumeOptions, BasicPublishOptions, BasicAckOptions, BasicNackOptions, BasicQosOptions},
     types::FieldTable,
     Consumer,
 };
@@ -123,6 +123,7 @@ impl RabbitMqConnectionBundle {
                 let msg = msg.unwrap();
                 let current_listeners = listeners.read().await.clone();
                 let topic_listeners = current_listeners.get(&queue);
+                let mut should_nack: bool = false;
                 if topic_listeners.is_some() {
                     let topic_listeners = topic_listeners.unwrap();
                     for l in topic_listeners {
@@ -130,17 +131,23 @@ impl RabbitMqConnectionBundle {
                             Ok(_) => (),
                             Err(err) => {
                                 log::warn!("Error in handling message: {:?}", err);
+                                should_nack = err == SquadOvError::Defer ||  err == SquadOvError::RateLimit;
                             }
                         };
                     }    
                 }
 
-                // TODO: Maybe nack some stuff too if we failed to parse something?
-                // We need to be able to detect that situation somehow though.
-                match msg.acker.ack(BasicAckOptions::default()).await {
-                    Ok(_) => (),
-                    Err(err) => log::warn!("Failed to ack RabbitMQ message: {:?}", err)
-                };
+                if should_nack {
+                    match msg.acker.nack(BasicNackOptions::default()).await {
+                        Ok(_) => (),
+                        Err(err) => log::warn!("Failed to nack RabbitMQ message: {:?}", err)
+                    };
+                } else {
+                    match msg.acker.ack(BasicAckOptions::default()).await {
+                        Ok(_) => (),
+                        Err(err) => log::warn!("Failed to ack RabbitMQ message: {:?}", err)
+                    };
+                }
             }
         });
     }
