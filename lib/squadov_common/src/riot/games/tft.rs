@@ -16,7 +16,7 @@ pub struct TftMatchDto {
 
 #[derive(Serialize, Deserialize)]
 pub struct TftInfoDto {
-    #[serde(rename(serialize="gameDatetime"), deserialize_with="crate::parse_utc_time_from_seconds")]
+    #[serde(rename(serialize="gameDatetime"), deserialize_with="crate::parse_utc_time_from_milliseconds")]
     pub game_datetime: Option<DateTime<Utc>>,
     #[serde(rename(serialize="gameLength"))]
     pub game_length: f32,
@@ -81,4 +81,23 @@ pub struct TftUnitDto {
     pub name: String,
     pub rarity: i32,
     pub tier: i32
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TftPlayerMatchSummary {
+    pub match_uuid: Uuid,
+    pub game_datetime: DateTime<Utc>,
+    pub game_length: f32,
+    pub game_variation: Option<String>,
+    pub game_version: String,
+    pub queue_id: i32,
+    pub tft_set_number: i32,
+    pub companion: TftCompanionDto,
+    pub level: i32,
+    pub placement: i32,
+    pub last_round: i32,
+    pub traits: Vec<TftTraitDto>,
+    pub units: Vec<TftUnitDto>,
+    pub has_vod: bool
 }

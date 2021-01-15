@@ -80,6 +80,7 @@ where
         FROM squadov.riot_accounts AS ra
         INNER JOIN squadov.riot_account_links AS ral
             ON ral.puuid = ra.puuid
+                AND ral.game = ra.game
         WHERE ral.user_id = $1
             AND ra.game_name = $2
             AND ra.tag_line = $3
@@ -105,6 +106,7 @@ where
         FROM squadov.riot_accounts AS ra
         INNER JOIN squadov.riot_account_links AS ral
             ON ral.puuid = ra.puuid
+                AND ral.game = ra.game
         WHERE ral.user_id = $1
             AND ra.puuid = $2
             AND ra.game = $3
@@ -128,6 +130,7 @@ where
         FROM squadov.riot_accounts AS ra
         INNER JOIN squadov.riot_account_links AS ral
             ON ral.puuid = ra.puuid
+                AND ral.game = ra.game
         WHERE ral.user_id = $1
             AND ra.game = $2
         ",

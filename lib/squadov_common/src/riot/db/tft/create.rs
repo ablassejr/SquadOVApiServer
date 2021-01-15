@@ -211,7 +211,7 @@ pub async fn store_tft_match_participants(ex: &mut Transaction<'_, Postgres>, ma
                     {time_eliminated},
                     {total_damage_to_players},
                     '{companion_content_id}',
-                    '{companion_skin_id}',
+                    {companion_skin_id},
                     '{companion_species}'
                 )
                 ",
@@ -225,7 +225,7 @@ pub async fn store_tft_match_participants(ex: &mut Transaction<'_, Postgres>, ma
                 time_eliminated=p.time_eliminated,
                 total_damage_to_players=p.total_damage_to_players,
                 companion_content_id=&p.companion.content_id,
-                companion_skin_id=&p.companion.skin_id,
+                companion_skin_id=p.companion.skin_id,
                 companion_species=&p.companion.species,
             )
         );

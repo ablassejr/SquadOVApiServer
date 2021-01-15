@@ -125,10 +125,12 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                 .service(
                                                     web::scope("/lol")
                                                         .route("/{summoner_name}", web::get().to(v1::get_riot_lol_summoner_account_handler))
+                                                        .route("", web::get().to(v1::list_riot_lol_accounts_handler))
                                                 )
                                                 .service(
                                                     web::scope("/tft")
                                                         .route("/{summoner_name}", web::get().to(v1::get_riot_tft_summoner_account_handler))
+                                                        .route("", web::get().to(v1::list_riot_tft_accounts_handler))
                                                 )
                                         )
                                 )
@@ -156,6 +158,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/user/{user_id}")
                                 .route("/backfill", web::post().to(v1::request_tft_match_backfill_handler))
+                                .service(
+                                    web::scope("/accounts/{puuid}")
+                                        .route("/matches", web::get().to(v1::list_tft_matches_for_user_handler))
+                                )
                         )
                 )
                 .service(

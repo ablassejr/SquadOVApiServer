@@ -60,3 +60,13 @@ pub async fn get_riot_tft_summoner_account_handler(app : web::Data<Arc<api::ApiA
     let summoner = db::get_user_riot_summoner_from_name(&*app.pool, path.user_id, &path.summoner_name, TFT_SHORTHAND).await?;
     Ok(HttpResponse::Ok().json(&summoner))
 }
+
+pub async fn list_riot_lol_accounts_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<UserResourcePath>) -> Result<HttpResponse, SquadOvError> {
+    let accounts = db::list_riot_summoners_for_user(&*app.pool, path.user_id, LOL_SHORTHAND).await?;
+    Ok(HttpResponse::Ok().json(&accounts))
+}
+
+pub async fn list_riot_tft_accounts_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<UserResourcePath>) -> Result<HttpResponse, SquadOvError> {
+    let accounts = db::list_riot_summoners_for_user(&*app.pool, path.user_id, TFT_SHORTHAND).await?;
+    Ok(HttpResponse::Ok().json(&accounts))
+}
