@@ -4,7 +4,6 @@ use crate::{
     riot::{
         db,
         games::{
-            TFT_SHORTHAND,
             TftMatchDto
         },
     }
@@ -72,11 +71,11 @@ impl super::RiotApiApplicationInterface {
         // We also need to obtain info about every player in the match to get their names since the TFT endpoint doesn't provide that info
         // off the bat and only provides PUUIDs.
         let puuids: Vec<String> = tft_match.info.participants.iter().map(|x| { x.puuid.clone() }).collect();
-        let missing_puuids = db::get_missing_riot_account_puuids(&*self.db, &puuids, TFT_SHORTHAND).await?;
+        let missing_puuids = db::get_missing_riot_account_puuids(&*self.db, &puuids).await?;
         for id in &missing_puuids {
             let mut tx = self.db.begin().await?;
             let summoner = self.api.get_tft_summoner_from_puuid(id, platform).await?;
-            db::store_riot_summoner(&mut tx, &summoner, TFT_SHORTHAND).await?;
+            db::store_riot_summoner(&mut tx, &summoner).await?;
             tx.commit().await?;
         }
 
@@ -102,9 +101,9 @@ impl super::RiotApiApplicationInterface {
     }
 
     pub async fn request_backfill_user_tft_matches(&self, summoner_name: &str, region: &str, user_id: i64) -> Result<(), SquadOvError> {
-        let summoner = db::get_user_riot_summoner_from_name(&*self.db, user_id, summoner_name, &self.game).await?;
-        if summoner.last_backfill_time.is_some() {
-            let time_since_backfill = Utc::now() - summoner.last_backfill_time.unwrap();
+        let summoner = db::get_user_riot_summoner_from_name(&*self.db, user_id, summoner_name).await?;
+        if summoner.last_backfill_tft_time.is_some() {
+            let time_since_backfill = Utc::now() - summoner.last_backfill_tft_time.unwrap();
             if time_since_backfill > Duration::days(3) {
                 return Ok(());
             }
@@ -120,7 +119,7 @@ impl super::RiotApiApplicationInterface {
     pub async fn backfill_user_tft_matches(&self, puuid: &str, region: &str) -> Result<(), SquadOvError> {
         log::info!("Backfill TFT Matches {} [{}]", puuid, region);
         let match_ids = self.api.get_tft_matches_for_user(puuid, region, TFT_BACKFILL_AMOUNT).await?;
-        db::tick_riot_puuid_backfill_time(&*self.db, puuid, TFT_SHORTHAND).await?;
+        db::tick_riot_puuid_tft_backfill_time(&*self.db, puuid).await?;
 
         let backfill_ids = db::get_tft_matches_that_require_backfill(&*self.db, &match_ids).await?;
         for (platform, game_id) in &backfill_ids {

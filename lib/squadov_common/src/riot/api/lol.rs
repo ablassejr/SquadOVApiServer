@@ -8,7 +8,6 @@ use crate::{
             LolMatchReferenceDto,
             LolMatchDto,
             LolMatchTimelineDto,
-            LOL_SHORTHAND,
         }
     },
 };
@@ -127,9 +126,9 @@ impl super::RiotApiApplicationInterface {
     }
 
     pub async fn request_backfill_user_lol_matches(&self, summoner_name: &str, platform: &str, user_id: i64) -> Result<(), SquadOvError> {
-        let summoner = db::get_user_riot_summoner_from_name(&*self.db, user_id, summoner_name, &self.game).await?;
-        if summoner.last_backfill_time.is_some() {
-            let time_since_backfill = Utc::now() - summoner.last_backfill_time.unwrap();
+        let summoner = db::get_user_riot_summoner_from_name(&*self.db, user_id, summoner_name).await?;
+        if summoner.last_backfill_lol_time.is_some() {
+            let time_since_backfill = Utc::now() - summoner.last_backfill_lol_time.unwrap();
             if time_since_backfill > Duration::days(3) {
                 return Ok(());
             }
@@ -146,7 +145,7 @@ impl super::RiotApiApplicationInterface {
     pub async fn backfill_user_lol_matches(&self, account_id: &str, platform: &str) -> Result<(), SquadOvError> {
         log::info!("Backfill LoL Matches {} [{}]", account_id, platform);
         let matches = self.api.get_lol_matches_for_user(account_id, platform, 0, LOL_BACKFILL_AMOUNT).await?;
-        db::tick_riot_account_backfill_time(&*self.db, account_id, LOL_SHORTHAND).await?;
+        db::tick_riot_account_lol_backfill_time(&*self.db, account_id).await?;
 
         let backfill_matches = db::get_lol_matches_that_require_backfill(&*self.db, &matches).await?;
         for bm in &backfill_matches {

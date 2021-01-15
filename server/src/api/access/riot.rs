@@ -10,7 +10,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use squadov_common::riot::{
     db,
-    games::VALORANT_SHORTHAND,
 };
 
 pub struct RiotValorantAccountAccessBasicData {
@@ -43,7 +42,7 @@ impl super::AccessChecker<RiotValorantAccountAccessBasicData> for RiotValorantAc
     }
 
     async fn check(&self, app: Arc<ApiApplication>, _session: &SquadOVSession, data: RiotValorantAccountAccessBasicData) -> Result<bool, SquadOvError> {
-        match db::get_user_riot_account(&*app.pool, data.user_id, &data.puuid, VALORANT_SHORTHAND).await {
+        match db::get_user_riot_account(&*app.pool, data.user_id, &data.puuid).await {
             Ok(_) => Ok(true),
             Err(_) => Ok(false)
         }

@@ -10,15 +10,10 @@ use std::sync::Arc;
 use squadov_common::{SquadOvError};
 use squadov_common::riot::{
     db,
-    games::{
-        VALORANT_SHORTHAND,
-        LOL_SHORTHAND,
-        TFT_SHORTHAND,
-    },
 };
 
 pub async fn list_riot_valorant_accounts_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<UserResourcePath>) -> Result<HttpResponse, SquadOvError> {
-    let accounts = db::list_riot_accounts_for_user(&*app.pool, path.user_id, VALORANT_SHORTHAND).await?;
+    let accounts = db::list_riot_accounts_for_user(&*app.pool, path.user_id).await?;
     Ok(HttpResponse::Ok().json(&accounts))
 }
 
@@ -42,31 +37,31 @@ pub struct RiotSummonerPathInput {
 }
 
 pub async fn get_riot_valorant_account_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<RiotPuuidPathInput>) -> Result<HttpResponse, SquadOvError> {
-    let account = db::get_user_riot_account(&*app.pool, path.user_id, &path.puuid, VALORANT_SHORTHAND).await?;
+    let account = db::get_user_riot_account(&*app.pool, path.user_id, &path.puuid).await?;
     Ok(HttpResponse::Ok().json(&account))
 }
 
 pub async fn get_riot_valorant_account_from_gamename_tagline_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<RiotAccountPathInput>) -> Result<HttpResponse, SquadOvError> {
-    let account = db::get_user_riot_account_gamename_tagline(&*app.pool, path.user_id, &path.game_name, &path.tag_line, VALORANT_SHORTHAND).await?;
+    let account = db::get_user_riot_account_gamename_tagline(&*app.pool, path.user_id, &path.game_name, &path.tag_line).await?;
     Ok(HttpResponse::Ok().json(&account))
 }
 
 pub async fn get_riot_lol_summoner_account_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<RiotSummonerPathInput>) -> Result<HttpResponse, SquadOvError> {
-    let summoner = db::get_user_riot_summoner_from_name(&*app.pool, path.user_id, &path.summoner_name, LOL_SHORTHAND).await?;
+    let summoner = db::get_user_riot_summoner_from_name(&*app.pool, path.user_id, &path.summoner_name).await?;
     Ok(HttpResponse::Ok().json(&summoner))
 }
 
 pub async fn get_riot_tft_summoner_account_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<RiotSummonerPathInput>) -> Result<HttpResponse, SquadOvError> {
-    let summoner = db::get_user_riot_summoner_from_name(&*app.pool, path.user_id, &path.summoner_name, TFT_SHORTHAND).await?;
+    let summoner = db::get_user_riot_summoner_from_name(&*app.pool, path.user_id, &path.summoner_name).await?;
     Ok(HttpResponse::Ok().json(&summoner))
 }
 
 pub async fn list_riot_lol_accounts_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<UserResourcePath>) -> Result<HttpResponse, SquadOvError> {
-    let accounts = db::list_riot_summoners_for_user(&*app.pool, path.user_id, LOL_SHORTHAND).await?;
+    let accounts = db::list_riot_summoners_for_user(&*app.pool, path.user_id).await?;
     Ok(HttpResponse::Ok().json(&accounts))
 }
 
 pub async fn list_riot_tft_accounts_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<UserResourcePath>) -> Result<HttpResponse, SquadOvError> {
-    let accounts = db::list_riot_summoners_for_user(&*app.pool, path.user_id, TFT_SHORTHAND).await?;
+    let accounts = db::list_riot_summoners_for_user(&*app.pool, path.user_id).await?;
     Ok(HttpResponse::Ok().json(&accounts))
 }

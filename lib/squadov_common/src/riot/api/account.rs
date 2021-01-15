@@ -53,7 +53,7 @@ impl super::RiotApiApplicationInterface {
     pub async fn obtain_riot_account_from_puuid(&self, puuid: &str) -> Result<(), SquadOvError> {
         let account = self.api.get_account_by_puuid(puuid).await?;
         let mut tx = self.db.begin().await?;
-        db::store_riot_account(&mut tx, &account, &self.game).await?;
+        db::store_riot_account(&mut tx, &account).await?;
         tx.commit().await?;
         Ok(())
     }

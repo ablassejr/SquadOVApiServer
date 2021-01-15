@@ -18,11 +18,6 @@ use squadov_common::{
     KafkaCredentialKeyPair,
     riot::{
         api::{RiotApiHandler, RiotApiApplicationInterface, RiotConfig},
-        games::{
-            VALORANT_SHORTHAND,
-            LOL_SHORTHAND,
-            TFT_SHORTHAND,
-        },
     },
     rabbitmq::{RabbitMqInterface, RabbitMqConfig}
 };
@@ -186,9 +181,9 @@ impl ApiApplication {
         let tft_api = Arc::new(RiotApiHandler::new(config.riot.tft_api_key.clone()));
         let rabbitmq = Arc::new(RabbitMqInterface::new(&config.rabbitmq).await.unwrap());
 
-        let valorant_itf = Arc::new(RiotApiApplicationInterface::new(&config.rabbitmq.valorant_queue, valorant_api.clone(), rabbitmq.clone(), pool.clone(), VALORANT_SHORTHAND));
-        let lol_itf = Arc::new(RiotApiApplicationInterface::new(&config.rabbitmq.lol_queue, lol_api.clone(), rabbitmq.clone(), pool.clone(), LOL_SHORTHAND));
-        let tft_itf = Arc::new(RiotApiApplicationInterface::new(&config.rabbitmq.tft_queue, tft_api.clone(), rabbitmq.clone(), pool.clone(), TFT_SHORTHAND));
+        let valorant_itf = Arc::new(RiotApiApplicationInterface::new(&config.rabbitmq.valorant_queue, valorant_api.clone(), rabbitmq.clone(), pool.clone()));
+        let lol_itf = Arc::new(RiotApiApplicationInterface::new(&config.rabbitmq.lol_queue, lol_api.clone(), rabbitmq.clone(), pool.clone()));
+        let tft_itf = Arc::new(RiotApiApplicationInterface::new(&config.rabbitmq.tft_queue, tft_api.clone(), rabbitmq.clone(), pool.clone()));
 
         rabbitmq.add_listener(config.rabbitmq.valorant_queue.clone(), valorant_itf.clone()).await;
         rabbitmq.add_listener(config.rabbitmq.lol_queue.clone(), lol_itf.clone()).await;

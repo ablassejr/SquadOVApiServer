@@ -23,8 +23,10 @@ pub struct RiotSummoner {
     pub summoner_id: Option<String>,
     #[serde(rename="summonerName")]
     pub summoner_name: Option<String>,
-    #[serde(rename="lastBackfillTime")]
-    pub last_backfill_time: Option<DateTime<Utc>>,
+    #[serde(rename="lastBackfillLolTime")]
+    pub last_backfill_lol_time: Option<DateTime<Utc>>,
+    #[serde(rename="lastBackfillTftTime")]
+    pub last_backfill_tft_time: Option<DateTime<Utc>>,
 }
 
 #[derive(Deserialize)]

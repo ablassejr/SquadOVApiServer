@@ -34,7 +34,6 @@ pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start:
             ON tmp.match_uuid = tmi.match_uuid
         INNER JOIN squadov.riot_account_links AS ral
             ON ral.puuid = tmp.puuid
-                AND ral.game = 'tft'
         INNER JOIN squadov.users AS u
             ON u.id = ral.user_id
         LEFT JOIN squadov.vods AS vod

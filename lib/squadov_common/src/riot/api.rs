@@ -161,17 +161,15 @@ pub struct RiotApiApplicationInterface {
     queue: String,
     rmq: Arc<RabbitMqInterface>,
     db: Arc<PgPool>,
-    game: String,
 }
 
 impl RiotApiApplicationInterface {
-    pub fn new (queue: &str, api: Arc<RiotApiHandler>, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>, game: &str) -> Self {
+    pub fn new (queue: &str, api: Arc<RiotApiHandler>, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>) -> Self {
         Self {
             api,
             queue: String::from(queue),
             rmq,
             db,
-            game: String::from(game),
         }
     }
 }

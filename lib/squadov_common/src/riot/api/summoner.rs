@@ -24,7 +24,8 @@ impl super::RiotApiHandler {
             account_id: Some(summoner.account_id),
             summoner_id: Some(summoner.id),
             summoner_name: Some(summoner.name),
-            last_backfill_time: None,
+            last_backfill_lol_time: None,
+            last_backfill_tft_time: None,
         })
     }
 }
