@@ -293,7 +293,8 @@ async fn store_lol_match_participants(ex: &mut Transaction<'_, Postgres>, match_
                 magical_damage_taken,
                 true_damage_taken,
                 total_heal,
-                damage_self_mitigated
+                damage_self_mitigated,
+                lane
             )
             VALUES
         ".to_string()
@@ -358,7 +359,8 @@ async fn store_lol_match_participants(ex: &mut Transaction<'_, Postgres>, match_
                     {magical_damage_taken},
                     {true_damage_taken},
                     {total_heal},
-                    {damage_self_mitigated}
+                    {damage_self_mitigated},
+                    '{lane}'
                 )
             ",
                 match_uuid=match_uuid,
@@ -416,7 +418,8 @@ async fn store_lol_match_participants(ex: &mut Transaction<'_, Postgres>, match_
                 magical_damage_taken=p.stats.magical_damage_taken,
                 true_damage_taken=p.stats.true_damage_taken,
                 total_heal=p.stats.total_heal,
-                damage_self_mitigated=p.stats.damage_self_mitigated
+                damage_self_mitigated=p.stats.damage_self_mitigated,
+                lane=&p.timeline.lane,
             )
         );
         sql.push(",".to_string());

@@ -1,5 +1,5 @@
 use uuid::Uuid;
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
@@ -34,7 +34,7 @@ pub struct LolMatchDto {
     pub game_duration: i64, // seconds
     #[serde(rename="platformId")]
     pub platform_id: String,
-    #[serde(rename="gameCreation", deserialize_with="crate::parse_utc_time_from_seconds")]
+    #[serde(rename="gameCreation", deserialize_with="crate::parse_utc_time_from_milliseconds")]
     pub game_creation: Option<DateTime<Utc>>, // timestamp when champ select ended and loading screen appears
     #[serde(rename="seasonId")]
     pub season_id: i32,
@@ -124,6 +124,14 @@ pub struct LolParticipantDto {
     #[serde(rename="spell2Id")]
     pub spell2_id: i32,
     pub stats: LolParticipantStatsDto,
+    pub timeline: LolParticipantTimelineDto
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LolParticipantTimelineDto {
+    pub participant_id: i32,
+    pub lane: String
 }
 
 #[derive(Deserialize)]
@@ -304,4 +312,37 @@ pub struct LolMatchEventDto {
     pub assisting_participant_ids: Option<Vec<i32>>,
     pub building_type: Option<String>,
     pub victim_id: Option<i32>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LolMiniParticipantStats {
+    pub participant_id: i32,
+    pub champion_id: i32,
+    pub summoner_name: Option<String>,
+    pub team_id: i32,
+    pub kills: i32,
+    pub deaths: i32,
+    pub assists: i32,
+    pub total_damage_dealt: i64,
+    pub total_minions_killed: i32,
+    pub wards_placed: i32,
+    pub lane: String,
+    pub win: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LolPlayerMatchSummary {
+    pub match_uuid: Uuid,
+    pub game_creation: DateTime<Utc>,
+    pub game_duration: i64,
+    pub game_type: String,
+    pub queue_id: i32,
+    pub season_id: i32,
+    pub map_id: i32,
+    pub game_mode: String,
+    pub current_participant_id: i32,
+    pub participants: Vec<LolMiniParticipantStats>,
+    pub has_vod: bool,
 }

@@ -130,15 +130,18 @@ impl RabbitMqConnectionBundle {
                         match l.handle(&msg.data).await {
                             Ok(_) => (),
                             Err(err) => {
-                                log::warn!("Error in handling message: {:?}", err);
                                 should_nack = err == SquadOvError::Defer ||  err == SquadOvError::RateLimit;
+                                log::warn!("Error in handling message: {:?} - Nack {:?}", err, should_nack);
                             }
                         };
                     }    
                 }
 
                 if should_nack {
-                    match msg.acker.nack(BasicNackOptions::default()).await {
+                    match msg.acker.nack(BasicNackOptions{
+                        multiple: false,
+                        requeue: true,
+                    }).await {
                         Ok(_) => (),
                         Err(err) => log::warn!("Failed to nack RabbitMQ message: {:?}", err)
                     };

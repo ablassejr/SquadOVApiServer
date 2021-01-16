@@ -146,6 +146,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/user/{user_id}")
                                 .route("/backfill", web::post().to(v1::request_lol_match_backfill_handler))
+                                .service(
+                                    web::scope("/accounts/{puuid}")
+                                        .route("/matches", web::get().to(v1::list_lol_matches_for_user_handler))
+                                )
                         )
                 )
                 .service(
