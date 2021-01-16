@@ -338,6 +338,7 @@ pub struct LolPlayerMatchSummary {
     pub game_creation: DateTime<Utc>,
     pub game_duration: i64,
     pub game_type: String,
+    pub game_version: String,
     pub queue_id: i32,
     pub season_id: i32,
     pub map_id: i32,

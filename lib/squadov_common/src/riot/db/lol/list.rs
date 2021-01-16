@@ -21,6 +21,7 @@ pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start:
             lmi.season_id,
             lmi.map_id,
             lmi.game_mode,
+            lmi.game_version,
             lmpi.participant_id AS "current_participant_id!",
             (vod.video_uuid IS NOT NULL) AS "has_vod!"
         FROM squadov.lol_match_info AS lmi
@@ -56,6 +57,7 @@ pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start:
                 season_id: x.season_id,
                 map_id: x.map_id,
                 game_mode: x.game_mode,
+                game_version: x.game_version,
                 current_participant_id: x.current_participant_id,
                 participants: vec![],
                 has_vod: x.has_vod,
@@ -85,6 +87,7 @@ pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start:
         FROM squadov.lol_match_participants AS lmp
         LEFT JOIN squadov.lol_match_participant_identities AS lmpi
             ON lmpi.participant_id = lmp.participant_id
+                AND lmpi.match_uuid = lmp.match_uuid
         LEFT JOIN squadov.riot_accounts AS ra
             ON ra.summoner_id = lmpi.summoner_id
         WHERE lmp.match_uuid = ANY($1)
