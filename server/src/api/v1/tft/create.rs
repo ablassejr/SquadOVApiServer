@@ -6,7 +6,6 @@ use crate::api;
 use actix_web::{web, HttpResponse};
 use std::sync::Arc;
 use serde::Deserialize;
-use uuid::Uuid;
 
 #[derive(Deserialize,Debug)]
 pub struct TftCreateMatchInput {
@@ -14,11 +13,6 @@ pub struct TftCreateMatchInput {
     region: String,
     #[serde(rename="matchId")]
     match_id: i64,
-}
-
-#[derive(Deserialize,Debug)]
-pub struct TftMatchInput {
-    match_uuid: Uuid
 }
 
 #[derive(Deserialize,Debug)]
@@ -54,7 +48,7 @@ pub async fn create_tft_match_handler(app : web::Data<Arc<api::ApiApplication>>,
     Err(SquadOvError::InternalError(String::from("Multiple failed attempts to create match uuid for TFT match exceeded retry threshold")))
 }
 
-pub async fn finish_tft_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<TftMatchInput>) -> Result<HttpResponse, SquadOvError> {
+pub async fn finish_tft_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::TftMatchInput>) -> Result<HttpResponse, SquadOvError> {
     let link = db::get_tft_match_link_from_uuid(&*app.pool, &path.match_uuid).await?;
     app.tft_itf.request_obtain_tft_match_info(&link.platform, &link.region, link.match_id, true).await?;
     Ok(HttpResponse::Ok().finish())

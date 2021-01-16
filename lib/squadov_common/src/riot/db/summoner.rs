@@ -38,6 +38,7 @@ where
             ON ral.puuid = ra.puuid
         WHERE ral.user_id = $1
             AND ra.puuid = $2
+            AND ra.summoner_name IS NOT NULL
         ",
         user_id,
         puuid,
@@ -58,6 +59,7 @@ where
         INNER JOIN squadov.riot_account_links AS ral
             ON ral.puuid = ra.puuid
         WHERE ral.user_id = $1
+            AND ra.summoner_name IS NOT NULL
         ",
         user_id,
     )

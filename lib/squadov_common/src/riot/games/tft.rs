@@ -1,6 +1,7 @@
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
+use std::collections::HashMap;
 
 pub struct TftMatchLink {
     pub match_uuid: Uuid,
@@ -9,7 +10,14 @@ pub struct TftMatchLink {
     pub match_id: i64
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WrappedTftMatch {
+    pub data: TftMatchDto,
+    pub puuid_to_name: HashMap<String, String>
+}
+
+#[derive(Serialize,Deserialize)]
 pub struct TftMatchDto {
     pub info: TftInfoDto,
 }

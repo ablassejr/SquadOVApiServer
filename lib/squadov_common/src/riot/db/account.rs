@@ -50,6 +50,8 @@ where
             LEFT JOIN squadov.riot_accounts AS ra
                 ON ra.puuid = t.id
             WHERE ra.puuid IS NULL
+                AND ra.game_name IS NOT NULL
+                AND ra.tag_line IS NOT NULL
             "#,
             puuids,
         )
@@ -99,6 +101,8 @@ where
             ON ral.puuid = ra.puuid
         WHERE ral.user_id = $1
             AND ra.puuid = $2
+            AND ra.game_name IS NOT NULL
+            AND ra.tag_line IS NOT NULL
         ",
         user_id,
         puuid,
@@ -119,6 +123,8 @@ where
         INNER JOIN squadov.riot_account_links AS ral
             ON ral.puuid = ra.puuid
         WHERE ral.user_id = $1
+            AND ra.game_name IS NOT NULL
+            AND ra.tag_line IS NOT NULL
         ",
         user_id,
     )
