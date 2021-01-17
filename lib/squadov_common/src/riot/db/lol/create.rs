@@ -646,7 +646,7 @@ async fn store_lol_match_timeline_events<'a>(ex: &mut Transaction<'_, Postgres>,
                 killer_id=crate::sql_format_option_value(&e.base.killer_id),
                 assisting_participant_ids=crate::sql_format_integer_array(&e.base.assisting_participant_ids.as_ref().unwrap_or(&vec![])),
                 building_type=crate::sql_format_option_string(&e.base.building_type),
-                victim_id=crate::sql_format_option_string(&e.base.victim_id),
+                victim_id=crate::sql_format_option_value(&e.base.victim_id),
             )
         );
         sql.push(",".to_string());

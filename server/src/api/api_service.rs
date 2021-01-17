@@ -142,6 +142,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/match/{match_uuid}")
                                 .route("", web::post().to(v1::finish_lol_match_handler))
+                                .route("", web::get().to(v1::get_lol_match_handler))
                         )
                         .service(
                             web::scope("/user/{user_id}")

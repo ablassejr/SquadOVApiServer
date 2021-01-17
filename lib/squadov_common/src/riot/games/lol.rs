@@ -22,7 +22,7 @@ pub struct LolMatchReferenceDto {
     pub platform_id: String
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct LolMatchDto {
     #[serde(rename="gameId")]
     pub game_id: i64,
@@ -50,14 +50,14 @@ pub struct LolMatchDto {
     pub participants: Vec<LolParticipantDto>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct LolParticipantIdentityDto {
     #[serde(rename="participantId")]
     pub participant_id: i32,
     pub player: Option<LolPlayerDto>
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct LolPlayerDto {
     #[serde(rename="accountId")]
     pub account_id: String,
@@ -73,7 +73,7 @@ pub struct LolPlayerDto {
     pub platform_id: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct LolTeamStatsDto {
     #[serde(rename="towerKills")]
     pub tower_kills: i32,
@@ -103,7 +103,7 @@ pub struct LolTeamStatsDto {
     pub bans: Vec<LolTeamBansDto>
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct LolTeamBansDto {
     #[serde(rename="championId")]
     pub champion_id: i32,
@@ -111,7 +111,7 @@ pub struct LolTeamBansDto {
     pub pick_turn: i32
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct LolParticipantDto {
     #[serde(rename="participantId")]
     pub participant_id: i32,
@@ -127,14 +127,14 @@ pub struct LolParticipantDto {
     pub timeline: LolParticipantTimelineDto
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LolParticipantTimelineDto {
     pub participant_id: i32,
     pub lane: String
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LolParticipantStatsDto {
     // Player Identity
@@ -252,14 +252,14 @@ pub struct LolParticipantStatsDto {
     pub damage_self_mitigated: i64,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LolMatchTimelineDto {
     pub frames: Vec<LolMatchFrameDto>,
     pub frame_interval: i64
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LolMatchFrameDto {
     pub participant_frames: HashMap<String, LolMatchParticipantFrameDto>,
@@ -267,7 +267,7 @@ pub struct LolMatchFrameDto {
     pub timestamp: i64,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LolMatchParticipantFrameDto {
     pub participant_id: i32,
@@ -280,13 +280,13 @@ pub struct LolMatchParticipantFrameDto {
     pub position: Option<LolMatchPositionDto>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 pub struct LolMatchPositionDto {
     pub x: i32,
     pub y: i32,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize,Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LolMatchEventDto {
     pub lane_type: Option<String>,
@@ -346,4 +346,12 @@ pub struct LolPlayerMatchSummary {
     pub current_participant_id: i32,
     pub participants: Vec<LolMiniParticipantStats>,
     pub has_vod: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FullLolMatch {
+    #[serde(rename="match")]
+    pub lol_match: LolMatchDto,
+    pub timeline: LolMatchTimelineDto,
 }
