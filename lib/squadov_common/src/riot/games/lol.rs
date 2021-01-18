@@ -240,7 +240,7 @@ pub struct LolParticipantStatsDto {
     #[serde(default)]
     pub total_damage_taken: i64, 
     #[serde(default)]
-    pub physical_damage_token: i64,
+    pub physical_damage_taken: i64,
     #[serde(default)]
     pub magical_damage_taken: i64,
     #[serde(default)]

@@ -1,0 +1,2 @@
+ALTER TABLE lol_match_participants
+RENAME COLUMN physical_damage_token TO physical_damage_taken;

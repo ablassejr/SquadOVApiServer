@@ -322,7 +322,7 @@ async fn get_lol_match_participants(ex: &PgPool, match_uuid: &Uuid) -> Result<Ve
                         true_damage_dealt: x.true_damage_dealt,
                         // Damage Taken
                         total_damage_taken: x.total_damage_taken,
-                        physical_damage_token: x.physical_damage_token,
+                        physical_damage_taken: x.physical_damage_taken,
                         magical_damage_taken: x.magical_damage_taken,
                         true_damage_taken: x.true_damage_taken,
                         // Other Combat
