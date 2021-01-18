@@ -372,5 +372,24 @@ pub async fn get_lol_match(ex: &PgPool, match_uuid: &Uuid) -> Result<FullLolMatc
     Ok(FullLolMatch{
         lol_match: get_lol_match_info(&*ex, match_uuid).await?,
         timeline: get_lol_match_timeline(&*ex, match_uuid).await?,
+        user_id_to_participant_id: sqlx::query!(
+            "
+            SELECT ral.user_id, lmpi.participant_id
+            FROM squadov.lol_match_participant_identities AS lmpi
+            INNER JOIN squadov.riot_accounts AS ra
+                ON ra.summoner_id = lmpi.summoner_id
+            INNER JOIN squadov.riot_account_links AS ral
+                ON ral.puuid = ra.puuid
+            WHERE lmpi.match_uuid = $1
+            ",
+            match_uuid
+        )
+            .fetch_all(&*ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                (x.user_id, x.participant_id)
+            })
+            .collect(),
     })
 }

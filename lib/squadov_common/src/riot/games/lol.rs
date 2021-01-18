@@ -324,7 +324,7 @@ pub struct LolMiniParticipantStats {
     pub kills: i32,
     pub deaths: i32,
     pub assists: i32,
-    pub total_damage_dealt: i64,
+    pub total_damage_dealt_to_champions: i64,
     pub total_minions_killed: i32,
     pub wards_placed: i32,
     pub lane: String,
@@ -354,4 +354,5 @@ pub struct FullLolMatch {
     #[serde(rename="match")]
     pub lol_match: LolMatchDto,
     pub timeline: LolMatchTimelineDto,
+    pub user_id_to_participant_id: HashMap<i64, i32>,
 }
