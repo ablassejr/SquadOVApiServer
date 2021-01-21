@@ -71,7 +71,7 @@ impl super::RiotApiApplicationInterface {
         // We also need to obtain info about every player in the match to get their names since the TFT endpoint doesn't provide that info
         // off the bat and only provides PUUIDs.
         let puuids: Vec<String> = tft_match.info.participants.iter().map(|x| { x.puuid.clone() }).collect();
-        let missing_puuids = db::get_missing_riot_account_puuids(&*self.db, &puuids).await?;
+        let missing_puuids = db::get_missing_riot_summoner_puuids(&*self.db, &puuids).await?;
         for id in &missing_puuids {
             let mut tx = self.db.begin().await?;
             let summoner = self.api.get_tft_summoner_from_puuid(id, platform).await?;

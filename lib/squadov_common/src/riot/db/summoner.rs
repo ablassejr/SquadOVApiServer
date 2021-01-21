@@ -25,6 +25,32 @@ where
         .await?)
 }
 
+pub async fn get_missing_riot_summoner_puuids<'a, T>(ex: T, puuids: &[String]) -> Result<Vec<String>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            r#"
+            SELECT t.id AS "id!"
+            FROM UNNEST($1::VARCHAR[]) AS t(id)
+            LEFT JOIN squadov.riot_accounts AS ra
+                ON ra.puuid = t.id
+            WHERE ra.summoner_id IS NULL
+            "#,
+            puuids,
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                x.id
+            })
+            .collect()
+    )
+}
+
+
 pub async fn get_user_riot_summoner<'a, T>(ex: T, user_id: i64, puuid: &str) -> Result<RiotSummoner, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>

@@ -144,3 +144,31 @@ pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start:
 
     Ok(match_summaries)
 }
+
+pub async fn get_puuids_in_tft_match_from_user_uuids(ex: &PgPool, match_uuid: &Uuid, user_uuids: &[Uuid]) -> Result<Vec<(Uuid, String)>, SquadOvError> {
+    Ok(
+        sqlx::query!(
+            "
+            SELECT u.uuid, tmp.puuid
+            FROM squadov.tft_match_participants AS tmp
+            INNER JOIN squadov.riot_accounts AS ra
+                ON ra.puuid = tmp.puuid
+            INNER JOIN squadov.riot_account_links AS ral
+                ON ral.puuid = ra.puuid
+            INNER JOIN squadov.users AS u
+                ON u.id = ral.user_id
+            WHERE tmp.match_uuid = $1
+                AND u.uuid = ANY($2)
+            ",
+            match_uuid,
+            user_uuids,
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                (x.uuid, x.puuid)
+            })
+            .collect()
+    )
+}

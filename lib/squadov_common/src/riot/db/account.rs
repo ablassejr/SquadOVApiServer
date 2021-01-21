@@ -49,9 +49,8 @@ where
             FROM UNNEST($1::VARCHAR[]) AS t(id)
             LEFT JOIN squadov.riot_accounts AS ra
                 ON ra.puuid = t.id
-            WHERE ra.puuid IS NULL
-                AND ra.game_name IS NOT NULL
-                AND ra.tag_line IS NOT NULL
+            WHERE ra.game_name IS NULL
+                AND ra.tag_line IS NULL
             "#,
             puuids,
         )
