@@ -44,7 +44,7 @@ where
             match worker.work(&data.data).await {
                 Ok(_) => (),
                 Err(err) => match err {
-                    SquadOvError::Defer => {
+                    SquadOvError::Defer(_) => {
                         log::warn!("Not ready to process job - deferring.");
                         match queue.enqueue(data) {
                             Ok(_) => (),

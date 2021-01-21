@@ -148,6 +148,7 @@ impl super::RiotApiApplicationInterface {
         db::tick_riot_account_lol_backfill_time(&*self.db, account_id).await?;
 
         let backfill_matches = db::get_lol_matches_that_require_backfill(&*self.db, &matches).await?;
+        log::info!("\tLoL Backfill Count: {}", backfill_matches.len());
         for bm in &backfill_matches {
             self.request_obtain_lol_match_info(&bm.platform_id, bm.game_id, false).await?;
         }

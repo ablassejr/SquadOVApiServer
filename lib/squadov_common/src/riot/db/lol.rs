@@ -76,7 +76,9 @@ where
             LEFT JOIN squadov.lol_matches AS lol
                 ON lol.platform = t.platform
                     AND lol.match_id = t.game_id
-            WHERE lol.match_id IS NULL
+            LEFT JOIN squadov.lol_match_info AS lmi
+                ON lmi.match_uuid = lol.match_uuid
+            WHERE lmi.match_uuid IS NULL
             "#,
             &platforms,
             &game_ids

@@ -122,6 +122,7 @@ impl super::RiotApiApplicationInterface {
         db::tick_riot_puuid_tft_backfill_time(&*self.db, puuid).await?;
 
         let backfill_ids = db::get_tft_matches_that_require_backfill(&*self.db, &match_ids).await?;
+        log::info!("\tTFT Backfill Count: {}", backfill_ids.len());
         for (platform, game_id) in &backfill_ids {
             self.request_obtain_tft_match_info(&platform, region, *game_id, false).await?;
         }

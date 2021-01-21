@@ -57,7 +57,7 @@ impl squadov_common::JobWorker<VodFastifyJob> for VodFastifyWorker {
             let session_uri = data.session_uri.as_ref().unwrap();
             if !data.app.vod.is_vod_session_finished(&session_uri).await? {
                 log::info!("Defer Fastifying {:?}", &data.video_uuid);
-                return Err(squadov_common::SquadOvError::Defer);
+                return Err(squadov_common::SquadOvError::Defer(1000));
             }
         }
 

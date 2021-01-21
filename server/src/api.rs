@@ -179,7 +179,7 @@ impl ApiApplication {
         let valorant_api = Arc::new(RiotApiHandler::new(config.riot.valorant_api_key.clone()));
         let lol_api = Arc::new(RiotApiHandler::new(config.riot.lol_api_key.clone()));
         let tft_api = Arc::new(RiotApiHandler::new(config.riot.tft_api_key.clone()));
-        let rabbitmq = Arc::new(RabbitMqInterface::new(&config.rabbitmq).await.unwrap());
+        let rabbitmq = RabbitMqInterface::new(&config.rabbitmq).await.unwrap();
 
         let valorant_itf = Arc::new(RiotApiApplicationInterface::new(&config.rabbitmq.valorant_queue, valorant_api.clone(), rabbitmq.clone(), pool.clone()));
         let lol_itf = Arc::new(RiotApiApplicationInterface::new(&config.rabbitmq.lol_queue, lol_api.clone(), rabbitmq.clone(), pool.clone()));

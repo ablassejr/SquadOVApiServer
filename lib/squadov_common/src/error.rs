@@ -29,8 +29,8 @@ pub enum SquadOvError {
     InternalError(String),
     #[display(fmt = "[SquadovError] Duplicate Error")]
     Duplicate,
-    #[display(fmt = "[SquadovError] Defer")]
-    Defer,
+    #[display(fmt = "[SquadovError] Defer: {}", _0)]
+    Defer(i64),
     #[display(fmt = "[SquadovError] Rate Limit")]
     RateLimit,
 }
@@ -52,7 +52,7 @@ impl error::ResponseError for SquadOvError {
             SquadOvError::NotFound => StatusCode::NOT_FOUND,
             SquadOvError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             SquadOvError::Duplicate => StatusCode::BAD_REQUEST,
-            SquadOvError::Defer => StatusCode::SERVICE_UNAVAILABLE,
+            SquadOvError::Defer(_) => StatusCode::SERVICE_UNAVAILABLE,
             SquadOvError::RateLimit => StatusCode::TOO_MANY_REQUESTS,
         }
     }

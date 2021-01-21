@@ -142,6 +142,7 @@ impl RiotApiHandler {
         match resp.status() {
             StatusCode::OK => Ok(resp),
             StatusCode::TOO_MANY_REQUESTS => Err(SquadOvError::RateLimit),
+            StatusCode::NOT_FOUND => Err(SquadOvError::NotFound),
             _ => {
                 let url = String::from(resp.url().as_str());
                 Err(SquadOvError::InternalError(format!(
@@ -185,7 +186,14 @@ impl RabbitMqListener for RiotApiApplicationInterface {
             RiotApiTask::LolBackfill{account_id, platform} => self.backfill_user_lol_matches(&account_id, &platform).await?,
             RiotApiTask::LolMatch{platform, game_id} => self.obtain_lol_match_info(&platform, game_id).await?,
             RiotApiTask::TftBackfill{puuid, region} => self.backfill_user_tft_matches(&puuid, &region).await?,
-            RiotApiTask::TftMatch{platform, region, game_id} => self.obtain_tft_match_info(&platform, &region, game_id).await?,
+            RiotApiTask::TftMatch{platform, region, game_id} => match self.obtain_tft_match_info(&platform, &region, game_id).await {
+                Ok(_) => (),
+                Err(err) => match err {
+                    // Remap not found to defer because chances are the game hasn't finished yet so we need to wait a bit before trying again.
+                    SquadOvError::NotFound => return Err(SquadOvError::Defer(60 * 1000)),
+                    _ => return Err(err)
+                }
+            },
         };
         Ok(())
     }

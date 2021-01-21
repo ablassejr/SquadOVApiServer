@@ -6,7 +6,7 @@ use lapin::{
     Connection,
     ConnectionProperties,
     Channel,
-    options::{QueueDeclareOptions, BasicConsumeOptions, BasicPublishOptions, BasicAckOptions, BasicNackOptions, BasicQosOptions},
+    options::{QueueDeclareOptions, BasicConsumeOptions, BasicPublishOptions, BasicAckOptions, BasicQosOptions},
     types::FieldTable,
     Consumer,
 };
@@ -48,6 +48,8 @@ pub struct RabbitMqInterface {
     publish_queue: Arc<RwLock<VecDeque<RabbitMqPacket>>>,
     consumer: Arc<RabbitMqConnectionBundle>,
 }
+
+type RequeueCallbackFn = fn(&RabbitMqInterface, RabbitMqPacket, i64);
 
 impl RabbitMqConnectionBundle {
     fn num_channels(&self) -> usize {
@@ -110,7 +112,7 @@ impl RabbitMqConnectionBundle {
         Ok(())
     }
 
-    fn start_consumer(&self, queue: &str, mut consumer: Consumer) {
+    fn start_consumer(&self, queue: &str, mut consumer: Consumer, itf: Arc<RabbitMqInterface>, requeue_callback: RequeueCallbackFn) {
         let queue = String::from(queue);
         let listeners = self.listeners.clone();
         tokio::task::spawn(async move {
@@ -123,39 +125,41 @@ impl RabbitMqConnectionBundle {
                 let msg = msg.unwrap();
                 let current_listeners = listeners.read().await.clone();
                 let topic_listeners = current_listeners.get(&queue);
-                let mut should_nack: bool = false;
+                let mut requeue_ms: Option<i64> = None;
                 if topic_listeners.is_some() {
                     let topic_listeners = topic_listeners.unwrap();
                     for l in topic_listeners {
                         match l.handle(&msg.data).await {
                             Ok(_) => (),
                             Err(err) => {
-                                should_nack = err == SquadOvError::Defer ||  err == SquadOvError::RateLimit;
-                                log::warn!("Error in handling message: {:?} - Nack {:?}", err, should_nack);
-                            }
+                                log::warn!("Failure in processing RabbitMQ message: {:?}", err);
+                                match err {
+                                    SquadOvError::Defer(ms) => { requeue_ms = Some(ms); },
+                                    SquadOvError::RateLimit => { requeue_ms = Some(100); },
+                                    _ => {},
+                                }
+                            },
                         };
                     }    
                 }
 
-                if should_nack {
-                    match msg.acker.nack(BasicNackOptions{
-                        multiple: false,
-                        requeue: true,
-                    }).await {
-                        Ok(_) => (),
-                        Err(err) => log::warn!("Failed to nack RabbitMQ message: {:?}", err)
-                    };
-                } else {
-                    match msg.acker.ack(BasicAckOptions::default()).await {
-                        Ok(_) => (),
-                        Err(err) => log::warn!("Failed to ack RabbitMQ message: {:?}", err)
-                    };
+                match msg.acker.ack(BasicAckOptions::default()).await {
+                    Ok(_) => (),
+                    Err(err) => log::warn!("Failed to ack RabbitMQ message: {:?}", err)
+                };
+
+                if requeue_ms.is_some() {
+                    requeue_callback(&*itf, RabbitMqPacket{
+                        queue: queue.clone(),
+                        data: msg.data.clone(),
+                        priority: msg.properties.priority().unwrap_or(RABBITMQ_DEFAULT_PRIORITY), 
+                    }, requeue_ms.unwrap());
                 }
             }
         });
     }
 
-    pub async fn begin_consuming(&self) -> Result<(), SquadOvError> {
+    pub async fn begin_consuming(&self, itf: Arc<RabbitMqInterface>, requeue_callback: RequeueCallbackFn) -> Result<(), SquadOvError> {
         // Each channel gets its own thread to start consuming from every channel.
         // I think we should probably only limit ourselves to having 1 consumer channel anyway.
         for ch in &self.channels {
@@ -168,7 +172,7 @@ impl RabbitMqConnectionBundle {
                     BasicConsumeOptions::default(),
                     FieldTable::default(),
                 ).await?;
-                self.start_consumer(&self.config.valorant_queue, consumer);
+                self.start_consumer(&self.config.valorant_queue, consumer, itf.clone(), requeue_callback);
             }
 
             {
@@ -177,8 +181,9 @@ impl RabbitMqConnectionBundle {
                     "",
                     BasicConsumeOptions::default(),
                     FieldTable::default(),
+
                 ).await?;
-                self.start_consumer(&self.config.lol_queue, consumer);
+                self.start_consumer(&self.config.lol_queue, consumer, itf.clone(), requeue_callback);
             }
 
             {
@@ -188,7 +193,7 @@ impl RabbitMqConnectionBundle {
                     BasicConsumeOptions::default(),
                     FieldTable::default(),
                 ).await?;
-                self.start_consumer(&self.config.tft_queue, consumer);
+                self.start_consumer(&self.config.tft_queue, consumer, itf.clone(), requeue_callback);
             }
         }
 
@@ -197,7 +202,7 @@ impl RabbitMqConnectionBundle {
 }
 
 impl RabbitMqInterface {
-    pub async fn new(config: &RabbitMqConfig) -> Result<Self, SquadOvError> {
+    pub async fn new(config: &RabbitMqConfig) -> Result<Arc<Self>, SquadOvError> {
         log::info!("Connecting to RabbitMQ...");
         let publisher = Arc::new(RabbitMqConnectionBundle::connect(&config, 4).await?);
         let publish_queue = Arc::new(RwLock::new(VecDeque::new()));
@@ -225,14 +230,23 @@ impl RabbitMqInterface {
 
         log::info!("\tStart Consuming (RabbitMQ)...");
         let consumer = Arc::new(RabbitMqConnectionBundle::connect(&config, 1).await?);
-        consumer.begin_consuming().await?;
-
-        log::info!("RabbitMQ Successfully Connected");
-        Ok(Self {
+        let itf = Arc::new(Self {
             config: config.clone(),
             publish_queue,
-            consumer,
-        })
+            consumer: consumer.clone(),
+        });
+
+        consumer.begin_consuming(itf.clone(), RabbitMqInterface::publish_delay).await?;
+        log::info!("RabbitMQ Successfully Connected");
+        Ok(itf)
+    }
+
+    fn publish_delay(&self, packet: RabbitMqPacket, time_ms: i64) {
+        let queue = self.publish_queue.clone();
+        tokio::task::spawn(async move {
+            async_std::task::sleep(std::time::Duration::from_millis(time_ms as u64)).await;
+            queue.write().await.push_back(packet);
+        });
     }
 
     pub async fn add_listener(&self, queue: String, listener: Arc<dyn RabbitMqListener>) {

@@ -74,7 +74,9 @@ where
             LEFT JOIN squadov.tft_matches AS tft
                 ON tft.platform = t.platform
                     AND tft.match_id = t.game_id
-            WHERE tft.match_id IS NULL
+            LEFT JOIN squadov.tft_match_info AS tmi
+                ON tmi.match_uuid = tft.match_uuid
+            WHERE tmi.match_uuid IS NULL
             "#,
             &platforms,
             &game_ids
