@@ -14,36 +14,58 @@ use crate::{
 };
 use sqlx::{Transaction, Postgres};
 use uuid::Uuid;
+use chrono::{DateTime, Utc};
 
-async fn link_match_uuid_to_lol_match(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, platform: &str, game_id: i64) -> Result<(), SquadOvError> {
+async fn update_lol_match_game_start_time(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, game_start_time: Option<DateTime<Utc>>) -> Result<(), SquadOvError> {
     sqlx::query!(
         "
-        INSERT INTO squadov.lol_matches (
-            match_uuid,
-            platform,
-            match_id
-        )
-        VALUES (
-            $1,
-            $2,
-            $3
-        )
+        UPDATE squadov.lol_matches
+        SET game_start_time = LEAST($2, game_start_time)
+        WHERE match_uuid = $1
         ",
         match_uuid,
-        platform,
-        game_id
+        game_start_time
     )
         .execute(ex)
         .await?;
     Ok(())
 }
 
-pub async fn create_or_get_match_uuid_for_lol_match(ex: &mut Transaction<'_, Postgres>, platform: &str, game_id: i64) -> Result<Uuid, SquadOvError> {
+async fn link_match_uuid_to_lol_match(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, platform: &str, game_id: i64, game_start_time: Option<DateTime<Utc>>) -> Result<(), SquadOvError> {
+    sqlx::query!(
+        "
+        INSERT INTO squadov.lol_matches (
+            match_uuid,
+            platform,
+            match_id,
+            game_start_time
+        )
+        VALUES (
+            $1,
+            $2,
+            $3,
+            $4
+        )
+        ",
+        match_uuid,
+        platform,
+        game_id,
+        game_start_time,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
+pub async fn create_or_get_match_uuid_for_lol_match(ex: &mut Transaction<'_, Postgres>, platform: &str, game_id: i64, game_start_time: Option<DateTime<Utc>>) -> Result<Uuid, SquadOvError> {
     Ok(match super::get_lol_match_uuid_if_exists(&mut *ex, platform, game_id).await? {
-        Some(x) => x,
+        Some(x) => {
+            update_lol_match_game_start_time(&mut *ex, &x, game_start_time).await?;
+            x
+        },
         None => {
             let match_uuid = matches::create_new_match(&mut *ex).await?;
-            link_match_uuid_to_lol_match(&mut *ex, &match_uuid, platform, game_id).await?;
+            link_match_uuid_to_lol_match(&mut *ex, &match_uuid, platform, game_id, game_start_time).await?;
             match_uuid
         }
     })

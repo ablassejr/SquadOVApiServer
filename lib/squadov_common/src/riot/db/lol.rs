@@ -44,7 +44,7 @@ where
         sqlx::query_as!(
             LolMatchLink,
             "
-            SELECT *
+            SELECT match_uuid, platform, match_id
             FROM squadov.lol_matches
             WHERE match_uuid = $1
             ",

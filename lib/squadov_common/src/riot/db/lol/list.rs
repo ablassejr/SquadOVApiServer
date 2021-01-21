@@ -124,3 +124,31 @@ pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start:
 
     Ok(match_summaries)
 }
+
+pub async fn get_participant_ids_in_lol_match_from_user_uuids(ex: &PgPool, match_uuid: &Uuid, user_uuids: &[Uuid]) -> Result<Vec<(Uuid, i32)>, SquadOvError> {
+    Ok(
+        sqlx::query!(
+            "
+            SELECT u.uuid, lmpi.participant_id
+            FROM squadov.lol_match_participant_identities AS lmpi
+            INNER JOIN squadov.riot_accounts AS ra
+                ON ra.summoner_id = lmpi.summoner_id
+            INNER JOIN squadov.riot_account_links AS ral
+                ON ral.puuid = ra.puuid
+            INNER JOIN squadov.users AS u
+                ON u.id = ral.user_id
+            WHERE lmpi.match_uuid = $1
+                AND u.uuid = ANY($2)
+            ",
+            match_uuid,
+            user_uuids,
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                (x.uuid, x.participant_id)
+            })
+            .collect()
+    )
+}

@@ -10,39 +10,61 @@ use crate::{
 };
 use sqlx::{Transaction, Postgres};
 use uuid::Uuid;
+use chrono::{DateTime, Utc};
 
-async fn link_match_uuid_to_tft_match(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, platform: &str, region: &str, game_id: i64) -> Result<(), SquadOvError> {
+async fn update_tft_match_game_start_time(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, game_start_time: Option<DateTime<Utc>>) -> Result<(), SquadOvError> {
     sqlx::query!(
         "
-        INSERT INTO squadov.tft_matches (
-            match_uuid,
-            platform,
-            region,
-            match_id
-        )
-        VALUES (
-            $1,
-            $2,
-            $3,
-            $4
-        )
+        UPDATE squadov.tft_matches
+        SET game_start_time = LEAST($2, game_start_time)
+        WHERE match_uuid = $1
         ",
         match_uuid,
-        platform,
-        region,
-        game_id
+        game_start_time
     )
         .execute(ex)
         .await?;
     Ok(())
 }
 
-pub async fn create_or_get_match_uuid_for_tft_match(ex: &mut Transaction<'_, Postgres>, platform: &str, region: &str, game_id: i64) -> Result<Uuid, SquadOvError> {
+async fn link_match_uuid_to_tft_match(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, platform: &str, region: &str, game_id: i64, game_start_time: Option<DateTime<Utc>>) -> Result<(), SquadOvError> {
+    sqlx::query!(
+        "
+        INSERT INTO squadov.tft_matches (
+            match_uuid,
+            platform,
+            region,
+            match_id,
+            game_start_time
+        )
+        VALUES (
+            $1,
+            $2,
+            $3,
+            $4,
+            $5
+        )
+        ",
+        match_uuid,
+        platform,
+        region,
+        game_id,
+        game_start_time,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
+pub async fn create_or_get_match_uuid_for_tft_match(ex: &mut Transaction<'_, Postgres>, platform: &str, region: &str, game_id: i64, game_start_time: Option<DateTime<Utc>>) -> Result<Uuid, SquadOvError> {
     Ok(match super::get_tft_match_uuid_if_exists(&mut *ex, platform, game_id).await? {
-        Some(x) => x,
+        Some(x) => {
+            update_tft_match_game_start_time(&mut *ex, &x, game_start_time).await?;
+            x
+        },
         None => {
             let match_uuid = matches::create_new_match(&mut *ex).await?;
-            link_match_uuid_to_tft_match(&mut *ex, &match_uuid, platform, region, game_id).await?;
+            link_match_uuid_to_tft_match(&mut *ex, &match_uuid, platform, region, game_id, game_start_time).await?;
             match_uuid
         }
     })

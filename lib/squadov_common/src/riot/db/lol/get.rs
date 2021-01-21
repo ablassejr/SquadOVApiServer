@@ -120,8 +120,10 @@ async fn get_lol_match_timeline_frames(ex: &PgPool, match_uuid: &Uuid) -> Result
         frame_timestamps.into_iter().map(|timestamp| {
             LolMatchFrameDto{
                 timestamp,
-                participant_frames: HashMap::new(),
-                events: Vec::new(),
+                participant_frames: frame_map.remove(&timestamp).unwrap_or(vec![]).into_iter().map(|x| {
+                    (x.participant_id.to_string(), x)
+                }).collect(),
+                events: event_map.remove(&timestamp).unwrap_or(vec![]),
             }
         }).collect()
     )
@@ -391,5 +393,15 @@ pub async fn get_lol_match(ex: &PgPool, match_uuid: &Uuid) -> Result<FullLolMatc
                 (x.user_id, x.participant_id)
             })
             .collect(),
+        game_start_time: sqlx::query!(
+            "
+            SELECT lm.game_start_time
+            FROM squadov.lol_matches AS lm
+            WHERE lm.match_uuid = $1
+            ",
+            match_uuid
+        )
+            .fetch_one(&*ex)
+            .await?.game_start_time
     })
 }

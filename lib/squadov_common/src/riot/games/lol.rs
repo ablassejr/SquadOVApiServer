@@ -355,4 +355,5 @@ pub struct FullLolMatch {
     pub lol_match: LolMatchDto,
     pub timeline: LolMatchTimelineDto,
     pub user_id_to_participant_id: HashMap<i64, i32>,
+    pub game_start_time: Option<DateTime<Utc>>,
 }

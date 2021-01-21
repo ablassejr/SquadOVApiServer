@@ -91,7 +91,7 @@ impl super::RiotApiApplicationInterface {
         
         for _i in 0..2i32 {
             let mut tx = self.db.begin().await?;
-            let match_uuid = match db::create_or_get_match_uuid_for_lol_match(&mut tx, platform, game_id).await {
+            let match_uuid = match db::create_or_get_match_uuid_for_lol_match(&mut tx, platform, game_id, None).await {
                 Ok(x) => x,
                 Err(err) => match err {
                     SquadOvError::Duplicate => {
@@ -129,7 +129,7 @@ impl super::RiotApiApplicationInterface {
         let summoner = db::get_user_riot_summoner_from_name(&*self.db, user_id, summoner_name).await?;
         if summoner.last_backfill_lol_time.is_some() {
             let time_since_backfill = Utc::now() - summoner.last_backfill_lol_time.unwrap();
-            if time_since_backfill > Duration::days(3) {
+            if time_since_backfill < Duration::days(3) {
                 return Ok(());
             }
         }

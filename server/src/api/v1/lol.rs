@@ -13,3 +13,9 @@ use uuid::Uuid;
 pub struct LolMatchInput {
     match_uuid: Uuid
 }
+
+#[derive(Deserialize)]
+pub struct LolMatchUserInput {
+    match_uuid: Uuid,
+    user_id: i64
+}

@@ -6,6 +6,7 @@ use crate::api;
 use actix_web::{web, HttpResponse};
 use std::sync::Arc;
 use serde::Deserialize;
+use chrono::{DateTime, Utc};
 
 #[derive(Deserialize,Debug)]
 pub struct TftCreateMatchInput {
@@ -13,6 +14,8 @@ pub struct TftCreateMatchInput {
     region: String,
     #[serde(rename="matchId")]
     match_id: i64,
+    #[serde(rename="gameStartTime")]
+    game_start_time: DateTime<Utc>,
 }
 
 #[derive(Deserialize,Debug)]
@@ -30,7 +33,7 @@ pub struct TftBackfillPath {
 pub async fn create_tft_match_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<TftCreateMatchInput>) -> Result<HttpResponse, SquadOvError> {
     for _i in 0..2i32 {
         let mut tx = app.pool.begin().await?;
-        let match_uuid = match db::create_or_get_match_uuid_for_tft_match(&mut tx, &data.platform, &data.region, data.match_id).await {
+        let match_uuid = match db::create_or_get_match_uuid_for_tft_match(&mut tx, &data.platform, &data.region, data.match_id, Some(data.game_start_time.clone())).await {
             Ok(x) => x,
             Err(err) => match err {
                 squadov_common::SquadOvError::Duplicate => {

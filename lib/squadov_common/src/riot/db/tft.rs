@@ -41,7 +41,7 @@ where
         sqlx::query_as!(
             TftMatchLink,
             "
-            SELECT *
+            SELECT match_uuid, platform, region, match_id
             FROM squadov.tft_matches
             WHERE match_uuid = $1
             ",
