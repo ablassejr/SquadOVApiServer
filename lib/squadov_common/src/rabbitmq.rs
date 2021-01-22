@@ -21,6 +21,7 @@ const RABBITMQ_PREFETCH_COUNT: u16 = 8;
 #[derive(Deserialize,Debug,Clone)]
 pub struct RabbitMqConfig {
     pub amqp_url: String,
+    pub rso_queue: String,
     pub valorant_queue: String,
     pub lol_queue: String,
     pub tft_queue: String,
@@ -65,6 +66,12 @@ impl RabbitMqConnectionBundle {
         let mut channels: Vec<Channel> = Vec::new();
         for _i in 0..num_channels {
             let ch = connection.create_channel().await?;
+            ch.queue_declare(
+                &config.rso_queue,
+                QueueDeclareOptions::default(),
+                FieldTable::default(),
+            ).await?;
+
             ch.queue_declare(
                 &config.valorant_queue,
                 QueueDeclareOptions::default(),
@@ -164,6 +171,17 @@ impl RabbitMqConnectionBundle {
         // I think we should probably only limit ourselves to having 1 consumer channel anyway.
         for ch in &self.channels {
             ch.basic_qos(RABBITMQ_PREFETCH_COUNT, BasicQosOptions::default()).await?;
+
+            {
+                let consumer = ch.basic_consume(
+                    &self.config.rso_queue,
+                    "",
+                    BasicConsumeOptions::default(),
+                    FieldTable::default(),
+
+                ).await?;
+                self.start_consumer(&self.config.rso_queue, consumer, itf.clone(), requeue_callback);
+            }
 
             {
                 let consumer = ch.basic_consume(

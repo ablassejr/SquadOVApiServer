@@ -16,6 +16,7 @@ use sqlx::postgres::{PgPool};
 use reqwest::header;
 use tokio::sync::{Semaphore};
 use reqwest::{StatusCode, Response};
+use chrono::{DateTime, Utc};
 
 #[derive(Deserialize,Debug,Clone)]
 pub struct ApiKeyLimit {
@@ -32,6 +33,10 @@ pub struct RiotApiKeyConfig {
 
 #[derive(Deserialize,Debug,Clone)]
 pub struct RiotConfig {
+    pub rso_url: String,
+    pub rso_client_id: String,
+    pub rso_client_secret: String,
+    pub rso_api_key: RiotApiKeyConfig,
     pub valorant_api_key: RiotApiKeyConfig,
     pub lol_api_key: RiotApiKeyConfig,
     pub tft_api_key: RiotApiKeyConfig,
@@ -46,6 +51,12 @@ pub struct RiotApiHandler {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum RiotApiTask {
+    AccountMe{
+        access_token: String,
+        refresh_token: String,
+        expiration: DateTime<Utc>,
+        user_id: i64,
+    },
     Account{
         puuid: String
     },
@@ -158,6 +169,7 @@ impl RiotApiHandler {
 }
 
 pub struct RiotApiApplicationInterface {
+    config: RiotConfig,
     api: Arc<RiotApiHandler>,
     queue: String,
     rmq: Arc<RabbitMqInterface>,
@@ -165,8 +177,9 @@ pub struct RiotApiApplicationInterface {
 }
 
 impl RiotApiApplicationInterface {
-    pub fn new (queue: &str, api: Arc<RiotApiHandler>, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>) -> Self {
+    pub fn new (config: RiotConfig, queue: &str, api: Arc<RiotApiHandler>, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>) -> Self {
         Self {
+            config,
             api,
             queue: String::from(queue),
             rmq,
@@ -180,6 +193,7 @@ impl RabbitMqListener for RiotApiApplicationInterface {
     async fn handle(&self, data: &[u8]) -> Result<(), SquadOvError> {
         let task: RiotApiTask = serde_json::from_slice(data)?;
         match task {
+            RiotApiTask::AccountMe{access_token, refresh_token, expiration, user_id} => self.obtain_riot_account_from_access_token(&access_token, &refresh_token, &expiration, user_id).await?,
             RiotApiTask::Account{puuid} => self.obtain_riot_account_from_puuid(&puuid).await?,
             RiotApiTask::ValorantBackfill{puuid} => self.backfill_user_valorant_matches(&puuid).await?,
             RiotApiTask::ValorantMatch{match_id, shard} => self.obtain_valorant_match_info(&match_id, &shard).await?,

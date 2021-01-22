@@ -1,6 +1,7 @@
 pub mod api;
 pub mod db;
 pub mod games;
+pub mod rso;
 
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};

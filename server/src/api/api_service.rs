@@ -37,6 +37,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route(web::post().to(v1::refresh_user_session_handler))
                 )
                 .service(
+                    web::scope("/oauth")
+                        .route("/riot", web::post().to(v1::handle_riot_oauth_callback_handler))
+                )
+                .service(
                     // These are the only two endpoints where the user needs to provide a valid session to use.
                     web::scope("")
                         .wrap(auth::ApiSessionValidator{})
@@ -67,10 +71,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::resource("/notifications")
                                         .route(web::get().to(v1::get_current_user_notifications_handler))
                                 )
-                                .service(
-                                    web::resource("/localenc")
-                                        .route(web::get().to(v1::get_current_user_local_encryption_handler))
-                                )
                                 .route("/active", web::post().to(v1::mark_user_active_endpoint_handler))
                         )
                         .service(
@@ -97,6 +97,17 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         ))
                                         .route("", web::get().to(v1::get_user_squads_handler))
                                         .route("/invites", web::get().to(v1::get_user_squad_invites_handler))
+                                )
+                                .service(
+                                    web::scope("/oauth")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::UserSpecificAccessChecker{
+                                                obtainer: access::UserIdPathSetObtainer{
+                                                    key: "user_id"
+                                                },
+                                            }),
+                                        ))
+                                        .route("/rso", web::get().to(v1::get_user_rso_auth_url_handler))
                                 )
                                 .service(
                                     web::scope("/accounts")

@@ -27,7 +27,6 @@ pub async fn refresh_user_session_handler(app : web::Data<Arc<api::ApiApplicatio
     Ok(HttpResponse::Ok().json(SerializedUserSession{
         session_id: session.session_id.clone(),
         expiration: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(token.claims.exp, 0), Utc),
-        localenc: app.get_user_local_encryption_password(session.user.id).await?,
     }))
 }
 

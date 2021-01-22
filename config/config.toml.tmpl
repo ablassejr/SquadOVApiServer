@@ -40,6 +40,20 @@ secret= "${KAFKA_SERVER_SECRET}"
 fastify_threads = ${VOD_FASTIFY_THREADS}
 
 [riot]
+rso_url = "https://auth.riotgames.com/authorize?client_id=squadov&redirect_uri=https://app.squadov.gg/riot/oauth-callback&response_type=code&scope=openid+offline_access+cpid"
+rso_client_id = "squadov"
+rso_client_secret = "${RSO_CLIENT_SECRET}"
+
+[riot.rso_api_key]
+key = "${RSO_API_KEY}"
+
+[riot.rso_api_key.burst_limit]
+requests = 10
+seconds = 10
+
+[riot.rso_api_key.bulk_limit]
+requests = 500
+seconds = 600
 
 [riot.valorant_api_key]
 key = "${VALORANT_API_KEY}"
@@ -76,6 +90,7 @@ seconds = 120
 
 [rabbitmq]
 amqp_url = "${RABBITMQ_AMQP_URL}"
+rso_queue = "riot_rso"
 valorant_queue = "valorant_api"
 lol_queue = "lol_api"
 tft_queue = "tft_api"

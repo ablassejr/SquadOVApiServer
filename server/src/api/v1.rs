@@ -10,6 +10,7 @@ mod wow;
 mod kafka;
 mod lol;
 mod tft;
+mod oauth;
 
 pub use user::*;
 pub use matches::*;
@@ -23,3 +24,4 @@ pub use wow::*;
 pub use kafka::*;
 pub use lol::*;
 pub use tft::*;
+pub use oauth::*;

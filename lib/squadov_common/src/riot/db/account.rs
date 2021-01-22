@@ -3,6 +3,7 @@ use crate::{
     riot::{RiotAccount}
 };
 use sqlx::{Executor, Postgres};
+use chrono::{DateTime, Utc};
 
 pub async fn tick_riot_account_lol_backfill_time<'a, T>(ex: T, account_id: &str) -> Result<(), SquadOvError>
 where
@@ -153,7 +154,54 @@ where
         ",
         account.puuid,
         account.game_name,
-        account.puuid,
+        account.tag_line,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
+pub async fn link_riot_account_to_user<'a, T>(ex: T, puuid: &str, user_id: i64) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        INSERT INTO squadov.riot_account_links (
+            puuid,
+            user_id
+        )
+        VALUES (
+            $1,
+            $2
+        )
+        ON CONFLICT DO NOTHING
+        ",
+        puuid,
+        user_id
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
+pub async fn store_rso_for_riot_account<'a, T>(ex: T, puuid: &str, user_id: i64, access_token: &str, refresh_token: &str, expiration: &DateTime<Utc>) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        UPDATE squadov.riot_account_links
+        SET rso_access_token = $3,
+            rso_refresh_token = $4,
+            rso_expiration = $5
+        WHERE puuid = $1 AND user_id = $2
+        ",
+        puuid,
+        user_id,
+        access_token,
+        refresh_token,
+        expiration
     )
         .execute(ex)
         .await?;

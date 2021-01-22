@@ -138,7 +138,7 @@ impl From<reqwest::header::InvalidHeaderValue> for SquadOvError {
 
 impl From<openssl::error::ErrorStack> for SquadOvError {
     fn from(err: openssl::error::ErrorStack) -> Self {
-        return Self::InternalError(format!("OpenSSL Error {}", err))
+        return Self::InternalError(format!("OpenSSL Error {:?}", err))
     }
 }
 
