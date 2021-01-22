@@ -50,6 +50,10 @@ def handleCard(client, cardFolder):
     metadataFname = os.path.join(cardFolder, 'metadata.json')
     with open(metadataFname, encoding='utf-8') as f:
         metadata = json.load(f)
+
+    imageFname = os.path.join(cardFolder, 'card.png')
+    if os.path.exists(imageFname):
+        return True
     
     cardId = metadata["Dbf"]["Id"]
     print('\tID: ', cardId)
@@ -63,9 +67,6 @@ def handleCard(client, cardFolder):
 
     # data has two fields we care about: image and imageGold
     # which have pre-renderered cards we can use.
-    imageFname = os.path.join(cardFolder, 'card.png')
-    if os.path.exists(imageFname):
-        return True
 
     if "image" in data and data["image"] != '':
         image = requests.get(data["image"]).content
