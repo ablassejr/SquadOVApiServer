@@ -75,6 +75,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         )
                         .service(
                             web::scope("/{user_id}")
+                                .route("/features", web::get().to(v1::get_user_feature_flags_handler))
                                 .service(
                                     web::scope("/profile")
                                         .wrap(access::ApiAccess::new(

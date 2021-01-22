@@ -1,0 +1,5 @@
+CREATE TABLE user_feature_flags(
+    user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    enable_lol BOOLEAN NOT NULL DEFAULT FALSE,
+    enable_tft BOOLEAN NOT NULL DEFAULT FALSE
+);
