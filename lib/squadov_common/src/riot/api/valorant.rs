@@ -47,6 +47,7 @@ impl super::RiotApiApplicationInterface {
         let shard = self.api.get_active_shard_by_game_for_puuid(VALORANT_SHORTHAND, puuid).await?;
         db::set_user_account_shard(&*self.db, puuid, VALORANT_SHORTHAND, &shard).await?;
 
+        log::info!("Requesting Valorant Backfill: {} [{}]", puuid, shard);
         // Obtain a list of matches that the user played from the VALORANT API and then cross check that
         // with the matches we have stored. If the match doesn't exist then go ahead and request a low
         // priority match retrieval for that particular match.
@@ -74,6 +75,7 @@ impl super::RiotApiApplicationInterface {
         if db::check_valorant_match_details_exist(&*self.db, match_id).await? {
             return Ok(());
         }
+        log::info!("Obtaining Valorant Match Details: {} [{}]", match_id, shard);
 
         let valorant_match = self.api.get_valorant_match(match_id, shard).await?;
 

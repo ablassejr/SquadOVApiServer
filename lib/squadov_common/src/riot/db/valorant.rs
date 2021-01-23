@@ -58,8 +58,10 @@ where
             "
             SELECT EXISTS (
                 SELECT 1
-                FROM squadov.valorant_matches
-                WHERE match_id = $1
+                FROM squadov.valorant_matches AS vm
+                INNER JOIN squadov.valorant_match_uuid_link AS vmul
+                    ON vmul.match_uuid = vm.match_uuid
+                WHERE vmul.match_id = $1
             )
             "
         )
