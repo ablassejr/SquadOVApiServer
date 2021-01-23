@@ -193,13 +193,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 .service(
                     web::scope("/valorant")
                         .route("", web::post().to(v1::create_new_valorant_match_handler))
-                            .data(web::Json::<v1::InputValorantMatch>::configure(|cfg| {
-                                // Bump up the size limit on this endpoint for now because
-                                // the user will have to send the entire match detail. Not
-                                // sure how large that can be so setting a *really* large
-                                // limit here. This should be about 10 MB.
-                                cfg.limit(10 * 1024 * 1024)
-                            }))
                         .service(
                             // Need to include the user here for us to verify that that the user
                             // is associated with this valorant account.
