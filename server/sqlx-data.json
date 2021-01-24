@@ -286,6 +286,39 @@
       ]
     }
   },
+  "0f69b4405330cd2854ef09991a64677a35880305030a4a035d536c43f8f45b83": {
+    "query": "\n                    SELECT\n                        vprm.round,\n                        vprm.buy_time,\n                        vprm.round_time\n                    FROM squadov.valorant_player_round_metadata AS vprm\n                    WHERE vprm.match_uuid = $1\n                        AND vprm.user_id = $2\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "round",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "buy_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "round_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        true
+      ]
+    }
+  },
   "10494392946cf830ebc4a35add66c7065675b5ce92700fb8328af5b9b40a4f6f": {
     "query": "\n            SELECT\n                hmp.user_id,\n                hmp.player_match_id,\n                hmp.player_name,\n                hmp.card_back_id,\n                hmp.arena_wins,\n                hmp.arena_loss,\n                hmp.tavern_brawl_wins,\n                hmp.tavern_brawl_loss,\n                hmp.battlegrounds_rating,\n                hmp.duels_casual_rating,\n                hmp.duels_heroic_rating\n            FROM squadov.hearthstone_match_players AS hmp\n            INNER JOIN squadov.hearthstone_match_view AS hmv\n                ON hmv.view_uuid = hmp.view_uuid\n            WHERE hmv.match_uuid = $1 AND hmv.user_id = $2\n            ",
     "describe": {
@@ -2176,6 +2209,21 @@
       ]
     }
   },
+  "56d0eb49223e119fba9c8286f0576177766926f255495d983402a2474ac238e2": {
+    "query": "\n            INSERT INTO squadov.valorant_player_match_metadata (\n                match_uuid,\n                user_id,\n                start_time,\n                end_time\n            )\n            VALUES (\n                $1,\n                $2,\n                $3,\n                $4\n            )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8",
+          "Timestamptz",
+          "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "56d23ad07f9e653876d627230ccac4b1263cd44f5de8e7ba35ab712f9c402444": {
     "query": "\n            SELECT\n                round_num,\n                puuid,\n                loadout_value,\n                remaining_money,\n                spent_money,\n                weapon,\n                armor\n            FROM squadov.valorant_match_round_player_loadout\n            WHERE match_uuid = $1\n            ",
     "describe": {
@@ -2304,6 +2352,33 @@
       ]
     }
   },
+  "604519ec4402d5dc1d2dffa5017c0bfaa904635b03553349d705ed43bc2d5f5a": {
+    "query": "\n            SELECT\n                vpmm.start_time,\n                vpmm.end_time\n            FROM squadov.valorant_player_match_metadata AS vpmm\n            WHERE vpmm.match_uuid = $1\n                AND vpmm.user_id = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "start_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 1,
+          "name": "end_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
   "6075ace88bc5730573de5c38c7404377e7f4d3f312d539c7fbd41e398f9ad226": {
     "query": "\n        INSERT INTO squadov.tft_match_info (\n            match_uuid,\n            game_datetime,\n            game_length,\n            game_variation,\n            game_version,\n            queue_id,\n            tft_set_number\n        )\n        VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            $5,\n            $6,\n            $7\n        )\n        ",
     "describe": {
@@ -2320,6 +2395,39 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "617817b3f309e43b91fe7c8ca1c59664d781eb74f5f13cb4c787bbe4d2b082e3": {
+    "query": "\n                    SELECT\n                        vprm.round,\n                        vprm.buy_time,\n                        vprm.round_time\n                    FROM squadov.valorant_player_round_metadata AS vprm\n                    WHERE vprm.match_uuid = $1\n                        AND vprm.puuid = $2\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "round",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "buy_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "round_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        true
+      ]
     }
   },
   "61f04eafa23e0df022a0053c606a3569f537fdb477c992c07927c729e0a687dc": {
@@ -2604,6 +2712,51 @@
       "nullable": []
     }
   },
+  "70d034499c1898c8a1ad5decdbf612d0741a18d2d5818d95b876a171af52c2fb": {
+    "query": "\n                    SELECT\n                        vm.match_id,\n                        vprm.puuid,\n                        vprm.round,\n                        vprm.buy_time,\n                        vprm.round_time\n                    FROM squadov.valorant_player_round_metadata AS vprm\n                    INNER JOIN squadov.valorant_match_uuid_link AS vm\n                        ON vm.match_uuid = vprm.match_uuid\n                    WHERE vprm.match_uuid = $1\n                        AND vprm.puuid = $2\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "puuid",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "round",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "buy_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "round_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        true,
+        true
+      ]
+    }
+  },
   "71f1b70c78b433f1a136ab0583d19291b5f2d63231ea8a2c5c3846a4e6a1db7e": {
     "query": "\n                INSERT INTO squadov.matches (uuid)\n                VALUES ($1)\n                ",
     "describe": {
@@ -2614,6 +2767,33 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "7208f56ad9f4e0bd881d374d0e36d35f4874f093dc8a06ec6a83bf8abe9cc6a6": {
+    "query": "\n            SELECT\n                vpmm.start_time,\n                vpmm.end_time\n            FROM squadov.valorant_player_match_metadata AS vpmm\n            WHERE vpmm.match_uuid = $1\n                AND vpmm.puuid = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "start_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 1,
+          "name": "end_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
     }
   },
   "738220b5cc48c2d7b2e4f3a4a51d937b9900ce1454d527a9b378abf9f50dc2da": {
@@ -4377,6 +4557,45 @@
         ]
       },
       "nullable": [
+        false
+      ]
+    }
+  },
+  "a95848b9038f3608c60d0fccaee911ce58115271e5512bda46d594830a14ee10": {
+    "query": "\n            SELECT\n                vm.match_id,\n                vpmm.start_time,\n                vpmm.end_time,\n                vpmm.puuid\n            FROM squadov.valorant_player_match_metadata AS vpmm\n            INNER JOIN squadov.valorant_match_uuid_link AS vm\n                ON vm.match_uuid = vpmm.match_uuid\n            WHERE vpmm.match_uuid = $1\n                AND vpmm.puuid = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "start_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "end_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "puuid",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
         false
       ]
     }
