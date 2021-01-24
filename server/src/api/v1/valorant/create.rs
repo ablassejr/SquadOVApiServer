@@ -6,23 +6,28 @@ use squadov_common::{
     }
 };
 use crate::api;
-use actix_web::{web, HttpResponse};
+use crate::api::auth::SquadOVSession;
+use actix_web::{web, HttpResponse, HttpRequest};
 use std::sync::Arc;
 use serde::{Deserialize};
 use sqlx::{Transaction, Postgres};
+use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct InputValorantMatch {
     // Valorant unique ID
     #[serde(rename = "matchId")]
     pub match_id: String,
-    pub puuid: String,
+    #[serde(rename = "gameName")]
+    pub game_name: String,
+    #[serde(rename = "tagLine")]
+    pub tag_line: String,
     #[serde(rename = "playerData")]
     pub player_data: super::ValorantPlayerMatchMetadata
 }
 
 impl api::ApiApplication {
-    async fn insert_valorant_player_round_data(&self, tx : &mut Transaction<'_, Postgres>, data: &[super::ValorantPlayerRoundMetadata]) -> Result<(), SquadOvError> {
+    async fn insert_valorant_player_round_data(&self, tx : &mut Transaction<'_, Postgres>, match_uuid: &Uuid, puuid: &str, data: &[super::ValorantPlayerRoundMetadata]) -> Result<(), SquadOvError> {
         if data.is_empty() {
             return Ok(())
         }
@@ -47,8 +52,8 @@ impl api::ApiApplication {
                 {buy_time},
                 {round_time}
             )",
-                match_uuid=&m.match_uuid,
-                puuid=&m.puuid,
+                match_uuid=&match_uuid.to_string(),
+                puuid=puuid,
                 round=m.round,
                 buy_time=squadov_common::sql_format_option_some_time(m.buy_time.as_ref()),
                 round_time=squadov_common::sql_format_option_some_time(m.round_time.as_ref())
@@ -62,7 +67,7 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    async fn insert_valorant_player_data(&self, tx : &mut Transaction<'_, Postgres>, player_data: &super::ValorantPlayerMatchMetadata) -> Result<(), SquadOvError> {
+    async fn insert_valorant_player_data(&self, tx : &mut Transaction<'_, Postgres>, match_uuid: &Uuid, puuid: &str, player_data: &super::ValorantPlayerMatchMetadata) -> Result<(), SquadOvError> {
         sqlx::query!(
             "
             INSERT INTO squadov.valorant_player_match_metadata (
@@ -78,22 +83,31 @@ impl api::ApiApplication {
                 $4
             )
             ",
-            &player_data.match_uuid,
-            &player_data.puuid,
+            match_uuid,
+            puuid,
             &player_data.start_time,
             &player_data.end_time
         )
             .execute(&mut *tx)
             .await?;
 
-        self.insert_valorant_player_round_data(tx, &player_data.rounds).await?;
+        self.insert_valorant_player_round_data(tx, match_uuid, puuid, &player_data.rounds).await?;
         Ok(())
     }
 }
 
-pub async fn create_new_valorant_match_handler(data : web::Json<InputValorantMatch>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
+pub async fn create_new_valorant_match_handler(data : web::Json<InputValorantMatch>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return Err(SquadOvError::Unauthorized),
+    };
+
+    // Make sure the account is valid.
+    let account = db::get_user_riot_account_gamename_tagline(&*app.pool, session.user.id, &data.game_name, &data.tag_line).await?;
+
     // Need to try multiple times to create a unique match uuid for the match in question.
-    let shard = db::get_user_account_shard(&*app.pool, &data.puuid, games::VALORANT_SHORTHAND).await?;
+    let shard = db::get_user_account_shard(&*app.pool, &account.puuid, games::VALORANT_SHORTHAND).await?;
 
     for _i in 0..2i32 {
         let mut tx = app.pool.begin().await?;
@@ -110,7 +124,7 @@ pub async fn create_new_valorant_match_handler(data : web::Json<InputValorantMat
                 _ => return Err(err)
             }
         };
-        app.insert_valorant_player_data(&mut tx, &data.player_data).await?;
+        app.insert_valorant_player_data(&mut tx, &match_uuid, &account.puuid, &data.player_data).await?;
         tx.commit().await?;
 
         app.valorant_itf.request_obtain_valorant_match_info(&data.match_id, &shard, true).await?;

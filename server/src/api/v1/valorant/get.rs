@@ -28,8 +28,6 @@ pub struct GetValorantPlayerMatchMetadataInput {
 }
 
 struct RawValorantPlayerMatchMetadata {
-    pub match_uuid: Uuid,
-    pub puuid: String,
     pub start_time: DateTime<Utc>,
     pub end_time: DateTime<Utc>
 }
@@ -60,10 +58,12 @@ impl api::ApiApplication {
         match sqlx::query_as!(
             RawValorantPlayerMatchMetadata,
             r#"
-            SELECT *
-            FROM squadov.valorant_player_match_metadata
-            WHERE match_uuid = $1
-                AND puuid = $2
+            SELECT
+                vpmm.start_time,
+                vpmm.end_time
+            FROM squadov.valorant_player_match_metadata AS vpmm
+            WHERE vpmm.match_uuid = $1
+                AND vpmm.puuid = $2
             "#,
             match_uuid,
             puuid
@@ -72,20 +72,21 @@ impl api::ApiApplication {
             .await?
         {
             Some(x) => Ok(Some(super::ValorantPlayerMatchMetadata{
-                match_uuid: x.match_uuid,
-                puuid: x.puuid,
                 start_time: x.start_time,
                 end_time: x.end_time,
                 rounds: sqlx::query_as!(
                     super::ValorantPlayerRoundMetadata,
                     r#"
-                    SELECT *
-                    FROM squadov.valorant_player_round_metadata
-                    WHERE match_uuid = $1
-                        AND puuid = $2
+                    SELECT
+                        vprm.round,
+                        vprm.buy_time,
+                        vprm.round_time
+                    FROM squadov.valorant_player_round_metadata AS vprm
+                    WHERE vprm.match_uuid = $1
+                        AND vprm.puuid = $2
                     "#,
                     match_uuid,
-                    puuid
+                    puuid,
                 )
                     .fetch_all(&*self.pool)
                     .await?,
@@ -119,7 +120,6 @@ pub async fn get_valorant_player_match_metadata_handler(data: web::Path<GetValor
 
 #[derive(Deserialize)]
 pub struct ValorantMatchUserVodAccessInput {
-    #[serde(rename="matchUuid")]
     pub match_uuid: Uuid,
     pub user_id: i64
 }

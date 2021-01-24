@@ -6,13 +6,9 @@ mod get;
 
 use chrono::{DateTime, Utc};
 use serde::{Serialize, Deserialize};
-use uuid::Uuid;
 
 #[derive(Serialize,Deserialize)]
 pub struct ValorantPlayerRoundMetadata {
-    #[serde(rename = "matchUuid")]
-    pub match_uuid: Uuid,
-    pub puuid: String,
     pub round: i32,
     #[serde(rename = "buyTime")]
     pub buy_time: Option<DateTime<Utc>>,
@@ -22,9 +18,6 @@ pub struct ValorantPlayerRoundMetadata {
 
 #[derive(Serialize,Deserialize)]
 pub struct ValorantPlayerMatchMetadata {
-    #[serde(rename = "matchUuid")]
-    pub match_uuid: Uuid,
-    pub puuid: String,
     #[serde(rename = "startTime")]
     pub start_time: DateTime<Utc>,
     #[serde(rename = "endTime")]
