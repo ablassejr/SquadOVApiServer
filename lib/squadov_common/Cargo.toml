@@ -21,7 +21,7 @@ serde_json = "1.0.59"
 percent-encoding = "2.1.0"
 sqlx = { path="../../deps/cargo/sqlx", version = "0.4.0-beta.1", default-features = false, features = [ "bigdecimal", "runtime-async-std", "macros", "postgres", "json", "ipnetwork", "uuid", "chrono", "offline"] }
 ipnetwork = { version = "0.17.0", features = ["serde"] }
-juniper = { git = "https://github.com/graphql-rust/juniper", rev = "cd66bdb", features = ["scalar-naivetime"]}
+juniper = { version = "0.15.2", features = ["scalar-naivetime"]}
 hex = "0.4.2"
 base64 = "0.13.0"
 sha2 = "0.9.1"

@@ -18,6 +18,7 @@ COPY tools /squadov/tools
 COPY deps /squadov/deps
 COPY config/$GCP_PROJECT.toml /squadov/config/config.toml
 COPY Cargo.toml /squadov/
+COPY Cargo.lock /squadov/
 COPY devops/gcp /squadov/gcp
 
 WORKDIR /squadov

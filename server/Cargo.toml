@@ -34,7 +34,7 @@ hex = "0.4.2"
 openssl = "0.10"
 openssl-sys = "0.9.58"
 percent-encoding = "2.1.0"
-juniper = { git = "https://github.com/graphql-rust/juniper", rev = "cd66bdb", features = ["scalar-naivetime"]}
+juniper = { version = "0.15.2", features = ["scalar-naivetime"]}
 ipnetwork = { version = "0.17.0", features = ["serde"] }
 squadov_common = { path="../lib/squadov_common" }
 flate2 = "1.0"
