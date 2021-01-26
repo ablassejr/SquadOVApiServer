@@ -76,6 +76,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route(web::get().to(v1::get_current_user_notifications_handler))
                                 )
                                 .route("/active", web::post().to(v1::mark_user_active_endpoint_handler))
+                                .route("/playtime", web::get().to(v1::get_user_recorded_playtime_handler))
                         )
                         .service(
                             web::scope("/{user_id}")
