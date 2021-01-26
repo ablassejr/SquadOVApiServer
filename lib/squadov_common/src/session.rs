@@ -38,4 +38,5 @@ where
 #[async_trait]
 pub trait SessionVerifier {
     async fn verify_session_id_for_user(&self, user_id: i64, session_id: String) -> Result<bool, SquadOvError>;
+    async fn verify_session_access_to_users(&self, session_id: String, user_ids: &[i64]) -> Result<bool, SquadOvError>;
 }

@@ -61,7 +61,14 @@ struct UserActivityDisconnect {
     pub id: Uuid,
 }
 
-// Message for when the user wants to subscribe to the status of another user.
+// Request message for when the user wants to subscribe to the status of another user (can be denied).
+#[derive(Message)]
+#[rtype(result="()")]
+struct UserActivitySubscribeRequest {
+    pub user_id: Vec<i64>,
+}
+
+// Authoritative message for when the user wants to subscribe to the status of another user.
 #[derive(Message)]
 #[rtype(result="UserActivitySubscribeResponse")]
 struct UserActivitySubscribe {
@@ -196,6 +203,7 @@ where
     pub watched_users: HashSet<Uuid>,
     pub tracker: actix::Addr<UserActivityStatusTracker>,
     pub verifier: Arc<T>,
+    pub squadov_session: Option<String>,
 }
 
 #[derive(Message)]
@@ -220,7 +228,8 @@ where
             last_heartbeat: Utc::now(),
             watched_users: HashSet::new(),
             tracker,
-            verifier
+            verifier,
+            squadov_session: None,
         }
     }
 
@@ -332,22 +341,12 @@ where
 
                 match parsed_message {
                     UserActivityMessage::Subscribe{users} => {
-                        self.tracker.send(UserActivitySubscribe{
-                            session_id: self.id.clone(),
+                        // Two step process here: 1) we need to ensure that the session has
+                        // access to the requested users before we 2) actually subscribe them
+                        // to the users' statuses.
+                        ctx.notify(UserActivitySubscribeRequest{
                             user_id: users,
-                        })
-                            .into_actor(self)
-                            .then(|res, _act, ctx| {
-                                match res {
-                                    Ok(x) => ctx.text(serde_json::to_string(&x).unwrap_or(String::from("ERROR"))),
-                                    Err(err) => {
-                                        log::warn!("Failed to subscribe to user status: {:?}", err);
-                                        ctx.text(String::from("ERROR"));
-                                    }
-                                }
-                                fut::ready(())
-                            })
-                            .wait(ctx);
+                        });
                     },
                     UserActivityMessage::Unsubscribe{users} => self.tracker.do_send(UserActivityUnsubscribe{
                         session_id: self.id.clone(),
@@ -381,6 +380,60 @@ where
     }
 }
 
+impl<T> actix::Handler<UserActivitySubscribeRequest> for UserActivitySession<T>
+where
+    T: SessionVerifier + 'static
+{
+    type Result = ();
+
+    fn handle(&mut self, msg: UserActivitySubscribeRequest, ctx: &mut Self::Context) {
+        if self.squadov_session.is_none() {
+            log::info!("Attempting to subscribe to user activity without an active session.");
+            return;
+        }
+
+        let verifier = self.verifier.clone();
+        let session_id = self.squadov_session.as_ref().unwrap().clone();
+        let user_ids = msg.user_id.clone();
+        let future = async move {
+            verifier.verify_session_access_to_users(session_id, &user_ids).await
+        };
+            
+        future
+            .into_actor(self)
+            .then(|res, act, ctx| {
+                match res {
+                    Ok(v) => {
+                        if v {
+                            act.tracker.send(UserActivitySubscribe{
+                                session_id: act.id.clone(),
+                                user_id: msg.user_id,
+                            })
+                                .into_actor(act)
+                                .then(|ires, _act, ictx| {
+                                    match ires {
+                                        Ok(x) => ictx.text(serde_json::to_string(&x).unwrap_or(String::from("ERROR"))),
+                                        Err(err) => {
+                                            log::warn!("Failed to subscribe to user status: {:?}", err);
+                                            ictx.text(String::from("ERROR"));
+                                        }
+                                    }
+                                    fut::ready(())
+                                })
+                                .wait(ctx);
+                        }
+                    },
+                    Err(err) => {
+                        log::warn!("Failed to subscribe to user activity: {:?}", err);
+                    }
+                }
+                fut::ready(())
+            })
+            .wait(ctx);
+    }
+}
+
+
 impl<T> actix::Handler<UserActivityChange> for UserActivitySession<T>
 where
     T: SessionVerifier + 'static
@@ -405,6 +458,8 @@ where
     fn handle(&mut self, msg: WebsocketAuthenticationRequest, ctx: &mut Self::Context) {
         let verifier = self.verifier.clone();
         let user_id = self.user_id;
+        self.squadov_session = Some(msg.session_id.clone());
+
         let future = async move {
             verifier.verify_session_id_for_user(user_id, msg.session_id).await
         };
