@@ -1,3 +1,5 @@
+pub mod status;
+
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 

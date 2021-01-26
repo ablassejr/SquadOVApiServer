@@ -49,6 +49,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 )
         )
         .service(
+            web::scope("/ws")
+                .route("/status/{user_id}", web::get().to(v1::get_user_status_handler))
+        )
+        .service(
             web::scope("/v1")
                 .wrap(auth::ApiSessionValidator{})
                 .service(

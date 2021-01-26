@@ -213,3 +213,9 @@ impl From<lapin::Error> for SquadOvError {
         return Self::InternalError(format!("AMQP {}", err))
     }
 }
+
+impl From<actix_web::Error> for SquadOvError {
+    fn from(err: actix_web::Error) -> Self {
+        return Self::InternalError(format!("Actix Web {}", err))
+    }
+}

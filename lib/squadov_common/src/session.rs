@@ -2,6 +2,7 @@ use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use crate::SquadOvError;
 use sqlx::{Executor, Postgres};
+use async_trait::async_trait;
 
 #[derive(Serialize)]
 pub struct SerializedUserSession {
@@ -32,4 +33,9 @@ where
     )
         .fetch_one(ex)
         .await?.valid)
+}
+
+#[async_trait]
+pub trait SessionVerifier {
+    async fn verify_session_id_for_user(&self, user_id: i64, session_id: String) -> Result<bool, SquadOvError>;
 }

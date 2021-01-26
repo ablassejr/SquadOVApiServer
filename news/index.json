@@ -1,0 +1,16 @@
+[
+    {
+        "title": "SquadOV v0.5.3",
+        "description": "Hotfix to address issues with VOD recordings.",
+        "timestamp": 1611513600000,
+        "data": "data/update-v0.5.3.md",
+        "type": "hotfix"
+    },
+    {
+        "title": "SquadOV v0.5.0",
+        "description": "Link your Riot account, League of Legends, and Teamfight Tactics!",
+        "timestamp": 1611427604000,
+        "data": "data/update-v0.5.0.md",
+        "type": "update"
+    }
+]
