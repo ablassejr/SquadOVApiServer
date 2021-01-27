@@ -199,7 +199,11 @@ impl api::ApiApplication {
             user_id
         )
             .fetch_all(&*self.pool)
-            .await?)
+            .await?
+            .into_iter()
+            .map(|x| { x.hide_email() })
+            .collect()
+        )
     }
 
     pub async fn get_squad_invites(&self, squad_id: i64) -> Result<Vec<SquadInvite>, SquadOvError> {
@@ -226,7 +230,11 @@ impl api::ApiApplication {
             squad_id
         )
             .fetch_all(&*self.pool)
-            .await?)
+            .await?
+            .into_iter()
+            .map(|x| { x.hide_email() })
+            .collect()
+        )
     }
 
     pub fn generate_invite_accept_reject_url(&self, invite_uuid: &Uuid) -> (String, String) {

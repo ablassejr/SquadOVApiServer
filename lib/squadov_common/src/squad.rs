@@ -2,6 +2,7 @@ pub mod status;
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Serialize)]
 pub struct SquadOvSquad {
@@ -51,4 +52,36 @@ pub struct SquadInvite {
     pub invite_uuid: uuid::Uuid,
     #[serde(rename="inviterUsername")]
     pub inviter_username: String
+}
+
+const EMAIL_HIDE_TOKEN: &'static str = "*******";
+
+impl SquadInvite {
+    pub fn hide_email(mut self) -> Self {
+        // Modify the email address so that it should be
+        // fairly obvious who the user sent the email to without
+        // revealing the entire email address.
+        let email_tokens: Vec<&str> = self.email.split("@").collect();
+        if email_tokens.len() >= 2 {
+            let username: String = email_tokens[0..email_tokens.len()-1].join("@");
+            let username: Vec<&str> = username.graphemes(true).collect();
+            let hidden_username = if username.len() > 1 {
+                format!(
+                    "{}{}{}",
+                    username[0],
+                    username[1],
+                    EMAIL_HIDE_TOKEN
+                )
+            } else {
+                String::from(EMAIL_HIDE_TOKEN)
+            };
+
+            self.email = format!(
+                "{}@{}",
+                hidden_username,
+                email_tokens.last().unwrap()
+            );
+        }
+        self
+    }
 }
