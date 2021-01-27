@@ -19,7 +19,9 @@ use squadov_common::{
     riot::{
         api::{RiotApiHandler, RiotApiApplicationInterface, RiotConfig},
     },
-    rabbitmq::{RabbitMqInterface, RabbitMqConfig}
+    rabbitmq::{RabbitMqInterface, RabbitMqConfig},
+    EmailConfig,
+    EmailClient,
 };
 use url::Url;
 use std::vec::Vec;
@@ -122,6 +124,11 @@ pub struct KafkaConfig {
 }
 
 #[derive(Deserialize,Debug,Clone)]
+pub struct SquadOvConfig {
+    pub app_url: String,
+}
+
+#[derive(Deserialize,Debug,Clone)]
 pub struct ApiConfig {
     fusionauth: fusionauth::FusionAuthConfig,
     pub gcp: squadov_common::GCPConfig,
@@ -133,6 +140,8 @@ pub struct ApiConfig {
     pub vod: VodConfig,
     pub riot: RiotConfig,
     pub rabbitmq: RabbitMqConfig,
+    pub email: EmailConfig,
+    pub squadov: SquadOvConfig,
 }
 
 struct ApiClients {
@@ -155,6 +164,7 @@ pub struct ApiApplication {
     pub valorant_itf: Arc<RiotApiApplicationInterface>,
     pub lol_itf: Arc<RiotApiApplicationInterface>,
     pub tft_itf: Arc<RiotApiApplicationInterface>,
+    pub email: Arc<EmailClient>,
 }
 
 impl ApiApplication {
@@ -212,6 +222,7 @@ impl ApiApplication {
             valorant_itf,
             lol_itf,
             tft_itf,
+            email: Arc::new(EmailClient::new(&config.email)),
         }
     }
 }

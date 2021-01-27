@@ -19,6 +19,7 @@ pub mod analytics;
 pub mod rabbitmq;
 pub mod matches;
 pub mod games;
+pub mod email;
 
 pub use error::*;
 pub use parse::*;
@@ -36,6 +37,7 @@ pub use session::*;
 pub use wow::*;
 pub use kafka::*;
 pub use games::*;
+pub use email::*;
 
 #[macro_use]
 extern crate lazy_static;

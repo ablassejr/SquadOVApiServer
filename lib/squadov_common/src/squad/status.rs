@@ -166,7 +166,6 @@ impl actix::Handler<UserActivitySubscribe> for UserActivityStatusTracker {
 
     fn handle(&mut self, msg: UserActivitySubscribe, _ctx: &mut Self::Context) -> Self::Result {
         let mut status = HashMap::new();
-        log::info!("Handle sub: {} {:?}", &msg.session_id, msg.user_id);
         for user in &msg.user_id {
             if !self.per_user_sessions.contains_key(user) {
                 self.per_user_sessions.insert(user.clone(), HashSet::new());

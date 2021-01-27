@@ -39,8 +39,9 @@ pub struct SquadInvite {
     #[serde(rename="squadId")]
     pub squad_id: i64,
     #[serde(rename="userId")]
-    pub user_id: i64,
-    pub username: String,
+    pub user_id: Option<i64>,
+    pub username: Option<String>,
+    pub email: String,
     pub joined: bool,
     #[serde(rename="responseTime")]
     pub response_time: Option<DateTime<Utc>>,
