@@ -219,3 +219,9 @@ impl From<actix_web::Error> for SquadOvError {
         return Self::InternalError(format!("Actix Web {}", err))
     }
 }
+
+impl From<hex::FromHexError> for SquadOvError {
+    fn from(err: hex::FromHexError) -> Self {
+        return Self::InternalError(format!("Hex Decode {}", err))
+    }
+}

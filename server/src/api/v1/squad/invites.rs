@@ -12,6 +12,9 @@ use serde::Deserialize;
 use chrono::Utc;
 use std::collections::HashMap;
 use uuid::Uuid;
+use openssl::pkey::PKey;
+use openssl::sign::Signer;
+use openssl::hash::MessageDigest;
 
 #[derive(Deserialize)]
 pub struct CreateSquadInviteInput {
@@ -163,8 +166,10 @@ impl api::ApiApplication {
                 user_id,
                 squad_role
             )
-            SELECT $1, user_id, 'Member'
-            FROM squadov.squad_membership_invites
+            SELECT $1, u.id, 'Member'
+            FROM squadov.squad_membership_invites AS smi
+            INNER JOIN squadov.users AS u
+                ON smi.email = u.email
             WHERE squad_id = $1 AND invite_uuid = $2
             ",
             squad_id,
@@ -237,23 +242,108 @@ impl api::ApiApplication {
         )
     }
 
-    pub fn generate_invite_accept_reject_url(&self, invite_uuid: &Uuid) -> (String, String) {
+    pub fn generate_invite_hmac_signature(&self, squad_id: i64, invite_uuid: &Uuid) -> Result<String, SquadOvError> {
+        let request = format!("{}+{}", squad_id, invite_uuid);
+
+        let key = PKey::hmac(&hex::decode(self.config.squadov.invite_key.as_bytes())?)?;
+        let mut signer = Signer::new(MessageDigest::sha256(), &key)?;
+        signer.update(request.as_bytes())?;
+        let hmac = signer.sign_to_vec()?;
+
+        Ok(base64::encode(&hmac))
+    }
+
+    pub fn generate_invite_accept_reject_url(&self, squad_id: i64, invite_uuid: &Uuid, is_user: bool) -> Result<(String, String), SquadOvError> {
         let base = format!(
             "{}/invite/{}",
             &self.config.squadov.app_url,
             invite_uuid
         );
 
-        (
+        let query = format!(
+            "?isUser={}&squadId={}&sig={}",
+            is_user,
+            squad_id,
+            self.generate_invite_hmac_signature(squad_id, invite_uuid)?
+        );
+
+        Ok((
             format!(
-                "{}/accept",
-                &base
+                "{}/accept{}",
+                &base,
+                &query
             ),
             format!(
-                "{}/reject",
-                &base
+                "{}/reject{}",
+                &base,
+                &query
             ),
+        ))
+    }
+
+    pub async fn accept_invite(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, invite_uuid: &Uuid) -> Result<(), SquadOvError> {
+        self.accept_reject_invite(&mut *tx, squad_id, invite_uuid, true).await?;
+        self.add_user_to_squad_from_invite(&mut *tx, squad_id, invite_uuid).await?;
+        Ok(())
+    }
+
+    pub async fn reassociate_invite_email(&self, tx: &mut Transaction<'_, Postgres>, invite_uuid: &Uuid, email: &str) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            "
+            UPDATE squadov.squad_membership_invites
+            SET email = $1
+            WHERE invite_uuid = $2
+                AND user_id IS NULL
+            ",
+            email,
+            invite_uuid,
         )
+            .execute(tx)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn set_invite_pending(&self, tx: &mut Transaction<'_, Postgres>, invite_uuid: &Uuid, pending: bool) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            "
+            UPDATE squadov.squad_membership_invites
+            SET pending = $1
+            WHERE invite_uuid = $2
+                AND user_id IS NULL
+            ",
+            pending,
+            invite_uuid,
+        )
+            .execute(tx)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn associate_pending_invites_to_user(&self, email: &str, user_id: i64) -> Result<(), SquadOvError> {
+        let mut tx = self.pool.begin().await?;
+
+        let invites = sqlx::query!(
+            "
+            UPDATE squadov.squad_membership_invites
+            SET pending = FALSE,
+                user_id = $2
+            WHERE pending = TRUE
+                AND email = $1
+            RETURNING invite_uuid, squad_id
+            ",
+            email,
+            user_id,
+        )
+            .fetch_all(&mut tx)
+            .await?;
+
+        // I'm assuming this should really only ever be an array of 1 invite so it won't be expensive to iterate.
+        for inv in &invites {
+            self.add_user_to_squad_from_invite(&mut tx, inv.squad_id, &inv.invite_uuid).await?;
+        }
+
+        tx.commit().await?;
+        Ok(())
     }
 }
 
@@ -271,8 +361,15 @@ pub async fn create_squad_invite_handler(app : web::Data<Arc<api::ApiApplication
     // Now that we've tracked all the invites in the database, we can go about sending email invites for all the
     // users in question.
     match app.email.send_bulk_templated_email(&app.config.email.invite_template, invites.into_iter().map(|(email, invite)| {
-        let (accept, reject) = app.generate_invite_accept_reject_url(&invite.invite_uuid);
-        EmailTemplate{
+        let (accept, reject) = match app.generate_invite_accept_reject_url(path.squad_id, &invite.invite_uuid, invite.username.is_some()) {
+            Ok(x) => x,
+            Err(err) => {
+                log::warn!("Failed to generate invite accept/reject URL: {:?}", err);
+                return None
+            }
+        };
+
+        Some(EmailTemplate{
             to: EmailUser{
                 email: email,
                 name: invite.username,
@@ -282,28 +379,55 @@ pub async fn create_squad_invite_handler(app : web::Data<Arc<api::ApiApplication
                 (String::from("accept_url"), accept),
                 (String::from("decline_url"), reject),
             ].into_iter().collect()
-        }
-    }).collect::<Vec<EmailTemplate>>()).await {
-        Ok(_) => (),
-        Err(err) => log::warn!("Failed to send squad invite emails: {:?}", err),
-    };
+        })
+    })
+        .filter(|x| {
+            x.is_some()
+        })
+        .map(|x| {
+            x.unwrap()
+        })
+        .collect::<Vec<EmailTemplate>>()).await {
+            Ok(_) => (),
+            Err(err) => log::warn!("Failed to send squad invite emails: {:?}", err),
+        };
 
-    Ok(HttpResponse::Ok().finish())
+        Ok(HttpResponse::NoContent().finish())
 }
 
 pub async fn accept_squad_invite_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadInviteInput>) -> Result<HttpResponse, SquadOvError> {
     let mut tx = app.pool.begin().await?;
-    app.accept_reject_invite(&mut tx, path.squad_id, &path.invite_uuid, true).await?;
-    app.add_user_to_squad_from_invite(&mut tx, path.squad_id, &path.invite_uuid).await?;
+    app.accept_invite(&mut tx, path.squad_id, &path.invite_uuid).await?;
     tx.commit().await?;
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::NoContent().finish())
 }
 
 pub async fn reject_squad_invite_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadInviteInput>) -> Result<HttpResponse, SquadOvError> {
     let mut tx = app.pool.begin().await?;
     app.accept_reject_invite(&mut tx, path.squad_id, &path.invite_uuid, false).await?;
     tx.commit().await?;
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::NoContent().finish())
+}
+
+#[derive(Deserialize)]
+pub struct PublicInviteQuery {
+    sig: String
+}
+
+pub async fn public_accept_squad_invite_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadInviteInput>, query: web::Query<PublicInviteQuery>) -> Result<HttpResponse, SquadOvError> {
+    let sig = app.generate_invite_hmac_signature(path.squad_id, &path.invite_uuid)?;
+    if sig != query.sig {
+        return Err(SquadOvError::Unauthorized);
+    }
+    accept_squad_invite_handler(app, path).await
+}
+
+pub async fn public_reject_squad_invite_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadInviteInput>, query: web::Query<PublicInviteQuery>) -> Result<HttpResponse, SquadOvError> {
+    let sig = app.generate_invite_hmac_signature(path.squad_id, &path.invite_uuid)?;
+    if sig != query.sig {
+        return Err(SquadOvError::Unauthorized);
+    }
+    reject_squad_invite_handler(app, path).await
 }
 
 pub async fn get_user_squad_invites_handler(app : web::Data<Arc<api::ApiApplication>>, path : web::Path<UserResourcePath>) -> Result<HttpResponse, SquadOvError> {

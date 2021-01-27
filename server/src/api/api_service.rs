@@ -53,6 +53,21 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 .route("/status/{user_id}", web::get().to(v1::get_user_status_handler))
         )
         .service(
+            // TODO: More generic signature verification here?
+            web::scope("/public")
+                .service(
+                    web::scope("/squad")
+                        .service(
+                            web::scope("/{squad_id}")
+                                .service(
+                                    web::scope("/invite/{invite_uuid}")
+                                        .route("/accept", web::post().to(v1::public_accept_squad_invite_handler))
+                                        .route("/reject", web::post().to(v1::public_reject_squad_invite_handler))
+                                )
+                        )
+                )
+        )
+        .service(
             web::scope("/v1")
                 .wrap(auth::ApiSessionValidator{})
                 .service(

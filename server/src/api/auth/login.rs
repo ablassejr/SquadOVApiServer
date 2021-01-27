@@ -97,9 +97,16 @@ pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<Arc<api:
     let stored_user = match app.users.get_stored_user_from_email(&session.user.email, &app.pool).await {
         Ok(x) => match x {
             Some(y) => y,
-            None => match app.users.create_user(&session.user, &app.pool).await {
-                Ok(z) => z,
-                Err(err) => return logged_error!(squadov_common::SquadOvError::InternalError(format!("Create User {}", err))),
+            None => {
+                let user = match app.users.create_user(&session.user, &app.pool).await {
+                    Ok(z) => z,
+                    Err(err) => return logged_error!(squadov_common::SquadOvError::InternalError(format!("Create User {}", err))),
+                };
+
+                // Check for any pending squad invites and apply them.
+                app.associate_pending_invites_to_user(&user.email, user.id).await?;
+
+                user
             },
         },
         Err(err) => return logged_error!(squadov_common::SquadOvError::InternalError(format!("Get User {}", err))),

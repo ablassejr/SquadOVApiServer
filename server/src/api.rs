@@ -126,6 +126,7 @@ pub struct KafkaConfig {
 #[derive(Deserialize,Debug,Clone)]
 pub struct SquadOvConfig {
     pub app_url: String,
+    pub invite_key: String,
 }
 
 #[derive(Deserialize,Debug,Clone)]
