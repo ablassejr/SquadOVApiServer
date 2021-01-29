@@ -39,6 +39,7 @@ struct RawRecentMatchData {
     user_uuid: Uuid,
     tm: DateTime<Utc>,
     username: String,
+    user_id: i64
 }
 
 impl api::ApiApplication {
@@ -53,7 +54,8 @@ impl api::ApiApplication {
                     v.match_uuid AS "match_uuid!",
                     v.user_uuid AS "user_uuid!",
                     v.start_time AS "tm!",
-                    ou.username AS "username!"
+                    ou.username AS "username!",
+                    ou.id AS "user_id!"
                 FROM squadov.users AS u
                 LEFT JOIN squadov.squad_role_assignments AS sra
                     ON sra.user_id = u.id
@@ -158,6 +160,7 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
                 },
                 vod: vod_manifests.remove(&x.video_uuid).ok_or(SquadOvError::InternalError(String::from("Failed to find expected VOD manifest.")))?,
                 username: x.username,
+                user_id: x.user_id,
             },
             aimlab_task: aimlab_task.cloned(),
             lol_match: lol_match.cloned(),

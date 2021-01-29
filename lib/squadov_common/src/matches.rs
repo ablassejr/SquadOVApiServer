@@ -49,6 +49,7 @@ pub struct BaseRecentMatch {
     pub game: SquadOvGames,
     pub vod: VodManifest,
     pub username: String,
+    pub user_id: i64,
 }
 
 #[derive(Serialize)]

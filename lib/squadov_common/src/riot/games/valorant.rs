@@ -253,4 +253,5 @@ pub struct ValorantPlayerMatchSummary {
     pub legshots: i64,
     #[serde(rename = "userUuid")]
     pub user_uuid: Uuid,
+    pub puuid: String,
 }

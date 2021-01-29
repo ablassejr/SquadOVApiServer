@@ -50,7 +50,8 @@ pub async fn list_valorant_match_summaries_for_uuids(ex: &PgPool, uuids: &[Match
                 COALESCE(vvpms.headshots, 0) AS "headshots!",
                 COALESCE(vvpms.bodyshots, 0) AS "bodyshots!",
                 COALESCE(vvpms.legshots, 0) AS "legshots!",
-                inp.user_uuid AS "user_uuid!"
+                inp.user_uuid AS "user_uuid!",
+                vmp.puuid AS "puuid!"
             FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)
             INNER JOIN squadov.valorant_matches AS vm
                 ON vm.match_uuid = inp.match_uuid
