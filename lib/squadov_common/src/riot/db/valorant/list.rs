@@ -69,6 +69,7 @@ pub async fn list_valorant_match_summaries_for_uuids(ex: &PgPool, uuids: &[Match
             INNER JOIN squadov.users AS u
                 ON u.id = ral.user_id
                     AND u.uuid = inp.user_uuid
+            ORDER BY vm.server_start_time_utc DESC
             "#,
             &match_uuids,
             &player_uuids,

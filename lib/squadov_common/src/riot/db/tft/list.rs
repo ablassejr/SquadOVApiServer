@@ -13,6 +13,24 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use std::collections::HashMap;
 
+pub async fn filter_tft_match_uuids(ex: &PgPool, uuids: &[Uuid]) -> Result<Vec<Uuid>, SquadOvError> {
+    Ok(
+        sqlx::query!(
+            "
+            SELECT tm.match_uuid
+            FROM squadov.tft_matches AS tm
+            WHERE tm.match_uuid = ANY($1)
+            ",
+            uuids,
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| { x.match_uuid })
+            .collect()
+    )
+}
+
 pub async fn list_tft_match_summaries_for_uuids(ex: &PgPool, uuids: &[MatchPlayerPair]) -> Result<Vec<TftPlayerMatchSummary>, SquadOvError> {
     let match_uuids = uuids.iter().map(|x| { x.match_uuid.clone() }).collect::<Vec<Uuid>>();
     let player_uuids = uuids.iter().map(|x| { x.player_uuid.clone() }).collect::<Vec<Uuid>>();
@@ -50,6 +68,7 @@ pub async fn list_tft_match_summaries_for_uuids(ex: &PgPool, uuids: &[MatchPlaye
             ON vod.match_uuid = tmi.match_uuid
                 AND vod.user_uuid = u.uuid
         WHERE tmi.tft_set_number >= 3
+        ORDER BY tmi.game_datetime DESC
         "#,
         &match_uuids,
         &player_uuids,

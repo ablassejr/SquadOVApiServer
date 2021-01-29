@@ -23,7 +23,7 @@ use squadov_common::{
 };
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
-use std::collections::HashMap;
+use std::collections::{HashSet, HashMap};
 
 pub struct Match {
     pub uuid : Uuid
@@ -53,7 +53,7 @@ impl api::ApiApplication {
                     v.video_uuid AS "video_uuid!",
                     v.match_uuid AS "match_uuid!",
                     v.user_uuid AS "user_uuid!",
-                    v.start_time AS "tm!",
+                    v.end_time AS "tm!",
                     ou.username AS "username!",
                     ou.id AS "user_id!"
                 FROM squadov.users AS u
@@ -71,7 +71,7 @@ impl api::ApiApplication {
                     AND v.user_uuid IS NOT NULL
                     AND v.start_time IS NOT NULL
                     AND v.end_time IS NOT NULL
-                ORDER BY v.start_time DESC
+                ORDER BY v.end_time DESC
                 LIMIT $2 OFFSET $3
                 "#,
                 user_id,
@@ -112,6 +112,7 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
     let wow_encounters = app.list_wow_encounter_for_uuids(&match_uuids).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, WoWEncounter>>();
     let wow_challenges = app.list_wow_challenges_for_uuids(&match_uuids).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, WoWChallenge>>();
     // TFT and Valorant are different because the match summary is player dependent.
+    let tft_match_uuids: HashSet<Uuid> = db::filter_tft_match_uuids(&*app.pool, &match_uuids).await?.into_iter().collect();
     let mut tft_matches = db::list_tft_match_summaries_for_uuids(&*app.pool, &match_player_pairs)
         .await?
         .into_iter()
@@ -143,13 +144,16 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
 
         Ok(RecentMatch {
             base: BaseRecentMatch{
-                match_uuid: x.match_uuid,
+                match_uuid: x.match_uuid.clone(),
                 tm: x.tm,
                 game: if aimlab_task.is_some() {
                     SquadOvGames::AimLab
                 } else if lol_match.is_some() {
                     SquadOvGames::LeagueOfLegends
-                } else if tft_match.is_some() {
+                // We require an additional check for Tft match UUIDs because there's a possibility that the 
+                // user didn't actually finish the match yet in which case the match UUID exists but the match
+                // details don't.
+                } else if tft_match.is_some() || tft_match_uuids.contains(&x.match_uuid) {
                     SquadOvGames::TeamfightTactics
                 } else if valorant_match.is_some() {
                     SquadOvGames::Valorant

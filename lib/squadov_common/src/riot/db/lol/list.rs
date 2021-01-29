@@ -37,6 +37,7 @@ pub async fn list_lol_match_summaries_for_uuids(ex: &PgPool, uuids: &[Uuid]) -> 
             ON vod.match_uuid = lmi.match_uuid
                 AND vod.user_uuid = u.uuid
         WHERE lmi.match_uuid = ANY($1)
+        ORDER BY lmi.game_creation DESC
         "#,
         uuids,
     )
