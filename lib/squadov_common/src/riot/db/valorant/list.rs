@@ -2,11 +2,17 @@ use crate::{
     SquadOvError,
     riot::games::valorant::{
         ValorantPlayerMatchSummary
-    }
+    },
+    matches::MatchPlayerPair,
+    riot::db::account,
 };
 use sqlx::PgPool;
+use uuid::Uuid;
 
-pub async fn list_valorant_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start: i64, end: i64) -> Result<Vec<ValorantPlayerMatchSummary>, SquadOvError> {
+pub async fn list_valorant_match_summaries_for_uuids(ex: &PgPool, uuids: &[MatchPlayerPair]) -> Result<Vec<ValorantPlayerMatchSummary>, SquadOvError> {
+    let match_uuids = uuids.iter().map(|x| { x.match_uuid.clone() }).collect::<Vec<Uuid>>();
+    let player_uuids = uuids.iter().map(|x| { x.player_uuid.clone() }).collect::<Vec<Uuid>>();
+
     Ok(
         sqlx::query_as!(
             ValorantPlayerMatchSummary,
@@ -43,8 +49,11 @@ pub async fn list_valorant_match_summaries_for_puuid(ex: &PgPool, puuid: &str, s
                 COALESCE(vvpms.total_damage, 0) AS "total_damage!",
                 COALESCE(vvpms.headshots, 0) AS "headshots!",
                 COALESCE(vvpms.bodyshots, 0) AS "bodyshots!",
-                COALESCE(vvpms.legshots, 0) AS "legshots!"
-            FROM squadov.valorant_matches AS vm
+                COALESCE(vvpms.legshots, 0) AS "legshots!",
+                inp.user_uuid AS "user_uuid!"
+            FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)
+            INNER JOIN squadov.valorant_matches AS vm
+                ON vm.match_uuid = inp.match_uuid
             INNER JOIN squadov.valorant_match_players AS vmp
                 ON vmp.match_uuid = vm.match_uuid
             INNER JOIN squadov.valorant_match_teams AS vmt
@@ -54,15 +63,50 @@ pub async fn list_valorant_match_summaries_for_puuid(ex: &PgPool, puuid: &str, s
                 ON vvpms.puuid = vmp.puuid AND vvpms.match_uuid = vm.match_uuid
             INNER JOIN squadov.valorant_match_uuid_link AS vmul
                 ON vmul.match_uuid = vm.match_uuid
-            WHERE vmp.puuid = $1
-            ORDER BY server_start_time_utc DESC
-            LIMIT $2 OFFSET $3
+            INNER JOIN squadov.riot_account_links AS ral
+                ON ral.puuid = vmp.puuid
+            INNER JOIN squadov.users AS u
+                ON u.id = ral.user_id
+                    AND u.uuid = inp.user_uuid
             "#,
-            puuid,
-            end - start,
-            start
+            &match_uuids,
+            &player_uuids,
         )
             .fetch_all(ex)
             .await?
     )
+}
+
+pub async fn list_valorant_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start: i64, end: i64) -> Result<Vec<ValorantPlayerMatchSummary>, SquadOvError> {
+    let uuids: Vec<Uuid> = sqlx::query!(
+        r#"
+            SELECT vm.match_uuid
+            FROM squadov.valorant_matches AS vm
+            INNER JOIN squadov.valorant_match_players AS vmp
+                ON vmp.match_uuid = vm.match_uuid
+            WHERE vmp.puuid = $1
+            ORDER BY vm.server_start_time_utc DESC
+            LIMIT $2 OFFSET $3
+        "#,
+        puuid,
+        end - start,
+        start
+    )
+        .fetch_all(&*ex)
+        .await?
+        .into_iter()
+        .map(|x| {
+            x.match_uuid
+        })
+        .collect();
+
+    // We do make the assumption that this account is associated with some user we have stored.
+    let user_uuid = account::get_riot_account_user_uuid(&*ex, puuid).await?;
+
+    list_valorant_match_summaries_for_uuids(ex, &uuids.into_iter().map(|x| {
+        MatchPlayerPair{
+            match_uuid: x,
+            player_uuid: user_uuid.clone(),
+        }
+    }).collect::<Vec<MatchPlayerPair>>()).await
 }

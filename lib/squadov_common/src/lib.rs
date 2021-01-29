@@ -20,6 +20,7 @@ pub mod rabbitmq;
 pub mod matches;
 pub mod games;
 pub mod email;
+pub mod aimlab;
 
 pub use error::*;
 pub use parse::*;
@@ -38,6 +39,7 @@ pub use wow::*;
 pub use kafka::*;
 pub use games::*;
 pub use email::*;
+pub use aimlab::*;
 
 #[macro_use]
 extern crate lazy_static;

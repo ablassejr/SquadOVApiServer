@@ -1,13 +1,14 @@
 use squadov_common;
+use squadov_common::AimlabTask;
 use crate::api;
 use actix_web::{web, HttpResponse};
 use uuid::Uuid;
 use std::sync::Arc;
 
 impl api::ApiApplication {
-    pub async fn get_aimlab_task_data(&self, match_id : Uuid) -> Result<Option<super::AimlabTask>, squadov_common::SquadOvError> {
+    pub async fn get_aimlab_task_data(&self, match_id : Uuid) -> Result<Option<AimlabTask>, squadov_common::SquadOvError> {
         let task = sqlx::query_as!(
-            super::AimlabTask,
+            AimlabTask,
             "
             SELECT *
             FROM squadov.aimlab_tasks

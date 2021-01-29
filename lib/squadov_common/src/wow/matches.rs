@@ -27,7 +27,7 @@ pub struct WoWEncounterEnd {
     pub success: bool
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct WoWEncounter {
     #[serde(rename="matchUuid")]
     pub match_uuid: Uuid,
@@ -70,7 +70,7 @@ pub struct WoWChallengeEnd {
     pub time_ms: i64
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct WoWChallenge {
     #[serde(rename="matchUuid")]
     pub match_uuid: Uuid,

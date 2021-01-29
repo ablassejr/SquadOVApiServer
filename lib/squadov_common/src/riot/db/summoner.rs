@@ -3,6 +3,7 @@ use crate::{
     riot::RiotSummoner
 };
 use sqlx::{Executor, Postgres};
+use uuid::Uuid;
 
 pub async fn get_user_riot_summoner_from_name<'a, T>(ex: T, user_id: i64, summoner_name: &str) -> Result<RiotSummoner, SquadOvError>
 where
@@ -50,6 +51,28 @@ where
     )
 }
 
+pub async fn get_riot_summoner_user_uuid<'a, T>(ex: T, puuid: &str) -> Result<Uuid, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(sqlx::query!(
+        "
+        SELECT u.uuid
+        FROM squadov.riot_accounts AS ra
+        INNER JOIN squadov.riot_account_links AS ral
+            ON ral.puuid = ra.puuid
+        INNER JOIN squadov.users AS u
+            ON u.id = ral.user_id
+        WHERE ra.puuid = $1
+            AND ra.summoner_name IS NOT NULL
+        ",
+        puuid,
+    )
+        .fetch_one(ex)
+        .await?
+        .uuid
+    )
+}
 
 pub async fn get_user_riot_summoner<'a, T>(ex: T, user_id: i64, puuid: &str) -> Result<RiotSummoner, SquadOvError>
 where

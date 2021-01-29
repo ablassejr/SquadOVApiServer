@@ -212,7 +212,7 @@ pub struct ValorantMatchEconomyDto {
     pub spent: i32,
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize, Clone)]
 pub struct ValorantPlayerMatchSummary {
     #[serde(rename = "matchId")]
     pub match_id: String,
@@ -250,5 +250,7 @@ pub struct ValorantPlayerMatchSummary {
     pub total_damage: i64,
     pub headshots: i64,
     pub bodyshots: i64,
-    pub legshots: i64
+    pub legshots: i64,
+    #[serde(rename = "userUuid")]
+    pub user_uuid: Uuid,
 }

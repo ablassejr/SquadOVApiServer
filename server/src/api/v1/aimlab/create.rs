@@ -1,4 +1,5 @@
 use squadov_common;
+use squadov_common::AimlabTask;
 use crate::api;
 use actix_web::{web, HttpResponse, HttpRequest};
 use uuid::Uuid;
@@ -15,7 +16,7 @@ struct CreateAimlabTaskResponse<'a> {
 }
 
 impl api::ApiApplication {
-    pub async fn bulk_create_aimlab_task(&self, tx : &mut Transaction<'_, Postgres>, all_matches : Vec<super::AimlabTask>) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn bulk_create_aimlab_task(&self, tx : &mut Transaction<'_, Postgres>, all_matches : Vec<AimlabTask>) -> Result<(), squadov_common::SquadOvError> {
         let mut sql : Vec<String> = Vec::new();
         sql.push(String::from("
             INSERT INTO squadov.aimlab_tasks (
@@ -66,7 +67,7 @@ impl api::ApiApplication {
         return Ok(());
     }
 
-    pub async fn create_new_aimlab_task(&self, tx : &mut Transaction<'_, Postgres>, uuid: &Uuid, raw_match : super::AimlabTask) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn create_new_aimlab_task(&self, tx : &mut Transaction<'_, Postgres>, uuid: &Uuid, raw_match : AimlabTask) -> Result<(), squadov_common::SquadOvError> {
         tx.execute(
             sqlx::query!(
                 "
@@ -112,7 +113,7 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn create_new_aimlab_task_handler(data : web::Json<super::AimlabTask>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
+pub async fn create_new_aimlab_task_handler(data : web::Json<AimlabTask>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
     let mut raw_data = data.into_inner();
 
     let extensions = request.extensions();
@@ -136,7 +137,7 @@ pub async fn create_new_aimlab_task_handler(data : web::Json<super::AimlabTask>,
     ))
 }
 
-pub async fn bulk_create_aimlab_task_handler(data : web::Json<Vec<super::AimlabTask>>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
+pub async fn bulk_create_aimlab_task_handler(data : web::Json<Vec<AimlabTask>>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
     let mut raw_data = data.into_inner();
 
     // First bulk create a bunch of matches for each of the input Aim Lab tasks. 

@@ -15,7 +15,6 @@ use actix_cors::{Cors};
 use std::fs;
 use rdkafka::config::ClientConfig;
 use async_std::sync::{Arc};
-use squadov_common::{TaskWrapper};
 use tokio::{
     runtime::Builder,
     task::LocalSet,
@@ -67,12 +66,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let vods = app.find_vods_without_fastify().await.unwrap();
                 for v in vods {
                     log::info!("Enqueue job: {}", &v);
-                    app.vod_fastify_jobs.enqueue(TaskWrapper::new(api::v1::VodFastifyJob{
-                        video_uuid: v,
-                        app: app.clone(),
-                        session_uri: None,
-                    })).unwrap();
+                    app.vod_itf.request_vod_processing(&v, None).await.unwrap();
                 }
+                async_std::task::sleep(std::time::Duration::from_secs(5)).await;
+            } else if mode == "vod_preview" {
+                let vods = app.find_vods_without_preview().await.unwrap();
+                for v in vods {
+                    log::info!("Enqueue job: {}", &v);
+                    app.vod_itf.request_vod_processing(&v, None).await.unwrap();
+                }
+                async_std::task::sleep(std::time::Duration::from_secs(5)).await;
             } else if mode == "wow_manual_parsing" {
                 wow_kafka::create_wow_consumer_thread(app.clone(), &kafka_config).await.unwrap();
             } else {
@@ -127,9 +130,3 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     Ok(())
 }
-
-/*
-#[tokio::main]
-async fn main() -> std::io::Result<()> {
-}
-*/

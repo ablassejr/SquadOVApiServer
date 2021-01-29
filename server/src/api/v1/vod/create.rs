@@ -1,6 +1,3 @@
-use async_trait::async_trait;
-use squadov_common;
-use squadov_common::{vod, TaskWrapper};
 use crate::api;
 use actix_web::{web, HttpResponse, HttpRequest};
 use sqlx::{Executor};
@@ -9,7 +6,6 @@ use std::sync::Arc;
 use serde::{Deserialize};
 use uuid::Uuid;
 use sqlx::{Transaction, Postgres};
-use tempfile::NamedTempFile;
 
 #[derive(Deserialize)]
 pub struct VodCreateDestinationUriInput {
@@ -28,43 +24,6 @@ pub struct VodAssociateBodyInput {
     metadata: squadov_common::VodMetadata,
     #[serde(rename="sessionUri")]
     session_uri: Option<String>,
-}
-
-pub struct VodFastifyJob {
-    pub video_uuid: Uuid,
-    pub app: Arc<api::ApiApplication>,
-    pub session_uri: Option<String>,
-}
-
-pub struct VodFastifyWorker {
-
-}
-
-#[async_trait]
-impl squadov_common::JobWorker<VodFastifyJob> for VodFastifyWorker {
-    fn new() -> Self {
-        Self {}
-    }
-
-    async fn work(&self, data: &VodFastifyJob) -> Result<(), squadov_common::SquadOvError> {
-        log::info!("Start Fastifying {:?}", &data.video_uuid);
-
-        // Note that we can only proceed with "fastifying" the VOD if the entire VOD has been uploaded.
-        // We can query GCS's XML API to determine this. If the GCS Session URI is not provided then
-        // we assume that the file has already been fully uploaded. If the file hasn't been fully uploaded
-        // then we want to defer taking care of this task until later.
-        if data.session_uri.is_some() {
-            let session_uri = data.session_uri.as_ref().unwrap();
-            if !data.app.vod.is_vod_session_finished(&session_uri).await? {
-                log::info!("Defer Fastifying {:?}", &data.video_uuid);
-                return Err(squadov_common::SquadOvError::Defer(1000));
-            }
-        }
-
-        data.app.fastify_vod(&data.video_uuid).await?;
-        log::info!("Finish Fastifying {:?}", &data.video_uuid);
-        Ok(())
-    }
 }
 
 impl api::ApiApplication {
@@ -153,59 +112,6 @@ impl api::ApiApplication {
         sqlx::query(&sql.join("")).execute(tx).await?;
         Ok(())
     }
-
-    pub async fn fastify_vod(&self, vod_uuid: &Uuid) -> Result<(), squadov_common::SquadOvError> {
-        // Simple 4 step process:
-        // 1) Download the video from the VOD manager.
-        // 2) Convert the video using the vod.fastify module.
-        // 3) Re-upload the video using the VOD manager.
-        // 4) Mark the video as being "fastified" (I really need a better word).
-
-        let input_filename = NamedTempFile::new()?.into_temp_path();
-        let output_filename = NamedTempFile::new()?.into_temp_path();
-
-        // TODO: Remove hard-coded stuff from this.
-        log::info!("Download VOD - {}", vod_uuid);
-        self.vod.download_vod_to_path(&squadov_common::VodSegmentId{
-            video_uuid: vod_uuid.clone(),
-            quality: String::from("source"),
-            segment_name: String::from("video.mp4"),
-        }, &input_filename).await?;
-
-        log::info!("Fastify Mp4 - {}", vod_uuid);
-        vod::fastify::fastify_mp4(&input_filename, &output_filename).await?;
-
-        log::info!("Upload Fastify VOD - {}", vod_uuid);
-        self.vod.upload_vod_from_file(&squadov_common::VodSegmentId{
-            video_uuid: vod_uuid.clone(),
-            quality: String::from("source"),
-            segment_name: String::from("fastify.mp4"),
-        }, &output_filename).await?;
-
-        log::info!("Mark DB Fastify (Begin) - {}", vod_uuid);
-        let mut tx = self.pool.begin().await?;
-        log::info!("Mark DB Fastify (Query) - {}", vod_uuid);
-        self.mark_vod_as_fastify(&mut tx, vod_uuid).await?;
-        log::info!("Mark DB Fastify (Commit) - {}", vod_uuid);
-        tx.commit().await?;
-
-        log::info!("Finish Fastify - {}", vod_uuid);
-        Ok(())
-    }
-
-    async fn mark_vod_as_fastify(&self, tx : &mut Transaction<'_, Postgres>, vod_uuid: &Uuid) -> Result<(), squadov_common::SquadOvError> {
-        sqlx::query!(
-            "
-            UPDATE squadov.vod_metadata
-            SET has_fastify = true
-            WHERE video_uuid = $1
-            ",
-            vod_uuid
-        )
-            .execute(tx)
-            .await?;
-        Ok(())
-    }
 }
 
 pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data : web::Json<super::VodAssociateBodyInput>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
@@ -240,12 +146,7 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
     // Note that we don't want to spawn a task directly here to "fastify" the VOD
     // because it does take a significant amount of memory/disk space to do so.
     // So we toss it to the local job queue so we can better limit the amount of resources we end up using.
-    app.vod_fastify_jobs.enqueue(TaskWrapper::new(VodFastifyJob{
-        video_uuid: data.association.video_uuid.clone(),
-        app: app.get_ref().clone(),
-        session_uri: data.session_uri,
-    }))?;
-
+    app.vod_itf.request_vod_processing(&data.association.video_uuid, data.session_uri.clone()).await?;
     return Ok(HttpResponse::Ok().finish());
 }
 

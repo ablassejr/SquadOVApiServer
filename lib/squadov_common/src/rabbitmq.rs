@@ -25,6 +25,7 @@ pub struct RabbitMqConfig {
     pub valorant_queue: String,
     pub lol_queue: String,
     pub tft_queue: String,
+    pub vod_queue: String,
 }
 
 #[async_trait]
@@ -33,11 +34,11 @@ pub trait RabbitMqListener: Send + Sync {
 }
 
 pub struct RabbitMqConnectionBundle {
-    config: RabbitMqConfig,
     channels: Vec<Channel>,
     listeners: Arc<RwLock<HashMap<String, Vec<Arc<dyn RabbitMqListener>>>>>,
 }
 
+#[derive(Debug)]
 pub struct RabbitMqPacket {
     queue: String,
     data: Vec<u8>,
@@ -47,7 +48,10 @@ pub struct RabbitMqPacket {
 pub struct RabbitMqInterface {
     pub config: RabbitMqConfig,
     publish_queue: Arc<RwLock<VecDeque<RabbitMqPacket>>>,
-    consumer: Arc<RabbitMqConnectionBundle>,
+    // Each queue gets its own vector of consumers so that we allocate 1 thread
+    // per connection bundle and we allow having multiple threads all receiving
+    // work from a single queue.
+    consumers: RwLock<HashMap<String, Vec<Arc<RabbitMqConnectionBundle>>>>,
 }
 
 type RequeueCallbackFn = fn(&RabbitMqInterface, RabbitMqPacket, i64);
@@ -90,11 +94,16 @@ impl RabbitMqConnectionBundle {
                 FieldTable::default(),
             ).await?;
 
+            ch.queue_declare(
+                &config.vod_queue,
+                QueueDeclareOptions::default(),
+                FieldTable::default(),
+            ).await?;
+
             channels.push(ch);
         }
 
         Ok(Self {
-            config: config.clone(),
             channels,
             listeners: Arc::new(RwLock::new(HashMap::new())),
         })
@@ -166,53 +175,20 @@ impl RabbitMqConnectionBundle {
         });
     }
 
-    pub async fn begin_consuming(&self, itf: Arc<RabbitMqInterface>, requeue_callback: RequeueCallbackFn) -> Result<(), SquadOvError> {
+    pub async fn begin_consuming(&self, itf: Arc<RabbitMqInterface>, queue: &str, requeue_callback: RequeueCallbackFn) -> Result<(), SquadOvError> {
         // Each channel gets its own thread to start consuming from every channel.
         // I think we should probably only limit ourselves to having 1 consumer channel anyway.
         for ch in &self.channels {
             ch.basic_qos(RABBITMQ_PREFETCH_COUNT, BasicQosOptions::default()).await?;
 
-            {
-                let consumer = ch.basic_consume(
-                    &self.config.rso_queue,
-                    "",
-                    BasicConsumeOptions::default(),
-                    FieldTable::default(),
+            let consumer = ch.basic_consume(
+                queue,
+                "",
+                BasicConsumeOptions::default(),
+                FieldTable::default(),
 
-                ).await?;
-                self.start_consumer(&self.config.rso_queue, consumer, itf.clone(), requeue_callback);
-            }
-
-            {
-                let consumer = ch.basic_consume(
-                    &self.config.valorant_queue,
-                    "",
-                    BasicConsumeOptions::default(),
-                    FieldTable::default(),
-                ).await?;
-                self.start_consumer(&self.config.valorant_queue, consumer, itf.clone(), requeue_callback);
-            }
-
-            {
-                let consumer = ch.basic_consume(
-                    &self.config.lol_queue,
-                    "",
-                    BasicConsumeOptions::default(),
-                    FieldTable::default(),
-
-                ).await?;
-                self.start_consumer(&self.config.lol_queue, consumer, itf.clone(), requeue_callback);
-            }
-
-            {
-                let consumer = ch.basic_consume(
-                    &self.config.tft_queue,
-                    "",
-                    BasicConsumeOptions::default(),
-                    FieldTable::default(),
-                ).await?;
-                self.start_consumer(&self.config.tft_queue, consumer, itf.clone(), requeue_callback);
-            }
+            ).await?;
+            self.start_consumer(queue, consumer, itf.clone(), requeue_callback);
         }
 
         Ok(())
@@ -232,29 +208,27 @@ impl RabbitMqInterface {
             tokio::task::spawn(async move {
                 let mut publish_idx: usize = 0;
                 loop {
-                    let next_msg = publish_queue.write().await.pop_front();
-                    if next_msg.is_some() {
-                        let next_msg = next_msg.unwrap();
-                        match publisher.publish(next_msg, publish_idx).await {
-                            Ok(_) => (),
-                            Err(err) => log::warn!("Failed to publish RabbitMQ message: {:?}", err)
+                    {
+                        let next_msg = publish_queue.write().await.pop_front();
+                        if next_msg.is_some() {
+                            let next_msg = next_msg.unwrap();
+                            match publisher.publish(next_msg, publish_idx).await {
+                                Ok(_) => (),
+                                Err(err) => log::warn!("Failed to publish RabbitMQ message: {:?}", err)
+                            }
+                            publish_idx = (publish_idx + 1) % publisher.num_channels();
                         }
-                        publish_idx = (publish_idx + 1) % publisher.num_channels();
                     }
                     async_std::task::sleep(std::time::Duration::from_millis(1)).await;
                 }
             });
         }
 
-        log::info!("\tStart Consuming (RabbitMQ)...");
-        let consumer = Arc::new(RabbitMqConnectionBundle::connect(&config, 1).await?);
         let itf = Arc::new(Self {
             config: config.clone(),
             publish_queue,
-            consumer: consumer.clone(),
+            consumers: RwLock::new(HashMap::new()),
         });
-
-        consumer.begin_consuming(itf.clone(), RabbitMqInterface::publish_delay).await?;
         log::info!("RabbitMQ Successfully Connected");
         Ok(itf)
     }
@@ -267,14 +241,31 @@ impl RabbitMqInterface {
         });
     }
 
-    pub async fn add_listener(&self, queue: String, listener: Arc<dyn RabbitMqListener>) {
-        let mut all_listeners = self.consumer.listeners.write().await;
-        if !all_listeners.contains_key(&queue) {
-            all_listeners.insert(queue.clone(), Vec::new());
+    pub async fn add_listener(itf: Arc<RabbitMqInterface>, queue: String, listener: Arc<dyn RabbitMqListener>) -> Result<(), SquadOvError> {
+        let mut consumers = itf.consumers.write().await;
+        if !consumers.contains_key(&queue) {
+            consumers.insert(queue.clone(), Vec::new());
         }
 
-        let arr = all_listeners.get_mut(&queue).unwrap();
-        arr.push(listener);
+        let consumer_array = consumers.get_mut(&queue).unwrap();
+        log::info!("Start Consuming (RabbitMQ) on Queue {} [{}]...", &queue, consumer_array.len());
+
+        let consumer = Arc::new(RabbitMqConnectionBundle::connect(&itf.config, 1).await?);
+        
+        {
+            let mut all_listeners = consumer.listeners.write().await;
+            if !all_listeners.contains_key(&queue) {
+                all_listeners.insert(queue.clone(), Vec::new());
+            }
+
+            let arr = all_listeners.get_mut(&queue).unwrap();
+            arr.push(listener);
+        }
+
+        consumer_array.push(consumer.clone());
+        consumer.begin_consuming(itf.clone(), &queue, RabbitMqInterface::publish_delay).await?;
+        log::info!("\t...Success.");
+        Ok(())
     }
 
     pub async fn publish(&self, queue: &str, data: Vec<u8>, priority: u8) {

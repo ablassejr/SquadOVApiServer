@@ -59,7 +59,7 @@ pub struct TftParticipantDto {
     pub companion: TftCompanionDto,
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize,Clone)]
 pub struct TftCompanionDto {
     #[serde(rename(deserialize="content_ID", serialize="contentId"))]
     pub content_id: String,
@@ -91,7 +91,7 @@ pub struct TftUnitDto {
     pub tier: i32
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TftPlayerMatchSummary {
     pub match_uuid: Uuid,
@@ -107,5 +107,7 @@ pub struct TftPlayerMatchSummary {
     pub last_round: i32,
     pub traits: Vec<TftTraitDto>,
     pub units: Vec<TftUnitDto>,
-    pub has_vod: bool
+    pub has_vod: bool,
+    pub user_uuid: Uuid,
+    pub puuid: String,
 }

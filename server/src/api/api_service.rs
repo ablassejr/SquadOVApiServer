@@ -7,6 +7,7 @@ use super::graphql;
 use super::admin;
 use std::vec::Vec;
 use std::boxed::Box;
+use squadov_common::AimlabTask;
 
 pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
     let mut scope = web::scope("")
@@ -92,6 +93,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 )
                                 .route("/active", web::post().to(v1::mark_user_active_endpoint_handler))
                                 .route("/playtime", web::get().to(v1::get_user_recorded_playtime_handler))
+                                .route("/recent", web::get().to(v1::get_recent_matches_for_me_handler))
                         )
                         .service(
                             web::scope("/{user_id}")
@@ -297,7 +299,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 )
                         )
                         .route("/bulk", web::post().to(v1::bulk_create_aimlab_task_handler))
-                            .data(web::Json::<Vec<v1::AimlabTask>>::configure(|cfg| {
+                            .data(web::Json::<Vec<AimlabTask>>::configure(|cfg| {
                                 cfg.limit(1 * 1024 * 1024)
                             }))
                 )

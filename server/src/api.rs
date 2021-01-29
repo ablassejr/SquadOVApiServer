@@ -14,7 +14,6 @@ use squadov_common::{
     SquadOvError,
     HalResponse,
     BlobManagementClient,
-    JobQueue,
     KafkaCredentialKeyPair,
     riot::{
         api::{RiotApiHandler, RiotApiApplicationInterface, RiotConfig},
@@ -22,6 +21,14 @@ use squadov_common::{
     rabbitmq::{RabbitMqInterface, RabbitMqConfig},
     EmailConfig,
     EmailClient,
+    vod,
+    vod::VodProcessingInterface,
+    vod::manager::{
+        VodManagerType,
+        VodManager,
+        GCSVodManager,
+        FilesystemVodManager,
+    }
 };
 use url::Url;
 use std::vec::Vec;
@@ -154,18 +161,16 @@ pub struct ApiApplication {
     clients: ApiClients,
     users: auth::UserManager,
     session: auth::SessionManager,
-    vod: Arc<dyn v1::VodManager + Send + Sync>,
+    vod: Arc<dyn VodManager + Send + Sync>,
     pub pool: Arc<PgPool>,
     schema: Arc<graphql::GraphqlSchema>,
     pub blob: Arc<BlobManagementClient>,
-    // Various local job queues - these should eventually
-    // probably be switched to something like RabbitMQ + microservices.
-    pub vod_fastify_jobs: Arc<JobQueue<v1::VodFastifyJob>>,
     pub rso_itf: Arc<RiotApiApplicationInterface>,
     pub valorant_itf: Arc<RiotApiApplicationInterface>,
     pub lol_itf: Arc<RiotApiApplicationInterface>,
     pub tft_itf: Arc<RiotApiApplicationInterface>,
     pub email: Arc<EmailClient>,
+    pub vod_itf: Arc<VodProcessingInterface>,
 }
 
 impl ApiApplication {
@@ -199,10 +204,22 @@ impl ApiApplication {
         let lol_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq.lol_queue, lol_api.clone(), rabbitmq.clone(), pool.clone()));
         let tft_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq.tft_queue, tft_api.clone(), rabbitmq.clone(), pool.clone()));
 
-        rabbitmq.add_listener(config.rabbitmq.rso_queue.clone(), rso_itf.clone()).await;
-        rabbitmq.add_listener(config.rabbitmq.valorant_queue.clone(), valorant_itf.clone()).await;
-        rabbitmq.add_listener(config.rabbitmq.lol_queue.clone(), lol_itf.clone()).await;
-        rabbitmq.add_listener(config.rabbitmq.tft_queue.clone(), tft_itf.clone()).await;
+        RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.rso_queue.clone(), rso_itf.clone()).await.unwrap();
+        RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.valorant_queue.clone(), valorant_itf.clone()).await.unwrap();
+        RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.lol_queue.clone(), lol_itf.clone()).await.unwrap();
+        RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.tft_queue.clone(), tft_itf.clone()).await.unwrap();
+
+        let vod_manager = match vod::manager::get_current_vod_manager_type() {
+            VodManagerType::GCS => Arc::new(GCSVodManager::new(gcp.clone()).await.unwrap()) as Arc<dyn VodManager + Send + Sync>,
+            VodManagerType::FileSystem => Arc::new(FilesystemVodManager::new().unwrap()) as Arc<dyn VodManager + Send + Sync>
+        };
+
+        // One VOD interface for publishing - individual interfaces for consuming.
+        let vod_itf = Arc::new(VodProcessingInterface::new(&config.rabbitmq.vod_queue, rabbitmq.clone(), pool.clone(), vod_manager.clone()));
+        for _i in 0..config.vod.fastify_threads {
+            let process_itf = Arc::new(VodProcessingInterface::new(&config.rabbitmq.vod_queue, rabbitmq.clone(), pool.clone(), vod_manager.clone()));
+            RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.vod_queue.clone(), process_itf).await.unwrap();
+        }
 
         ApiApplication{
             config: config.clone(),
@@ -211,19 +228,16 @@ impl ApiApplication {
             },
             users: auth::UserManager{},
             session: auth::SessionManager::new(),
-            vod: match v1::get_current_vod_manager_type() {
-                v1::VodManagerType::GCS => Arc::new(v1::GCSVodManager::new(gcp.clone()).await.unwrap()) as Arc<dyn v1::VodManager + Send + Sync>,
-                v1::VodManagerType::FileSystem => Arc::new(v1::FilesystemVodManager::new().unwrap()) as Arc<dyn v1::VodManager + Send + Sync>
-            },
+            vod: vod_manager,
             pool: pool,
             schema: Arc::new(graphql::create_schema()),
             blob: blob,
-            vod_fastify_jobs: JobQueue::new::<v1::VodFastifyWorker>(config.vod.fastify_threads),
             rso_itf,
             valorant_itf,
             lol_itf,
             tft_itf,
             email: Arc::new(EmailClient::new(&config.email)),
+            vod_itf,
         }
     }
 }

@@ -1,8 +1,12 @@
-use squadov_common;
+use squadov_common::{
+    SquadOvError,
+    AimlabTask,
+};
 use crate::api;
 use actix_web::{web, HttpResponse, HttpRequest};
 use serde::Deserialize;
 use std::sync::Arc;
+use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct AimlabUserTaskListInput {
@@ -10,9 +14,9 @@ pub struct AimlabUserTaskListInput {
 }
 
 impl api::ApiApplication {
-    pub async fn list_aimlab_matches_for_user(&self, user_id: i64, start: i64, end: i64) -> Result<Vec<super::AimlabTask>, squadov_common::SquadOvError> {
+    pub async fn list_aimlab_matches_for_user(&self, user_id: i64, start: i64, end: i64) -> Result<Vec<AimlabTask>, SquadOvError> {
         let matches = sqlx::query_as!(
-            super::AimlabTask,
+            AimlabTask,
             "
             SELECT *
             FROM squadov.aimlab_tasks
@@ -27,6 +31,22 @@ impl api::ApiApplication {
             .fetch_all(&*self.pool)
             .await?;
         return Ok(matches);
+    }
+
+    pub async fn list_aimlab_matches_for_uuids(&self, uuids: &[Uuid]) -> Result<Vec<AimlabTask>, SquadOvError> {
+        Ok(
+            sqlx::query_as!(
+                AimlabTask,
+                "
+                SELECT *
+                FROM squadov.aimlab_tasks
+                WHERE match_uuid = ANY($1)
+                ",
+                uuids
+            )
+                .fetch_all(&*self.pool)
+                .await?
+        )
     }
 }
 

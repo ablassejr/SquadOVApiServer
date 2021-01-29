@@ -11,20 +11,31 @@ pub struct VodDeleteFromUuid {
 }
 
 pub async fn delete_vod_handler(data : web::Path<VodDeleteFromUuid>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, squadov_common::SquadOvError> {
-    let quality_options = app.get_vod_quality_options(&data.video_uuid).await?;
-    for quality in &quality_options {
-        app.vod.delete_vod(&squadov_common::VodSegmentId{
-            video_uuid: data.video_uuid.clone(),
-            quality: quality.id.clone(),
-            segment_name: String::from("video.mp4")
-        }).await?;
-
-        if quality.has_fastify {
+    let quality_options = app.get_vod_quality_options(&[data.video_uuid.clone()]).await?;
+    let quality_arr = quality_options.get(&data.video_uuid);
+    if quality_arr.is_some() {
+        for quality in quality_arr.unwrap() {
             app.vod.delete_vod(&squadov_common::VodSegmentId{
                 video_uuid: data.video_uuid.clone(),
                 quality: quality.id.clone(),
-                segment_name: String::from("fastify.mp4")
+                segment_name: String::from("video.mp4")
             }).await?;
+
+            if quality.has_fastify {
+                app.vod.delete_vod(&squadov_common::VodSegmentId{
+                    video_uuid: data.video_uuid.clone(),
+                    quality: quality.id.clone(),
+                    segment_name: String::from("fastify.mp4")
+                }).await?;
+            }
+
+            if quality.has_preview {
+                app.vod.delete_vod(&squadov_common::VodSegmentId{
+                    video_uuid: data.video_uuid.clone(),
+                    quality: quality.id.clone(),
+                    segment_name: String::from("preview.mp4")
+                }).await?;
+            }
         }
     }
 

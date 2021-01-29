@@ -237,7 +237,7 @@ impl super::GCSClient {
                 // 400 errors should result in a retry w/o exponential backoff. 
                 // 500 errors should result in a retry with exponential backoff.
                 if status.unwrap().as_u16() > 500 {
-                    sleep_ms = 2u64.pow(backoff_tick) + rand::thread_rng().gen_range(0, 1000);
+                    sleep_ms = 2u64.pow(backoff_tick) + rand::thread_rng().gen_range(0..1000);
                     backoff_tick += 1;
                 }
                 

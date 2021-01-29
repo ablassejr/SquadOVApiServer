@@ -5,13 +5,18 @@ use crate::{
         TftCompanionDto,
         TftUnitDto,
         TftTraitDto,
-    }
+    },
+    riot::db::summoner,
+    matches::MatchPlayerPair,
 };
 use sqlx::PgPool;
 use uuid::Uuid;
 use std::collections::HashMap;
 
-pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start: i64, end: i64) -> Result<Vec<TftPlayerMatchSummary>, SquadOvError> {
+pub async fn list_tft_match_summaries_for_uuids(ex: &PgPool, uuids: &[MatchPlayerPair]) -> Result<Vec<TftPlayerMatchSummary>, SquadOvError> {
+    let match_uuids = uuids.iter().map(|x| { x.match_uuid.clone() }).collect::<Vec<Uuid>>();
+    let player_uuids = uuids.iter().map(|x| { x.player_uuid.clone() }).collect::<Vec<Uuid>>();
+
     let mut match_summaries: Vec<TftPlayerMatchSummary> = sqlx::query!(
         r#"
         SELECT
@@ -28,25 +33,26 @@ pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start:
             tmp.level AS "level!",
             tmp.placement AS "placement!",
             tmp.last_round AS "last_round!",
-            (vod.video_uuid IS NOT NULL) AS "has_vod!"
-        FROM squadov.tft_match_info AS tmi
+            (vod.video_uuid IS NOT NULL) AS "has_vod!",
+            inp.user_uuid AS "user_uuid!",
+            ral.puuid AS "puuid!"
+        FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)
+        INNER JOIN squadov.tft_match_info AS tmi
+            ON tmi.match_uuid = inp.match_uuid
         INNER JOIN squadov.tft_match_participants AS tmp
             ON tmp.match_uuid = tmi.match_uuid
         INNER JOIN squadov.riot_account_links AS ral
             ON ral.puuid = tmp.puuid
         INNER JOIN squadov.users AS u
             ON u.id = ral.user_id
+                AND u.uuid = inp.user_uuid
         LEFT JOIN squadov.vods AS vod
             ON vod.match_uuid = tmi.match_uuid
                 AND vod.user_uuid = u.uuid
-        WHERE tmp.puuid = $1
-            AND tmi.tft_set_number >= 3
-        ORDER BY tmi.game_datetime DESC
-        LIMIT $2 OFFSET $3
+        WHERE tmi.tft_set_number >= 3
         "#,
-        puuid,
-        end - start,
-        start
+        &match_uuids,
+        &player_uuids,
     )
         .fetch_all(ex)
         .await?
@@ -71,33 +77,39 @@ pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start:
                 traits: vec![],
                 units: vec![],
                 has_vod: x.has_vod,
+                user_uuid: x.user_uuid,
+                puuid: x.puuid,
             }
         })
         .collect();
-    let match_uuids: Vec<Uuid> = match_summaries.iter().map(|x| { x.match_uuid.clone() }).collect();
 
     // These need to be separate queries because SQLX doesn't really let us
     // do a ARRAY_AGG cleanly (i think?) so this is easier + type safe.
-    let mut unit_map: HashMap<Uuid, Vec<TftUnitDto>> = HashMap::new();
+    let mut unit_map: HashMap<(Uuid, Uuid), Vec<TftUnitDto>> = HashMap::new();
     sqlx::query!(
-        "
-        SELECT *
-        FROM squadov.tft_match_participant_units
-        WHERE match_uuid = ANY($1)
-            AND puuid = $2
-        ",
+        r#"
+        SELECT tmpu.*, u.uuid AS "user_uuid!"
+        FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)
+        INNER JOIN squadov.users AS u
+            ON u.uuid = inp.user_uuid
+        INNER JOIN squadov.riot_account_links AS ral
+            ON ral.user_id = u.id
+        INNER JOIN squadov.tft_match_participant_units AS tmpu
+            ON tmpu.match_uuid = inp.match_uuid
+                AND tmpu.puuid = ral.puuid
+        "#,
         &match_uuids,
-        puuid,
+        &player_uuids,
     )
         .fetch_all(ex)
         .await?
         .into_iter()
         .for_each(|x| {
-            let match_uuid = x.match_uuid.clone();
-            if !unit_map.contains_key(&match_uuid) {
-                unit_map.insert(match_uuid.clone(), Vec::new());
+            let key = (x.match_uuid.clone(), x.user_uuid.clone());
+            if !unit_map.contains_key(&key) {
+                unit_map.insert(key.clone(), Vec::new());
             }
-            let vec = unit_map.get_mut(&match_uuid).unwrap();
+            let vec = unit_map.get_mut(&key).unwrap();
             vec.push(TftUnitDto{
                 items: x.items,
                 character_id: x.character_id,
@@ -108,26 +120,31 @@ pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start:
             });
         });
 
-    let mut trait_map: HashMap<Uuid, Vec<TftTraitDto>> = HashMap::new();
+    let mut trait_map: HashMap<(Uuid, Uuid), Vec<TftTraitDto>> = HashMap::new();
     sqlx::query!(
-        "
-        SELECT *
-        FROM squadov.tft_match_participant_traits
-        WHERE match_uuid = ANY($1)
-            AND puuid = $2
-        ",
+        r#"
+        SELECT tmpt.*, u.uuid AS "user_uuid!"
+        FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)
+        INNER JOIN squadov.users AS u
+            ON u.uuid = inp.user_uuid
+        INNER JOIN squadov.riot_account_links AS ral
+            ON ral.user_id = u.id
+        INNER JOIN squadov.tft_match_participant_traits AS tmpt
+            ON tmpt.match_uuid = inp.match_uuid
+                AND tmpt.puuid = ral.puuid
+        "#,
         &match_uuids,
-        puuid,
+        &player_uuids,
     )
         .fetch_all(ex)
         .await?
         .into_iter()
         .for_each(|x| {
-            let match_uuid = x.match_uuid.clone();
-            if !trait_map.contains_key(&match_uuid) {
-                trait_map.insert(match_uuid.clone(), Vec::new());
+            let key = (x.match_uuid.clone(), x.user_uuid.clone());
+            if !trait_map.contains_key(&key) {
+                trait_map.insert(key.clone(), Vec::new());
             }
-            let vec = trait_map.get_mut(&match_uuid).unwrap();
+            let vec = trait_map.get_mut(&key).unwrap();
             vec.push(TftTraitDto{
                 name: x.name,
                 num_units: x.num_units,
@@ -138,11 +155,46 @@ pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start:
         });
 
     for m in &mut match_summaries {
-        m.units.extend(unit_map.remove(&m.match_uuid).unwrap_or(vec![]));
-        m.traits.extend(trait_map.remove(&m.match_uuid).unwrap_or(vec![]));
+        m.units.extend(unit_map.remove(&(m.match_uuid.clone(), m.user_uuid.clone())).unwrap_or(vec![]));
+        m.traits.extend(trait_map.remove(&(m.match_uuid.clone(), m.user_uuid.clone())).unwrap_or(vec![]));
     }
 
     Ok(match_summaries)
+}
+
+pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start: i64, end: i64) -> Result<Vec<TftPlayerMatchSummary>, SquadOvError> {
+    let uuids: Vec<Uuid> = sqlx::query!(
+        r#"
+        SELECT tmi.match_uuid
+        FROM squadov.tft_match_info AS tmi
+        INNER JOIN squadov.tft_match_participants AS tmp
+            ON tmp.match_uuid = tmi.match_uuid
+        WHERE tmp.puuid = $1
+            AND tmi.tft_set_number >= 3
+        ORDER BY tmi.game_datetime DESC
+        LIMIT $2 OFFSET $3
+        "#,
+        puuid,
+        end - start,
+        start
+    )
+        .fetch_all(&*ex)
+        .await?
+        .into_iter()
+        .map(|x| {
+            x.match_uuid
+        })
+        .collect();
+
+    // We do make the assumption that this account is associated with some user we have stored.
+    let user_uuid = summoner::get_riot_summoner_user_uuid(&*ex, puuid).await?;
+
+    list_tft_match_summaries_for_uuids(ex, &uuids.into_iter().map(|x| {
+        MatchPlayerPair{
+            match_uuid: x,
+            player_uuid: user_uuid.clone(),
+        }
+    }).collect::<Vec<MatchPlayerPair>>()).await
 }
 
 pub async fn get_puuids_in_tft_match_from_user_uuids(ex: &PgPool, match_uuid: &Uuid, user_uuids: &[Uuid]) -> Result<Vec<(Uuid, String)>, SquadOvError> {

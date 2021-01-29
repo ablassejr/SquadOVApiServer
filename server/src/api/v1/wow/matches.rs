@@ -278,6 +278,28 @@ impl api::ApiApplication {
         )
     }
 
+    pub async fn list_wow_encounter_for_uuids(&self, uuids: &[Uuid]) -> Result<Vec<WoWEncounter>, SquadOvError> {
+        Ok(
+            sqlx::query_as!(
+                WoWEncounter,
+                r#"
+                SELECT DISTINCT we.*, wcl.build_version AS "build"
+                FROM squadov.wow_encounters AS we
+                INNER JOIN squadov.wow_match_combatants AS wmc
+                    ON wmc.match_uuid = we.match_uuid
+                INNER JOIN squadov.wow_match_combat_log_association AS cla
+                    ON cla.match_uuid = we.match_uuid
+                INNER JOIN squadov.wow_combat_logs AS wcl
+                    ON wcl.uuid = cla.combat_log_uuid
+                WHERE we.match_uuid = ANY($1)
+                "#,
+                uuids,
+            )
+                .fetch_all(&*self.pool)
+                .await?
+        )
+    }
+
     async fn list_wow_challenges_for_character(&self, character_guid: &str, start: i64, end: i64) -> Result<Vec<WoWChallenge>, SquadOvError> {
         Ok(
             sqlx::query_as!(
@@ -298,6 +320,28 @@ impl api::ApiApplication {
                 character_guid,
                 end - start,
                 start
+            )
+                .fetch_all(&*self.pool)
+                .await?
+        )
+    }
+
+    pub async fn list_wow_challenges_for_uuids(&self, uuids: &[Uuid]) -> Result<Vec<WoWChallenge>, SquadOvError> {
+        Ok(
+            sqlx::query_as!(
+                WoWChallenge,
+                r#"
+                SELECT DISTINCT wc.*, wcl.build_version AS "build"
+                FROM squadov.wow_challenges AS wc
+                INNER JOIN squadov.wow_match_combatants AS wmc
+                    ON wmc.match_uuid = wc.match_uuid
+                INNER JOIN squadov.wow_match_combat_log_association AS cla
+                    ON cla.match_uuid = wc.match_uuid
+                INNER JOIN squadov.wow_combat_logs AS wcl
+                    ON wcl.uuid = cla.combat_log_uuid
+                WHERE wc.match_uuid = ANY($1)
+                "#,
+                uuids,
             )
                 .fetch_all(&*self.pool)
                 .await?

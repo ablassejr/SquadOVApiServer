@@ -9,7 +9,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use std::collections::HashMap;
 
-pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start: i64, end: i64) -> Result<Vec<LolPlayerMatchSummary>, SquadOvError> {
+pub async fn list_lol_match_summaries_for_uuids(ex: &PgPool, uuids: &[Uuid]) -> Result<Vec<LolPlayerMatchSummary>, SquadOvError> {
     let mut match_summaries: Vec<LolPlayerMatchSummary> = sqlx::query!(
         r#"
         SELECT
@@ -36,13 +36,9 @@ pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start:
         LEFT JOIN squadov.vods AS vod
             ON vod.match_uuid = lmi.match_uuid
                 AND vod.user_uuid = u.uuid
-        WHERE ra.puuid = $1
-        ORDER BY lmi.game_creation DESC
-        LIMIT $2 OFFSET $3
+        WHERE lmi.match_uuid = ANY($1)
         "#,
-        puuid,
-        end - start,
-        start
+        uuids,
     )
         .fetch_all(ex)
         .await?
@@ -123,6 +119,31 @@ pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start:
     }
 
     Ok(match_summaries)
+}
+
+pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start: i64, end: i64) -> Result<Vec<LolPlayerMatchSummary>, SquadOvError> {
+    let uuids: Vec<Uuid> = sqlx::query!(
+        r#"
+        SELECT lmi.match_uuid
+        FROM squadov.lol_match_info AS lmi
+        INNER JOIN squadov.lol_match_participant_identities AS lmpi
+            ON lmpi.match_uuid = lmi.match_uuid
+        INNER JOIN squadov.riot_accounts AS ra
+            ON ra.summoner_id = lmpi.summoner_id
+        WHERE ra.puuid = $1
+        ORDER BY lmi.game_creation DESC
+        LIMIT $2 OFFSET $3
+        "#,
+        puuid,
+        end - start,
+        start
+    )
+        .fetch_all(&*ex)
+        .await?
+        .into_iter()
+        .map(|x| { x.match_uuid })
+        .collect();
+    list_lol_match_summaries_for_uuids(&*ex, &uuids).await
 }
 
 pub async fn get_participant_ids_in_lol_match_from_user_uuids(ex: &PgPool, match_uuid: &Uuid, user_uuids: &[Uuid]) -> Result<Vec<(Uuid, i32)>, SquadOvError> {

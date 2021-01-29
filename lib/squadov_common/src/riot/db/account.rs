@@ -4,6 +4,7 @@ use crate::{
 };
 use sqlx::{Executor, Postgres};
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
 
 pub async fn tick_riot_account_lol_backfill_time<'a, T>(ex: T, account_id: &str) -> Result<(), SquadOvError>
 where
@@ -65,6 +66,7 @@ where
     )
 }
 
+
 pub async fn get_user_riot_account_gamename_tagline<'a, T>(ex: T, user_id: i64, game_name: &str, tag_line: &str) -> Result<RiotAccount, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
@@ -109,6 +111,30 @@ where
     )
         .fetch_one(ex)
         .await?)
+}
+
+pub async fn get_riot_account_user_uuid<'a, T>(ex: T, puuid: &str) -> Result<Uuid, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(sqlx::query!(
+        "
+        SELECT u.uuid
+        FROM squadov.riot_accounts AS ra
+        INNER JOIN squadov.riot_account_links AS ral
+            ON ral.puuid = ra.puuid
+        INNER JOIN squadov.users AS u
+            ON u.id = ral.user_id
+        WHERE ra.puuid = $1
+            AND ra.game_name IS NOT NULL
+            AND ra.tag_line IS NOT NULL
+        ",
+        puuid,
+    )
+        .fetch_one(ex)
+        .await?
+        .uuid
+    )
 }
 
 pub async fn list_riot_accounts_for_user<'a, T>(ex: T, user_id: i64) -> Result<Vec<RiotAccount>, SquadOvError>

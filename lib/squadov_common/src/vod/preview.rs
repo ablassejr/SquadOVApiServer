@@ -1,10 +1,8 @@
-// LOL. Fastify. Sorry. :')
 use crate::SquadOvError;
 use tokio::process::Command;
 
-// Converts the mp4 to have the faststart ffmpeg movflag so that users
-// can start viewing the video immediately.
-pub async fn fastify_mp4(input_fname: &str, output_fname: &std::path::Path) -> Result<(), SquadOvError> {
+// Generate a (hopefully) relevant clip for use as the VOD's preview.
+pub async fn generate_vod_preview(input_fname: &str, output_fname: &std::path::Path) -> Result<(), SquadOvError> {
     let ffmpeg_path = std::env::var("FFMPEG_BINARY_PATH")?;
     let ffmpeg_output = Command::new(&ffmpeg_path)
         // Single threaded so that we can split our CPU bandwidth among multiple videos.
@@ -14,17 +12,22 @@ pub async fn fastify_mp4(input_fname: &str, output_fname: &std::path::Path) -> R
         .arg("1")
         // Need to auto accept overwriting existing files to prevent blocking.
         .arg("-y")
+        // TODO: smarter choosing of the clip timing
+        .arg("-sseof")
+        .arg("-30")
+        .arg("-t")
+        .arg("-25")
         .arg("-f")
         .arg("mp4")
         .arg("-i")
         .arg(input_fname)
-        // The general use case of this function is to take an already encoded video (mp4) that
-        // the user is streaming into Google Storage with the +empty_moov+frag_keyframe+default_base_moof
-        // flags and convert it to an mp4 that has the +faststart flag.
+        .arg("-vf")
+        .arg("fps=fps=25,scale=320:-1")
         .arg("-c:v")
-        .arg("copy")
-        .arg("-c:a")
-        .arg("copy")
+        .arg("h264")
+        .arg("-crf")
+        .arg("28")
+        .arg("-an")
         .arg("-movflags")
         .arg("+faststart")
         .arg("-f")
@@ -34,10 +37,10 @@ pub async fn fastify_mp4(input_fname: &str, output_fname: &std::path::Path) -> R
         .await?;
 
     if !ffmpeg_output.status.success() {
-        log::warn!("Failed to convert fastify mp4 with ffmpeg: {} to {}", input_fname, output_fname.display());
+        log::warn!("Failed to convert generate VOD preview with ffmpeg: {} to {}", input_fname, output_fname.display());
         log::warn!("FFMPEG STDOUT:\n {}", std::str::from_utf8(&ffmpeg_output.stdout).unwrap_or("???"));
         log::warn!("FFMPEG STDERR:\n {}", std::str::from_utf8(&ffmpeg_output.stderr).unwrap_or("???"));
-        Err(SquadOvError::InternalError(String::from("FFmpeg Fastify Failure")))
+        Err(SquadOvError::InternalError(String::from("FFmpeg VOD Preview Failure")))
     } else {
         Ok(())
     }
