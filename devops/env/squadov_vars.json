@@ -33,6 +33,8 @@
 	"LOL_API_KEY": "",
 	"TFT_API_KEY": "",
 	"RABBITMQ_AMQP_URL": "ENC[AES256_GCM,data:r/wOAwt/X2wJjGAB7qXselUCAlL0ZqPQeWHZb7sIrH6sXtpe7C7FiK90yGTGLqBrw3/RLGavA1nXtvh7ERs7hIAImnyfym2TFlrWaAurS5heIkyZFIM=,iv:+cb5eIgamKR0fTKpfzQhu8PGmgKvtWKvlp0gsEM9Xx8=,tag:1sG2BgDtrCwRYUvLO0ktDg==,type:str]",
+	"SENDGRID_API_KEY": "ENC[AES256_GCM,data:LrWWvEi5vdLTtZAg0CUvwNipiq3tMXqmPrj6PyqbbrvskGGELk4IUweoNkFsRv1Q5VTAm+M6SYB3ypeQ/8ApJvluLM2f,iv:I2sZfQtIhwF9xgShcl3uMTpjtKN0Dxl7q5ZRDo+Qmjg=,tag:VJbiH8ofOIfhjpGqI7uIxQ==,type:str]",
+	"INVITE_HMAC_KEY": "ENC[AES256_GCM,data:+uzAx+jbASfy+KwKMvYpF4IRkr7Ouan2t7K1+DGj2k4Lzcgiei8LwRzxFPY/ex6SEDgMI8IOHJKwKzGPezJe6w==,iv:oJqUjrc1jWVWAYAq9h365frLF5pxxF2yODRsZpZ61JQ=,tag:NzXZHxgVFChK4dkEtNgivA==,type:str]",
 	"sops": {
 		"kms": null,
 		"gcp_kms": [
@@ -44,8 +46,8 @@
 		],
 		"azure_kv": null,
 		"hc_vault": null,
-		"lastmodified": "2021-01-23T18:23:17Z",
-		"mac": "ENC[AES256_GCM,data:kXNITgh0dJah51b8T4XNvZhJsh20FOCbhJEzwUD651ibNcHQwOmWQB7ErXGDRxZjJ+R3fDXopGXVJFplZKnfY1vsQKH8j5i/ZOqPMpA/7eYGzS7o8ZlVR6uEJJvI0vka/1UrK1PoOEg+f+qRmTzTL1BCCJLCGKnjmwenmYqxvk4=,iv:oWPQkkWViO3tIc1e2OQIEWYNTC9JPqQr3GIbNLfuLdk=,tag:7KBi3y0cUWrSVBIc/OCFxQ==,type:str]",
+		"lastmodified": "2021-01-29T22:53:06Z",
+		"mac": "ENC[AES256_GCM,data:fZlC5ZiYEpI9AhRyuBik9AKQNhIjbx1JRKfpHyhUIQ4e0WFIk+ALgkF3o0VvU6uEVJ0Fcy+R64wk32jUdxw/Tx6WOewuKeKHhe8j+LWXXFtp5jFaOYDCrpx//SXU/EyTNTIMacGpqJglC0GIe0X57Iue+k4seuW4yHgSwD8paU8=,iv:jt/FslIOIOysioC0YGtWYmCoResVUeRMFXks2JcI48k=,tag:VmwRJ7WKhRI2IqC172TiBA==,type:str]",
 		"pgp": null,
 		"unencrypted_suffix": "_unencrypted",
 		"version": "3.6.1"

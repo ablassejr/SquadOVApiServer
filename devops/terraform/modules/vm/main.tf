@@ -46,7 +46,7 @@ resource "google_compute_address" "vm-static-ip" {
 resource "google_compute_disk" "vm-boot-disk" {
     name    = "vm-boot-disk"
     image   = data.google_compute_image.vm-image.self_link
-    size    = 20
+    size    = 50
     type    = "pd-standard"
     zone    = "us-central1-c"
 }
