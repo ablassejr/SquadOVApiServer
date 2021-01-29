@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.5.4",
+        "description": "A brand new dashboard to help you track you and your friends' most recent VODs!",
+        "timestamp": 1611959617000,
+        "data": "data/update-v0.5.4.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.5.3",
         "description": "Hotfix to address issues with VOD recordings.",
         "timestamp": 1611513600000,
