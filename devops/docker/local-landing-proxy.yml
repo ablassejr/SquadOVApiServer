@@ -1,0 +1,20 @@
+version: "3.8"
+services:
+    nginx:
+      image: "registry.gitlab.com/squadov/squadovapiserver/squadov/nginx_dev:latest"
+      ports:
+        - "80:80"
+      networks:
+        c3p1:
+          ipv4_address: "172.23.0.254"
+    landing:
+      image: "registry.gitlab.com/squadov/squadovapiserver/squadov/squadov_landing:latest"
+      networks:
+        c3p1:
+          ipv4_address: "172.23.0.2"
+networks:
+    c3p1:
+        ipam:
+            driver: default
+            config:
+                - subnet: "172.23.0.0/24"

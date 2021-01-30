@@ -16,6 +16,7 @@ server {
     }
 
     location / {
+        proxy_redirect http://$host:8080/ https://$host/;
         include /etc/nginx/conf.d/common-http-headers.conf;
         proxy_pass http://172.22.0.7:8080/;
     }
