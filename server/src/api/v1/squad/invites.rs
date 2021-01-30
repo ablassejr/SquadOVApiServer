@@ -250,7 +250,7 @@ impl api::ApiApplication {
         signer.update(request.as_bytes())?;
         let hmac = signer.sign_to_vec()?;
 
-        Ok(base64::encode(&hmac))
+        Ok(base64::encode_config(&hmac, base64::URL_SAFE_NO_PAD))
     }
 
     pub fn generate_invite_accept_reject_url(&self, squad_id: i64, invite_uuid: &Uuid, is_user: bool) -> Result<(String, String), SquadOvError> {
