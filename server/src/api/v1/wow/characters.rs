@@ -18,12 +18,14 @@ impl api::ApiApplication {
         let characters = sqlx::query!(
             r#"
             WITH match_start_stop (start, stop) AS (
-                SELECT COALESCE(we.tm, wc.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, NOW())
+                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
                 FROM squadov.matches AS m
                 LEFT JOIN squadov.wow_encounters AS we
                     ON we.match_uuid = m.uuid
                 LEFT JOIN squadov.wow_challenges AS wc
                     ON wc.match_uuid = m.uuid
+                LEFT JOIN squadov.wow_arenas AS wa
+                    ON wa.match_uuid = m.uuid
                 WHERE m.uuid = $2
             )
             SELECT DISTINCT ON (mcl.evt->>'guid')
@@ -32,7 +34,8 @@ impl api::ApiApplication {
                 jsonb_path_query_array(
                     (mcl.evt->>'items')::jsonb,
                     '$[*].ilvl'
-                ) AS "items!"
+                ) AS "items!",
+                (mcl.evt->>'team')::INTEGER AS "team!"
             FROM (
                 SELECT wce.*
                 FROM squadov.wow_combat_log_events AS wce
@@ -102,6 +105,7 @@ impl api::ApiApplication {
                     name: nm,
                     ilvl: (relevant_ilvls.iter().sum::<i32>() as f32 / relevant_ilvls.len() as f32).floor() as i32,
                     spec_id: x.spec_id,
+                    team: x.team,
                 }
             }).collect()          
         )
@@ -188,7 +192,8 @@ impl api::ApiApplication {
                         guid: x.guid,
                         name: x.name.unwrap_or(String::from("<Unknown>")),
                         ilvl: (relevant_ilvls.iter().sum::<i32>() as f32 / relevant_ilvls.len() as f32).floor() as i32,
-                        spec_id: x.spec_id
+                        spec_id: x.spec_id,
+                        team: 0,
                     }
                 })
                 .collect()

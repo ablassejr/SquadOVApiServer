@@ -219,6 +219,7 @@ pub enum WoWCombatLogEventType {
     SpellSummon(WoWSpellInfo),
     CombatantInfo{
         guid: String,
+        team: i32,
         strength: i32,
         agility: i32,
         stamina: i32,
@@ -240,6 +241,16 @@ pub enum WoWCombatLogEventType {
         difficulty: i32,
         num_players: i32,
         success: bool
+    },
+    ArenaStart{
+        instance_id: i32,
+        arena_type: String,
+        local_team_id: i32,
+    },
+    ArenaEnd{
+        winning_team_id: i32,
+        match_duration_seconds: i32,
+        new_ratings: Vec<i32>,
     },
     ChallengeModeStart{
         challenge_name: String,
@@ -430,6 +441,7 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
             }),
             "COMBATANT_INFO" => Ok((None, WoWCombatLogEventType::CombatantInfo{
                 guid: payload.parts[1].clone(),
+                team: payload.parts[2].parse()?,
                 strength: payload.parts[3].parse()?,
                 agility: payload.parts[4].parse()?,
                 stamina: payload.parts[5].parse()?,
@@ -463,6 +475,19 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                 keystone: payload.parts[3].parse()?,
                 time_ms: payload.parts[4].parse()?,
             })),
+            "ARENA_MATCH_START" => Ok((None, WoWCombatLogEventType::ArenaStart{
+                instance_id: payload.parts[1].parse()?,
+                arena_type: payload.parts[3].clone(),
+                local_team_id: payload.parts[4].parse()?,
+            })),
+            "ARENA_MATCH_END" => Ok((None, WoWCombatLogEventType::ArenaEnd{
+                winning_team_id: payload.parts[1].parse()?,
+                match_duration_seconds: payload.parts[2].parse()?,
+                new_ratings: vec![
+                    payload.parts[3].parse()?,
+                    payload.parts[4].parse()?,
+                ],
+            })),
             _ => Ok((None, WoWCombatLogEventType::Unknown))
         },
     }
@@ -482,6 +507,8 @@ pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, state: &WoWCombatLogState, 
             "ENCOUNTER_END" |
             "CHALLENGE_MODE_START" |
             "CHALLENGE_MODE_END" |
+            "ARENA_MATCH_START" |
+            "ARENA_MATCH_END" |
             "COMBATANT_INFO" => false,
         _ => true,
     };

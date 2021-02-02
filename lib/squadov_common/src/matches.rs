@@ -13,6 +13,7 @@ use crate::{
     wow::{
         WoWEncounter,
         WoWChallenge,
+        WoWArena,
     },
 };
 use chrono::{DateTime, Utc};
@@ -63,4 +64,5 @@ pub struct RecentMatch {
     pub valorant_match: Option<ValorantPlayerMatchSummary>,
     pub wow_challenge: Option<WoWChallenge>,
     pub wow_encounter: Option<WoWEncounter>,
+    pub wow_arena: Option<WoWArena>,
 }

@@ -124,7 +124,7 @@ def extract_instances_to(data, interface, listfile, output):
     with open(os.path.join(data, 'map.csv')) as maps:
         reader = csv.DictReader(maps)
         for row in reader:
-            if row['InstanceType'] != '1' and row['InstanceType'] != '2':
+            if row['InstanceType'] != '1' and row['InstanceType'] != '2' and row['InstanceType'] != '4':
                 continue
 
             allInstances[row['ID']] = {
@@ -138,13 +138,15 @@ def extract_instances_to(data, interface, listfile, output):
     with open(os.path.join(data, 'loadingscreens.csv')) as loading:
         reader = csv.DictReader(loading)
         for row in reader:
-            if row['MainImageFileDataID'] == '0':
-                continue
+            if row['MainImageFileDataID'] != '0' and row['MainImageFileDataID'] in listfile:
+                allLoading[row['ID']] = listfile[row['MainImageFileDataID']]
+            elif row['WideScreen169FileDataID'] != '0' and row['WideScreen169FileDataID'] in listfile:
+                allLoading[row['ID']] = listfile[row['WideScreen169FileDataID']]
+            elif row['WideScreenFileDataID'] != '0' and row['WideScreenFileDataID'] in listfile:
+                allLoading[row['ID']] = listfile[row['WideScreenFileDataID']]
+            elif row['NarrowScreenFileDataID'] != '0' and row['NarrowScreenFileDataID'] in listfile:
+                allLoading[row['ID']] = listfile[row['NarrowScreenFileDataID']]
 
-            if row['MainImageFileDataID'] not in listfile:
-                continue
-
-            allLoading[row['ID']] = listfile[row['MainImageFileDataID']]
 
     for instId, instanceData in allInstances.items():
         instFolder = os.path.join(output, instId)

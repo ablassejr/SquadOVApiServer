@@ -6,7 +6,8 @@ pub struct WoWCharacter {
     pub name: String,
     pub ilvl: i32,
     #[serde(rename="specId")]
-    pub spec_id: i32
+    pub spec_id: i32,
+    pub team: i32,
 }
 
 #[derive(Serialize)]

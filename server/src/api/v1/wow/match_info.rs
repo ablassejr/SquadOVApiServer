@@ -19,12 +19,14 @@ impl api::ApiApplication {
         let raw_starts = sqlx::query!(
             r#"
             WITH match_start_stop (start, stop) AS (
-                SELECT COALESCE(we.tm, wc.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, NOW())
+                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
                 FROM squadov.matches AS m
                 LEFT JOIN squadov.wow_encounters AS we
                     ON we.match_uuid = m.uuid
                 LEFT JOIN squadov.wow_challenges AS wc
                     ON wc.match_uuid = m.uuid
+                LEFT JOIN squadov.wow_arenas AS wa
+                    ON wa.match_uuid = m.uuid
                 WHERE m.uuid = $1
             )
             SELECT
@@ -51,12 +53,14 @@ impl api::ApiApplication {
         let raw_ends = sqlx::query!(
             r#"
             WITH match_start_stop (start, stop) AS (
-                SELECT COALESCE(we.tm, wc.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, NOW())
+                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
                 FROM squadov.matches AS m
                 LEFT JOIN squadov.wow_encounters AS we
                     ON we.match_uuid = m.uuid
                 LEFT JOIN squadov.wow_challenges AS wc
                     ON wc.match_uuid = m.uuid
+                LEFT JOIN squadov.wow_arenas AS wa
+                    ON wa.match_uuid = m.uuid
                 WHERE m.uuid = $1
             )
             SELECT
@@ -131,12 +135,14 @@ impl api::ApiApplication {
         let raw_applied_auras = sqlx::query!(
             r#"
             WITH match_start_stop (start, stop) AS (
-                SELECT COALESCE(we.tm, wc.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, NOW())
+                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
                 FROM squadov.matches AS m
                 LEFT JOIN squadov.wow_encounters AS we
                     ON we.match_uuid = m.uuid
                 LEFT JOIN squadov.wow_challenges AS wc
                     ON wc.match_uuid = m.uuid
+                LEFT JOIN squadov.wow_arenas AS wa
+                    ON wa.match_uuid = m.uuid
                 WHERE m.uuid = $1
             )
             SELECT
@@ -168,12 +174,14 @@ impl api::ApiApplication {
         let raw_removed_auras = sqlx::query!(
             r#"
             WITH match_start_stop (start, stop) AS (
-                SELECT COALESCE(we.tm, wc.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, NOW())
+                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
                 FROM squadov.matches AS m
                 LEFT JOIN squadov.wow_encounters AS we
                     ON we.match_uuid = m.uuid
                 LEFT JOIN squadov.wow_challenges AS wc
                     ON wc.match_uuid = m.uuid
+                LEFT JOIN squadov.wow_arenas AS wa
+                    ON wa.match_uuid = m.uuid
                 WHERE m.uuid = $1
             )
             SELECT
@@ -287,12 +295,14 @@ impl api::ApiApplication {
                 SerializedWoWDeath,
                 r#"
                 WITH match_start_stop (start, stop) AS (
-                    SELECT COALESCE(we.tm, wc.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, NOW())
+                    SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
                     FROM squadov.matches AS m
                     LEFT JOIN squadov.wow_encounters AS we
                         ON we.match_uuid = m.uuid
                     LEFT JOIN squadov.wow_challenges AS wc
                         ON wc.match_uuid = m.uuid
+                    LEFT JOIN squadov.wow_arenas AS wa
+                        ON wa.match_uuid = m.uuid
                     WHERE m.uuid = $1
                 ), match_combat_logs AS (
                     SELECT wce.*
@@ -329,12 +339,14 @@ impl api::ApiApplication {
                 SerializedWoWResurrection,
                 r#"
                 WITH match_start_stop (start, stop) AS (
-                    SELECT COALESCE(we.tm, wc.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, NOW())
+                    SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
                     FROM squadov.matches AS m
                     LEFT JOIN squadov.wow_encounters AS we
                         ON we.match_uuid = m.uuid
                     LEFT JOIN squadov.wow_challenges AS wc
                         ON wc.match_uuid = m.uuid
+                    LEFT JOIN squadov.wow_arenas AS wa
+                        ON wa.match_uuid = m.uuid
                     WHERE m.uuid = $1
                 ), match_combat_logs AS (
                     SELECT wce.*

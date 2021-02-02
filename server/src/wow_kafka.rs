@@ -59,11 +59,11 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, cfg: &ClientCon
                     let mut events = opaque.events.write().await;
                     let new_event = parsed_event.unwrap();
 
-                    // We want to flush logs on ENCOUNTER_END/COMBAT_CHALLENGE_END so that the entire
+                    // We want to flush logs on ENCOUNTER_END/COMBAT_CHALLENGE_END/ARENA_MATCH_END so that the entire
                     // match is available as soon as it's finished and not have to rely on more events
                     // being pushed onto the Kafka queue or waiting for the user to end the game.
                     manual_handle_flags = match &new_event.event {
-                        squadov_common::WoWCombatLogEventType::ChallengeModeEnd{..} | squadov_common::WoWCombatLogEventType::EncounterEnd{..} => true,
+                        squadov_common::WoWCombatLogEventType::ChallengeModeEnd{..} | squadov_common::WoWCombatLogEventType::EncounterEnd{..} | squadov_common::WoWCombatLogEventType::ArenaEnd{..} => true,
                         _ => false
                     };
 

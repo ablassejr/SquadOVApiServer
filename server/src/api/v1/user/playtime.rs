@@ -86,6 +86,11 @@ impl api::ApiApplication {
                             FROM relevant_matches AS rm
                             INNER JOIN squadov.wow_encounters AS we
                                 ON we.match_uuid = rm.match_uuid
+                        ) + (
+                            SELECT COALESCE(SUM(rm.duration)::BIGINT,0)
+                            FROM relevant_matches AS rm
+                            INNER JOIN squadov.wow_arenas AS wa
+                                ON wa.match_uuid = rm.match_uuid
                         )
                     ) AS "wow_ms!"
                 "#,

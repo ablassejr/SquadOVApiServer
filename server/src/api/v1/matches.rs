@@ -19,6 +19,7 @@ use squadov_common::{
     wow::{
         WoWEncounter,
         WoWChallenge,
+        WoWArena,
     },
 };
 use std::sync::Arc;
@@ -111,7 +112,8 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
     let lol_matches = db::list_lol_match_summaries_for_uuids(&*app.pool, &match_uuids).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, LolPlayerMatchSummary>>();
     let wow_encounters = app.list_wow_encounter_for_uuids(&match_uuids).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, WoWEncounter>>();
     let wow_challenges = app.list_wow_challenges_for_uuids(&match_uuids).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, WoWChallenge>>();
-    // TFT and Valorant are different because the match summary is player dependent.
+    // TFT, Valorant, and WoW arenas are different because the match summary is player dependent.
+    let mut wow_arenas = app.list_wow_arenas_for_uuids(&match_player_pairs).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWArena>>();
     let tft_match_uuids: HashSet<Uuid> = db::filter_tft_match_uuids(&*app.pool, &match_uuids).await?.into_iter().collect();
     let mut tft_matches = db::list_tft_match_summaries_for_uuids(&*app.pool, &match_player_pairs)
         .await?
@@ -141,6 +143,7 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
         let valorant_match = valorant_matches.remove(&key_pair);
         let wow_encounter = wow_encounters.get(&x.match_uuid);
         let wow_challenge = wow_challenges.get(&x.match_uuid);
+        let wow_arena = wow_arenas.remove(&key_pair);
 
         Ok(RecentMatch {
             base: BaseRecentMatch{
@@ -157,7 +160,7 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
                     SquadOvGames::TeamfightTactics
                 } else if valorant_match.is_some() {
                     SquadOvGames::Valorant
-                } else if wow_encounter.is_some() || wow_challenge.is_some() {
+                } else if wow_encounter.is_some() || wow_challenge.is_some() || wow_arena.is_some() {
                     SquadOvGames::WorldOfWarcraft
                 } else {
                     SquadOvGames::Hearthstone
@@ -172,6 +175,7 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
             valorant_match,
             wow_challenge: wow_challenge.cloned(),
             wow_encounter: wow_encounter.cloned(),
+            wow_arena,
         })
     }).collect::<Result<Vec<RecentMatch>, SquadOvError>>()?, &req, &query, expected_total == got_total)?)) 
 }

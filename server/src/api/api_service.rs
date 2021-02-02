@@ -390,6 +390,14 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         )
                                 )
                                 .service(
+                                    web::scope("/arena")
+                                        .route("", web::post().to(v1::create_wow_arena_match_handler))
+                                        .service(
+                                            web::scope("/{match_uuid}")
+                                                .route("", web::post().to(v1::finish_wow_arena_handler))
+                                        )
+                                )
+                                .service(
                                     web::scope("/{match_uuid}")
                                         .service(
                                             web::scope("/users/{user_id}")
@@ -421,6 +429,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                             web::scope("/{character_guid}")
                                                 .route("/encounters", web::get().to(v1::list_wow_encounters_for_character_handler))
                                                 .route("/challenges", web::get().to(v1::list_wow_challenges_for_character_handler))
+                                                .route("/arena", web::get().to(v1::list_wow_arenas_for_character_handler))
                                         )
                                 )
                                 .service(
