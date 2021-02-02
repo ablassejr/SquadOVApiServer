@@ -35,7 +35,7 @@ impl api::ApiApplication {
                     (mcl.evt->>'items')::jsonb,
                     '$[*].ilvl'
                 ) AS "items!",
-                (mcl.evt->>'team')::INTEGER AS "team!"
+                COALESCE((mcl.evt->>'team')::INTEGER, 0) AS "team!"
             FROM (
                 SELECT wce.*
                 FROM squadov.wow_combat_log_events AS wce
