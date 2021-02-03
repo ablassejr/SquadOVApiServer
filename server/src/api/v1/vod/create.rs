@@ -146,7 +146,7 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
     // Note that we don't want to spawn a task directly here to "fastify" the VOD
     // because it does take a significant amount of memory/disk space to do so.
     // So we toss it to the local job queue so we can better limit the amount of resources we end up using.
-    app.vod_itf.request_vod_processing(&data.association.video_uuid, data.session_uri.clone()).await?;
+    app.vod_itf.request_vod_processing(&data.association.video_uuid, data.session_uri.clone(), true).await?;
     return Ok(HttpResponse::Ok().finish());
 }
 

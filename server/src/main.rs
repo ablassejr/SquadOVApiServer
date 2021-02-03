@@ -66,14 +66,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let vods = app.find_vods_without_fastify().await.unwrap();
                 for v in vods {
                     log::info!("Enqueue job: {}", &v);
-                    app.vod_itf.request_vod_processing(&v, None).await.unwrap();
+                    app.vod_itf.request_vod_processing(&v, None, false).await.unwrap();
                 }
                 async_std::task::sleep(std::time::Duration::from_secs(5)).await;
             } else if mode == "vod_preview" {
                 let vods = app.find_vods_without_preview().await.unwrap();
                 for v in vods {
                     log::info!("Enqueue job: {}", &v);
-                    app.vod_itf.request_vod_processing(&v, None).await.unwrap();
+                    app.vod_itf.request_vod_processing(&v, None, false).await.unwrap();
                 }
                 async_std::task::sleep(std::time::Duration::from_secs(5)).await;
             } else if mode == "wow_manual_parsing" {

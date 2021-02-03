@@ -15,9 +15,12 @@ impl api::ApiApplication {
     pub async fn find_vods_without_fastify(&self) -> Result<Vec<Uuid>, squadov_common::SquadOvError> {
         Ok(sqlx::query_scalar(
             "
-            SELECT video_uuid
-            FROM squadov.vod_metadata
+            SELECT vm.video_uuid
+            FROM squadov.vod_metadata AS vm
+            INNER JOIN squadov.vods AS v
+                ON v.video_uuid = vm.video_uuid
             WHERE has_fastify = false
+                AND end_time BETWEEN NOW() - INTERVAL '1 months' AND NOW()
             "
         )
             .fetch_all(&*self.pool)
@@ -27,9 +30,12 @@ impl api::ApiApplication {
     pub async fn find_vods_without_preview(&self) -> Result<Vec<Uuid>, squadov_common::SquadOvError> {
         Ok(sqlx::query_scalar(
             "
-            SELECT video_uuid
-            FROM squadov.vod_metadata
+            SELECT vm.video_uuid
+            FROM squadov.vod_metadata AS vm
+            INNER JOIN squadov.vods AS v
+                ON v.video_uuid = vm.video_uuid
             WHERE has_preview = false
+                AND end_time BETWEEN NOW() - INTERVAL '1 months' AND NOW()
             "
         )
             .fetch_all(&*self.pool)

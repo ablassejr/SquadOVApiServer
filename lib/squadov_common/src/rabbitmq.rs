@@ -16,7 +16,7 @@ use std::collections::{HashMap, VecDeque};
 
 pub const RABBITMQ_DEFAULT_PRIORITY: u8 = 0;
 pub const RABBITMQ_HIGH_PRIORITY: u8 = 10;
-const RABBITMQ_PREFETCH_COUNT: u16 = 8;
+const RABBITMQ_PREFETCH_COUNT: u16 = 2;
 
 #[derive(Deserialize,Debug,Clone)]
 pub struct RabbitMqConfig {

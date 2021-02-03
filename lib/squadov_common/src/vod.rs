@@ -13,6 +13,7 @@ use crate::{
     SquadOvError,
     rabbitmq::{
         RABBITMQ_DEFAULT_PRIORITY,
+        RABBITMQ_HIGH_PRIORITY,
         RabbitMqInterface,
         RabbitMqListener,
     },
@@ -117,11 +118,11 @@ impl VodProcessingInterface {
         }
     }
 
-    pub async fn request_vod_processing(&self, vod_uuid: &Uuid, session_id: Option<String>) -> Result<(), SquadOvError> {
+    pub async fn request_vod_processing(&self, vod_uuid: &Uuid, session_id: Option<String>, high_priority: bool) -> Result<(), SquadOvError> {
         self.rmq.publish(&self.queue, serde_json::to_vec(&VodProcessingTask::Process{
             vod_uuid: vod_uuid.clone(),
             session_id,
-        })?, RABBITMQ_DEFAULT_PRIORITY).await;
+        })?, if high_priority { RABBITMQ_HIGH_PRIORITY } else { RABBITMQ_DEFAULT_PRIORITY }).await;
         Ok(())
     }
 
@@ -141,22 +142,27 @@ impl VodProcessingInterface {
         }
 
         // We do *ALL* processing on the VOD here (for better or worse).
-        // 1) Convert the video using the vod.fastify module. This gets us a VOD
+        // 1) Download the VOD to disk using the VOD manager (I think this gets us
+        //    faster DL speed than using FFMPEG directly).
+        // 2) Convert the video using the vod.fastify module. This gets us a VOD
         //    that has the faststart flag.
-        // 2) Generate a preview of the VOD.
-        // 3) Re-upload the video and the preview using the VOD manager.
-        // 4) Mark the video as being "fastified" (I really need a better word).
-        // 5) Mark the video as having a preview.
-        let fastify_filename = NamedTempFile::new()?.into_temp_path();
-        let preview_filename = NamedTempFile::new()?.into_temp_path();
-        let raw_uri = self.vod.get_segment_redirect_uri(&VodSegmentId{
+        // 3) Generate a preview of the VOD.
+        // 4) Upload the processed video and the preview using the VOD manager.
+        // 5) Mark the video as being "fastified" (I really need a better word).
+        // 6) Mark the video as having a preview.
+        let input_filename = NamedTempFile::new()?.into_temp_path();
+        log::info!("Download VOD - {}", vod_uuid);
+        self.vod.download_vod_to_path(&VodSegmentId{
             video_uuid: vod_uuid.clone(),
             quality: String::from("source"),
             segment_name: String::from("video.mp4"),
-        }).await?;
+        }, &input_filename).await?;
+
+        let fastify_filename = NamedTempFile::new()?.into_temp_path();
+        let preview_filename = NamedTempFile::new()?.into_temp_path();
 
         log::info!("Fastify Mp4 - {}", vod_uuid);
-        fastify::fastify_mp4(&raw_uri, &fastify_filename).await?;
+        fastify::fastify_mp4(input_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &fastify_filename).await?;
 
         log::info!("Generate Preview Mp4 - {}", vod_uuid);
         preview::generate_vod_preview(fastify_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &preview_filename).await?;

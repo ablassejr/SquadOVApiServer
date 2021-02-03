@@ -23,7 +23,7 @@ pub async fn generate_vod_preview(input_fname: &str, output_fname: &std::path::P
             .arg("-i")
             .arg(input_fname)
             .arg("-vf")
-            .arg("fps=fps=25,scale=320:-1")
+            .arg("fps=fps=25,scale=320:-1,pad=ceil(iw/2)*2:ceil(ih/2)*2")
             .arg("-c:v")
             .arg("h264")
             .arg("-crf")
