@@ -648,6 +648,56 @@
       "nullable": []
     }
   },
+  "17a51c2fcc61458ff8bfb694cef579041e1e4f9dc641f58b77a6b0e70f3f0210": {
+    "query": "\n            SELECT *\n            FROM squadov.vods\n            WHERE video_uuid = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "user_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 3,
+          "name": "start_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "end_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "raw_container_format",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        false,
+        true,
+        true,
+        false
+      ]
+    }
+  },
   "19da982e6bfdb23d8b77bd2d2763c6e61fe4bc6abf9b0885f8964e7692ac67f9": {
     "query": "\n            SELECT\n                sq.id AS \"id!\",\n                sq.squad_name AS \"squad_name!\",\n                sq.squad_group AS \"squad_group!\",\n                sq.creation_time AS \"creation_time!\",\n                sq.member_count AS \"member_count!\",\n                sq.pending_invite_count AS \"pending_invite_count!\"\n            FROM squadov.squad_overview AS sq\n            WHERE id = $1\n            ",
     "describe": {
@@ -1301,6 +1351,11 @@
           "ordinal": 4,
           "name": "end_time",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "raw_container_format",
+          "type_info": "Varchar"
         }
       ],
       "parameters": {
@@ -1314,7 +1369,8 @@
         true,
         false,
         true,
-        true
+        true,
+        false
       ]
     }
   },
@@ -2820,6 +2876,56 @@
       "nullable": []
     }
   },
+  "61392061af743e6ce12c197fadea87fd5cce6fda3720406384c3093c09d4d080": {
+    "query": "\n                SELECT v.*\n                FROM squadov.vods AS v\n                WHERE v.video_uuid = ANY($1)\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "user_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 3,
+          "name": "start_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "end_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "raw_container_format",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        false,
+        true,
+        true,
+        false
+      ]
+    }
+  },
   "617817b3f309e43b91fe7c8ca1c59664d781eb74f5f13cb4c787bbe4d2b082e3": {
     "query": "\n                    SELECT\n                        vprm.round,\n                        vprm.buy_time,\n                        vprm.round_time\n                    FROM squadov.valorant_player_round_metadata AS vprm\n                    WHERE vprm.match_uuid = $1\n                        AND vprm.puuid = $2\n                    ",
     "describe": {
@@ -4269,6 +4375,20 @@
       ]
     }
   },
+  "8dc245a94b50bf1c93c2a76481583616d793796c1dffdcd1a68c13b730cc08f3": {
+    "query": "\n            INSERT INTO squadov.vods (video_uuid, raw_container_format, user_uuid)\n            SELECT $1, $2, u.uuid\n            FROM squadov.users AS u\n            WHERE u.id = $3\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Varchar",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "8e0e514b947b6c6c89844fb840c0bf90bc35bfe3bdd6aa71b334339d08d68788": {
     "query": "\n            SELECT match_uuid, platform, match_id\n            FROM squadov.lol_matches\n            WHERE match_uuid = $1\n            ",
     "describe": {
@@ -4880,6 +5000,11 @@
           "ordinal": 4,
           "name": "end_time",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "raw_container_format",
+          "type_info": "Varchar"
         }
       ],
       "parameters": {
@@ -4893,7 +5018,8 @@
         true,
         false,
         true,
-        true
+        true,
+        false
       ]
     }
   },

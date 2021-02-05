@@ -209,6 +209,56 @@
       "nullable": []
     }
   },
+  "17a51c2fcc61458ff8bfb694cef579041e1e4f9dc641f58b77a6b0e70f3f0210": {
+    "query": "\n            SELECT *\n            FROM squadov.vods\n            WHERE video_uuid = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "user_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 3,
+          "name": "start_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "end_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "raw_container_format",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        false,
+        true,
+        true,
+        false
+      ]
+    }
+  },
   "1a45b676a68e81a7fc80599e7a5f2891a0676cb8511e752229770aba4dfbb29e": {
     "query": "\n        INSERT INTO squadov.riot_account_game_shards (\n            puuid,\n            game,\n            shard\n        )\n        VALUES (\n            $1,\n            $2,\n            $3\n        )\n        ON CONFLICT (puuid, game) DO UPDATE\n            SET shard = EXCLUDED.shard\n        ",
     "describe": {
