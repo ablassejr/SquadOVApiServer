@@ -20,6 +20,23 @@ use crate::{
 };
 use std::sync::Arc;
 use tempfile::NamedTempFile;
+use chrono::{DateTime, Utc};
+
+#[derive(Serialize,Deserialize, Clone)]
+pub struct VodAssociation {
+    #[serde(rename = "matchUuid")]
+    pub match_uuid: Option<Uuid>,
+    #[serde(rename = "userUuid")]
+    pub user_uuid: Option<Uuid>,
+    #[serde(rename = "videoUuid")]
+    pub video_uuid: Uuid,
+    #[serde(rename = "startTime")]
+    pub start_time: Option<DateTime<Utc>>,
+    #[serde(rename = "endTime")]
+    pub end_time: Option<DateTime<Utc>>,
+    #[serde(rename = "rawContainerFormat")]
+    pub raw_container_format: String,
+}
 
 #[derive(Serialize,Deserialize,Clone)]
 pub struct VodMetadata {
@@ -57,7 +74,9 @@ pub struct VodSegment {
     pub uri: String,
     pub duration: f32,
     #[serde(rename="segmentStart")]
-    pub segment_start: f32
+    pub segment_start: f32,
+    #[serde(rename="mimeType")]
+    pub mime_type: String,
 }
 
 #[derive(Serialize,Deserialize)]
@@ -141,6 +160,9 @@ impl VodProcessingInterface {
             }
         }
 
+        let vod = db::get_vod_association(&*self.db, vod_uuid).await?;
+        let raw_extension = container_format_to_extension(&vod.raw_container_format);
+
         // We do *ALL* processing on the VOD here (for better or worse).
         // 1) Download the VOD to disk using the VOD manager (I think this gets us
         //    faster DL speed than using FFMPEG directly).
@@ -155,14 +177,14 @@ impl VodProcessingInterface {
         self.vod.download_vod_to_path(&VodSegmentId{
             video_uuid: vod_uuid.clone(),
             quality: String::from("source"),
-            segment_name: String::from("video.mp4"),
+            segment_name: format!("video.{}", &raw_extension),
         }, &input_filename).await?;
 
         let fastify_filename = NamedTempFile::new()?.into_temp_path();
         let preview_filename = NamedTempFile::new()?.into_temp_path();
 
         log::info!("Fastify Mp4 - {}", vod_uuid);
-        fastify::fastify_mp4(input_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &fastify_filename).await?;
+        fastify::fastify_mp4(input_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &vod.raw_container_format, &fastify_filename).await?;
 
         log::info!("Generate Preview Mp4 - {}", vod_uuid);
         preview::generate_vod_preview(fastify_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &preview_filename).await?;
@@ -192,5 +214,19 @@ impl VodProcessingInterface {
 
         log::info!("Finish Fastifying {:?}", vod_uuid);
         Ok(())
+    }
+}
+
+pub fn container_format_to_extension(container_format: &str) -> String {
+    match container_format {
+        "mpegts" => String::from("ts"),
+        _ => String::from("mp4")
+    }
+}
+
+pub fn container_format_to_mime_type(container_format: &str) -> String {
+    match container_format {
+        "mpegts" => String::from("video/mp2t"),
+        _ => String::from("video/mp4")
     }
 }

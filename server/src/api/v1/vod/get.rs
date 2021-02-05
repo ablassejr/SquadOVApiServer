@@ -45,6 +45,8 @@ impl api::ApiApplication {
 
     pub async fn get_vod(&self, video_uuid: &[Uuid]) -> Result<HashMap<Uuid, VodManifest>, SquadOvError> {
         let quality_options = self.get_vod_quality_options(video_uuid).await?;
+        let associations = self.find_vod_associations(video_uuid).await?;
+
         Ok(
             video_uuid.iter().map(|x| {
                 // We return our custom manifest format here instead of using M3U8 because we're not
@@ -56,48 +58,56 @@ impl api::ApiApplication {
                     ..Default::default()
                 };
 
-                let options = quality_options.get(x);
-                if options.is_some() {
-                    for quality in options.unwrap() {
-                        let mut track = VodTrack{
-                            metadata: quality.clone(),
-                            segments: Vec::new(),
-                            preview: None,
-                        };
+                let options = quality_options.get(x).ok_or(SquadOvError::NotFound)?;
+                let assoc = associations.get(x).ok_or(SquadOvError::NotFound)?;
 
-                        // Eventually we'll want to figure out how to do real segments and maintaining
-                        // compatability wit Electron but for now just a single file is all we have so just
-                        // pretend we just have a single segment.
-                        track.segments.push(VodSegment{
-                            uri: format!("/v1/vod/{video_uuid}/{quality}/{segment}.mp4",
-                                video_uuid=x,
-                                quality=&quality.id,
-                                segment=if quality.has_fastify {
-                                    "fastify"
-                                } else {
-                                    "video"
-                                }
-                            ),
-                            // Duration is a placeholder - not really needed but will be useful once we get
-                            // back to using semgnets.
-                            duration: 0.0,
-                            segment_start: 0.0,
-                        });
+                for quality in options {
+                    let mut track = VodTrack{
+                        metadata: quality.clone(),
+                        segments: Vec::new(),
+                        preview: None,
+                    };
 
-                        if quality.has_preview {
-                            track.preview = Some(format!(
-                                "/v1/vod/{video_uuid}/{quality}/preview.mp4",
-                                video_uuid=x,
-                                quality=&quality.id,
-                            ));
-                        }
+                    let container_format = String::from(if quality.has_fastify {
+                        "mp4"
+                    } else {
+                        &assoc.raw_container_format
+                    });
 
-                        manifest.video_tracks.push(track);
+                    // Eventually we'll want to figure out how to do real segments and maintaining
+                    // compatability wit Electron but for now just a single file is all we have so just
+                    // pretend we just have a single segment.
+                    track.segments.push(VodSegment{
+                        uri: format!("/v1/vod/{video_uuid}/{quality}/{segment}.{extension}",
+                            video_uuid=x,
+                            quality=&quality.id,
+                            segment=if quality.has_fastify {
+                                "fastify"
+                            } else {
+                                "video"
+                            },
+                            extension=&squadov_common::container_format_to_extension(&container_format),
+                        ),
+                        // Duration is a placeholder - not really needed but will be useful once we get
+                        // back to using semgnets.
+                        duration: 0.0,
+                        segment_start: 0.0,
+                        mime_type: squadov_common::container_format_to_mime_type(&container_format),
+                    });
+
+                    if quality.has_preview {
+                        track.preview = Some(format!(
+                            "/v1/vod/{video_uuid}/{quality}/preview.mp4",
+                            video_uuid=x,
+                            quality=&quality.id,
+                        ));
                     }
+
+                    manifest.video_tracks.push(track);
                 }
 
-                (x.clone(), manifest)
-            }).collect()
+                Ok((x.clone(), manifest))
+            }).collect::<Result<HashMap<Uuid, VodManifest>, SquadOvError>>()?
         )
     }
 }

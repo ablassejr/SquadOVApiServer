@@ -4,7 +4,7 @@ use tokio::process::Command;
 
 // Converts the mp4 to have the faststart ffmpeg movflag so that users
 // can start viewing the video immediately.
-pub async fn fastify_mp4(input_fname: &str, output_fname: &std::path::Path) -> Result<(), SquadOvError> {
+pub async fn fastify_mp4(input_fname: &str, container_format: &str, output_fname: &std::path::Path) -> Result<(), SquadOvError> {
     let ffmpeg_path = std::env::var("FFMPEG_BINARY_PATH")?;
     let ffmpeg_output = Command::new(&ffmpeg_path)
         // Single threaded so that we can split our CPU bandwidth among multiple videos.
@@ -15,7 +15,7 @@ pub async fn fastify_mp4(input_fname: &str, output_fname: &std::path::Path) -> R
         // Need to auto accept overwriting existing files to prevent blocking.
         .arg("-y")
         .arg("-f")
-        .arg("mp4")
+        .arg(container_format)
         .arg("-i")
         .arg(input_fname)
         // The general use case of this function is to take an already encoded video (mp4) that

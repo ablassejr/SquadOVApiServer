@@ -3,6 +3,7 @@ use tokio::process::Command;
 
 // Generate a (hopefully) relevant clip for use as the VOD's preview.
 pub async fn generate_vod_preview(input_fname: &str, output_fname: &std::path::Path) -> Result<(), SquadOvError> {
+    // HARD CODING OF MP4 HERE IS FINE FOR NOW.
     let ffmpeg_path = std::env::var("FFMPEG_BINARY_PATH")?;
     let ffmpeg_output = if cfg!(unix) {
         Command::new(&ffmpeg_path)

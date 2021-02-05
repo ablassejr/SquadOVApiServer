@@ -3,7 +3,7 @@ use squadov_common::{
     riot::db,
 };
 use crate::api;
-use crate::api::v1::VodAssociation;
+use squadov_common::vod::VodAssociation;
 use actix_web::{web, HttpResponse};
 use std::sync::Arc;
 use super::TftMatchUserInput;

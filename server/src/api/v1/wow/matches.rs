@@ -14,7 +14,7 @@ use squadov_common::{
 };
 use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
-use crate::api::v1::VodAssociation;
+use squadov_common::vod::VodAssociation;
 use std::sync::Arc;
 use uuid::Uuid;
 use sqlx::{Executor, Postgres};

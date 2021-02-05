@@ -6,11 +6,14 @@ use std::sync::Arc;
 use serde::{Deserialize};
 use uuid::Uuid;
 use sqlx::{Transaction, Postgres};
+use squadov_common::vod::VodAssociation;
 
 #[derive(Deserialize)]
 pub struct VodCreateDestinationUriInput {
     #[serde(rename="videoUuid")]
-    video_uuid: Uuid
+    video_uuid: Uuid,
+    #[serde(rename="containerFormat")]
+    container_format: String,
 }
 
 #[derive(Deserialize)]
@@ -20,14 +23,14 @@ pub struct VodAssociatePathInput {
 
 #[derive(Deserialize)]
 pub struct VodAssociateBodyInput {
-    association: super::VodAssociation,
+    association: VodAssociation,
     metadata: squadov_common::VodMetadata,
     #[serde(rename="sessionUri")]
     session_uri: Option<String>,
 }
 
 impl api::ApiApplication {
-    pub async fn associate_vod(&self, tx : &mut Transaction<'_, Postgres>, assoc : &super::VodAssociation) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn associate_vod(&self, tx : &mut Transaction<'_, Postgres>, assoc : &VodAssociation) -> Result<(), squadov_common::SquadOvError> {
         tx.execute(
             sqlx::query!(
                 "
@@ -48,17 +51,18 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn reserve_vod_uuid(&self, vod_uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn reserve_vod_uuid(&self, vod_uuid: &Uuid, container_format: &str, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
         let mut tx = self.pool.begin().await?;
 
         sqlx::query!(
             "
-            INSERT INTO squadov.vods (video_uuid, user_uuid)
-            SELECT $1, u.uuid
+            INSERT INTO squadov.vods (video_uuid, raw_container_format, user_uuid)
+            SELECT $1, $2, u.uuid
             FROM squadov.users AS u
-            WHERE u.id = $2
+            WHERE u.id = $3
             ",
             vod_uuid,
+            container_format,
             user_id,
         )
             .execute(&mut tx)
@@ -159,12 +163,13 @@ pub async fn create_vod_destination_handler(data : web::Json<VodCreateDestinatio
         None => return Err(squadov_common::SquadOvError::BadRequest)
     };
     
-    app.reserve_vod_uuid(&data.video_uuid, session.user.id).await?;
+    app.reserve_vod_uuid(&data.video_uuid, &data.container_format, session.user.id).await?;
 
+    let extension = squadov_common::container_format_to_extension(&data.container_format);
     let path = app.vod.get_segment_upload_uri(&squadov_common::VodSegmentId{
         video_uuid: data.video_uuid.clone(),
         quality: String::from("source"),
-        segment_name: String::from("video.mp4")
+        segment_name: format!("video.{}", &extension),
     }).await?;
     Ok(HttpResponse::Ok().json(&path))
 }

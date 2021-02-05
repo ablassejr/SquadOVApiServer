@@ -10,8 +10,8 @@ use squadov_common::hearthstone::game_packet::{
     HearthstoneMatchMetadata,
     HearthstoneGamePacket,
 };
+use squadov_common::vod::VodAssociation;
 use crate::api;
-use crate::api::v1::VodAssociation;
 use actix_web::{web, HttpResponse};
 use std::sync::Arc;
 use uuid::Uuid;

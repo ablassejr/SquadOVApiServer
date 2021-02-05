@@ -6,7 +6,7 @@ use squadov_common::{
     SquadOvError,
 };
 use crate::api;
-use crate::api::v1::VodAssociation;
+use squadov_common::vod::VodAssociation;
 use actix_web::{web, HttpResponse};
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;

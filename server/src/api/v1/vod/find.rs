@@ -4,6 +4,8 @@ use actix_web::{web, HttpResponse};
 use serde::{Deserialize};
 use uuid::Uuid;
 use std::sync::Arc;
+use std::collections::HashMap;
+use squadov_common::vod::VodAssociation;
 
 #[derive(Deserialize)]
 pub struct VodMatchFindFromMatchUserId {
@@ -42,9 +44,9 @@ impl api::ApiApplication {
             .await?)
     }
 
-    pub async fn find_vod_from_match_user_id(&self, match_uuid: Uuid, user_id: i64) -> Result<Option<super::VodAssociation>, squadov_common::SquadOvError> {
+    pub async fn find_vod_from_match_user_id(&self, match_uuid: Uuid, user_id: i64) -> Result<Option<VodAssociation>, squadov_common::SquadOvError> {
         Ok(sqlx::query_as!(
-            super::VodAssociation,
+            VodAssociation,
             "
             SELECT v.*
             FROM squadov.vods AS v
@@ -60,9 +62,9 @@ impl api::ApiApplication {
             .await?)
     }
 
-    pub async fn find_accessible_vods_in_match_for_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<super::VodAssociation>, squadov_common::SquadOvError> {
+    pub async fn find_accessible_vods_in_match_for_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<VodAssociation>, squadov_common::SquadOvError> {
         Ok(sqlx::query_as!(
-            super::VodAssociation,
+            VodAssociation,
             "
             SELECT DISTINCT v.*
             FROM squadov.vods AS v
@@ -80,6 +82,27 @@ impl api::ApiApplication {
         )
             .fetch_all(&*self.pool)
             .await?)
+    }
+
+    pub async fn find_vod_associations(&self, video_uuid: &[Uuid]) -> Result<HashMap<Uuid, VodAssociation>, squadov_common::SquadOvError> {
+        Ok(
+            sqlx::query_as!(
+                VodAssociation,
+                "
+                SELECT v.*
+                FROM squadov.vods AS v
+                WHERE v.video_uuid = ANY($1)
+                ",
+                video_uuid,
+            )
+            .fetch_all(&*self.pool)
+            .await?
+            .into_iter()
+            .map(|x| {
+                (x.video_uuid.clone(), x)
+            })
+            .collect()
+        )
     }
 }
 
