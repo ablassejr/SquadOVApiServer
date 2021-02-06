@@ -21,10 +21,14 @@ use squadov_common::{
         WoWChallenge,
         WoWArena,
     },
+    access::AccessTokenRequest
 };
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use std::collections::{HashSet, HashMap};
+use serde::Deserialize;
+use url::Url;
+use rand::Rng;
 
 pub struct Match {
     pub uuid : Uuid
@@ -32,6 +36,11 @@ pub struct Match {
 
 pub struct MatchCollection {
     pub uuid: Uuid
+}
+
+#[derive(Deserialize,Debug)]
+pub struct GenericMatchPathInput {
+    match_uuid: Uuid
 }
 
 struct RawRecentMatchData {
@@ -178,4 +187,96 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
             wow_arena,
         })
     }).collect::<Result<Vec<RecentMatch>, SquadOvError>>()?, &req, &query, expected_total == got_total)?)) 
+}
+
+#[derive(Deserialize,Debug)]
+#[serde(rename_all="camelCase")]
+pub struct MatchShareSignatureData {
+    full_path: String,
+    game: SquadOvGames,
+}
+
+pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, data: web::Json<MatchShareSignatureData>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return Err(SquadOvError::Unauthorized),
+    };
+
+    // We need to verify that the requesting user is actually a part of the match. Note that we should not
+    // check for the presence of a VOD because we should keep it possible to share matches that are VOD-less.
+    if !squadov_common::matches::is_user_in_match(&*app.pool, session.user.id, &path.match_uuid, data.game).await? {
+        return Err(SquadOvError::Unauthorized);
+    }
+
+    // Next we need to generate the share URL for this match. This is dependent on
+    // 1) The app domain
+    // 2) The game of the match being requested.
+    // 3) The user's POV that's being requested.
+    // #1 is something the API server should know while #2 is something more along the lines of what
+    // the client (user) should know. HOWEVER, we shouldn't fully trust them so we need to examine the
+    // URL that they sent to do further verification. Generally the only two things we need to verify are
+    // 1) The user ID (should match the session user id)
+    // 2) The Riot PUUID (only in certain cases).
+    let base_url = format!(
+        "{}{}",
+        &app.config.cors.domain,
+        &data.full_path,
+    );
+    let parsed_url = Url::parse(&base_url)?;
+    for qp in parsed_url.query_pairs() {
+        if qp.0 == "userId" {
+            if qp.1.parse::<i64>()? != session.user.id {
+                return Err(SquadOvError::Unauthorized);
+            }
+        } else if qp.0 == "puuid" {
+            if !db::is_riot_puuid_linked_to_user(&*app.pool, session.user.id, &qp.1).await? {
+                return Err(SquadOvError::Unauthorized);
+            }
+        }
+    }
+
+    // If the user already shared this match, reuse that token so we don't fill up our databases with a bunch of useless tokens.
+    let mut token = squadov_common::access::find_encrypted_access_token(&*app.pool, &path.match_uuid, session.user.id).await?;
+
+    if token.is_none() {
+        // Now that we've verified all these things we can go ahead and return to the user a fully fleshed out
+        // URL that can be shared. We enable this by generating an encrypted access token that can be used to imitate 
+        // access as this session's user to ONLY this current match UUID (along with an optional VOD UUID if one exists).
+        let access_request = AccessTokenRequest{
+            full_path: data.full_path.clone(),
+            user_uuid: session.user.uuid.clone(),
+            match_uuid: path.match_uuid.clone(),
+            video_uuid: app.find_vod_from_match_user_id(path.match_uuid.clone(), session.user.id).await?.map(|x| {
+                x.video_uuid
+            }),
+        };
+
+        let mut rng = rand::thread_rng();
+        let iv: String = (0i32..8i32).map(|_x| {
+            rng.gen::<char>()
+        }).collect();
+        let new_token = access_request.generate_token(&app.config.squadov.share_key, &iv)?;
+
+        // Store the encrypted token in our database and return to the user a URL with the unique ID and the IV.
+        // This way we get a (relatively) shorter URL instead of a giant encrypted blob.
+        let mut tx = app.pool.begin().await?;
+        let token_id = squadov_common::access::store_encrypted_access_token(&mut tx, &path.match_uuid, session.user.id, &new_token, &iv).await?;
+        tx.commit().await?;
+
+        token = Some((token_id, iv));
+    }
+
+    let token = token.ok_or(SquadOvError::InternalError(String::from("Failed to obtain/generate share token.")))?;
+
+    // It could be neat to store some sort of access token ID in our database and allow users to track how
+    // many times it was used and be able to revoke it and stuff but I don't think the gains are worth it at
+    // the moment. I'd rather have a more distributed version where we toss a URL out there and just let it be
+    // valid.
+    Ok(HttpResponse::Ok().json(&format!(
+        "{}/share/{}?i={}",
+        &app.config.cors.domain,
+        &token.0,
+        &base64::encode_config(token.1.as_bytes(), base64::URL_SAFE_NO_PAD),
+    )))
 }

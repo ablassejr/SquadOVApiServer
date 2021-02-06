@@ -21,6 +21,7 @@ pub mod matches;
 pub mod games;
 pub mod email;
 pub mod aimlab;
+pub mod access;
 
 pub use error::*;
 pub use parse::*;

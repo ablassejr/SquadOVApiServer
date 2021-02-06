@@ -80,6 +80,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("/info", web::get().to(v1::get_kafka_info_handler))
                 )
                 .service(
+                    web::scope("/match/{match_uuid}")
+                        .route("/share", web::post().to(v1::create_match_share_signature_handler))
+                )
+                .service(
                     web::scope("/users")
                         .service(
                             web::scope("/me")

@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.5.7",
+        "description": "Fixing an oopsie (:",
+        "timestamp": 1612558836000,
+        "data": "data/hotfix-v0.5.7.md",
+        "type": "hotfix"
+    },
+    {
         "title": "SquadOV v0.5.6",
         "description": "Better VOD support for World of Warcraft!",
         "timestamp": 1612550110000,
