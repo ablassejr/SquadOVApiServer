@@ -92,8 +92,11 @@ struct UserActivityUnsubscribe {
 // TODO: This probably needs to be stored externally if we ever want to
 // sync across multiple servers.
 pub struct UserActivityStatusTracker {
+    // Session ID of the Websocket to the address of the recipient to send to. 
     sessions: HashMap<Uuid, Recipient<UserActivityChange>>,
+    // For each user, sessions that are listening to the user.
     per_user_sessions: HashMap<i64, HashSet<Uuid>>,
+    // For each user, their current activity state.
     user_states: HashMap<i64, UserActivityState>,
 }
 
@@ -137,6 +140,7 @@ impl actix::Handler<UserActivityConnect> for UserActivityStatusTracker {
     type Result = ();
 
     fn handle(&mut self, msg: UserActivityConnect, _ctx: &mut Self::Context) {
+        log::info!("User Activity Connect: {}", &msg.id);
         self.sessions.insert(msg.id, msg.addr);
     }
 }
@@ -145,6 +149,7 @@ impl actix::Handler<UserActivityDisconnect> for UserActivityStatusTracker {
     type Result = ();
 
     fn handle(&mut self, msg: UserActivityDisconnect, _ctx: &mut Self::Context) {
+        log::info!("User Activity Disconnect: {}", &msg.id);
         self.sessions.remove(&msg.id);
         for (_, user_sessions) in &mut self.per_user_sessions {
             user_sessions.remove(&msg.id);
@@ -165,6 +170,7 @@ impl actix::Handler<UserActivitySubscribe> for UserActivityStatusTracker {
     type Result = UserActivitySubscribeResponse;
 
     fn handle(&mut self, msg: UserActivitySubscribe, _ctx: &mut Self::Context) -> Self::Result {
+        log::info!("User Activity Subscribe to {:?} by {}", &msg.user_id, &msg.session_id);
         let mut status = HashMap::new();
         for user in &msg.user_id {
             if !self.per_user_sessions.contains_key(user) {
@@ -182,6 +188,7 @@ impl actix::Handler<UserActivityUnsubscribe> for UserActivityStatusTracker {
     type Result = ();
 
     fn handle(&mut self, msg: UserActivityUnsubscribe, _ctx: &mut Self::Context) {
+        log::info!("User Activity Unsubscribe from {:?} by {}", &msg.user_id, &msg.session_id);
         for user in &msg.user_id {
             if !self.per_user_sessions.contains_key(user) {
                 continue;
