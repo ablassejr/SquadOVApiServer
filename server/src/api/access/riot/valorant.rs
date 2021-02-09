@@ -37,4 +37,8 @@ impl AccessChecker<ValorantMatchUuidData> for ValorantMatchAccessChecker {
         let access_set: HashSet<i64> = HashSet::from_iter(app.list_squadov_accounts_can_access_valorant_match(&data.match_uuid).await?);
         Ok(access_set.contains(&session.user.id))
     }
+
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: ValorantMatchUuidData) -> Result<bool, SquadOvError> {
+        Ok(true)
+    }
 }

@@ -14,6 +14,7 @@ pub use verify_email::*;
 pub use logout::*;
 pub use session::*;
 
+use squadov_common::SquadOvError;
 use std::sync::Arc;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -85,14 +86,29 @@ where
                 None => return Err(actix_web::error::ErrorInternalServerError("Bad App Data")),
             };
 
-            let session = match app.session.get_session_from_request(&request, &app.pool).await {
-                Ok(x) => match x {
-                    Some(s) => s,
-                    None => return Err(actix_web::error::ErrorUnauthorized("No Session")),
-                },
-                Err(_) => return Err(actix_web::error::ErrorInternalServerError("Could not retrieve session")),
+            // First check for the presence of a valid share key. This takes precendence over everything else.
+            let share_token = app.session.get_share_token_from_request(&request, &app.config.squadov.share_key).await?;
+            let session = if share_token.is_some() {
+                let share_token = share_token.unwrap();
+                SquadOVSession{
+                    session_id: String::new(),
+                    user: app.users.get_stored_user_from_uuid(&share_token.user_uuid, &*app.pool).await?.ok_or(SquadOvError::NotFound)?,
+                    access_token: String::new(),
+                    refresh_token: String::new(),
+                    old_session_id: None,
+                    is_temp: true,
+                    share_token: Some(share_token),
+                }
+            } else {
+                match app.session.get_session_from_request(&request, &app.pool).await {
+                    Ok(x) => match x {
+                        Some(s) => s,
+                        None => return Err(actix_web::error::ErrorUnauthorized("No Session")),
+                    },
+                    Err(_) => return Err(actix_web::error::ErrorInternalServerError("Could not retrieve session")),
+                }
             };
-
+            
             match app.is_session_valid(&session).await {
                 Ok(b) => {
                     if !b {

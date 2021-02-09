@@ -47,4 +47,8 @@ impl super::AccessChecker<RiotValorantAccountAccessBasicData> for RiotValorantAc
             Err(_) => Ok(false)
         }
     }
+
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: RiotValorantAccountAccessBasicData) -> Result<bool, SquadOvError> {
+        Ok(true)
+    }
 }

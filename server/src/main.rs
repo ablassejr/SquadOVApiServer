@@ -110,6 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .allowed_methods(vec!["GET", "POST", "OPTIONS", "DELETE", "PUT"])
                             .allowed_headers(vec![
                                 "x-squadov-session-id",
+                                "x-squadov-share-id",
                                 "content-type"
                             ])
                             .finish()

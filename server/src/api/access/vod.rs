@@ -43,4 +43,8 @@ impl super::AccessChecker<VodAccessBasicData> for VodAccessChecker {
             Ok(same_squad_user_ids.contains(&session.user.id))
         }
     }
+
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: VodAccessBasicData) -> Result<bool, SquadOvError> {
+        Ok(true)
+    }
 }

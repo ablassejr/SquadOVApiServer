@@ -14,6 +14,9 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
         .service(
             web::scope("/admin")
                 .wrap(access::ApiAccess::new(
+                    Box::new(access::ShareTokenAccessRestricter{}),
+                ))
+                .wrap(access::ApiAccess::new(
                     Box::new(access::AdminAccessChecker{}),
                 ))
                 .wrap(auth::ApiSessionValidator{})
@@ -44,6 +47,9 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 .service(
                     // These are the only two endpoints where the user needs to provide a valid session to use.
                     web::scope("")
+                        .wrap(access::ApiAccess::new(
+                            Box::new(access::DenyShareTokenAccess{}),
+                        ))
                         .wrap(auth::ApiSessionValidator{})
                         .route("/verify", web::get().to(auth::check_verify_email_handler))
                         .route("/verify/resend", web::post().to(auth::resend_verify_email_handler))
@@ -67,24 +73,43 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 )
                         )
                 )
+                .service(
+                    web::scope("/share/{access_token_id}")
+                        .route("/exchange", web::post().to(v1::exchange_access_token_id_handler))
+                )
         )
         .service(
             web::scope("/v1")
+                .wrap(access::ApiAccess::new(
+                    Box::new(access::ShareTokenAccessRestricter{}),
+                ))
                 .wrap(auth::ApiSessionValidator{})
                 .service(
                     web::scope("/bug")
+                        .wrap(access::ApiAccess::new(
+                            Box::new(access::DenyShareTokenAccess{}),
+                        ))
                         .route("", web::post().to(v1::create_bug_report_handler))
                 )
                 .service(
                     web::scope("/kafka")
+                        .wrap(access::ApiAccess::new(
+                            Box::new(access::DenyShareTokenAccess{}),
+                        ))
                         .route("/info", web::get().to(v1::get_kafka_info_handler))
                 )
                 .service(
                     web::scope("/match/{match_uuid}")
+                        .wrap(access::ApiAccess::new(
+                            Box::new(access::DenyShareTokenAccess{}),
+                        ))
                         .route("/share", web::post().to(v1::create_match_share_signature_handler))
                 )
                 .service(
                     web::scope("/users")
+                        .wrap(access::ApiAccess::new(
+                            Box::new(access::DenyShareTokenAccess{}),
+                        ))
                         .service(
                             web::scope("/me")
                                 .service(
@@ -223,6 +248,9 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                             // Need to include the user here for us to verify that that the user
                             // is associated with this valorant account.
                             web::scope("/user/{user_id}")
+                                .wrap(access::ApiAccess::new(
+                                    Box::new(access::DenyShareTokenAccess{}),
+                                ))
                                 .wrap(access::ApiAccess::new(
                                     Box::new(access::SameSquadAccessChecker{
                                         obtainer: access::UserIdPathSetObtainer{
@@ -428,6 +456,9 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 ))
                                 .service(
                                     web::scope("/characters")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::DenyShareTokenAccess{}),
+                                        ))
                                         .route("", web::get().to(v1::list_wow_characters_for_user_handler))
                                         .service(
                                             web::scope("/{character_guid}")
@@ -510,6 +541,9 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 )
                 .service(
                     web::scope("/squad")
+                        .wrap(access::ApiAccess::new(
+                            Box::new(access::DenyShareTokenAccess{}),
+                        ))
                         .route("", web::post().to(v1::create_squad_handler))
                         .service(
                             web::scope("/{squad_id}")
@@ -574,14 +608,14 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
     if graphql_debug {
         scope = scope.service(
             web::resource("/graphql")
-                    .route(web::post().to(graphql::graphql_handler))
-                    .route(web::get().to(graphql::graphiql_handler))
+                .route(web::post().to(graphql::graphql_handler))
+                .route(web::get().to(graphql::graphiql_handler))
         );
     } else {
         scope = scope.service(
             web::resource("/graphql")
-                    .wrap(auth::ApiSessionValidator{})
-                    .route(web::post().to(graphql::graphql_handler))
+                .wrap(auth::ApiSessionValidator{})
+                .route(web::post().to(graphql::graphql_handler))
         );
     }
     scope

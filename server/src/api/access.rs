@@ -4,6 +4,7 @@ mod squad_invite;
 mod riot;
 mod vod;
 mod wow;
+mod share;
 
 pub use user_specific::*;
 pub use squad::*;
@@ -11,6 +12,7 @@ pub use squad_invite::*;
 pub use riot::*;
 pub use vod::*;
 pub use wow::*;
+pub use share::*;
 
 use squadov_common;
 use actix_web::{web, HttpRequest};
@@ -43,6 +45,7 @@ pub trait AccessChecker<T: Send + Sync> {
     /// to that path (e.g. checking whether the user has access to some
     /// resource specifically).
     async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: T) -> Result<bool, squadov_common::SquadOvError>;
+    async fn post_check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: T) -> Result<bool, squadov_common::SquadOvError>;
     fn generate_aux_metadata(&self, req: &HttpRequest) -> Result<T, squadov_common::SquadOvError>;
 }
 
@@ -149,10 +152,39 @@ where
                 };
             }
 
-            match ServiceRequest::from_parts(request, payload) {
-                Ok(x) => Ok(srv.call(x).await?),
-                Err(_) => Err(actix_web::error::ErrorInternalServerError("Failed to reconstruct service request"))
+            let resp = match ServiceRequest::from_parts(request, payload) {
+                Ok(x) => srv.call(x).await?,
+                Err(_) => return Err(actix_web::error::ErrorInternalServerError("Failed to reconstruct service request"))
+            };
+
+            // This is *NOT IDEAL*; however, for checkers that rely on the path, it has to go here since actix web doesn't
+            // parse the path parameters beforehand.
+            {
+                // We assume that this middleware is used in conjunction with the api::auth::ApiSessionValidatorMiddleware
+                // middleware so given that they're logged in, we can obtain their session.
+                let extensions = resp.request().extensions();
+                let session = match extensions.get::<SquadOVSession>() {
+                    Some(x) => x,
+                    None => return Err(actix_web::error::ErrorUnauthorized("No session"))
+                };
+
+                let app = resp.request().app_data::<web::Data<Arc<ApiApplication>>>();
+                if app.is_none() {
+                    return Err(actix_web::error::ErrorInternalServerError("No app data."));
+                }
+
+                let borrowed_checker = checker.borrow();
+
+                // Obtain aux data from the request necessary for the checker to perform an access check.
+                // This is necessary because HttpRequest is not send/sync so we can't pass it to an async call.
+                let aux_data = borrowed_checker.generate_aux_metadata(&resp.request())?;
+                match checker.borrow().post_check(app.unwrap().get_ref().clone(), session, aux_data).await {
+                    Ok(x) => if x { () } else {  return Err(actix_web::error::ErrorUnauthorized("Access [post] check fail")) },
+                    Err(_) => return Err(actix_web::error::ErrorInternalServerError("Failed to perform [post] access check")),
+                };
             }
+
+            Ok(resp)
         })
     }
 }

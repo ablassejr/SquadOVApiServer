@@ -1,5 +1,5 @@
 use actix_web::{HttpRequest};
-use squadov_common;
+use squadov_common::SquadOvError;
 use std::collections::HashSet;
 use crate::api::auth::SquadOVSession;
 use crate::api::ApiApplication;
@@ -53,6 +53,10 @@ impl super::AccessChecker<UserAccessSetBasicData> for UserSpecificAccessChecker<
     async fn check(&self, _app: Arc<ApiApplication>, session: &SquadOVSession, data: UserAccessSetBasicData) -> Result<bool, squadov_common::SquadOvError> {
         return Ok(data.access_set.contains(&session.user.id));
     }
+
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: UserAccessSetBasicData) -> Result<bool, SquadOvError> {
+        Ok(true)
+    }
 }
 
 pub struct AdminAccessChecker {
@@ -66,5 +70,9 @@ impl super::AccessChecker<()> for AdminAccessChecker {
 
     async fn check(&self, _app: Arc<ApiApplication>, session: &SquadOVSession, _data: ()) -> Result<bool, squadov_common::SquadOvError> {
         Ok(session.user.is_admin)
+    }
+
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: ()) -> Result<bool, SquadOvError> {
+        Ok(true)
     }
 }

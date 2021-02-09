@@ -39,4 +39,8 @@ impl super::AccessChecker<WowMatchUserMatchupBasicData> for WowMatchUserMatchupC
         // Check that the given user (in the path) is actually a part of the given match. 
         Ok(app.check_user_has_combat_log_for_match(data.user_id, &data.match_uuid).await?)
     }
+
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: WowMatchUserMatchupBasicData) -> Result<bool, SquadOvError> {
+        Ok(true)
+    }
 }

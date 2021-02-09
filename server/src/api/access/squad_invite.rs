@@ -3,6 +3,7 @@ use crate::api::auth::SquadOVSession;
 use crate::api::ApiApplication;
 use std::sync::Arc;
 use async_trait::async_trait;
+use squadov_common::SquadOvError;
 
 pub trait SquadInviteObtainer {
     fn obtain(&self, req: &HttpRequest) -> Result<uuid::Uuid, squadov_common::SquadOvError>;
@@ -41,5 +42,9 @@ impl super::AccessChecker<SquadInviteAccessBasicData> for super::UserSpecificAcc
     async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: SquadInviteAccessBasicData) -> Result<bool, squadov_common::SquadOvError> {
         let user_id = app.get_squad_invite_user(&data.invite_uuid).await?;
         Ok(user_id == session.user.id)
+    }
+
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: SquadInviteAccessBasicData) -> Result<bool, SquadOvError> {
+        Ok(true)
     }
 }

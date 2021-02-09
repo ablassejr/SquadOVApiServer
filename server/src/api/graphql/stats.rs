@@ -39,7 +39,7 @@ pub(crate) fn stat_sort_direction_to_sql(d: &GraphqlSortDirection) -> squadov_co
 }
 
 pub struct GraphqlAllStats {
-    pub user_uuid: String
+    pub user_id: i64
 }
 
 #[juniper::graphql_object(
@@ -48,7 +48,7 @@ pub struct GraphqlAllStats {
 impl GraphqlAllStats {
     fn aimlab(&self) -> aimlab::GraphqlAimlabStats {
         aimlab::GraphqlAimlabStats{
-            user_uuid: self.user_uuid.clone()
+            user_id: self.user_id,
         }
     }
 }

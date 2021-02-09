@@ -160,7 +160,7 @@ struct ApiClients {
 pub struct ApiApplication {
     pub config: ApiConfig,
     clients: ApiClients,
-    users: auth::UserManager,
+    pub users: auth::UserManager,
     session: auth::SessionManager,
     vod: Arc<dyn VodManager + Send + Sync>,
     pub pool: Arc<PgPool>,

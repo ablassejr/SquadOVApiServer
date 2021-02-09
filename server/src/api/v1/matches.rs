@@ -21,14 +21,19 @@ use squadov_common::{
         WoWChallenge,
         WoWArena,
     },
-    access::AccessTokenRequest
+    access::AccessTokenRequest,
+    encrypt::{
+        AESEncryptRequest,
+        squadov_encrypt,
+        squadov_decrypt,
+    },
+    stats::StatPermission,
 };
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use std::collections::{HashSet, HashMap};
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use url::Url;
-use rand::Rng;
 
 pub struct Match {
     pub uuid : Uuid
@@ -194,6 +199,7 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
 pub struct MatchShareSignatureData {
     full_path: String,
     game: SquadOvGames,
+    graphql_stats: Option<Vec<StatPermission>>,
 }
 
 pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, data: web::Json<MatchShareSignatureData>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
@@ -250,21 +256,23 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
             video_uuid: app.find_vod_from_match_user_id(path.match_uuid.clone(), session.user.id).await?.map(|x| {
                 x.video_uuid
             }),
+            graphql_stats: data.graphql_stats.clone(),
         };
 
-        let mut rng = rand::thread_rng();
-        let iv: String = (0i32..8i32).map(|_x| {
-            rng.gen::<char>()
-        }).collect();
-        let new_token = access_request.generate_token(&app.config.squadov.share_key, &iv)?;
+        let encryption_request = AESEncryptRequest{
+            data: serde_json::to_vec(&access_request)?,
+            aad: session.user.uuid.as_bytes().to_vec(),
+        };
+
+        let encryption_token = squadov_encrypt(encryption_request, &app.config.squadov.share_key)?;
 
         // Store the encrypted token in our database and return to the user a URL with the unique ID and the IV.
         // This way we get a (relatively) shorter URL instead of a giant encrypted blob.
         let mut tx = app.pool.begin().await?;
-        let token_id = squadov_common::access::store_encrypted_access_token(&mut tx, &path.match_uuid, session.user.id, &new_token, &iv).await?;
+        let token_id = squadov_common::access::store_encrypted_access_token(&mut tx, &path.match_uuid, session.user.id, &encryption_token).await?;
         tx.commit().await?;
 
-        token = Some((token_id, iv));
+        token = Some(token_id);
     }
 
     let token = token.ok_or(SquadOvError::InternalError(String::from("Failed to obtain/generate share token.")))?;
@@ -274,9 +282,34 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
     // the moment. I'd rather have a more distributed version where we toss a URL out there and just let it be
     // valid.
     Ok(HttpResponse::Ok().json(&format!(
-        "{}/share/{}?i={}",
+        "{}/share/{}",
         &app.config.cors.domain,
-        &token.0,
-        &base64::encode_config(token.1.as_bytes(), base64::URL_SAFE_NO_PAD),
+        &token,
     )))
+}
+
+#[derive(Deserialize,Debug)]
+pub struct ExchangeShareTokenPath {
+    access_token_id: Uuid
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct ShareTokenResponse {
+    full_path: String,
+    key: String,
+    uid: i64,
+}
+
+pub async fn exchange_access_token_id_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<ExchangeShareTokenPath>) -> Result<HttpResponse, SquadOvError> {
+    let token = squadov_common::access::find_encrypted_access_token_from_id(&*app.pool, &path.access_token_id).await?;
+    let key = token.to_string();
+    let req = squadov_decrypt(token, &app.config.squadov.share_key)?;
+
+    let access = serde_json::from_slice::<AccessTokenRequest>(&req.data)?;
+    Ok(HttpResponse::Ok().json(&ShareTokenResponse{
+        full_path: access.full_path,
+        key,
+        uid: app.users.get_stored_user_from_uuid(&access.user_uuid, &*app.pool).await?.ok_or(SquadOvError::NotFound)?.id,
+    }))
 }

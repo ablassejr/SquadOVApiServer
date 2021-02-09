@@ -1,4 +1,5 @@
 use actix_web::{HttpRequest};
+use squadov_common::SquadOvError;
 use crate::api::auth::SquadOVSession;
 use crate::api::ApiApplication;
 use std::sync::Arc;
@@ -64,6 +65,10 @@ impl<T: SquadIdSetObtainer + Send + Sync> super::AccessChecker<SquadAccessBasicD
             Ok(true)
         }
     }
+
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: SquadAccessBasicData) -> Result<bool, SquadOvError> {
+        Ok(true)
+    }
 }
 
 pub struct SameSquadAccessChecker<T> {
@@ -87,5 +92,9 @@ impl super::AccessChecker<super::UserAccessSetBasicData> for SameSquadAccessChec
         same_squad_user_ids.extend(&user_ids);
 
         Ok(same_squad_user_ids.contains(&session.user.id))
+    }
+
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: super::UserAccessSetBasicData) -> Result<bool, SquadOvError> {
+        Ok(true)
     }
 }

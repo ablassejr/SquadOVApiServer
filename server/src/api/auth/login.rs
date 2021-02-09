@@ -51,6 +51,7 @@ async fn login(fa: &fusionauth::FusionAuthClient, data: LoginData, ip: Option<&s
                     refresh_token: result.refresh_token,
                     old_session_id: None,
                     is_temp: false,
+                    share_token: None,
                 }),
                 None => Err(squadov_common::SquadOvError::InternalError(String::from("Could not find user auth registration with the current app."))),
             }

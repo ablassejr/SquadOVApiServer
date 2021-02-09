@@ -6,13 +6,13 @@ use squadov_common::sql::{SqlColumn, SqlJoinTable, SqlTable};
 use juniper::FieldResult;
 
 impl api::ApiApplication {
-    async fn get_aimlab_spar_data(&self, task: &str, mode: i32, user_uuid: &str, params: &super::GraphqlAimlabStatsParams) -> Result<Vec<stats::AimlabStatSparData>, SquadOvError> {
+    async fn get_aimlab_spar_data(&self, task: &str, mode: i32, user_id: i64, params: &super::GraphqlAimlabStatsParams) -> Result<Vec<stats::AimlabStatSparData>, SquadOvError> {
         let secondary_table = SqlTable{
             name: String::from("squadov.view_aimlab_spar_data"),
             alias: String::from("vasd"),
         };
 
-        let (builder, primary_table) = super::common_aimlab_stat_query_builder("$1", "$2", "$3::UUID", params);
+        let (builder, primary_table) = super::common_aimlab_stat_query_builder("$1", "$2", "$3", params);
         Ok(sqlx::query_as::<_, stats::AimlabStatSparData>(
             &builder
                 .join(SqlJoinTable{
@@ -26,14 +26,14 @@ impl api::ApiApplication {
         )
             .bind(task)
             .bind(mode)
-            .bind(user_uuid)
+            .bind(user_id)
             .fetch_all(&*self.pool)
             .await?)
     }
 }
 
 pub struct GraphqlAimlabSparStats {
-    pub user_uuid: String,
+    pub user_id: i64,
     pub task: String,
 }
 
@@ -42,14 +42,14 @@ pub struct GraphqlAimlabSparStats {
 )]
 impl GraphqlAimlabSparStats {
     async fn ultimate(&self, context: &api::graphql::GraphqlContext, params: super::GraphqlAimlabStatsParams) -> FieldResult<Vec<stats::AimlabStatSparData>> {
-        Ok(context.app.get_aimlab_spar_data(&self.task, 10, &self.user_uuid, &params).await?)
+        Ok(context.app.get_aimlab_spar_data(&self.task, 10, self.user_id, &params).await?)
     }
 
     async fn precision(&self, context: &api::graphql::GraphqlContext, params: super::GraphqlAimlabStatsParams) -> FieldResult<Vec<stats::AimlabStatSparData>> {
-        Ok(context.app.get_aimlab_spar_data(&self.task, 11, &self.user_uuid, &params).await?)
+        Ok(context.app.get_aimlab_spar_data(&self.task, 11, self.user_id, &params).await?)
     }
 
     async fn speed(&self, context: &api::graphql::GraphqlContext, params: super::GraphqlAimlabStatsParams) -> FieldResult<Vec<stats::AimlabStatSparData>> {
-        Ok(context.app.get_aimlab_spar_data(&self.task, 12, &self.user_uuid, &params).await?)
+        Ok(context.app.get_aimlab_spar_data(&self.task, 12, self.user_id, &params).await?)
     }
 }

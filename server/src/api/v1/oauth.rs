@@ -26,6 +26,7 @@ pub async fn get_user_rso_auth_url_handler(app : web::Data<Arc<api::ApiApplicati
         refresh_token: String::new(),
         old_session_id: None,
         is_temp: true,
+        share_token: None,
     };
     app.session.store_session(&session, &*app.pool).await?;
 

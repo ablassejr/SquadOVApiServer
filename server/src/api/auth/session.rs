@@ -4,6 +4,11 @@ use actix_web::{ HttpRequest, FromRequest, dev, Error };
 use actix_web::error::ErrorUnauthorized;
 use futures_util::future::{ok, err, Ready};
 use squadov_common;
+use squadov_common::{
+    SquadOvError,
+    encrypt::{AESEncryptToken, squadov_decrypt},
+    access::AccessTokenRequest,
+};
 use crate::api::fusionauth;
 use uuid::Uuid;
 use crate::logged_error;
@@ -18,6 +23,7 @@ pub struct SquadOVSession {
     pub refresh_token: String,
     pub old_session_id: Option<String>,
     pub is_temp: bool,
+    pub share_token: Option<AccessTokenRequest>,
 }
 
 impl FromRequest for SquadOVSession {
@@ -38,6 +44,7 @@ pub struct SessionManager {
 }
 
 const SESSION_ID_HEADER_KEY : &str = "x-squadov-session-id";
+const SHARE_KEY_HEADER_KEY: &str = "x-squadov-share-id";
 
 impl SessionManager {
     pub fn new() -> SessionManager {
@@ -98,6 +105,7 @@ impl SessionManager {
                 refresh_token: x.refresh_token,
                 old_session_id: None,
                 is_temp: x.is_temp,
+                share_token: None,
             })),
             None => Ok(None),
         }
@@ -108,6 +116,16 @@ impl SessionManager {
             Some(id) => self.get_session_from_id(id.to_str().unwrap(), pool).await,
             None => Ok(None),
         }
+    }
+
+    pub async fn get_share_token_from_request(&self, req: &HttpRequest, encryption_key: &str) -> Result<Option<AccessTokenRequest>, SquadOvError> {
+        let access_token = req.headers().get(SHARE_KEY_HEADER_KEY);
+        if access_token.is_none() {
+            return Ok(None);
+        }
+        let access_token = AESEncryptToken::from_string(&access_token.unwrap().to_str()?)?;
+        let decrypted_token = squadov_decrypt(access_token, encryption_key)?;
+        Ok(Some(serde_json::from_slice::<AccessTokenRequest>(&decrypted_token.data)?))
     }
 
     pub async fn store_session(&self, session: &SquadOVSession, pool: &PgPool) -> Result<(), sqlx::Error> {
