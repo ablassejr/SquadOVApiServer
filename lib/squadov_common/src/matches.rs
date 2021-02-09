@@ -176,6 +176,7 @@ where
                     .fetch_one(ex)
                     .await?
                     .exists,
+            SquadOvGames::Unknown => false 
         }   
     )
 }

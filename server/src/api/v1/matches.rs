@@ -126,6 +126,7 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
     let lol_matches = db::list_lol_match_summaries_for_uuids(&*app.pool, &match_uuids).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, LolPlayerMatchSummary>>();
     let wow_encounters = app.list_wow_encounter_for_uuids(&match_uuids).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, WoWEncounter>>();
     let wow_challenges = app.list_wow_challenges_for_uuids(&match_uuids).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, WoWChallenge>>();
+    let hearthstone_matches = app.filter_hearthstone_match_uuids(&match_uuids).await?.into_iter().collect::<HashSet<Uuid>>();
     // TFT, Valorant, and WoW arenas are different because the match summary is player dependent.
     let mut wow_arenas = app.list_wow_arenas_for_uuids(&match_player_pairs).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWArena>>();
     let tft_match_uuids: HashSet<Uuid> = db::filter_tft_match_uuids(&*app.pool, &match_uuids).await?.into_iter().collect();
@@ -176,8 +177,10 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
                     SquadOvGames::Valorant
                 } else if wow_encounter.is_some() || wow_challenge.is_some() || wow_arena.is_some() {
                     SquadOvGames::WorldOfWarcraft
-                } else {
+                } else if hearthstone_matches.contains(&x.match_uuid) {
                     SquadOvGames::Hearthstone
+                } else {
+                    SquadOvGames::Unknown
                 },
                 vod: vod_manifests.remove(&x.video_uuid).ok_or(SquadOvError::InternalError(String::from("Failed to find expected VOD manifest.")))?,
                 username: x.username,

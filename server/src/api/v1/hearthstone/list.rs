@@ -50,6 +50,24 @@ impl api::ApiApplication {
             .collect()
         )
     }
+
+    pub async fn filter_hearthstone_match_uuids(&self, uuids: &[Uuid]) -> Result<Vec<Uuid>, SquadOvError> {
+        Ok(
+            sqlx::query!(
+                "
+                SELECT hm.match_uuid
+                FROM squadov.hearthstone_matches AS hm
+                WHERE hm.match_uuid = ANY($1)
+                ",
+                uuids
+            )
+                .fetch_all(&*self.pool)
+                .await?
+                .into_iter()
+                .map(|x| { x.match_uuid })
+                .collect()
+        )
+    }
 }
 
 pub async fn list_hearthstone_matches_for_user_handler(data : web::Path<super::HearthstoneUserMatchInput>, query: web::Query<FilteredMatchParameters>, app : web::Data<Arc<api::ApiApplication>>, req : HttpRequest) -> Result<HttpResponse, SquadOvError> {
