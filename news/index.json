@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.5.9",
+        "description": "Match URL sharing!",
+        "timestamp": 1612904888000,
+        "data": "data/hotfix-v0.5.9.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.5.7",
         "description": "Fixing an oopsie (:",
         "timestamp": 1612558836000,

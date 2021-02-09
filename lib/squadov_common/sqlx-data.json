@@ -100,6 +100,44 @@
       ]
     }
   },
+  "089bb1331035647563769932a352c2ebca473988956d80a52ecd9e666d381568": {
+    "query": "\n            SELECT\n                encrypted_token AS \"data\",\n                iv,\n                aad,\n                tag\n            FROM squadov.share_tokens\n            WHERE id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "data",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 1,
+          "name": "iv",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 2,
+          "name": "aad",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 3,
+          "name": "tag",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "0f1e6d7867f3ade47b16c6643996319a592c84cd9d4d421ec8962a576dc54c8d": {
     "query": "\n        SELECT ra.puuid, ra.game_name, ra.tag_line\n        FROM squadov.riot_accounts AS ra\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.puuid = ra.puuid\n        WHERE ral.user_id = $1\n            AND ra.game_name = $2\n            AND ra.tag_line = $3\n        ",
     "describe": {
@@ -131,6 +169,27 @@
         false,
         true,
         true
+      ]
+    }
+  },
+  "11b8042937f17bdd07181ff4825c56f9c01442ea13fddba6969436781245f609": {
+    "query": "\n                    SELECT EXISTS (\n                        SELECT 1\n                        FROM squadov.valorant_match_players AS vmp\n                        INNER JOIN squadov.riot_account_links AS ral\n                            ON ral.puuid = vmp.puuid\n                        WHERE ral.user_id = $1 AND vmp.match_uuid = $2\n                    ) as \"exists!\"\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "exists!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -384,6 +443,31 @@
       ]
     }
   },
+  "26ff1f37e6bc335668fdb2cd381d5b3460d61a247af172d52794af4391507b42": {
+    "query": "\n            INSERT INTO squadov.share_tokens (\n                id,\n                match_uuid,\n                user_id,\n                encrypted_token,\n                iv,\n                aad,\n                tag\n            ) VALUES (\n                gen_random_uuid(),\n                $1,\n                $2,\n                $3,\n                $4,\n                $5,\n                $6\n            )\n            RETURNING id\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8",
+          "Bytea",
+          "Bytea",
+          "Bytea",
+          "Bytea"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "27198d8ddaec95cf7351c671f75dd2b604ea176032d3b2f52b010a36e8e561cc": {
     "query": "\n        SELECT ra.puuid, ra.account_id, ra.summoner_id, ra.summoner_name, ra.last_backfill_lol_time, ra.last_backfill_tft_time\n        FROM squadov.riot_accounts AS ra\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.puuid = ra.puuid\n        WHERE ral.user_id = $1\n            AND ra.puuid = $2\n            AND ra.summoner_name IS NOT NULL\n        ",
     "describe": {
@@ -432,6 +516,27 @@
         true,
         true,
         true
+      ]
+    }
+  },
+  "28ff54f0d1cce0978436eb7884981b3f9fe446adf75433cf971b3f605690c3e9": {
+    "query": "\n                    SELECT EXISTS (\n                        SELECT 1\n                        FROM squadov.tft_match_participants AS tmp\n                        INNER JOIN squadov.riot_account_links AS ral\n                            ON ral.puuid = tmp.puuid\n                        WHERE ral.user_id = $1 AND tmp.match_uuid = $2\n                    ) as \"exists!\"\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "exists!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -734,6 +839,27 @@
       ]
     }
   },
+  "378a151b8c4779e48135fa48f71e1f1b86a8db161125ae28cdb6568962536ac7": {
+    "query": "\n                    SELECT EXISTS (\n                        SELECT 1\n                        FROM squadov.hearthstone_match_view\n                        WHERE user_id = $1 AND match_uuid = $2\n                    ) as \"exists!\"\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "exists!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "3b808dbc27e1d9a369281fb78018ef267550bf7eb65c79d17c77335ab429ad97": {
     "query": "\n        UPDATE squadov.lol_matches\n        SET game_start_time = LEAST($2, game_start_time)\n        WHERE match_uuid = $1\n        ",
     "describe": {
@@ -745,6 +871,27 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "3d00ef54788440289935e3d6f40816a1484e3aae474f24a5a21fe54766dcc0b1": {
+    "query": "\n                    SELECT EXISTS (\n                        SELECT 1\n                        FROM squadov.aimlab_tasks\n                        WHERE user_id = $1 AND match_uuid = $2\n                    ) as \"exists!\"\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "exists!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        null
+      ]
     }
   },
   "3e138458547a534fffa3ded62f291cb1049aff35284cb445872485fa50045b42": {
@@ -1111,6 +1258,27 @@
         false,
         false,
         false,
+        false
+      ]
+    }
+  },
+  "44bd28db999a124fa8a17d6809e2f885f0717a3bfb7dfa268fa4b463403650a2": {
+    "query": "\n            SELECT id\n            FROM squadov.share_tokens\n            WHERE match_uuid = $1 AND user_id = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8"
+        ]
+      },
+      "nullable": [
         false
       ]
     }
@@ -1933,6 +2101,48 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "8f88a18a97c703ac238c4b77a2856c7fb8b67092981540ea52a15c88ba5bb843": {
+    "query": "\n                    SELECT EXISTS (\n                        SELECT 1\n                        FROM squadov.wow_match_combatants AS wmc\n                        INNER JOIN squadov.wow_user_character_association AS wuca\n                            ON wuca.guid = wmc.combatant_guid\n                        WHERE wuca.user_id = $1 AND wmc.match_uuid = $2\n                    ) as \"exists!\"\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "exists!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
+  "988b7f29e275a40b7ee9b0ccb1face5efe4c8e73f93deee5e1ce7ee7d1730b4c": {
+    "query": "\n        SELECT EXISTS (\n            SELECT 1\n            FROM squadov.riot_account_links AS ral\n            WHERE ral.user_id = $1\n                AND ral.puuid = $2\n        ) AS \"exists!\"\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "exists!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -3093,6 +3303,27 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "f71ee441cd1a3002b4d26b5549a5f8de2c412690f00aceb5b9e09fa6e5103988": {
+    "query": "\n                    SELECT EXISTS (\n                        SELECT 1\n                        FROM squadov.lol_match_participants AS lmp\n                        INNER JOIN squadov.lol_match_participant_identities AS lmpi\n                            ON lmpi.match_uuid = lmp.match_uuid\n                                AND lmpi.participant_id = lmp.participant_id\n                        INNER JOIN squadov.riot_accounts AS ra\n                            ON ra.account_id = lmpi.account_id\n                        INNER JOIN squadov.riot_account_links AS ral\n                            ON ral.puuid = ra.puuid\n                        WHERE ral.user_id = $1 AND lmp.match_uuid = $2\n                    ) as \"exists!\"\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "exists!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },
