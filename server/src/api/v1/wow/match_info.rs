@@ -132,7 +132,7 @@ impl api::ApiApplication {
     }
 
     async fn get_wow_match_aura_events(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<SerializedWoWAura>, SquadOvError> {
-        let raw_applied_auras = sqlx::query!(
+        let raw_auras = sqlx::query!(
             r#"
             WITH match_start_stop (start, stop) AS (
                 SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
@@ -151,7 +151,8 @@ impl api::ApiApplication {
                 wce.dest->>'name' AS "name",
                 (wce.evt#>>'{spell, id}')::BIGINT AS "spell_id",
                 (wce.evt#>'{aura_type}') AS "aura",
-                wce.evt#>>'{spell, name}' AS "spell_name"
+                wce.evt#>>'{spell, name}' AS "spell_name",
+                COALESCE((wce.evt#>>'{applied}')::BOOLEAN, FALSE) AS "applied!"
             FROM squadov.wow_combat_log_events AS wce
             INNER JOIN squadov.wow_combat_logs AS wcl
                 ON wcl.uuid = wce.combat_log_uuid
@@ -162,43 +163,6 @@ impl api::ApiApplication {
                 AND wcl.user_id = $2
                 AND wce.tm >= mss.start AND wce.tm <= mss.stop
                 AND wce.evt @> '{"type": "SpellAura"}'
-                AND wce.evt @> '{"applied": true}'
-            ORDER BY wce.tm ASC
-            "#,
-            match_uuid,
-            user_id
-        )
-            .fetch_all(&*self.pool)
-            .await?;
-
-        let raw_removed_auras = sqlx::query!(
-            r#"
-            WITH match_start_stop (start, stop) AS (
-                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
-                FROM squadov.matches AS m
-                LEFT JOIN squadov.wow_encounters AS we
-                    ON we.match_uuid = m.uuid
-                LEFT JOIN squadov.wow_challenges AS wc
-                    ON wc.match_uuid = m.uuid
-                LEFT JOIN squadov.wow_arenas AS wa
-                    ON wa.match_uuid = m.uuid
-                WHERE m.uuid = $1
-            )
-            SELECT
-                wce.tm,
-                wce.dest->>'guid' AS "guid",
-                (wce.evt#>>'{spell, id}')::BIGINT AS "spell_id"
-            FROM squadov.wow_combat_log_events AS wce
-            INNER JOIN squadov.wow_combat_logs AS wcl
-                ON wcl.uuid = wce.combat_log_uuid
-            INNER JOIN squadov.wow_match_combat_log_association AS wma
-                ON wma.combat_log_uuid = wcl.uuid
-            CROSS JOIN match_start_stop AS mss
-            WHERE wma.match_uuid = $1
-                AND wcl.user_id = $2
-                AND wce.tm >= mss.start AND wce.tm <= mss.stop
-                AND wce.evt @> '{"type": "SpellAura"}'
-                AND wce.evt @> '{"applied": false}'
             ORDER BY wce.tm ASC
             "#,
             match_uuid,
@@ -224,8 +188,8 @@ impl api::ApiApplication {
         // we'd only need to do amortized constant time indexing by destination GUID and spell ID and then do
         // a binary search to find the first timestamp greater than the applied aura timestamp.
         let mut removed_aura_hashmap: HashMap<String, HashMap<i64, Vec<DateTime<Utc>>>> = HashMap::new();
-        for aura in &raw_removed_auras {
-            if aura.guid.is_none() || aura.spell_id.is_none() {
+        for aura in &raw_auras {
+            if aura.guid.is_none() || aura.spell_id.is_none() || aura.applied {
                 continue;
             }
 
@@ -246,13 +210,14 @@ impl api::ApiApplication {
         }
 
         Ok(
-            raw_applied_auras.into_iter()
+            raw_auras.into_iter()
                 .filter(|x| {
                     return x.guid.is_some() &&
                         x.name.is_some() &&
                         x.spell_id.is_some() &&
                         x.spell_name.is_some() &&
-                        x.aura.is_some()
+                        x.aura.is_some() &&
+                        x.applied
                 })
                 .map(|x| {
                     let guid = x.guid.unwrap();
