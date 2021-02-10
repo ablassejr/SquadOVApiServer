@@ -1002,29 +1002,6 @@
       ]
     }
   },
-  "2286661db99f8ba090d03767e50fc2599c16e10feea3bd6668b1e9240ef07470": {
-    "query": "\n            INSERT INTO squadov.share_tokens (\n                id,\n                match_uuid,\n                user_id,\n                encrypted_token,\n                iv\n            ) VALUES (\n                gen_random_uuid(),\n                $1,\n                $2,\n                $3,\n                $4\n            )\n            RETURNING id\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Int8",
-          "Varchar",
-          "Varchar"
-        ]
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
   "229c6133e7a1e226d1d2db5b80696d3dd052ff466aa60f2009b7079a8fa58476": {
     "query": "\n            INSERT INTO squadov.wow_encounters (\n                match_uuid,\n                tm,\n                combatants_key,\n                encounter_id,\n                encounter_name,\n                difficulty,\n                num_players,\n                instance_id,\n                success\n            )\n            VALUES (\n                $1,\n                $2,\n                $3,\n                $4,\n                $5,\n                $6,\n                $7,\n                $8,\n                false\n            )\n            ",
     "describe": {
@@ -1816,33 +1793,6 @@
       ]
     }
   },
-  "37744ba3236d7020d4e5616d1173dcebbbbc4fcd0b81d8056231e83bf903d0ca": {
-    "query": "\n            SELECT encrypted_token, iv\n            FROM squadov.share_tokens\n            WHERE match_uuid = $1 AND user_id = $2\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "encrypted_token",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "iv",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false
-      ]
-    }
-  },
   "378a151b8c4779e48135fa48f71e1f1b86a8db161125ae28cdb6568962536ac7": {
     "query": "\n                    SELECT EXISTS (\n                        SELECT 1\n                        FROM squadov.hearthstone_match_view\n                        WHERE user_id = $1 AND match_uuid = $2\n                    ) as \"exists!\"\n                    ",
     "describe": {
@@ -1875,57 +1825,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "3ba3090c658151c92462dc3f4fdc0c33426d3e308ec33ea9dbddbaab8471d0a0": {
-    "query": "\n            WITH match_start_stop (start, stop) AS (\n                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())\n                FROM squadov.matches AS m\n                LEFT JOIN squadov.wow_encounters AS we\n                    ON we.match_uuid = m.uuid\n                LEFT JOIN squadov.wow_challenges AS wc\n                    ON wc.match_uuid = m.uuid\n                LEFT JOIN squadov.wow_arenas AS wa\n                    ON wa.match_uuid = m.uuid\n                WHERE m.uuid = $1\n            )\n            SELECT\n                wce.tm,\n                wce.dest->>'guid' AS \"guid\",\n                wce.dest->>'name' AS \"name\",\n                (wce.evt#>>'{spell, id}')::BIGINT AS \"spell_id\",\n                (wce.evt#>'{aura_type}') AS \"aura\",\n                wce.evt#>>'{spell, name}' AS \"spell_name\"\n            FROM squadov.wow_combat_log_events AS wce\n            INNER JOIN squadov.wow_combat_logs AS wcl\n                ON wcl.uuid = wce.combat_log_uuid\n            INNER JOIN squadov.wow_match_combat_log_association AS wma\n                ON wma.combat_log_uuid = wcl.uuid\n            CROSS JOIN match_start_stop AS mss\n            WHERE wma.match_uuid = $1\n                AND wcl.user_id = $2\n                AND wce.tm >= mss.start AND wce.tm <= mss.stop\n                AND wce.evt @> '{\"type\": \"SpellAura\"}'\n                AND wce.evt @> '{\"applied\": true}'\n            ORDER BY wce.tm ASC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tm",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 1,
-          "name": "guid",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "spell_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "aura",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 5,
-          "name": "spell_name",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        null,
-        null,
-        null,
-        null,
-        null
-      ]
     }
   },
   "3bedd86bf5d4d4d4f9f74223548e976bfc5ac3d034c19e50484ceef0dabf0583": {
@@ -2895,6 +2794,63 @@
       ]
     }
   },
+  "554fba776d3643eaf6edbe8b3e995a38c2e587e41627f2be7c5ba695c2af7b19": {
+    "query": "\n            WITH match_start_stop (start, stop) AS (\n                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())\n                FROM squadov.matches AS m\n                LEFT JOIN squadov.wow_encounters AS we\n                    ON we.match_uuid = m.uuid\n                LEFT JOIN squadov.wow_challenges AS wc\n                    ON wc.match_uuid = m.uuid\n                LEFT JOIN squadov.wow_arenas AS wa\n                    ON wa.match_uuid = m.uuid\n                WHERE m.uuid = $1\n            )\n            SELECT\n                wce.tm,\n                wce.dest->>'guid' AS \"guid\",\n                wce.dest->>'name' AS \"name\",\n                (wce.evt#>>'{spell, id}')::BIGINT AS \"spell_id\",\n                (wce.evt#>'{aura_type}') AS \"aura\",\n                wce.evt#>>'{spell, name}' AS \"spell_name\",\n                COALESCE((wce.evt#>>'{applied}')::BOOLEAN, FALSE) AS \"applied!\"\n            FROM squadov.wow_combat_log_events AS wce\n            INNER JOIN squadov.wow_combat_logs AS wcl\n                ON wcl.uuid = wce.combat_log_uuid\n            INNER JOIN squadov.wow_match_combat_log_association AS wma\n                ON wma.combat_log_uuid = wcl.uuid\n            CROSS JOIN match_start_stop AS mss\n            WHERE wma.match_uuid = $1\n                AND wcl.user_id = $2\n                AND wce.tm >= mss.start AND wce.tm <= mss.stop\n                AND wce.evt @> '{\"type\": \"SpellAura\"}'\n            ORDER BY wce.tm ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 1,
+          "name": "guid",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "spell_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "aura",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 5,
+          "name": "spell_name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "applied!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    }
+  },
   "5623f8dffa39a60ac5a9e2d54ac6dd3e0991104172aa16c5ae1b443eb6c52cd1": {
     "query": "\n            SELECT\n                smi.squad_id,\n                smi.user_id,\n                smi.joined,\n                smi.response_time,\n                smi.invite_time,\n                smi.invite_uuid,\n                smi.email,\n                ur.username AS \"username?\",\n                us.username AS \"inviter_username\"\n            FROM squadov.squad_membership_invites AS smi\n            INNER JOIN squadov.users AS us\n                ON us.id = smi.inviter_user_id\n            LEFT JOIN squadov.users AS ur\n                ON ur.id = smi.user_id\n            WHERE smi.squad_id = $1 AND response_time IS NULL\n            ",
     "describe": {
@@ -3329,27 +3285,6 @@
       },
       "nullable": [
         false
-      ]
-    }
-  },
-  "654733d53a513db9df5918b6bdfbbc50a581acecda11e877f630405ebebb97f8": {
-    "query": "\n                    SELECT EXISTS (\n                        SELECT 1\n                        FROM squadov.lol_match_participants AS lmp\n                        INNER JOIN squadov.lol_match_participant_identities AS lmpi\n                            ON lmpi.match_uuid = lmp.match_uuid\n                                AND lmpi.participant_id = lmp.participant_id\n                        INNER JOIN squadov.riot_accounts AS ra\n                            ON ra.account_id = lmpi.account_id\n                        INNER JOIN squadov.riot_account_links AS ral\n                            ON ral.puuid = ra.puuid\n                        WHERE ral.user_id = $1 AND lmp.match_uuid = $2\n                    )\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "exists",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        null
       ]
     }
   },
@@ -5025,27 +4960,6 @@
       ]
     }
   },
-  "9c118ae4da9a30bef9aaf8ae1a67b16611a76394b823ca1774eadc055c70f3f2": {
-    "query": "\n                    SELECT EXISTS (\n                        SELECT 1\n                        FROM squadov.valorant_match_players AS vmp\n                        INNER JOIN squadov.riot_account_links AS ral\n                            ON ral.puuid = vmp.puuid\n                        WHERE ral.user_id = $1 AND vmp.match_uuid = $2\n                    )\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "exists",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "9c8653063868f7826460db4c2a701029dea1579c1e72fb56a2a4b5e6d0810253": {
     "query": "\n            SELECT\n                hmpm.player_match_id,\n                hmpm.league_id,\n                hmpm.earned_stars,\n                hmpm.star_level,\n                hmpm.best_star_level,\n                hmpm.win_streak,\n                hmpm.legend_index,\n                hmpm.is_standard\n            FROM squadov.hearthstone_match_player_medals AS hmpm\n            INNER JOIN squadov.hearthstone_match_view AS hmv\n                ON hmv.view_uuid = hmpm.view_uuid\n            WHERE hmv.match_uuid = $1 AND hmv.user_id = $2\n            ",
     "describe": {
@@ -5106,27 +5020,6 @@
         false,
         false,
         false
-      ]
-    }
-  },
-  "9d960329d34f2f29592611ed96995079de9e88086892c3153d347507f9661366": {
-    "query": "\n                    SELECT EXISTS (\n                        SELECT 1\n                        FROM squadov.aimlab_tasks\n                        WHERE user_id = $1 AND match_uuid = $2\n                    )\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "exists",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        null
       ]
     }
   },
@@ -5449,27 +5342,6 @@
       ]
     }
   },
-  "a5c315ec67700b5dd344ef944d09b29f3205892e1c9af481806920ee54c27f3a": {
-    "query": "\n                    SELECT EXISTS (\n                        SELECT 1\n                        FROM squadov.tft_match_participants AS tmp\n                        INNER JOIN squadov.riot_account_links AS ral\n                            ON ral.puuid = tmp.puuid\n                        WHERE ral.user_id = $1 AND tmp.match_uuid = $2\n                    )\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "exists",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "a7c959a1afac6d2ef008963261ebbfc9c8a5b42e2d837e45b656ba6a6d9dc0cd": {
     "query": "\n                INSERT INTO squadov.aimlab_tasks (\n                    id,\n                    user_id,\n                    klutch_id,\n                    match_uuid,\n                    task_name,\n                    mode,\n                    score,\n                    version,\n                    create_date,\n                    raw_data\n                )\n                VALUES (\n                    $1,\n                    $2,\n                    $3,\n                    $4,\n                    $5,\n                    $6,\n                    $7,\n                    $8,\n                    $9,\n                    $10\n                )\n                ON CONFLICT DO NOTHING\n                ",
     "describe": {
@@ -5657,29 +5529,60 @@
       "nullable": []
     }
   },
-  "af040cd0fb9fde41cbfc72ce25b938e850874e3f1bb99f986e6d130ffb42680e": {
-    "query": "\n        SELECT encrypted_token, iv\n        FROM squadov.share_tokens\n        WHERE id = $1\n        ",
+  "b1afc9886f8cb45d6ec1dc43adf5edcd2c773b71aeca14ddee70874dee8031e2": {
+    "query": "\n            WITH match_start_stop (start, stop) AS (\n                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())\n                FROM squadov.matches AS m\n                LEFT JOIN squadov.wow_encounters AS we\n                    ON we.match_uuid = m.uuid\n                LEFT JOIN squadov.wow_challenges AS wc\n                    ON wc.match_uuid = m.uuid\n                LEFT JOIN squadov.wow_arenas AS wa\n                    ON wa.match_uuid = m.uuid\n                WHERE m.uuid = $1\n            )\n            SELECT\n                wce.tm,\n                wce.dest->>'guid' AS \"guid\",\n                wce.dest->>'name' AS \"name\",\n                (wce.evt#>>'{spell, id}')::BIGINT AS \"spell_id\",\n                (wce.evt#>'{aura_type}') AS \"aura\",\n                wce.evt#>>'{spell, name}' AS \"spell_name\",\n                (wce.evt#>>'{applied}')::BOOLEAN AS \"applied\"\n            FROM squadov.wow_combat_log_events AS wce\n            INNER JOIN squadov.wow_combat_logs AS wcl\n                ON wcl.uuid = wce.combat_log_uuid\n            INNER JOIN squadov.wow_match_combat_log_association AS wma\n                ON wma.combat_log_uuid = wcl.uuid\n            CROSS JOIN match_start_stop AS mss\n            WHERE wma.match_uuid = $1\n                AND wcl.user_id = $2\n                AND wce.tm >= mss.start AND wce.tm <= mss.stop\n                AND wce.evt @> '{\"type\": \"SpellAura\"}'\n            ORDER BY wce.tm ASC\n            ",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "encrypted_token",
-          "type_info": "Varchar"
+          "name": "tm",
+          "type_info": "Timestamptz"
         },
         {
           "ordinal": 1,
-          "name": "iv",
-          "type_info": "Varchar"
+          "name": "guid",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "spell_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "aura",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 5,
+          "name": "spell_name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "applied",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
         "Left": [
-          "Uuid"
+          "Uuid",
+          "Int8"
         ]
       },
       "nullable": [
         false,
-        false
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
       ]
     }
   },
@@ -5808,27 +5711,6 @@
       "nullable": [
         false,
         false
-      ]
-    }
-  },
-  "b6a347af9c88cf077cdc8c2c39bd066b6a405fde80a400f1da383b7d7442a776": {
-    "query": "\n                    SELECT EXISTS (\n                        SELECT 1\n                        FROM squadov.wow_match_combatants AS wmc\n                        INNER JOIN squadov.wow_user_character_association AS wuca\n                            ON wuca.guid = wmc.combatant_guid\n                        WHERE wuca.user_id = $1 AND wmc.match_uuid = $2\n                    )\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "exists",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        null
       ]
     }
   },
@@ -6047,33 +5929,6 @@
       "nullable": []
     }
   },
-  "c464332356512d5db6527fbb5d2864811a3c67cd17191d00e4fa151980402a61": {
-    "query": "\n            SELECT id, iv\n            FROM squadov.share_tokens\n            WHERE match_uuid = $1 AND user_id = $2\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "iv",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false
-      ]
-    }
-  },
   "c49493a92cf7c045e3b7f00cb17059bb9161374f33eb3e43935e233d9cabb067": {
     "query": "\n            UPDATE squadov.wow_encounters\n            SET finish_time = $2,\n                success = $3\n            WHERE match_uuid = $1\n                AND finish_time IS NULL\n            ",
     "describe": {
@@ -6086,27 +5941,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "c4ad96c8fbeb37941821198f262e5482d85db2af67fb3dd661210fcc9003589d": {
-    "query": "\n                    SELECT EXISTS (\n                        SELECT 1\n                        FROM squadov.hearthstone_match_view\n                        WHERE user_id = $1 AND match_uuid = $2\n                    )\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "exists",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        null
-      ]
     }
   },
   "c50e40f04e3419dd1b021dcdb664505fc10f839abac1fab98afcf2e575dbd187": {
@@ -6829,39 +6663,6 @@
       ]
     }
   },
-  "dad0ff295f4d30b79b04a324fcfa27baa7a2d842d6a6521acf264fe91c182a0f": {
-    "query": "\n            WITH match_start_stop (start, stop) AS (\n                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())\n                FROM squadov.matches AS m\n                LEFT JOIN squadov.wow_encounters AS we\n                    ON we.match_uuid = m.uuid\n                LEFT JOIN squadov.wow_challenges AS wc\n                    ON wc.match_uuid = m.uuid\n                LEFT JOIN squadov.wow_arenas AS wa\n                    ON wa.match_uuid = m.uuid\n                WHERE m.uuid = $1\n            )\n            SELECT\n                wce.tm,\n                wce.dest->>'guid' AS \"guid\",\n                (wce.evt#>>'{spell, id}')::BIGINT AS \"spell_id\"\n            FROM squadov.wow_combat_log_events AS wce\n            INNER JOIN squadov.wow_combat_logs AS wcl\n                ON wcl.uuid = wce.combat_log_uuid\n            INNER JOIN squadov.wow_match_combat_log_association AS wma\n                ON wma.combat_log_uuid = wcl.uuid\n            CROSS JOIN match_start_stop AS mss\n            WHERE wma.match_uuid = $1\n                AND wcl.user_id = $2\n                AND wce.tm >= mss.start AND wce.tm <= mss.stop\n                AND wce.evt @> '{\"type\": \"SpellAura\"}'\n                AND wce.evt @> '{\"applied\": false}'\n            ORDER BY wce.tm ASC\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "tm",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 1,
-          "name": "guid",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "spell_id",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        null,
-        null
-      ]
-    }
-  },
   "dd999a4aaef59d2e12b5d9de3803674f0afb821abaef16c1f377e5f34740e18c": {
     "query": "\n        INSERT INTO squadov.lol_match_info (\n            match_uuid,\n            game_id,\n            platform_id,\n            queue_id,\n            game_type,\n            game_duration,\n            game_creation,\n            season_id,\n            game_version,\n            map_id,\n            game_mode\n        )\n        VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            $5,\n            $6,\n            $7,\n            $8,\n            $9,\n            $10,\n            $11\n        )\n        ",
     "describe": {
@@ -7158,94 +6959,6 @@
         false,
         false,
         true,
-        false,
-        false
-      ]
-    }
-  },
-  "e4a7404bcec2e14ff39fc224df54d3099f6eb4f9475fd7f3d932169da5476bae": {
-    "query": "\n                SELECT DISTINCT\n                    wa.*,\n                    (wcle.evt->>'team')::INTEGER = wa.winning_team_id AS \"success!\",\n                    u.uuid AS \"user_uuid!\",\n                    wcl.build_version AS \"build\"\n                FROM squadov.wow_arenas AS wa\n                INNER JOIN squadov.wow_match_combatants AS wmc\n                    ON wmc.match_uuid = wa.match_uuid\n                INNER JOIN squadov.wow_match_combat_log_association AS cla\n                    ON cla.match_uuid = wa.match_uuid\n                INNER JOIN squadov.wow_combat_logs AS wcl\n                    ON wcl.uuid = cla.combat_log_uuid\n                INNER JOIN squadov.wow_combat_log_events AS wcle\n                    ON wcle.combat_log_uuid = wcl.uuid\n                        AND wcle.evt @> '{\"type\": \"CombatantInfo\"}'\n                        AND wcle.evt->>'guid' = wmc.combatant_guid\n                INNER JOIN squadov.wow_user_character_association AS wuca\n                    ON wuca.guid = wmc.combatant_guid\n                INNER JOIN squadov.users AS u\n                    ON u.id = wuca.user_id\n                WHERE wmc.combatant_guid = $1\n                ORDER BY tm DESC\n                LIMIT $2 OFFSET $3\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "tm",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 2,
-          "name": "combatants_key",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 3,
-          "name": "instance_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "arena_type",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 5,
-          "name": "finish_time",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 6,
-          "name": "winning_team_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "match_duration_seconds",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 8,
-          "name": "new_ratings",
-          "type_info": "Int4Array"
-        },
-        {
-          "ordinal": 9,
-          "name": "success!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 10,
-          "name": "user_uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 11,
-          "name": "build",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        true,
-        true,
-        null,
         false,
         false
       ]
