@@ -608,6 +608,7 @@ impl api::ApiApplication {
                     ON wcle.combat_log_uuid = wcl.uuid
                         AND wcle.evt @> '{"type": "CombatantInfo"}'
                         AND wcle.evt->>'guid' = wmc.combatant_guid
+                        AND wcle.tm BETWEEN wa.tm AND wa.finish_time
                 INNER JOIN squadov.wow_user_character_association AS wuca
                     ON wuca.guid = wmc.combatant_guid
                 INNER JOIN squadov.users AS u
