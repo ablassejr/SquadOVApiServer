@@ -70,23 +70,23 @@ seconds = 120
 key = "${LOL_API_KEY}"
 
 [riot.lol_api_key.burst_limit]
-requests = 20
-seconds = 1
+requests = 500
+seconds = 10
 
 [riot.lol_api_key.bulk_limit]
-requests = 100
-seconds = 120
+requests = 30000
+seconds = 600
 
 [riot.tft_api_key]
 key = "${TFT_API_KEY}"
 
 [riot.tft_api_key.burst_limit]
-requests = 20
-seconds = 1
+requests = 500
+seconds = 10
 
 [riot.tft_api_key.bulk_limit]
-requests = 100
-seconds = 120
+requests = 30000
+seconds = 600
 
 [rabbitmq]
 amqp_url = "${RABBITMQ_AMQP_URL}"

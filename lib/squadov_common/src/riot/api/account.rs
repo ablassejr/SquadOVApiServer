@@ -77,7 +77,7 @@ impl super::RiotApiApplicationInterface {
     }
     
     pub async fn request_riot_account_from_puuid(&self, puuid: &str) -> Result<(), SquadOvError> {
-        self.rmq.publish(&self.queue, serde_json::to_vec(&RiotApiTask::Account{puuid: String::from(puuid)})?, RABBITMQ_DEFAULT_PRIORITY).await;
+        self.rmq.publish(&self.mqconfig.rso_queue, serde_json::to_vec(&RiotApiTask::Account{puuid: String::from(puuid)})?, RABBITMQ_DEFAULT_PRIORITY).await;
         Ok(())
     }
 
@@ -99,12 +99,17 @@ impl super::RiotApiApplicationInterface {
         db::link_riot_account_to_user(&mut tx, &account.puuid, user_id).await?;
         db::store_rso_for_riot_account(&mut tx, &account.puuid, user_id, &access_token, &refresh_token, &expiration).await?;
         tx.commit().await?;
-        // TODO: Also put in a request for League of Legends summoner information here now that we have the PUUID.
+
+        // Also fire off a request for LoL summoner information. Note however that this needs to be done on the correct queue
+        // as the RSO queue and the LoL queue use different keys. We can, however, do a publish correctly from whatever queue that
+        // we want!
+        self.request_lol_summoner_from_puuid(&account.puuid).await?;
+
         Ok(())
     }
     
     pub async fn request_riot_account_from_access_token(&self, access_token: &str, refresh_token: &str, expiration: DateTime<Utc>, user_id: i64) -> Result<(), SquadOvError> {
-        self.rmq.publish(&self.queue, serde_json::to_vec(&RiotApiTask::AccountMe{
+        self.rmq.publish(&self.mqconfig.rso_queue, serde_json::to_vec(&RiotApiTask::AccountMe{
             access_token: access_token.to_string(),
             refresh_token: refresh_token.to_string(),
             expiration,

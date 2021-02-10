@@ -65,7 +65,7 @@ impl super::RiotApiApplicationInterface {
             RABBITMQ_DEFAULT_PRIORITY
         };
 
-        self.rmq.publish(&self.queue, serde_json::to_vec(&RiotApiTask::LolMatch{
+        self.rmq.publish(&self.mqconfig.lol_queue, serde_json::to_vec(&RiotApiTask::LolMatch{
             platform: String::from(platform),
             game_id,
         })?, priority).await;
@@ -135,7 +135,7 @@ impl super::RiotApiApplicationInterface {
         }
 
         let account_id = summoner.account_id.as_ref().ok_or(SquadOvError::NotFound)?.clone();
-        self.rmq.publish(&self.queue, serde_json::to_vec(&RiotApiTask::LolBackfill{
+        self.rmq.publish(&self.mqconfig.lol_queue, serde_json::to_vec(&RiotApiTask::LolBackfill{
             account_id,
             platform: String::from(platform),
         })?, RABBITMQ_DEFAULT_PRIORITY).await;
@@ -152,6 +152,10 @@ impl super::RiotApiApplicationInterface {
         for bm in &backfill_matches {
             self.request_obtain_lol_match_info(&bm.platform_id, bm.game_id, false).await?;
         }
+        Ok(())
+    }
+
+    pub async fn request_lol_summoner_from_puuid(&self, _puuid: &str) -> Result<(), SquadOvError> {
         Ok(())
     }
 }

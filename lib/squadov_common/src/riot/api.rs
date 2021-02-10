@@ -10,7 +10,7 @@ use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use crate::{
     SquadOvError,
-    rabbitmq::{RabbitMqInterface, RabbitMqListener}
+    rabbitmq::{RabbitMqInterface, RabbitMqListener, RabbitMqConfig},
 };
 use sqlx::postgres::{PgPool};
 use reqwest::header;
@@ -171,17 +171,17 @@ impl RiotApiHandler {
 pub struct RiotApiApplicationInterface {
     config: RiotConfig,
     api: Arc<RiotApiHandler>,
-    queue: String,
+    mqconfig: RabbitMqConfig,
     rmq: Arc<RabbitMqInterface>,
     db: Arc<PgPool>,
 }
 
 impl RiotApiApplicationInterface {
-    pub fn new (config: RiotConfig, queue: &str, api: Arc<RiotApiHandler>, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>) -> Self {
+    pub fn new (config: RiotConfig, mqconfig: &RabbitMqConfig, api: Arc<RiotApiHandler>, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>) -> Self {
         Self {
             config,
             api,
-            queue: String::from(queue),
+            mqconfig: mqconfig.clone(),
             rmq,
             db,
         }

@@ -200,10 +200,10 @@ impl ApiApplication {
         let tft_api = Arc::new(RiotApiHandler::new(config.riot.tft_api_key.clone()));
         let rabbitmq = RabbitMqInterface::new(&config.rabbitmq).await.unwrap();
 
-        let rso_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq.rso_queue, rso_api.clone(), rabbitmq.clone(), pool.clone()));
-        let valorant_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq.valorant_queue, valorant_api.clone(), rabbitmq.clone(), pool.clone()));
-        let lol_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq.lol_queue, lol_api.clone(), rabbitmq.clone(), pool.clone()));
-        let tft_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq.tft_queue, tft_api.clone(), rabbitmq.clone(), pool.clone()));
+        let rso_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, rso_api.clone(), rabbitmq.clone(), pool.clone()));
+        let valorant_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, valorant_api.clone(), rabbitmq.clone(), pool.clone()));
+        let lol_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, lol_api.clone(), rabbitmq.clone(), pool.clone()));
+        let tft_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, tft_api.clone(), rabbitmq.clone(), pool.clone()));
 
         RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.rso_queue.clone(), rso_itf.clone()).await.unwrap();
         RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.valorant_queue.clone(), valorant_itf.clone()).await.unwrap();

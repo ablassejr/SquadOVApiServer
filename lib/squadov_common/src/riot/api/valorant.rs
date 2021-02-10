@@ -61,7 +61,7 @@ impl super::RiotApiApplicationInterface {
     }
 
     pub async fn request_backfill_user_valorant_matches(&self, puuid: &str) -> Result<(), SquadOvError> {
-        self.rmq.publish(&self.queue, serde_json::to_vec(&RiotApiTask::ValorantBackfill{puuid: String::from(puuid)})?, RABBITMQ_DEFAULT_PRIORITY).await;
+        self.rmq.publish(&self.mqconfig.valorant_queue, serde_json::to_vec(&RiotApiTask::ValorantBackfill{puuid: String::from(puuid)})?, RABBITMQ_DEFAULT_PRIORITY).await;
         Ok(())
     }
 
@@ -110,7 +110,7 @@ impl super::RiotApiApplicationInterface {
             RABBITMQ_DEFAULT_PRIORITY
         };
 
-        self.rmq.publish(&self.queue, serde_json::to_vec(&RiotApiTask::ValorantMatch{
+        self.rmq.publish(&self.mqconfig.valorant_queue, serde_json::to_vec(&RiotApiTask::ValorantMatch{
             match_id: String::from(match_id),
             shard: String::from(shard),
         })?, priority).await;

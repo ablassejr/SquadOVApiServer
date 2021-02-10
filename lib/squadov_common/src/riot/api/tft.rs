@@ -49,7 +49,7 @@ impl super::RiotApiApplicationInterface {
             RABBITMQ_DEFAULT_PRIORITY
         };
 
-        self.rmq.publish(&self.queue, serde_json::to_vec(&RiotApiTask::TftMatch{
+        self.rmq.publish(&self.mqconfig.tft_queue, serde_json::to_vec(&RiotApiTask::TftMatch{
             platform: String::from(platform),
             region: String::from(region),
             game_id,
@@ -109,7 +109,7 @@ impl super::RiotApiApplicationInterface {
             }
         }
 
-        self.rmq.publish(&self.queue, serde_json::to_vec(&RiotApiTask::TftBackfill{
+        self.rmq.publish(&self.mqconfig.tft_queue, serde_json::to_vec(&RiotApiTask::TftBackfill{
             puuid: summoner.puuid.clone(),
             region: String::from(region),
         })?, RABBITMQ_DEFAULT_PRIORITY).await;
