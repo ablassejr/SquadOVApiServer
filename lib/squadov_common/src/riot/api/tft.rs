@@ -101,7 +101,7 @@ impl super::RiotApiApplicationInterface {
     }
 
     pub async fn request_backfill_user_tft_matches(&self, summoner_name: &str, region: &str, user_id: i64) -> Result<(), SquadOvError> {
-        let summoner = db::get_user_riot_summoner_from_name(&*self.db, user_id, summoner_name).await?;
+        let summoner = db::get_user_riot_summoner_from_name(&*self.db, user_id, summoner_name).await?.ok_or(SquadOvError::NotFound)?;
         if summoner.last_backfill_tft_time.is_some() {
             let time_since_backfill = Utc::now() - summoner.last_backfill_tft_time.unwrap();
             if time_since_backfill < Duration::days(3) {

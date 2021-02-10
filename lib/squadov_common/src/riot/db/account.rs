@@ -6,6 +6,63 @@ use sqlx::{Executor, Postgres};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+pub async fn get_user_riot_account_from_raw_puuid<'a, T>(ex: T, user_id: i64, raw_puuid: &str) -> Result<Option<RiotAccount>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            RiotAccount,
+            r#"
+            SELECT ra.puuid, ra.game_name, ra.tag_line
+            FROM squadov.riot_accounts AS ra
+            INNER JOIN squadov.riot_account_links AS ral
+                ON ral.puuid = ra.puuid
+            WHERE ra.raw_puuid = $1
+                AND ral.user_id = $2
+            "#,
+            raw_puuid,
+            user_id,
+        )
+            .fetch_optional(ex)
+            .await?
+    )
+}
+
+pub async fn associate_raw_puuid_with_puuid<'a, T>(ex: T, puuid: &str, raw_puuid: &str) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        UPDATE squadov.riot_accounts
+        SET raw_puuid = $2
+        WHERE puuid = $1
+        ",
+        puuid,
+        raw_puuid,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_riot_account<'a, T>(ex: T, puuid: &str) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        DELETE FROM squadov.riot_accounts
+        WHERE puuid = $1
+        ",
+        puuid,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
 pub async fn tick_riot_account_lol_backfill_time<'a, T>(ex: T, account_id: &str) -> Result<(), SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
@@ -67,7 +124,7 @@ where
 }
 
 
-pub async fn get_user_riot_account_gamename_tagline<'a, T>(ex: T, user_id: i64, game_name: &str, tag_line: &str) -> Result<RiotAccount, SquadOvError>
+pub async fn get_user_riot_account_gamename_tagline<'a, T>(ex: T, user_id: i64, game_name: &str, tag_line: &str) -> Result<Option<RiotAccount>, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
 {
@@ -86,7 +143,7 @@ where
         game_name,
         tag_line,
     )
-        .fetch_one(ex)
+        .fetch_optional(ex)
         .await?)
 }
 

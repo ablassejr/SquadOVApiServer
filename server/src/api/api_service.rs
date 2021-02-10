@@ -182,18 +182,23 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                 .service(
                                                     web::scope("/valorant")
                                                         .route("/puuid/{puuid}", web::get().to(v1::get_riot_valorant_account_handler))
-                                                        .route("/account/{game_name}/{tag_line}", web::get().to(v1::get_riot_valorant_account_from_gamename_tagline_handler))
+                                                        .route("/account", web::post().to(v1::verify_valorant_account_ownership_handler))
                                                         .route("", web::get().to(v1::list_riot_valorant_accounts_handler))
                                                 )
                                                 .service(
                                                     web::scope("/lol")
-                                                        .route("/{summoner_name}", web::get().to(v1::get_riot_lol_summoner_account_handler))
+                                                        .route("/account", web::post().to(v1::verify_lol_summoner_ownership_handler))
                                                         .route("", web::get().to(v1::list_riot_lol_accounts_handler))
                                                 )
                                                 .service(
                                                     web::scope("/tft")
-                                                        .route("/{summoner_name}", web::get().to(v1::get_riot_tft_summoner_account_handler))
+                                                        .route("/account", web::post().to(v1::verify_tft_summoner_ownership_handler))
                                                         .route("", web::get().to(v1::list_riot_tft_accounts_handler))
+                                                )
+                                                .service(
+                                                    web::scope("/generic/{puuid}")
+                                                        .route("", web::post().to(v1::refresh_riot_account_from_puuid_handler))
+                                                        .route("", web::delete().to(v1::delete_riot_account_handler))
                                                 )
                                         )
                                 )

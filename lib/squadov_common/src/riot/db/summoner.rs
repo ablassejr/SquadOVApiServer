@@ -5,7 +5,31 @@ use crate::{
 use sqlx::{Executor, Postgres};
 use uuid::Uuid;
 
-pub async fn get_user_riot_summoner_from_name<'a, T>(ex: T, user_id: i64, summoner_name: &str) -> Result<RiotSummoner, SquadOvError>
+pub async fn get_user_riot_summoner_from_raw_puuid<'a, T>(ex: T, user_id: i64, raw_puuid: &str) -> Result<Option<RiotSummoner>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            RiotSummoner,
+            r#"
+            SELECT ra.puuid, ra.account_id, ra.summoner_id, ra.summoner_name, ra.last_backfill_lol_time, ra.last_backfill_tft_time
+            FROM squadov.riot_accounts AS ra
+            INNER JOIN squadov.riot_account_links AS ral
+                ON ral.puuid = ra.puuid
+            WHERE ral.user_id = $1
+                AND ra.raw_puuid = $2
+            "#,
+            user_id,
+            raw_puuid,
+        )
+            .fetch_optional(ex)
+            .await?
+    )
+}
+
+
+pub async fn get_user_riot_summoner_from_name<'a, T>(ex: T, user_id: i64, summoner_name: &str) -> Result<Option<RiotSummoner>, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
 {
@@ -22,7 +46,7 @@ where
         user_id,
         summoner_name,
     )
-        .fetch_one(ex)
+        .fetch_optional(ex)
         .await?)
 }
 

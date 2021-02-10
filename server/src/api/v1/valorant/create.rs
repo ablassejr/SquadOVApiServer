@@ -18,10 +18,7 @@ pub struct InputValorantMatch {
     // Valorant unique ID
     #[serde(rename = "matchId")]
     pub match_id: String,
-    #[serde(rename = "gameName")]
-    pub game_name: String,
-    #[serde(rename = "tagLine")]
-    pub tag_line: String,
+    pub puuid: String,
     #[serde(rename = "playerData")]
     pub player_data: super::ValorantPlayerMatchMetadata
 }
@@ -104,11 +101,10 @@ pub async fn create_new_valorant_match_handler(data : web::Json<InputValorantMat
     };
 
     // Make sure the account is valid.
-    let account = db::get_user_riot_account_gamename_tagline(&*app.pool, session.user.id, &data.game_name, &data.tag_line).await?;
-
-    // Need to try multiple times to create a unique match uuid for the match in question.
+    let account = db::get_user_riot_account_from_raw_puuid(&*app.pool, session.user.id, &data.puuid).await?.ok_or(SquadOvError::NotFound)?;
     let shard = db::get_user_account_shard(&*app.pool, &account.puuid, games::VALORANT_SHORTHAND).await?;
 
+    // Need to try multiple times to create a unique match uuid for the match in question.
     for _i in 0..2i32 {
         let mut tx = app.pool.begin().await?;
         let match_uuid = match db::create_or_get_match_uuid_for_valorant_match(&mut tx, &data.match_id).await {

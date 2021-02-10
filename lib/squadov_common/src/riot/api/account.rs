@@ -77,7 +77,7 @@ impl super::RiotApiApplicationInterface {
     }
     
     pub async fn request_riot_account_from_puuid(&self, puuid: &str) -> Result<(), SquadOvError> {
-        self.rmq.publish(&self.mqconfig.rso_queue, serde_json::to_vec(&RiotApiTask::Account{puuid: String::from(puuid)})?, RABBITMQ_DEFAULT_PRIORITY).await;
+        self.rmq.publish(&self.mqconfig.valorant_queue, serde_json::to_vec(&RiotApiTask::Account{puuid: String::from(puuid)})?, RABBITMQ_DEFAULT_PRIORITY).await;
         Ok(())
     }
 
