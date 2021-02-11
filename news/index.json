@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.5.10",
+        "description": "Lots of bug fixes.",
+        "timestamp": 1613004928000,
+        "data": "data/update-v0.5.10.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.5.9",
         "description": "Match URL sharing!",
         "timestamp": 1612904888000,

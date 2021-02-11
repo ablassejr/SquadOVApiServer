@@ -138,6 +138,18 @@
       ]
     }
   },
+  "0f0b8630aa0ead1aa0fc00a1a7d4e5ab35e866cd0500bf4c596538183f90da60": {
+    "query": "\n        DELETE FROM squadov.riot_accounts\n        WHERE puuid = $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "0f1e6d7867f3ade47b16c6643996319a592c84cd9d4d421ec8962a576dc54c8d": {
     "query": "\n        SELECT ra.puuid, ra.game_name, ra.tag_line\n        FROM squadov.riot_accounts AS ra\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.puuid = ra.puuid\n        WHERE ral.user_id = $1\n            AND ra.game_name = $2\n            AND ra.tag_line = $3\n        ",
     "describe": {
@@ -163,6 +175,39 @@
           "Int8",
           "Text",
           "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        true
+      ]
+    }
+  },
+  "0f21a011e30e17baa3444f73af12378063a65eeab2ed53f806fbfef89a1a35ed": {
+    "query": "\n            SELECT ra.puuid, ra.game_name, ra.tag_line\n            FROM squadov.riot_accounts AS ra\n            INNER JOIN squadov.riot_account_links AS ral\n                ON ral.puuid = ra.puuid\n            WHERE ra.raw_puuid = $1\n                AND ral.user_id = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "puuid",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "game_name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "tag_line",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Int8"
         ]
       },
       "nullable": [
@@ -2240,6 +2285,19 @@
       "nullable": []
     }
   },
+  "a10122437e4cbc1060fda82a8179608dcc185462b320a67e8723a162b4080a00": {
+    "query": "\n        UPDATE squadov.riot_accounts\n        SET raw_puuid = $2\n        WHERE puuid = $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "a1849e398b0f08cd1443ea92d7eb7a901c236743f6adb38271fc6aafd679895e": {
     "query": "\n        SELECT lmi.match_uuid\n        FROM squadov.lol_match_info AS lmi\n        INNER JOIN squadov.lol_match_participant_identities AS lmpi\n            ON lmpi.match_uuid = lmi.match_uuid\n        INNER JOIN squadov.riot_accounts AS ra\n            ON ra.summoner_id = lmpi.summoner_id\n        WHERE ra.puuid = $1\n        ORDER BY lmi.game_creation DESC\n        LIMIT $2 OFFSET $3\n        ",
     "describe": {
@@ -2985,6 +3043,57 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "e7e695baa65ce97ad22ef2f26ddf44e69877f5e86ed8524cc578ca934ab96817": {
+    "query": "\n            SELECT ra.puuid, ra.account_id, ra.summoner_id, ra.summoner_name, ra.last_backfill_lol_time, ra.last_backfill_tft_time\n            FROM squadov.riot_accounts AS ra\n            INNER JOIN squadov.riot_account_links AS ral\n                ON ral.puuid = ra.puuid\n            WHERE ral.user_id = $1\n                AND ra.raw_puuid = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "puuid",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "account_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "summoner_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "summoner_name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "last_backfill_lol_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "last_backfill_tft_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true
       ]
     }
   },
