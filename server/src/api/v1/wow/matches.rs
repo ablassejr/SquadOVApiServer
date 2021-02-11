@@ -533,6 +533,7 @@ impl api::ApiApplication {
                     ON wcle.combat_log_uuid = wcl.uuid
                         AND wcle.evt @> '{"type": "CombatantInfo"}'
                         AND wcle.evt->>'guid' = wmc.combatant_guid
+                        AND wcle.tm BETWEEN wa.tm AND wa.finish_time
                 "#,
                 &match_uuids,
                 &player_uuids,
