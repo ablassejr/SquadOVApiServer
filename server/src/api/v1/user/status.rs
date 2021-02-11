@@ -25,15 +25,8 @@ impl SessionVerifier for api::ApiApplication {
         Ok(session.user.id == user_id && self.is_session_valid(&session).await?)
     }
 
-    async fn verify_session_access_to_users(&self, session_id: String, user_ids: &[i64]) -> Result<bool, SquadOvError> {
-        let session = self.session.get_session_from_id(&session_id, &*self.pool).await?;
-        if session.is_none() {
-            return Ok(false);
-        }
-        
-        let session = session.unwrap();
-
-        let same_squad_user_ids: HashSet<i64> = HashSet::from_iter(self.get_user_ids_in_same_squad_as_users(&[session.user.id]).await?.into_iter());
+    async fn verify_user_access_to_users(&self, uid: i64, user_ids: &[i64]) -> Result<bool, SquadOvError> {
+        let same_squad_user_ids: HashSet<i64> = HashSet::from_iter(self.get_user_ids_in_same_squad_as_users(&[uid]).await?.into_iter());
         Ok(user_ids.iter().all(|x| {
             same_squad_user_ids.contains(x)
         }))

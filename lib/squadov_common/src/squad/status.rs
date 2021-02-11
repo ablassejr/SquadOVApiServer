@@ -209,7 +209,7 @@ where
     pub watched_users: HashSet<Uuid>,
     pub tracker: actix::Addr<UserActivityStatusTracker>,
     pub verifier: Arc<T>,
-    pub squadov_session: Option<String>,
+    pub authenticated: bool,
 }
 
 #[derive(Message)]
@@ -235,7 +235,7 @@ where
             watched_users: HashSet::new(),
             tracker,
             verifier,
-            squadov_session: None,
+            authenticated: false,
         }
     }
 
@@ -393,16 +393,15 @@ where
     type Result = ();
 
     fn handle(&mut self, msg: UserActivitySubscribeRequest, ctx: &mut Self::Context) {
-        if self.squadov_session.is_none() {
-            log::info!("Attempting to subscribe to user activity without an active session.");
+        if !self.authenticated {
             return;
         }
 
         let verifier = self.verifier.clone();
-        let session_id = self.squadov_session.as_ref().unwrap().clone();
+        let user_id = self.user_id;
         let user_ids = msg.user_id.clone();
         let future = async move {
-            verifier.verify_session_access_to_users(session_id, &user_ids).await
+            verifier.verify_user_access_to_users(user_id, &user_ids).await
         };
             
         future
@@ -427,6 +426,8 @@ where
                                     fut::ready(())
                                 })
                                 .wait(ctx);
+                        } else {
+                            log::warn!("Session does not have access to requested users.");
                         }
                     },
                     Err(err) => {
@@ -447,6 +448,10 @@ where
     type Result = ();
 
     fn handle(&mut self, msg: UserActivityChange, ctx: &mut Self::Context) {
+        if !self.authenticated {
+            return;
+        }
+        
         let mut resp = UserActivitySubscribeResponse{
             status: HashMap::new(),
         };
@@ -464,7 +469,6 @@ where
     fn handle(&mut self, msg: WebsocketAuthenticationRequest, ctx: &mut Self::Context) {
         let verifier = self.verifier.clone();
         let user_id = self.user_id;
-        self.squadov_session = Some(msg.session_id.clone());
 
         let future = async move {
             verifier.verify_session_id_for_user(user_id, msg.session_id).await
@@ -472,11 +476,14 @@ where
             
         future
             .into_actor(self)
-            .then(|res, _act, ctx| {
+            .then(|res, act, ctx| {
                 match res {
-                    Ok(v) => ctx.text(serde_json::to_string(&WebsocketAuthenticationResponse{
-                        success: v
-                    }).unwrap()),
+                    Ok(v) => {
+                        act.authenticated = v;
+                        ctx.text(serde_json::to_string(&WebsocketAuthenticationResponse{
+                            success: v
+                        }).unwrap())
+                    },
                     Err(err) => {
                         log::warn!("Failed to verify user session: {:?}", err);
                         ctx.text(serde_json::to_string(&WebsocketAuthenticationResponse{
