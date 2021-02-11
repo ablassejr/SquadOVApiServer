@@ -2417,56 +2417,6 @@
       ]
     }
   },
-  "45ff58d6e8aedbe03d05f1a859394b17a252e0d028fa4e4a620aae77534ff307": {
-    "query": "\n            SELECT puuid, account_id, summoner_id, summoner_name, last_backfill_lol_time, last_backfill_tft_time\n            FROM squadov.riot_accounts\n            WHERE raw_puuid = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "puuid",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "account_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "summoner_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 3,
-          "name": "summoner_name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "last_backfill_lol_time",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 5,
-          "name": "last_backfill_tft_time",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        true,
-        true,
-        true,
-        true,
-        true
-      ]
-    }
-  },
   "4924319db705ea8f6bdd17883d05c56e9327da9c1b87564c664bdfc2c1134b93": {
     "query": "\n            SELECT ral.user_id, lmpi.participant_id\n            FROM squadov.lol_match_participant_identities AS lmpi\n            INNER JOIN squadov.riot_accounts AS ra\n                ON ra.summoner_id = lmpi.summoner_id\n            INNER JOIN squadov.riot_account_links AS ral\n                ON ral.puuid = ra.puuid\n            WHERE lmpi.match_uuid = $1\n            ",
     "describe": {
@@ -2885,6 +2835,94 @@
         ]
       },
       "nullable": [
+        false
+      ]
+    }
+  },
+  "53a37da1a8dec1e536b99a12fa3008a972d29e519016984c0ddec8a8d196fd2f": {
+    "query": "\n                SELECT DISTINCT\n                    wa.*,\n                    (wcle.evt->>'team')::INTEGER = wa.winning_team_id AS \"success!\",\n                    inp.player_uuid AS \"user_uuid!\",\n                    wcl.build_version AS \"build\"\n                FROM UNNEST($1::UUID[], $2::UUID[], $3::VARCHAR[]) AS inp(match_uuid, player_uuid, combatant_guid)\n                INNER JOIN squadov.wow_arenas AS wa\n                    ON wa.match_uuid = inp.match_uuid\n                INNER JOIN squadov.wow_match_combatants AS wmc\n                    ON wmc.match_uuid = wa.match_uuid\n                        AND wmc.combatant_guid = inp.combatant_guid\n                INNER JOIN squadov.wow_match_combat_log_association AS cla\n                    ON cla.match_uuid = wa.match_uuid\n                INNER JOIN squadov.wow_combat_logs AS wcl\n                    ON wcl.uuid = cla.combat_log_uuid\n                INNER JOIN squadov.wow_combat_log_events AS wcle\n                    ON wcle.combat_log_uuid = wcl.uuid\n                        AND wcle.evt @> '{\"type\": \"CombatantInfo\"}'\n                        AND wcle.evt->>'guid' = wmc.combatant_guid\n                        AND wcle.tm BETWEEN wa.tm AND wa.finish_time\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "combatants_key",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "instance_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "arena_type",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "finish_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "winning_team_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "match_duration_seconds",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 8,
+          "name": "new_ratings",
+          "type_info": "Int4Array"
+        },
+        {
+          "ordinal": 9,
+          "name": "success!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 10,
+          "name": "user_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 11,
+          "name": "build",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "UuidArray",
+          "VarcharArray"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        null,
+        null,
         false
       ]
     }
@@ -3562,125 +3600,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "701c6b1e0ff90d8bdb0468cd885f345c5cd669dc2eacc3a5fad07a97b0264b88": {
-    "query": "\n            SELECT puuid, game_name, tag_line\n            FROM squadov.riot_accounts\n            WHERE raw_puuid = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "puuid",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "game_name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "tag_line",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        true,
-        true
-      ]
-    }
-  },
-  "70d4d49122dbea7f70c2213b84ae85000c4027f743af344d5a6b295b2d23926c": {
-    "query": "\n                SELECT DISTINCT\n                    wa.*,\n                    (wcle.evt->>'team')::INTEGER = wa.winning_team_id AS \"success!\",\n                    u.uuid AS \"user_uuid!\",\n                    wcl.build_version AS \"build\"\n                FROM squadov.wow_arenas AS wa\n                INNER JOIN squadov.wow_match_combatants AS wmc\n                    ON wmc.match_uuid = wa.match_uuid\n                INNER JOIN squadov.wow_match_combat_log_association AS cla\n                    ON cla.match_uuid = wa.match_uuid\n                INNER JOIN squadov.wow_combat_logs AS wcl\n                    ON wcl.uuid = cla.combat_log_uuid\n                INNER JOIN squadov.wow_combat_log_events AS wcle\n                    ON wcle.combat_log_uuid = wcl.uuid\n                        AND wcle.evt @> '{\"type\": \"CombatantInfo\"}'\n                        AND wcle.evt->>'guid' = wmc.combatant_guid\n                INNER JOIN squadov.wow_user_character_association AS wuca\n                    ON wuca.guid = wmc.combatant_guid\n                INNER JOIN squadov.users AS u\n                    ON u.id = wuca.user_id\n                WHERE wa.match_uuid = $1 AND u.id = $2\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "tm",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 2,
-          "name": "combatants_key",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 3,
-          "name": "instance_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "arena_type",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 5,
-          "name": "finish_time",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 6,
-          "name": "winning_team_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "match_duration_seconds",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 8,
-          "name": "new_ratings",
-          "type_info": "Int4Array"
-        },
-        {
-          "ordinal": 9,
-          "name": "success!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 10,
-          "name": "user_uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 11,
-          "name": "build",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        true,
-        true,
-        null,
-        false,
-        false
-      ]
     }
   },
   "71f1b70c78b433f1a136ab0583d19291b5f2d63231ea8a2c5c3846a4e6a1db7e": {
