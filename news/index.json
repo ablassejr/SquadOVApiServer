@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.5.11",
+        "description": "Minor bug fixes.",
+        "timestamp": 1613072693000,
+        "data": "data/hotfix-v0.5.11.md",
+        "type": "hotfix"
+    },
+    {
         "title": "SquadOV v0.5.10",
         "description": "Lots of bug fixes.",
         "timestamp": 1613004928000,
