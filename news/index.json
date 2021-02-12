@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.5.12",
+        "description": "Minor bug fixes - welcome /r/wow and /r/worldofpvp.",
+        "timestamp": 1613157597000,
+        "data": "data/hotfix-v0.5.12.md",
+        "type": "hotfix"
+    },
+    {
         "title": "SquadOV v0.5.11",
         "description": "Minor bug fixes.",
         "timestamp": 1613072693000,
