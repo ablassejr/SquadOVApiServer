@@ -375,7 +375,9 @@ pub async fn create_squad_invite_handler(app : web::Data<Arc<api::ApiApplication
                 name: invite.username,
             },
             params: vec![
-                (String::from("inviter_username"), session.user.username.clone()),
+                (String::from("product_url"), String::from("https://www.squadov.gg")),
+                (String::from("product_name"), String::from("SquadOV")),
+                (String::from("invite_sender_name"), session.user.username.clone()),
                 (String::from("accept_url"), accept),
                 (String::from("decline_url"), reject),
             ].into_iter().collect()
