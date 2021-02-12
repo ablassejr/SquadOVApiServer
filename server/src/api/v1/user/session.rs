@@ -24,9 +24,15 @@ pub async fn refresh_user_session_handler(app : web::Data<Arc<api::ApiApplicatio
 
     // Extract expiration from the access token JWT.
     let token = jsonwebtoken::dangerous_insecure_decode::<SessionJwtClaims>(&session.access_token)?;
+    let expiration = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(token.claims.exp, 0), Utc);
+
+    if expiration < Utc::now() {
+        return Err(SquadOvError::InternalError(String::from("Bad expiration")));
+    }
+
     Ok(HttpResponse::Ok().json(SerializedUserSession{
         session_id: session.session_id.clone(),
-        expiration: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(token.claims.exp, 0), Utc),
+        expiration,
     }))
 }
 
