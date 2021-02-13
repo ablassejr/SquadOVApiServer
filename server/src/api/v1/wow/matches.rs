@@ -456,12 +456,13 @@ impl api::ApiApplication {
                     ON wcle.combat_log_uuid = wcl.uuid
                         AND wcle.evt @> '{"type": "CombatantInfo"}'
                         AND wcle.evt->>'guid' = wmc.combatant_guid
-                        AND wcle.tm BETWEEN wa.tm AND wa.finish_time
+                        AND wcle.tm BETWEEN wa.tm AND LEAST(wcle.tm + INTERVAL '30 minutes', COALESCE(wa.finish_time, wcle.tm + INTERVAL '10 minutes'))
                 INNER JOIN squadov.wow_user_character_association AS wuca
                     ON wuca.guid = wmc.combatant_guid
                 INNER JOIN squadov.users AS u
                     ON u.id = wuca.user_id
                 WHERE wmc.combatant_guid = $1
+                    AND wa.finish_time IS NOT NULL
                 ORDER BY tm DESC
                 LIMIT $2 OFFSET $3
                 "#,
@@ -533,7 +534,7 @@ impl api::ApiApplication {
                     ON wcle.combat_log_uuid = wcl.uuid
                         AND wcle.evt @> '{"type": "CombatantInfo"}'
                         AND wcle.evt->>'guid' = wmc.combatant_guid
-                        AND wcle.tm BETWEEN wa.tm AND wa.finish_time
+                        AND wcle.tm BETWEEN wa.tm AND LEAST(wcle.tm + INTERVAL '30 minutes', COALESCE(wa.finish_time, wcle.tm + INTERVAL '10 minutes'))
                 "#,
                 &match_uuids,
                 &player_uuids,
@@ -609,7 +610,7 @@ impl api::ApiApplication {
                     ON wcle.combat_log_uuid = wcl.uuid
                         AND wcle.evt @> '{"type": "CombatantInfo"}'
                         AND wcle.evt->>'guid' = wmc.combatant_guid
-                        AND wcle.tm BETWEEN wa.tm AND wa.finish_time
+                        AND wcle.tm BETWEEN wa.tm AND LEAST(wcle.tm + INTERVAL '30 minutes', COALESCE(wa.finish_time, wcle.tm + INTERVAL '10 minutes'))
                 INNER JOIN squadov.wow_user_character_association AS wuca
                     ON wuca.guid = wmc.combatant_guid
                 INNER JOIN squadov.users AS u
