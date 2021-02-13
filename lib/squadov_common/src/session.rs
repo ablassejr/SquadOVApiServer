@@ -9,6 +9,9 @@ pub struct SerializedUserSession {
     #[serde(rename="sessionId")]
     pub session_id: String,
     pub expiration: DateTime<Utc>,
+    // Number of seconds to expiration
+    #[serde(rename="expiresIn")]
+    pub expires_in: i64,
 }
 
 #[derive(Deserialize)]
