@@ -65,7 +65,7 @@ impl api::ApiApplication {
             params.end.unwrap(),
             params.ps_step_seconds,
         )
-            .fetch_all(&*self.pool)
+            .fetch_all(&*self.heavy_pool)
             .await?;
 
         let mut ret_map: HashMap<String, Vec<WowStatDatum>> = HashMap::new();
@@ -126,7 +126,7 @@ impl api::ApiApplication {
             params.end.unwrap(),
             params.ps_step_seconds,
         )
-            .fetch_all(&*self.pool)
+            .fetch_all(&*self.heavy_pool)
             .await?;
 
         let mut ret_map: HashMap<String, Vec<WowStatDatum>> = HashMap::new();
@@ -187,7 +187,7 @@ impl api::ApiApplication {
             params.end.unwrap(),
             params.ps_step_seconds,
         )
-            .fetch_all(&*self.pool)
+            .fetch_all(&*self.heavy_pool)
             .await?;
 
         let mut ret_map: HashMap<String, Vec<WowStatDatum>> = HashMap::new();

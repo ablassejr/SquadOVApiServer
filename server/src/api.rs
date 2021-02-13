@@ -97,7 +97,8 @@ pub fn construct_hal_pagination_response<T>(data : T, req: &HttpRequest, params:
 #[derive(Deserialize,Debug,Clone)]
 pub struct DatabaseConfig {
     pub url: String,
-    pub connections: u32
+    pub connections: u32,
+    pub heavy_connections: u32,
 }
 
 #[derive(Deserialize,Debug,Clone)]
@@ -164,6 +165,7 @@ pub struct ApiApplication {
     session: auth::SessionManager,
     vod: Arc<dyn VodManager + Send + Sync>,
     pub pool: Arc<PgPool>,
+    pub heavy_pool: Arc<PgPool>,
     schema: Arc<graphql::GraphqlSchema>,
     pub blob: Arc<BlobManagementClient>,
     pub rso_itf: Arc<RiotApiApplicationInterface>,
@@ -180,6 +182,12 @@ impl ApiApplication {
         // database configuration, external API client configuration, etc.
         let pool = Arc::new(PgPoolOptions::new()
             .max_connections(config.database.connections)
+            .connect(&config.database.url)
+            .await
+            .unwrap());
+
+        let heavy_pool = Arc::new(PgPoolOptions::new()
+            .max_connections(config.database.heavy_connections)
             .connect(&config.database.url)
             .await
             .unwrap());
@@ -230,7 +238,8 @@ impl ApiApplication {
             users: auth::UserManager{},
             session: auth::SessionManager::new(),
             vod: vod_manager,
-            pool: pool,
+            pool,
+            heavy_pool,
             schema: Arc::new(graphql::create_schema()),
             blob: blob,
             rso_itf,
