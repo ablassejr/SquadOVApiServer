@@ -75,7 +75,7 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, cfg: &ClientCon
             };
 
             if handle_events {
-                let mut tx = opaque.app.pool.begin().await?;
+                let mut tx = opaque.app.heavy_pool.begin().await?;
                 let events = {
                     let events = opaque.events.read().await;
                     events.clone()
