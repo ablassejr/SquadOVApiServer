@@ -54,7 +54,7 @@ impl api::ApiApplication {
             user_id,
             match_uuid
         )
-            .fetch_all(&*self.pool)
+            .fetch_all(&*self.heavy_pool)
             .await?;
 
         let guids: Vec<String> = characters.iter().map(|x| { x.guid.clone() }).collect();
@@ -83,7 +83,7 @@ impl api::ApiApplication {
             user_id,
             match_uuid
         )
-            .fetch_all(&*self.pool)
+            .fetch_all(&*self.heavy_pool)
             .await?
             .into_iter()
             .map(|x| {
@@ -178,7 +178,7 @@ impl api::ApiApplication {
                 &guids,
                 user_id,
             )
-                .fetch_all(&*self.pool)
+                .fetch_all(&*self.heavy_pool)
                 .await?
                 .into_iter()
                 .map(|x| {

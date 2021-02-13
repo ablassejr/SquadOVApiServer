@@ -469,7 +469,7 @@ impl api::ApiApplication {
                 end - start,
                 start
             )
-                .fetch_all(&*self.pool)
+                .fetch_all(&*self.heavy_pool)
                 .await?
         )
     }
@@ -539,7 +539,7 @@ impl api::ApiApplication {
                 &player_uuids,
                 &character_guids,
             )
-                .fetch_all(&*self.pool)
+                .fetch_all(&*self.heavy_pool)
                 .await?
         )
     }
@@ -619,7 +619,7 @@ impl api::ApiApplication {
                 match_uuid,
                 user_id,
             )
-                .fetch_optional(&*self.pool)
+                .fetch_optional(&*self.heavy_pool)
                 .await?
         )
     }
