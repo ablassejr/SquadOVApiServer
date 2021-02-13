@@ -51,9 +51,7 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, cfg: &ClientCon
             let mut manual_handle_flags = false;
             if parsed_payload.is_finish_token() {
                 log::info!("Detect Finish Token for WoW Combat Log: {}", &combat_log_uuid);
-                opaque.app.blob.finish_resumable_blob(&combat_log.blob).await?;
             } else {
-                opaque.app.blob.store_resumable_blob(&combat_log.blob, parsed_payload.flatten().as_bytes()).await?;
                 let parsed_event = squadov_common::parse_raw_wow_combat_log_payload(&combat_log_uuid, &combat_log.state, &parsed_payload)?;
                 if parsed_event.is_some() {
                     let mut events = opaque.events.write().await;
