@@ -673,6 +673,42 @@
       ]
     }
   },
+  "11fc80de600072bb29dcd58cc9a0f2727030f03ac4d98477b2f7671b328e4900": {
+    "query": "\n            SELECT\n                FLOOR((EXTRACT(EPOCH FROM mcl.tm) - EXTRACT(EPOCH FROM $3)) / $5::BIGINT) * $5::BIGINT AS \"xtm\",\n                mcl.source->>'guid' AS \"guid\",\n                SUM(GREATEST((mcl.evt->>'amount')::INTEGER - (mcl.evt->>'overheal')::INTEGER, 0)) / CAST($5::BIGINT AS DOUBLE PRECISION) AS \"amount\"\n            FROM squadov.wow_match_combatants AS wmc\n            LEFT JOIN LATERAL (\n                SELECT wce.*\n                FROM squadov.wow_combat_log_events AS wce\n                INNER JOIN squadov.wow_combat_logs AS wcl\n                    ON wcl.uuid = wce.combat_log_uuid\n                INNER JOIN squadov.wow_match_combat_log_association AS wma\n                    ON wma.combat_log_uuid = wcl.uuid\n                WHERE wcl.user_id = $1\n                    AND wma.match_uuid = $2\n                    AND wce.tm BETWEEN $3 AND $4\n                    AND wce.evt->>'type' = 'Healing'\n                    AND wce.source->>'guid' = wmc.combatant_guid\n            ) AS mcl ON TRUE\n            WHERE wmc.match_uuid = $2\n            GROUP BY xtm, guid\n            ORDER BY xtm, guid\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "xtm",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 1,
+          "name": "guid",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "amount",
+          "type_info": "Float8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid",
+          "Timestamptz",
+          "Timestamptz",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null,
+        null,
+        null
+      ]
+    }
+  },
   "127a93e43ea5d76bd739b8b4ccc7fd725f7c4da21b0013e9949c605aa931c19c": {
     "query": "\n        SELECT tmi.match_uuid\n        FROM squadov.tft_match_info AS tmi\n        INNER JOIN squadov.tft_match_participants AS tmp\n            ON tmp.match_uuid = tmi.match_uuid\n        WHERE tmp.puuid = $1\n            AND tmi.tft_set_number >= 3\n        ORDER BY tmi.game_datetime DESC\n        LIMIT $2 OFFSET $3\n        ",
     "describe": {
@@ -741,6 +777,42 @@
         null,
         null,
         null,
+        null,
+        null,
+        null
+      ]
+    }
+  },
+  "154c877608b2ca3db065fe71e70489f2878449dcde0b2de03be8e997c9ae149a": {
+    "query": "\n            SELECT\n                FLOOR((EXTRACT(EPOCH FROM mcl.tm) - EXTRACT(EPOCH FROM $3)) / $5::BIGINT) * $5::BIGINT AS \"xtm\",\n                COALESCE(mcl.owner_guid, mcl.source->>'guid') AS \"guid\",\n                SUM((mcl.evt->>'amount')::INTEGER) / CAST($5::BIGINT AS DOUBLE PRECISION) AS \"amount\"\n            FROM squadov.wow_match_combatants AS wmc\n            LEFT JOIN LATERAL (\n                SELECT wce.*, wuco.owner_guid\n                FROM squadov.wow_combat_log_events AS wce\n                INNER JOIN squadov.wow_combat_logs AS wcl\n                    ON wcl.uuid = wce.combat_log_uuid\n                INNER JOIN squadov.wow_match_combat_log_association AS wma\n                    ON wma.combat_log_uuid = wcl.uuid\n                LEFT JOIN squadov.wow_combatlog_unit_ownership AS wuco\n                    ON wuco.combat_log_uuid = wcl.uuid\n                        AND wuco.unit_guid = wce.source->>'guid'\n                WHERE wcl.user_id = $1\n                    AND wma.match_uuid = $2\n                    AND wce.tm BETWEEN $3 AND $4\n                    AND wce.evt->>'type' = 'DamageDone'\n                    AND (wce.source->>'guid' = wmc.combatant_guid OR wuco.owner_guid = wmc.combatant_guid)\n            ) AS mcl ON TRUE\n            WHERE wmc.match_uuid = $2\n            GROUP BY xtm, guid\n            ORDER BY xtm, guid\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "xtm",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 1,
+          "name": "guid",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "amount",
+          "type_info": "Float8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid",
+          "Timestamptz",
+          "Timestamptz",
+          "Int8"
+        ]
+      },
+      "nullable": [
         null,
         null,
         null
@@ -1557,6 +1629,35 @@
       ]
     }
   },
+  "2f4f6df8aa5aef7c66c7ed85113e81b31aada6e0ca1fa8353abb7cd60e9b69ac": {
+    "query": "\n            SELECT\n                wce.tm,\n                wce.evt#>>'{encounter_name}' AS \"encounter_name\"\n            FROM squadov.wow_combat_log_events AS wce\n            INNER JOIN squadov.wow_combat_logs AS wcl\n                ON wcl.uuid = wce.combat_log_uuid\n            INNER JOIN squadov.wow_match_combat_log_association AS wma\n                ON wma.combat_log_uuid = wcl.uuid\n            WHERE wma.match_uuid = $1\n                AND wcl.user_id = $2\n                AND wce.tm BETWEEN $3 AND $4\n                AND wce.evt->>'type' = 'EncounterStart'\n            ORDER BY wce.tm ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 1,
+          "name": "encounter_name",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8",
+          "Timestamptz",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        false,
+        null
+      ]
+    }
+  },
   "2f7e55ee63c5666e6bdcab0f9f79a9af2805f0b723aeb16aa8551d222e2960ce": {
     "query": "\n                WITH match_start_stop (start, stop) AS (\n                    SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())\n                    FROM squadov.matches AS m\n                    LEFT JOIN squadov.wow_encounters AS we\n                        ON we.match_uuid = m.uuid\n                    LEFT JOIN squadov.wow_challenges AS wc\n                        ON wc.match_uuid = m.uuid\n                    LEFT JOIN squadov.wow_arenas AS wa\n                        ON wa.match_uuid = m.uuid\n                    WHERE m.uuid = $1\n                ), match_combat_logs AS (\n                    SELECT wce.*\n                    FROM squadov.wow_combat_log_events AS wce\n                    INNER JOIN squadov.wow_combat_logs AS wcl\n                        ON wcl.uuid = wce.combat_log_uuid\n                    INNER JOIN squadov.wow_match_combat_log_association AS wma\n                        ON wma.combat_log_uuid = wcl.uuid\n                    CROSS JOIN match_start_stop AS mss\n                    WHERE wma.match_uuid = $1\n                        AND wcl.user_id = $2\n                        AND wce.tm >= mss.start AND wce.tm <= mss.stop\n                )\n                SELECT\n                    mcl.dest->>'guid' AS \"guid!\",\n                    mcl.dest->>'name' AS \"name!\",\n                    (mcl.dest->>'flags')::BIGINT AS \"flags!\",\n                    mcl.tm AS \"tm!\"\n                FROM match_combat_logs AS mcl\n                WHERE mcl.evt @> '{\"type\": \"Resurrect\"}'\n                ORDER BY mcl.tm ASC\n                ",
     "describe": {
@@ -2215,6 +2316,45 @@
       "nullable": []
     }
   },
+  "3e86967e8a752e7cb6e7364ae79f4e75b3f8804c7f6c2180b272bd3cda35e965": {
+    "query": "\n                SELECT\n                    pl.guid AS \"guid!\",\n                    t1.name AS \"name\",\n                    (wce.evt->>'spec_id')::INTEGER AS \"spec_id!\",\n                    jsonb_path_query_array(\n                        (wce.evt->>'items')::jsonb,\n                        '$[*].ilvl'\n                    ) AS \"items!\"\n                FROM UNNEST($1::VARCHAR[]) AS pl(guid)\n                CROSS JOIN LATERAL (\n                    SELECT wcl.uuid\n                    FROM squadov.wow_combat_logs AS wcl\n                    INNER JOIN squadov.wow_combat_log_character_presence AS wclcp\n                        ON wclcp.combat_log_uuid = wcl.uuid\n                    WHERE wclcp.guid = pl.guid\n                        AND wcl.user_id = $2\n                    ORDER BY wcl.tm DESC\n                    LIMIT 1\n                ) AS cl(id)\n                CROSS JOIN LATERAL (\n                    SELECT wce.source->>'name'\n                    FROM squadov.wow_combat_log_events AS wce\n                    INNER JOIN squadov.wow_combat_logs AS wcl\n                        ON wcl.uuid = wce.combat_log_uuid\n                    WHERE wcl.user_id = $2\n                        AND wcl.uuid = cl.id\n                        AND wce.source->>'guid' = pl.guid\n                    LIMIT 1\n                ) AS t1(name)\n                CROSS JOIN LATERAL (\n                    SELECT wce.*\n                    FROM squadov.wow_combat_log_events AS wce\n                    WHERE wce.combat_log_uuid = cl.id\n                        AND wce.evt->>'type' = 'CombatantInfo'\n                        AND wce.evt->>'guid' = pl.guid\n                    LIMIT 1\n                ) AS wce\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "guid!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "spec_id!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "items!",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "VarcharArray",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null,
+        null,
+        null,
+        null
+      ]
+    }
+  },
   "42d2240cdc49bf199cca11ccbb77d218e1e8c3aec5791434b6712a7114e3c552": {
     "query": "\n            SELECT lmp.*\n            FROM squadov.lol_match_participants AS lmp\n            WHERE lmp.match_uuid = $1\n            ",
     "describe": {
@@ -2571,6 +2711,94 @@
       ]
     }
   },
+  "4361f3f2a9ed3495989a68b323a7724fd9825553a63a4d2367b68b476a6f4fff": {
+    "query": "\n                SELECT DISTINCT\n                    wa.*,\n                    (wcle.evt->>'team')::INTEGER = wa.winning_team_id AS \"success!\",\n                    inp.player_uuid AS \"user_uuid!\",\n                    wcl.build_version AS \"build\"\n                FROM UNNEST($1::UUID[], $2::UUID[], $3::VARCHAR[]) AS inp(match_uuid, player_uuid, combatant_guid)\n                INNER JOIN squadov.wow_arenas AS wa\n                    ON wa.match_uuid = inp.match_uuid\n                INNER JOIN squadov.wow_match_combatants AS wmc\n                    ON wmc.match_uuid = wa.match_uuid\n                        AND wmc.combatant_guid = inp.combatant_guid\n                INNER JOIN squadov.wow_match_combat_log_association AS cla\n                    ON cla.match_uuid = wa.match_uuid\n                INNER JOIN squadov.wow_combat_logs AS wcl\n                    ON wcl.uuid = cla.combat_log_uuid\n                INNER JOIN squadov.wow_combat_log_events AS wcle\n                    ON wcle.combat_log_uuid = wcl.uuid\n                        AND wcle.evt->>'type' = 'CombatantInfo'\n                        AND wcle.evt->>'guid' = wmc.combatant_guid\n                        AND wcle.tm BETWEEN wa.tm AND LEAST(wcle.tm + INTERVAL '30 minutes', COALESCE(wa.finish_time, wcle.tm + INTERVAL '10 minutes'))\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "combatants_key",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "instance_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "arena_type",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "finish_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "winning_team_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "match_duration_seconds",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 8,
+          "name": "new_ratings",
+          "type_info": "Int4Array"
+        },
+        {
+          "ordinal": 9,
+          "name": "success!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 10,
+          "name": "user_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 11,
+          "name": "build",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "UuidArray",
+          "VarcharArray"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        null,
+        null,
+        false
+      ]
+    }
+  },
   "44bd28db999a124fa8a17d6809e2f885f0717a3bfb7dfa268fa4b463403650a2": {
     "query": "\n            SELECT id\n            FROM squadov.share_tokens\n            WHERE match_uuid = $1 AND user_id = $2\n            ",
     "describe": {
@@ -2588,6 +2816,134 @@
         ]
       },
       "nullable": [
+        false
+      ]
+    }
+  },
+  "44cb7eb1c20d67082d4d3c9018d34eeed61966c59f1a2c4936249fa75209ebcd": {
+    "query": "\n                SELECT DISTINCT\n                    wa.*,\n                    (wcle.evt->>'team')::INTEGER = wa.winning_team_id AS \"success!\",\n                    u.uuid AS \"user_uuid!\",\n                    wcl.build_version AS \"build\"\n                FROM squadov.wow_arenas AS wa\n                INNER JOIN squadov.wow_match_combatants AS wmc\n                    ON wmc.match_uuid = wa.match_uuid\n                INNER JOIN squadov.wow_match_combat_log_association AS cla\n                    ON cla.match_uuid = wa.match_uuid\n                INNER JOIN squadov.wow_combat_logs AS wcl\n                    ON wcl.uuid = cla.combat_log_uuid\n                INNER JOIN squadov.wow_combat_log_events AS wcle\n                    ON wcle.combat_log_uuid = wcl.uuid\n                        AND wcle.evt->>'type' = 'CombatantInfo'\n                        AND wcle.evt->>'guid' = wmc.combatant_guid\n                        AND wcle.tm BETWEEN wa.tm AND LEAST(wcle.tm + INTERVAL '30 minutes', COALESCE(wa.finish_time, wcle.tm + INTERVAL '10 minutes'))\n                INNER JOIN squadov.wow_user_character_association AS wuca\n                    ON wuca.guid = wmc.combatant_guid\n                INNER JOIN squadov.users AS u\n                    ON u.id = wuca.user_id\n                WHERE wa.match_uuid = $1 AND u.id = $2\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "combatants_key",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "instance_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "arena_type",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "finish_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "winning_team_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "match_duration_seconds",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 8,
+          "name": "new_ratings",
+          "type_info": "Int4Array"
+        },
+        {
+          "ordinal": 9,
+          "name": "success!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 10,
+          "name": "user_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 11,
+          "name": "build",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        null,
+        false,
+        false
+      ]
+    }
+  },
+  "469f5fad61763ecd67e6c938becfad9a7230a9a4fd0d6bdb8b7daff3d84129e0": {
+    "query": "\n                SELECT\n                    wce.dest->>'guid' AS \"guid!\",\n                    wce.dest->>'name' AS \"name!\",\n                    (wce.dest->>'flags')::BIGINT AS \"flags!\",\n                    wce.tm AS \"tm!\"\n                FROM squadov.wow_combat_log_events AS wce\n                INNER JOIN squadov.wow_combat_logs AS wcl\n                    ON wcl.uuid = wce.combat_log_uuid\n                INNER JOIN squadov.wow_match_combat_log_association AS wma\n                    ON wma.combat_log_uuid = wcl.uuid\n                WHERE wma.match_uuid = $1\n                    AND wcl.user_id = $2\n                    AND wce.tm BETWEEN $3 AND $4\n                    AND wce.evt->>'type' = 'UnitDied'\n                ORDER BY wce.tm ASC\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "guid!",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "name!",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "flags!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "tm!",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8",
+          "Timestamptz",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        null,
+        null,
+        null,
         false
       ]
     }
@@ -2806,6 +3162,65 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "4d156b9b96d80aca0d2965c0677898e93718e782e097e88f54f0e98450d0d29f": {
+    "query": "\n            SELECT\n                wce.tm,\n                wce.dest->>'guid' AS \"guid\",\n                wce.dest->>'name' AS \"name\",\n                (wce.evt#>>'{spell, id}')::BIGINT AS \"spell_id\",\n                (wce.evt#>'{aura_type}') AS \"aura\",\n                wce.evt#>>'{spell, name}' AS \"spell_name\",\n                COALESCE((wce.evt#>>'{applied}')::BOOLEAN, FALSE) AS \"applied!\"\n            FROM squadov.wow_combat_log_events AS wce\n            INNER JOIN squadov.wow_combat_logs AS wcl\n                ON wcl.uuid = wce.combat_log_uuid\n            INNER JOIN squadov.wow_match_combat_log_association AS wma\n                ON wma.combat_log_uuid = wcl.uuid\n            WHERE wma.match_uuid = $1\n                AND wcl.user_id = $2\n                AND wce.tm BETWEEN $3 AND $4\n                AND wce.evt->>'type' = 'SpellAura'\n            ORDER BY wce.tm ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 1,
+          "name": "guid",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "spell_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "aura",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 5,
+          "name": "spell_name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "applied!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8",
+          "Timestamptz",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        false,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
     }
   },
   "4d654232655dc70e8934c88436efef4ab2a2059254246b03447b2b380de2ae09": {
@@ -3460,6 +3875,47 @@
         false,
         false,
         false,
+        false
+      ]
+    }
+  },
+  "6412558f5640b1d52778c2c00c210e336edb18f0bac695ec540c80fa6552bea9": {
+    "query": "\n                SELECT\n                    wce.dest->>'guid' AS \"guid!\",\n                    wce.dest->>'name' AS \"name!\",\n                    (wce.dest->>'flags')::BIGINT AS \"flags!\",\n                    wce.tm AS \"tm!\"\n                FROM squadov.wow_combat_log_events AS wce\n                INNER JOIN squadov.wow_combat_logs AS wcl\n                    ON wcl.uuid = wce.combat_log_uuid\n                INNER JOIN squadov.wow_match_combat_log_association AS wma\n                    ON wma.combat_log_uuid = wcl.uuid\n                WHERE wma.match_uuid = $1\n                    AND wcl.user_id = $2\n                    AND wce.tm BETWEEN $3 AND $4\n                    AND wce.evt->>'type' = 'Resurrect'\n                ORDER BY wce.tm ASC\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "guid!",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "name!",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "flags!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "tm!",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8",
+          "Timestamptz",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        null,
+        null,
+        null,
         false
       ]
     }
@@ -5541,6 +5997,76 @@
       ]
     }
   },
+  "a8707a712bc6d026e44e04b7f9f61bdc0e1affe7ccd635c232e571386afe88a4": {
+    "query": "\n            SELECT DISTINCT ON (mcl.evt->>'guid')\n                mcl.evt->>'guid' AS \"guid!\",\n                (mcl.evt->>'spec_id')::INTEGER AS \"spec_id!\",\n                jsonb_path_query_array(\n                    (mcl.evt->>'items')::jsonb,\n                    '$[*].ilvl'\n                ) AS \"items!\",\n                COALESCE((mcl.evt->>'team')::INTEGER, 0) AS \"team!\"\n            FROM (\n                SELECT wce.*\n                FROM squadov.wow_combat_log_events AS wce\n                INNER JOIN squadov.wow_combat_logs AS wcl\n                    ON wcl.uuid = wce.combat_log_uuid\n                INNER JOIN squadov.wow_match_combat_log_association AS wma\n                    ON wma.combat_log_uuid = wcl.uuid\n                WHERE wcl.user_id = $1\n                    AND wma.match_uuid = $2\n                    AND wce.tm BETWEEN $3 AND $4\n                    AND wce.evt @> '{\"type\": \"CombatantInfo\"}'\n            ) AS mcl\n            ORDER BY mcl.evt->>'guid', mcl.tm DESC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "guid!",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "spec_id!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "items!",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 3,
+          "name": "team!",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid",
+          "Timestamptz",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        null,
+        null,
+        null,
+        null
+      ]
+    }
+  },
+  "a9b59b4d26c0d5e8824cc7df5ef4d880cfb3e4609e790a227513f0938f126caa": {
+    "query": "\n            SELECT\n                wce.tm,\n                wce.evt#>>'{encounter_name}' AS \"encounter_name\"\n            FROM squadov.wow_combat_log_events AS wce\n            INNER JOIN squadov.wow_combat_logs AS wcl\n                ON wcl.uuid = wce.combat_log_uuid\n            INNER JOIN squadov.wow_match_combat_log_association AS wma\n                ON wma.combat_log_uuid = wcl.uuid\n            WHERE wma.match_uuid = $1\n                AND wcl.user_id = $2\n                AND wce.tm BETWEEN $3 AND $4\n                AND wce.evt->>'type' = 'EncounterEnd'\n            ORDER BY wce.tm ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 1,
+          "name": "encounter_name",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8",
+          "Timestamptz",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        false,
+        null
+      ]
+    }
+  },
   "aa278c97d95ceb727d5b983034d30708c62887ce9cd465d54c68d2f0c326fcc9": {
     "query": "\n                UPDATE squadov.vods\n                SET match_uuid = $1,\n                    user_uuid = $2,\n                    start_time = $3,\n                    end_time = $4\n                WHERE video_uuid = $5\n                ",
     "describe": {
@@ -5812,6 +6338,32 @@
       "nullable": [
         false,
         false
+      ]
+    }
+  },
+  "b58ef0d6cbed383a37011e0e2f3a4d25adbc5dba5da14adb1c2ea3b46dc70ba1": {
+    "query": "\n                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()) AS \"start!\", COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW()) AS \"end!\"\n                FROM squadov.matches AS m\n                LEFT JOIN squadov.wow_encounters AS we\n                    ON we.match_uuid = m.uuid\n                LEFT JOIN squadov.wow_challenges AS wc\n                    ON wc.match_uuid = m.uuid\n                LEFT JOIN squadov.wow_arenas AS wa\n                    ON wa.match_uuid = m.uuid\n                WHERE m.uuid = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "start!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 1,
+          "name": "end!",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        null,
+        null
       ]
     }
   },
@@ -6122,6 +6674,94 @@
         ]
       },
       "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "c6392d61594c8764aefaa371a4b48c50652dd45aa7226d27b4b57a5369a61a24": {
+    "query": "\n                SELECT DISTINCT\n                    wa.*,\n                    (wcle.evt->>'team')::INTEGER = wa.winning_team_id AS \"success!\",\n                    u.uuid AS \"user_uuid!\",\n                    wcl.build_version AS \"build\"\n                FROM squadov.wow_arenas AS wa\n                INNER JOIN squadov.wow_match_combatants AS wmc\n                    ON wmc.match_uuid = wa.match_uuid\n                INNER JOIN squadov.wow_match_combat_log_association AS cla\n                    ON cla.match_uuid = wa.match_uuid\n                INNER JOIN squadov.wow_combat_logs AS wcl\n                    ON wcl.uuid = cla.combat_log_uuid\n                INNER JOIN squadov.wow_combat_log_events AS wcle\n                    ON wcle.combat_log_uuid = wcl.uuid\n                        AND wcle.evt->>'type' = 'CombatantInfo'\n                        AND wcle.evt->>'guid' = wmc.combatant_guid\n                        AND wcle.tm BETWEEN wa.tm AND LEAST(wcle.tm + INTERVAL '30 minutes', COALESCE(wa.finish_time, wcle.tm + INTERVAL '10 minutes'))\n                INNER JOIN squadov.wow_user_character_association AS wuca\n                    ON wuca.guid = wmc.combatant_guid\n                INNER JOIN squadov.users AS u\n                    ON u.id = wuca.user_id\n                WHERE wmc.combatant_guid = $1\n                    AND wa.finish_time IS NOT NULL\n                ORDER BY tm DESC\n                LIMIT $2 OFFSET $3\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "combatants_key",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "instance_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "arena_type",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "finish_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "winning_team_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "match_duration_seconds",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 8,
+          "name": "new_ratings",
+          "type_info": "Int4Array"
+        },
+        {
+          "ordinal": 9,
+          "name": "success!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 10,
+          "name": "user_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 11,
+          "name": "build",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        null,
         false,
         false
       ]
@@ -7646,6 +8286,42 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "f66dfe2d720959181cf5dfeb20d4742b220efd6ac9a4fc809dcbad10e69cca35": {
+    "query": "\n            SELECT\n                FLOOR((EXTRACT(EPOCH FROM mcl.tm) - EXTRACT(EPOCH FROM $3)) / $5::BIGINT) * $5::BIGINT AS \"xtm\",\n                mcl.dest->>'guid' AS \"guid\",\n                SUM((mcl.evt->>'amount')::INTEGER) / CAST($5::BIGINT AS DOUBLE PRECISION) AS \"amount\"\n            FROM squadov.wow_match_combatants AS wmc\n            LEFT JOIN LATERAL (\n                SELECT wce.*\n                FROM squadov.wow_combat_log_events AS wce\n                INNER JOIN squadov.wow_combat_logs AS wcl\n                    ON wcl.uuid = wce.combat_log_uuid\n                INNER JOIN squadov.wow_match_combat_log_association AS wma\n                    ON wma.combat_log_uuid = wcl.uuid\n                WHERE wcl.user_id = $1\n                    AND wma.match_uuid = $2\n                    AND wce.tm BETWEEN $3 AND $4\n                    AND wce.evt->>'type' = 'DamageDone'\n                    AND wce.dest->>'guid' = wmc.combatant_guid\n            ) AS mcl ON TRUE\n            WHERE wmc.match_uuid = $2\n            GROUP BY xtm, guid\n            ORDER BY xtm, guid\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "xtm",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 1,
+          "name": "guid",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "amount",
+          "type_info": "Float8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid",
+          "Timestamptz",
+          "Timestamptz",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null,
+        null,
+        null
       ]
     }
   },
