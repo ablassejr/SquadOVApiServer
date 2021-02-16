@@ -181,13 +181,19 @@ impl ApiApplication {
         // Use TOML config to create application - e.g. for
         // database configuration, external API client configuration, etc.
         let pool = Arc::new(PgPoolOptions::new()
+            .min_connections(4)
             .max_connections(config.database.connections)
+            .max_lifetime(std::time::Duration::from_secs(6*60*60))
+            .idle_timeout(std::time::Duration::from_secs(3*60*60))
             .connect(&config.database.url)
             .await
             .unwrap());
 
         let heavy_pool = Arc::new(PgPoolOptions::new()
+            .min_connections(4)
             .max_connections(config.database.heavy_connections)
+            .max_lifetime(std::time::Duration::from_secs(3*60*60))
+            .idle_timeout(std::time::Duration::from_secs(1*60*60))
             .connect(&config.database.url)
             .await
             .unwrap());
