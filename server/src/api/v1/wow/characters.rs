@@ -11,23 +11,13 @@ use std::collections::HashMap;
 
 impl api::ApiApplication {
     pub async fn list_wow_characters_for_match(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<WoWCharacter>, SquadOvError> {
+        let mss = self.get_wow_match_start_stop(match_uuid).await?;
         // There's two queries that need to be done here: get a list if the COMBATANT_INFO events that tell us every character that's
         // supposed to be in the match along with their character spec and item level. Additionally, we need to retrieve a log line
         // with that particular character as the source to get the character's name (for display purposes). We combine these two separate
         // queries to generate our vector of WoWCharacter objects.
         let characters = sqlx::query!(
             r#"
-            WITH match_start_stop (start, stop) AS (
-                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
-                FROM squadov.matches AS m
-                LEFT JOIN squadov.wow_encounters AS we
-                    ON we.match_uuid = m.uuid
-                LEFT JOIN squadov.wow_challenges AS wc
-                    ON wc.match_uuid = m.uuid
-                LEFT JOIN squadov.wow_arenas AS wa
-                    ON wa.match_uuid = m.uuid
-                WHERE m.uuid = $2
-            )
             SELECT DISTINCT ON (mcl.evt->>'guid')
                 mcl.evt->>'guid' AS "guid!",
                 (mcl.evt->>'spec_id')::INTEGER AS "spec_id!",
@@ -43,16 +33,17 @@ impl api::ApiApplication {
                     ON wcl.uuid = wce.combat_log_uuid
                 INNER JOIN squadov.wow_match_combat_log_association AS wma
                     ON wma.combat_log_uuid = wcl.uuid
-                CROSS JOIN match_start_stop AS mss
                 WHERE wcl.user_id = $1
                     AND wma.match_uuid = $2
-                    AND wce.tm >= mss.start AND wce.tm <= mss.stop
+                    AND wce.tm BETWEEN $3 AND $4
                     AND wce.evt @> '{"type": "CombatantInfo"}'
             ) AS mcl
             ORDER BY mcl.evt->>'guid', mcl.tm DESC
             "#,
             user_id,
-            match_uuid
+            match_uuid,
+            &mss.start,
+            &mss.end,
         )
             .fetch_all(&*self.heavy_pool)
             .await?;
@@ -134,6 +125,7 @@ impl api::ApiApplication {
         // based on time. However, it's expensive to sort based on combat log events time (lots of rows). So instead, we
         // assume that the user's name doesn't change within each combat log and order based combat log time. Note that this
         // query also handles retrieving spec ID and ilvl because it can for cheap.
+        // NOTE: If there ever comes a time where this query becomes too expensive we should note that wce.source->>'guid' and wce.evt->>'guid' dont have indices on them.
         Ok(
             sqlx::query!(
                 r#"
@@ -170,7 +162,7 @@ impl api::ApiApplication {
                     SELECT wce.*
                     FROM squadov.wow_combat_log_events AS wce
                     WHERE wce.combat_log_uuid = cl.id
-                        AND wce.evt @> '{"type": "CombatantInfo"}'
+                        AND wce.evt->>'type' = 'CombatantInfo'
                         AND wce.evt->>'guid' = pl.guid
                     LIMIT 1
                 ) AS wce

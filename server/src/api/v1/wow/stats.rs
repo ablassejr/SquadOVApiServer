@@ -52,7 +52,7 @@ impl api::ApiApplication {
                 WHERE wcl.user_id = $1
                     AND wma.match_uuid = $2
                     AND wce.tm BETWEEN $3 AND $4
-                    AND wce.evt @> '{"type": "DamageDone"}'
+                    AND wce.evt->>'type' = 'DamageDone'
                     AND (wce.source->>'guid' = wmc.combatant_guid OR wuco.owner_guid = wmc.combatant_guid)
             ) AS mcl ON TRUE
             WHERE wmc.match_uuid = $2
@@ -113,7 +113,7 @@ impl api::ApiApplication {
                 WHERE wcl.user_id = $1
                     AND wma.match_uuid = $2
                     AND wce.tm BETWEEN $3 AND $4
-                    AND wce.evt @> '{"type": "Healing"}'
+                    AND wce.evt->>'type' = 'Healing'
                     AND wce.source->>'guid' = wmc.combatant_guid
             ) AS mcl ON TRUE
             WHERE wmc.match_uuid = $2
@@ -174,7 +174,7 @@ impl api::ApiApplication {
                 WHERE wcl.user_id = $1
                     AND wma.match_uuid = $2
                     AND wce.tm BETWEEN $3 AND $4
-                    AND wce.evt @> '{"type": "DamageDone"}'
+                    AND wce.evt->>'type' = 'DamageDone'
                     AND wce.dest->>'guid' = wmc.combatant_guid
             ) AS mcl ON TRUE
             WHERE wmc.match_uuid = $2

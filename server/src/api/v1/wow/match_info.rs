@@ -13,22 +13,12 @@ use uuid::Uuid;
 use serde::Serialize;
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
+use super::WowMatchStartStop;
 
 impl api::ApiApplication {
-    async fn get_wow_match_subencounters(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<SerializedWowEncounter>, SquadOvError> {
+    async fn get_wow_match_subencounters(&self, match_uuid: &Uuid, mss: &WowMatchStartStop, user_id: i64) -> Result<Vec<SerializedWowEncounter>, SquadOvError> {
         let raw_starts = sqlx::query!(
             r#"
-            WITH match_start_stop (start, stop) AS (
-                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
-                FROM squadov.matches AS m
-                LEFT JOIN squadov.wow_encounters AS we
-                    ON we.match_uuid = m.uuid
-                LEFT JOIN squadov.wow_challenges AS wc
-                    ON wc.match_uuid = m.uuid
-                LEFT JOIN squadov.wow_arenas AS wa
-                    ON wa.match_uuid = m.uuid
-                WHERE m.uuid = $1
-            )
             SELECT
                 wce.tm,
                 wce.evt#>>'{encounter_name}' AS "encounter_name"
@@ -37,32 +27,22 @@ impl api::ApiApplication {
                 ON wcl.uuid = wce.combat_log_uuid
             INNER JOIN squadov.wow_match_combat_log_association AS wma
                 ON wma.combat_log_uuid = wcl.uuid
-            CROSS JOIN match_start_stop AS mss
             WHERE wma.match_uuid = $1
                 AND wcl.user_id = $2
-                AND wce.tm >= mss.start AND wce.tm <= mss.stop
-                AND wce.evt @> '{"type": "EncounterStart"}'
+                AND wce.tm BETWEEN $3 AND $4
+                AND wce.evt->>'type' = 'EncounterStart'
             ORDER BY wce.tm ASC
             "#,
             match_uuid,
-            user_id
+            user_id,
+            &mss.start,
+            &mss.end,
         )
             .fetch_all(&*self.heavy_pool)
             .await?;
 
         let raw_ends = sqlx::query!(
             r#"
-            WITH match_start_stop (start, stop) AS (
-                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
-                FROM squadov.matches AS m
-                LEFT JOIN squadov.wow_encounters AS we
-                    ON we.match_uuid = m.uuid
-                LEFT JOIN squadov.wow_challenges AS wc
-                    ON wc.match_uuid = m.uuid
-                LEFT JOIN squadov.wow_arenas AS wa
-                    ON wa.match_uuid = m.uuid
-                WHERE m.uuid = $1
-            )
             SELECT
                 wce.tm,
                 wce.evt#>>'{encounter_name}' AS "encounter_name"
@@ -71,15 +51,16 @@ impl api::ApiApplication {
                 ON wcl.uuid = wce.combat_log_uuid
             INNER JOIN squadov.wow_match_combat_log_association AS wma
                 ON wma.combat_log_uuid = wcl.uuid
-            CROSS JOIN match_start_stop AS mss
             WHERE wma.match_uuid = $1
                 AND wcl.user_id = $2
-                AND wce.tm >= mss.start AND wce.tm <= mss.stop
-                AND wce.evt @> '{"type": "EncounterEnd"}'
+                AND wce.tm BETWEEN $3 AND $4
+                AND wce.evt->>'type' = 'EncounterEnd'
             ORDER BY wce.tm ASC
             "#,
             match_uuid,
-            user_id
+            user_id,
+            &mss.start,
+            &mss.end,
         )
             .fetch_all(&*self.heavy_pool)
             .await?;
@@ -131,20 +112,9 @@ impl api::ApiApplication {
         )
     }
 
-    async fn get_wow_match_aura_events(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<SerializedWoWAura>, SquadOvError> {
+    async fn get_wow_match_aura_events(&self, match_uuid: &Uuid, mss: &WowMatchStartStop, user_id: i64) -> Result<Vec<SerializedWoWAura>, SquadOvError> {
         let raw_auras = sqlx::query!(
             r#"
-            WITH match_start_stop (start, stop) AS (
-                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
-                FROM squadov.matches AS m
-                LEFT JOIN squadov.wow_encounters AS we
-                    ON we.match_uuid = m.uuid
-                LEFT JOIN squadov.wow_challenges AS wc
-                    ON wc.match_uuid = m.uuid
-                LEFT JOIN squadov.wow_arenas AS wa
-                    ON wa.match_uuid = m.uuid
-                WHERE m.uuid = $1
-            )
             SELECT
                 wce.tm,
                 wce.dest->>'guid' AS "guid",
@@ -158,15 +128,16 @@ impl api::ApiApplication {
                 ON wcl.uuid = wce.combat_log_uuid
             INNER JOIN squadov.wow_match_combat_log_association AS wma
                 ON wma.combat_log_uuid = wcl.uuid
-            CROSS JOIN match_start_stop AS mss
             WHERE wma.match_uuid = $1
                 AND wcl.user_id = $2
-                AND wce.tm >= mss.start AND wce.tm <= mss.stop
-                AND wce.evt @> '{"type": "SpellAura"}'
+                AND wce.tm BETWEEN $3 AND $4
+                AND wce.evt->>'type' = 'SpellAura'
             ORDER BY wce.tm ASC
             "#,
             match_uuid,
-            user_id
+            user_id,
+            &mss.start,
+            &mss.end,
         )
             .fetch_all(&*self.heavy_pool)
             .await?;
@@ -254,88 +225,62 @@ impl api::ApiApplication {
         )
     }
 
-    async fn get_wow_match_death_events(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<SerializedWoWDeath>, SquadOvError> {
+    async fn get_wow_match_death_events(&self, match_uuid: &Uuid, mss: &WowMatchStartStop, user_id: i64) -> Result<Vec<SerializedWoWDeath>, SquadOvError> {
         Ok(
             sqlx::query_as!(
                 SerializedWoWDeath,
                 r#"
-                WITH match_start_stop (start, stop) AS (
-                    SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
-                    FROM squadov.matches AS m
-                    LEFT JOIN squadov.wow_encounters AS we
-                        ON we.match_uuid = m.uuid
-                    LEFT JOIN squadov.wow_challenges AS wc
-                        ON wc.match_uuid = m.uuid
-                    LEFT JOIN squadov.wow_arenas AS wa
-                        ON wa.match_uuid = m.uuid
-                    WHERE m.uuid = $1
-                ), match_combat_logs AS (
-                    SELECT wce.*
-                    FROM squadov.wow_combat_log_events AS wce
-                    INNER JOIN squadov.wow_combat_logs AS wcl
-                        ON wcl.uuid = wce.combat_log_uuid
-                    INNER JOIN squadov.wow_match_combat_log_association AS wma
-                        ON wma.combat_log_uuid = wcl.uuid
-                    CROSS JOIN match_start_stop AS mss
-                    WHERE wma.match_uuid = $1
-                        AND wcl.user_id = $2
-                        AND wce.tm >= mss.start AND wce.tm <= mss.stop
-                )
                 SELECT
-                    mcl.dest->>'guid' AS "guid!",
-                    mcl.dest->>'name' AS "name!",
-                    (mcl.dest->>'flags')::BIGINT AS "flags!",
-                    mcl.tm AS "tm!"
-                FROM match_combat_logs AS mcl
-                WHERE mcl.evt @> '{"type": "UnitDied"}'
-                ORDER BY mcl.tm ASC
+                    wce.dest->>'guid' AS "guid!",
+                    wce.dest->>'name' AS "name!",
+                    (wce.dest->>'flags')::BIGINT AS "flags!",
+                    wce.tm AS "tm!"
+                FROM squadov.wow_combat_log_events AS wce
+                INNER JOIN squadov.wow_combat_logs AS wcl
+                    ON wcl.uuid = wce.combat_log_uuid
+                INNER JOIN squadov.wow_match_combat_log_association AS wma
+                    ON wma.combat_log_uuid = wcl.uuid
+                WHERE wma.match_uuid = $1
+                    AND wcl.user_id = $2
+                    AND wce.tm BETWEEN $3 AND $4
+                    AND wce.evt->>'type' = 'UnitDied'
+                ORDER BY wce.tm ASC
                 "#,
                 match_uuid,
                 user_id,
+                &mss.start,
+                &mss.end,
             )
                 .fetch_all(&*self.heavy_pool)
                 .await?
         )
     }
 
-    async fn get_wow_match_resurrection_events(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<SerializedWoWResurrection>, SquadOvError> {
+    async fn get_wow_match_resurrection_events(&self, match_uuid: &Uuid, mss: &WowMatchStartStop, user_id: i64) -> Result<Vec<SerializedWoWResurrection>, SquadOvError> {
         Ok(
             sqlx::query_as!(
                 SerializedWoWResurrection,
                 r#"
-                WITH match_start_stop (start, stop) AS (
-                    SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()), COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW())
-                    FROM squadov.matches AS m
-                    LEFT JOIN squadov.wow_encounters AS we
-                        ON we.match_uuid = m.uuid
-                    LEFT JOIN squadov.wow_challenges AS wc
-                        ON wc.match_uuid = m.uuid
-                    LEFT JOIN squadov.wow_arenas AS wa
-                        ON wa.match_uuid = m.uuid
-                    WHERE m.uuid = $1
-                ), match_combat_logs AS (
-                    SELECT wce.*
-                    FROM squadov.wow_combat_log_events AS wce
-                    INNER JOIN squadov.wow_combat_logs AS wcl
-                        ON wcl.uuid = wce.combat_log_uuid
-                    INNER JOIN squadov.wow_match_combat_log_association AS wma
-                        ON wma.combat_log_uuid = wcl.uuid
-                    CROSS JOIN match_start_stop AS mss
-                    WHERE wma.match_uuid = $1
-                        AND wcl.user_id = $2
-                        AND wce.tm >= mss.start AND wce.tm <= mss.stop
-                )
                 SELECT
-                    mcl.dest->>'guid' AS "guid!",
-                    mcl.dest->>'name' AS "name!",
-                    (mcl.dest->>'flags')::BIGINT AS "flags!",
-                    mcl.tm AS "tm!"
-                FROM match_combat_logs AS mcl
-                WHERE mcl.evt @> '{"type": "Resurrect"}'
-                ORDER BY mcl.tm ASC
+                    wce.dest->>'guid' AS "guid!",
+                    wce.dest->>'name' AS "name!",
+                    (wce.dest->>'flags')::BIGINT AS "flags!",
+                    wce.tm AS "tm!"
+                FROM squadov.wow_combat_log_events AS wce
+                INNER JOIN squadov.wow_combat_logs AS wcl
+                    ON wcl.uuid = wce.combat_log_uuid
+                INNER JOIN squadov.wow_match_combat_log_association AS wma
+                    ON wma.combat_log_uuid = wcl.uuid
+                WHERE wma.match_uuid = $1
+                    AND wcl.user_id = $2
+                    AND wce.tm BETWEEN $3 AND $4
+                    AND wce.evt->>'type' = 'Resurrect'
+                ORDER BY wce.tm ASC
                 "#,
                 match_uuid,
                 user_id,
+                &mss.start,
+                &mss.end,
             )
                 .fetch_all(&*self.heavy_pool)
                 .await?
@@ -352,10 +297,11 @@ pub async fn list_wow_events_for_match_handler(app : web::Data<Arc<api::ApiAppli
         resurrections: Vec<SerializedWoWResurrection>
     }
 
+    let mss = app.get_wow_match_start_stop(&path.match_uuid).await?;
     Ok(HttpResponse::Ok().json(Response{
-        deaths: app.get_wow_match_death_events(&path.match_uuid, path.user_id).await?,
-        auras: app.get_wow_match_aura_events(&path.match_uuid, path.user_id).await?,
-        encounters: app.get_wow_match_subencounters(&path.match_uuid, path.user_id).await?,
-        resurrections: app.get_wow_match_resurrection_events(&path.match_uuid, path.user_id).await?,
+        deaths: app.get_wow_match_death_events(&path.match_uuid, &mss, path.user_id).await?,
+        auras: app.get_wow_match_aura_events(&path.match_uuid, &mss, path.user_id).await?,
+        encounters: app.get_wow_match_subencounters(&path.match_uuid, &mss, path.user_id).await?,
+        resurrections: app.get_wow_match_resurrection_events(&path.match_uuid, &mss, path.user_id).await?,
     }))
 }

@@ -21,6 +21,7 @@ use sqlx::{Executor, Postgres};
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
+use super::WowMatchStartStop;
 
 #[derive(Deserialize)]
 pub struct GenericMatchCreationRequest<T> {
@@ -38,6 +39,28 @@ pub struct GenericMatchFinishCreationRequest<T> {
 }
 
 impl api::ApiApplication {
+    pub async fn get_wow_match_start_stop(&self, match_uuid: &Uuid) -> Result<WowMatchStartStop, SquadOvError> {
+        Ok(
+            sqlx::query_as!(
+                WowMatchStartStop,
+                r#"
+                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()) AS "start!", COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW()) AS "end!"
+                FROM squadov.matches AS m
+                LEFT JOIN squadov.wow_encounters AS we
+                    ON we.match_uuid = m.uuid
+                LEFT JOIN squadov.wow_challenges AS wc
+                    ON wc.match_uuid = m.uuid
+                LEFT JOIN squadov.wow_arenas AS wa
+                    ON wa.match_uuid = m.uuid
+                WHERE m.uuid = $1
+                "#,
+                match_uuid
+            )
+                .fetch_one(&*self.pool)
+                .await?
+        )
+    }
+
     async fn find_ongoing_wow_encounter_match<'a, T>(&self, ex: T, encounter: &WoWEncounterStart, combatants: &[WoWCombatantInfo]) -> Result<Option<Uuid>, SquadOvError>
     where
         T: Executor<'a, Database = Postgres>
@@ -454,7 +477,7 @@ impl api::ApiApplication {
                     ON wcl.uuid = cla.combat_log_uuid
                 INNER JOIN squadov.wow_combat_log_events AS wcle
                     ON wcle.combat_log_uuid = wcl.uuid
-                        AND wcle.evt @> '{"type": "CombatantInfo"}'
+                        AND wcle.evt->>'type' = 'CombatantInfo'
                         AND wcle.evt->>'guid' = wmc.combatant_guid
                         AND wcle.tm BETWEEN wa.tm AND LEAST(wcle.tm + INTERVAL '30 minutes', COALESCE(wa.finish_time, wcle.tm + INTERVAL '10 minutes'))
                 INNER JOIN squadov.wow_user_character_association AS wuca
@@ -532,7 +555,7 @@ impl api::ApiApplication {
                     ON wcl.uuid = cla.combat_log_uuid
                 INNER JOIN squadov.wow_combat_log_events AS wcle
                     ON wcle.combat_log_uuid = wcl.uuid
-                        AND wcle.evt @> '{"type": "CombatantInfo"}'
+                        AND wcle.evt->>'type' = 'CombatantInfo'
                         AND wcle.evt->>'guid' = wmc.combatant_guid
                         AND wcle.tm BETWEEN wa.tm AND LEAST(wcle.tm + INTERVAL '30 minutes', COALESCE(wa.finish_time, wcle.tm + INTERVAL '10 minutes'))
                 "#,
@@ -608,7 +631,7 @@ impl api::ApiApplication {
                     ON wcl.uuid = cla.combat_log_uuid
                 INNER JOIN squadov.wow_combat_log_events AS wcle
                     ON wcle.combat_log_uuid = wcl.uuid
-                        AND wcle.evt @> '{"type": "CombatantInfo"}'
+                        AND wcle.evt->>'type' = 'CombatantInfo'
                         AND wcle.evt->>'guid' = wmc.combatant_guid
                         AND wcle.tm BETWEEN wa.tm AND LEAST(wcle.tm + INTERVAL '30 minutes', COALESCE(wa.finish_time, wcle.tm + INTERVAL '10 minutes'))
                 INNER JOIN squadov.wow_user_character_association AS wuca

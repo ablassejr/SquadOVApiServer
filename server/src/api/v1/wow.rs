@@ -12,6 +12,7 @@ pub use stats::*;
 
 use serde::Deserialize;
 use uuid::Uuid;
+use chrono::{DateTime, Utc};
 
 #[derive(Deserialize)]
 pub struct WoWMatchPath {
@@ -33,4 +34,9 @@ pub struct WoWUserCharacterPath {
 pub struct WoWUserMatchPath {
     pub user_id: i64,
     pub match_uuid: Uuid
+}
+
+pub struct WowMatchStartStop {
+    pub start: DateTime<Utc>,
+    pub end: DateTime<Utc>,
 }
