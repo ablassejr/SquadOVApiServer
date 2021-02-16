@@ -1,5 +1,19 @@
 [
     {
+        "title": "SquadOV v0.5.16",
+        "description": "Audio controls and more!",
+        "timestamp": 1613431309000,
+        "data": "data/update-v0.5.16.md",
+        "type": "update"
+    },
+    {
+        "title": "SquadOV v0.5.13",
+        "description": "Various video recording fixes.",
+        "timestamp": 1613200402000,
+        "data": "data/hotfix-v0.5.13.md",
+        "type": "hotfix"
+    },
+    {
         "title": "SquadOV v0.5.12",
         "description": "Minor bug fixes - welcome /r/wow and /r/worldofpvp.",
         "timestamp": 1613157597000,
@@ -39,34 +53,6 @@
         "description": "Better VOD support for World of Warcraft!",
         "timestamp": 1612550110000,
         "data": "data/update-v0.5.6.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.5.5",
-        "description": "World of Warcraft arena support!",
-        "timestamp": 1612295837000,
-        "data": "data/update-v0.5.5.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.5.4",
-        "description": "A brand new dashboard to help you track you and your friends' most recent VODs!",
-        "timestamp": 1611959617000,
-        "data": "data/update-v0.5.4.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.5.3",
-        "description": "Hotfix to address issues with VOD recordings.",
-        "timestamp": 1611513600000,
-        "data": "data/update-v0.5.3.md",
-        "type": "hotfix"
-    },
-    {
-        "title": "SquadOV v0.5.0",
-        "description": "Link your Riot account, League of Legends, and Teamfight Tactics!",
-        "timestamp": 1611427604000,
-        "data": "data/update-v0.5.0.md",
         "type": "update"
     }
 ]

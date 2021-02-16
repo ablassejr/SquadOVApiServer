@@ -47,7 +47,7 @@ impl api::ApiApplication {
             match_uuid,
             user_id
         )
-            .fetch_all(&*self.pool)
+            .fetch_all(&*self.heavy_pool)
             .await?;
 
         let raw_ends = sqlx::query!(
@@ -81,7 +81,7 @@ impl api::ApiApplication {
             match_uuid,
             user_id
         )
-            .fetch_all(&*self.pool)
+            .fetch_all(&*self.heavy_pool)
             .await?;
 
         // Same logic as the aura matching but we only need to match on the encounter name.
@@ -168,7 +168,7 @@ impl api::ApiApplication {
             match_uuid,
             user_id
         )
-            .fetch_all(&*self.pool)
+            .fetch_all(&*self.heavy_pool)
             .await?;
 
         // We need to go through every applied aura and match it up with the first matching
@@ -293,7 +293,7 @@ impl api::ApiApplication {
                 match_uuid,
                 user_id,
             )
-                .fetch_all(&*self.pool)
+                .fetch_all(&*self.heavy_pool)
                 .await?
         )
     }
@@ -337,7 +337,7 @@ impl api::ApiApplication {
                 match_uuid,
                 user_id,
             )
-                .fetch_all(&*self.pool)
+                .fetch_all(&*self.heavy_pool)
                 .await?
         )
     }
