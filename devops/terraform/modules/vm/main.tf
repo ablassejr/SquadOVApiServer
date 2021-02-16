@@ -51,15 +51,30 @@ resource "google_compute_disk" "vm-boot-disk" {
     zone    = "us-central1-c"
 }
 
-resource "google_compute_instance" "vm" {
-    name                        = "squadov-vm-central1-c"
-    machine_type                = "n1-standard-4"
+resource "google_compute_snapshot" "vm-snapshot" {
+    name = "vm-snapshot"
+    source_disk = google_compute_disk.vm-boot-disk.name
+    zone = "us-central1-c"
+    storage_locations = ["us-central1"]
+}
+
+resource "google_compute_disk" "vm2-boot-disk" {
+    name    = "vm2-boot-disk"
+    size    = 100
+    type    = "pd-ssd"
+    zone    = "us-central1-c"
+    snapshot = google_compute_snapshot.vm-snapshot.self_link
+}
+
+resource "google_compute_instance" "vm2" {
+    name                        = "squadov-vm2-central1-c"
+    machine_type                = "custom-8-15360"
     zone                        = "us-central1-c"
     allow_stopping_for_update   = true
 
     boot_disk {
         auto_delete = false
-        source      = google_compute_disk.vm-boot-disk.self_link
+        source      = google_compute_disk.vm2-boot-disk.self_link
     }
 
     network_interface {

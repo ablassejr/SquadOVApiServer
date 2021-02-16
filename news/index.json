@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.5.16",
+        "description": "Audio controls and more!",
+        "timestamp": 1613431309000,
+        "data": "data/update-v0.5.16.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.5.13",
         "description": "Various video recording fixes.",
         "timestamp": 1613200402000,
