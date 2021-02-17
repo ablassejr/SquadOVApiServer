@@ -68,7 +68,7 @@ resource "google_compute_disk" "vm2-boot-disk" {
 
 resource "google_compute_instance" "vm2" {
     name                        = "squadov-vm2-central1-c"
-    machine_type                = "custom-8-15360"
+    machine_type                = "custom-16-24576"
     zone                        = "us-central1-c"
     allow_stopping_for_update   = true
 
