@@ -19,7 +19,7 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, cfg: &ClientCon
     cfg.set("group.id", "squadov_primary_wow_combat_logs_cg");
 
     let wow_consumer: StreamConsumer = cfg.create().unwrap();
-    wow_consumer.subscribe(&vec!["wow_combat_logs"]).unwrap();
+    wow_consumer.subscribe(&vec!["wow_combat_logs_2"]).unwrap();
     tokio::task::spawn(async move {
         let wow_opaque = WoWKafkaOpaque{
             app,
