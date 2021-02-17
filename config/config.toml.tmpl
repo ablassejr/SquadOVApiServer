@@ -7,8 +7,8 @@ application_id = "${FUSIONAUTH_CLIENT_ID}"
 
 [database]
 url = "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}/squadov"
-connections = 16
-heavy_connections = 32
+connections = 32
+heavy_connections = 128
 
 [cors]
 domain = "https://app.${DEPLOYMENT_DOMAIN}"
