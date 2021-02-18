@@ -42,9 +42,9 @@ spec:
                             key: password
                   resources:
                     requests:
-                        cpu: "3000m"
+                        cpu: "2000m"
                     limits:
-                        cpu: "7890m"
+                        cpu: "4500m"
                 - name: cloudsql-proxy
                   image: gcr.io/cloudsql-docker/gce-proxy:1.16
                   ports:
@@ -61,9 +61,9 @@ spec:
                         readOnly: true
                   resources:
                     requests:
-                        cpu: "10m"
+                        cpu: "1000m"
                     limits:
-                        cpu: "100m"
+                        cpu: "3000m"
             volumes:
                 - name: gke-service-account
                   secret:
