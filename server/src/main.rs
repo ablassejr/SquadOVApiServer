@@ -34,6 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::env::set_var("SQLX_LOG", "0");
     env_logger::init();
 
+    log::info!("Start SquadOV Api Server.");
     // Setup Tokio and Actix runtimes so that they play nice with eachother.
     let mut tokio_rt = Builder::new()
         .threaded_scheduler()
@@ -77,7 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 async_std::task::sleep(std::time::Duration::from_secs(5)).await;
             } else if mode == "wow_manual_parsing" {
-                wow_kafka::create_wow_consumer_thread(app.clone(), &kafka_config).await.unwrap();
+                wow_kafka::create_wow_consumer_thread(app.clone(), &config.kafka.wow_combat_log_topic, &kafka_config).await.unwrap();
             } else {
                 log::error!("Invalid mode: {}", &mode);
             }
@@ -85,7 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let config2 = config.clone();
 
             for _i in 0..config.kafka.wow_combat_log_threads {
-                wow_kafka::create_wow_consumer_thread(app.clone(), &kafka_config);
+                wow_kafka::create_wow_consumer_thread(app.clone(), &config.kafka.wow_combat_log_topic, &kafka_config);
             }
 
             let user_status_tracker = squadov_common::squad::status::UserActivityStatusTracker::new().start();

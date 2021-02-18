@@ -36,3 +36,7 @@ module "vm" {
     vod_storage_bucket = var.vod_storage_bucket
     blob_storage_bucket = var.blob_storage_bucket
 }
+
+module "k8s" {
+    source = "../modules/k8s"
+}

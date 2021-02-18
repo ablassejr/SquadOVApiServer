@@ -27,7 +27,8 @@ project_id = ${GITLAB_PROJECT_ID}
 
 [kafka]
 bootstrap_servers = "${KAFKA_BROKERS}"
-wow_combat_log_threads = ${KAFKA_WOW_THREADS}
+wow_combat_log_threads = 0
+wow_combat_log_topic = "wow_combat_logs_2"
 
 [kafka.client_keypair]
 key = "${KAFKA_CLIENT_KEY}"
