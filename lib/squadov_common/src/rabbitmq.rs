@@ -196,32 +196,34 @@ impl RabbitMqConnectionBundle {
 }
 
 impl RabbitMqInterface {
-    pub async fn new(config: &RabbitMqConfig) -> Result<Arc<Self>, SquadOvError> {
+    pub async fn new(config: &RabbitMqConfig, enabled: bool) -> Result<Arc<Self>, SquadOvError> {
         log::info!("Connecting to RabbitMQ...");
-        let publisher = Arc::new(RabbitMqConnectionBundle::connect(&config, 4).await?);
+        let publisher = Arc::new(RabbitMqConnectionBundle::connect(&config, if enabled { 4 } else { 0 }).await?);
         let publish_queue = Arc::new(RwLock::new(VecDeque::new()));
 
-        log::info!("\tStart Publishing (RabbitMQ)...");
-        {
-            let publisher = publisher.clone();
-            let publish_queue = publish_queue.clone();
-            tokio::task::spawn(async move {
-                let mut publish_idx: usize = 0;
-                loop {
-                    {
-                        let next_msg = publish_queue.write().await.pop_front();
-                        if next_msg.is_some() {
-                            let next_msg = next_msg.unwrap();
-                            match publisher.publish(next_msg, publish_idx).await {
-                                Ok(_) => (),
-                                Err(err) => log::warn!("Failed to publish RabbitMQ message: {:?}", err)
+        if enabled {
+            log::info!("\tStart Publishing (RabbitMQ)...");
+            {
+                let publisher = publisher.clone();
+                let publish_queue = publish_queue.clone();
+                tokio::task::spawn(async move {
+                    let mut publish_idx: usize = 0;
+                    loop {
+                        {
+                            let next_msg = publish_queue.write().await.pop_front();
+                            if next_msg.is_some() {
+                                let next_msg = next_msg.unwrap();
+                                match publisher.publish(next_msg, publish_idx).await {
+                                    Ok(_) => (),
+                                    Err(err) => log::warn!("Failed to publish RabbitMQ message: {:?}", err)
+                                }
+                                publish_idx = (publish_idx + 1) % publisher.num_channels();
                             }
-                            publish_idx = (publish_idx + 1) % publisher.num_channels();
                         }
+                        async_std::task::sleep(std::time::Duration::from_millis(1)).await;
                     }
-                    async_std::task::sleep(std::time::Duration::from_millis(1)).await;
-                }
-            });
+                });
+            }
         }
 
         let itf = Arc::new(Self {

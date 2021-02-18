@@ -127,6 +127,7 @@ pub struct VodConfig {
 pub struct KafkaConfig {
     pub bootstrap_servers: String,
     pub wow_combat_log_threads: i32,
+    pub wow_combat_log_topic: String,
     pub client_keypair: KafkaCredentialKeyPair,
     pub server_keypair: KafkaCredentialKeyPair
 }
@@ -178,6 +179,8 @@ pub struct ApiApplication {
 
 impl ApiApplication {
     pub async fn new(config: &ApiConfig) -> ApiApplication {
+        let disable_rabbitmq = std::env::var("DISABLE_RABBITMQ").is_ok();
+
         // Use TOML config to create application - e.g. for
         // database configuration, external API client configuration, etc.
         let pool = Arc::new(PgPoolOptions::new()
@@ -212,17 +215,19 @@ impl ApiApplication {
         let valorant_api = Arc::new(RiotApiHandler::new(config.riot.valorant_api_key.clone()));
         let lol_api = Arc::new(RiotApiHandler::new(config.riot.lol_api_key.clone()));
         let tft_api = Arc::new(RiotApiHandler::new(config.riot.tft_api_key.clone()));
-        let rabbitmq = RabbitMqInterface::new(&config.rabbitmq).await.unwrap();
+        let rabbitmq = RabbitMqInterface::new(&config.rabbitmq, !disable_rabbitmq).await.unwrap();
 
         let rso_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, rso_api.clone(), rabbitmq.clone(), pool.clone()));
         let valorant_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, valorant_api.clone(), rabbitmq.clone(), pool.clone()));
         let lol_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, lol_api.clone(), rabbitmq.clone(), pool.clone()));
         let tft_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, tft_api.clone(), rabbitmq.clone(), pool.clone()));
 
-        RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.rso_queue.clone(), rso_itf.clone()).await.unwrap();
-        RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.valorant_queue.clone(), valorant_itf.clone()).await.unwrap();
-        RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.lol_queue.clone(), lol_itf.clone()).await.unwrap();
-        RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.tft_queue.clone(), tft_itf.clone()).await.unwrap();
+        if !disable_rabbitmq {
+            RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.rso_queue.clone(), rso_itf.clone()).await.unwrap();
+            RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.valorant_queue.clone(), valorant_itf.clone()).await.unwrap();
+            RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.lol_queue.clone(), lol_itf.clone()).await.unwrap();
+            RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.tft_queue.clone(), tft_itf.clone()).await.unwrap();
+        }
 
         let vod_manager = match vod::manager::get_current_vod_manager_type() {
             VodManagerType::GCS => Arc::new(GCSVodManager::new(gcp.clone()).await.unwrap()) as Arc<dyn VodManager + Send + Sync>,
@@ -231,9 +236,11 @@ impl ApiApplication {
 
         // One VOD interface for publishing - individual interfaces for consuming.
         let vod_itf = Arc::new(VodProcessingInterface::new(&config.rabbitmq.vod_queue, rabbitmq.clone(), pool.clone(), vod_manager.clone()));
-        for _i in 0..config.vod.fastify_threads {
-            let process_itf = Arc::new(VodProcessingInterface::new(&config.rabbitmq.vod_queue, rabbitmq.clone(), pool.clone(), vod_manager.clone()));
-            RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.vod_queue.clone(), process_itf).await.unwrap();
+        if !disable_rabbitmq {
+            for _i in 0..config.vod.fastify_threads {
+                let process_itf = Arc::new(VodProcessingInterface::new(&config.rabbitmq.vod_queue, rabbitmq.clone(), pool.clone(), vod_manager.clone()));
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.vod_queue.clone(), process_itf).await.unwrap();
+            }
         }
 
         ApiApplication{

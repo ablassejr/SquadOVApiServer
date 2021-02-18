@@ -14,12 +14,12 @@ struct WoWKafkaOpaque {
     events: Arc<RwLock<Vec<WoWCombatLogEvent>>>,
 }
 
-pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, cfg: &ClientConfig) -> tokio::task::JoinHandle<()> {
+pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cfg: &ClientConfig) -> tokio::task::JoinHandle<()> {
     let mut cfg = cfg.clone();
     cfg.set("group.id", "squadov_primary_wow_combat_logs_cg");
 
     let wow_consumer: StreamConsumer = cfg.create().unwrap();
-    wow_consumer.subscribe(&vec!["wow_combat_logs_2"]).unwrap();
+    wow_consumer.subscribe(&vec![topic]).unwrap();
     tokio::task::spawn(async move {
         let wow_opaque = WoWKafkaOpaque{
             app,

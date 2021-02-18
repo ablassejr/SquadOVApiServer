@@ -45,3 +45,11 @@ prost = "0.6.1"
 tempfile = "3.1.0"
 rand = "0.8.0"
 rdkafka = { version = "0.24", features = ["cmake-build", "ssl"] }
+
+[[bin]]
+name = "squadov_api_server"
+path = "src/main.rs"
+
+[[bin]]
+name = "wow_kafka_worker"
+path = "src/wow_kafka_worker.rs"

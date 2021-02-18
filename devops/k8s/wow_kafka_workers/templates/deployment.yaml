@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: wow-kafka-workers
+    labels:
+        task: wowkafka
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            task: wowkafka
+    template:
+        metadata:
+            labels:
+                task: wowkafka
+        spec:
+            nodeSelector:
+                task: wowkafka
+            containers:
+                - name: webserver-container
+                  image: "registry.gitlab.com/squadov/squadovapiserver/squadov/wow_kafka_worker:latest"
+                  env:
+                    - name: DB_CONNS
+                      value: "128"
+                    - name: KAFKA_THREADS
+                      value: "128"
+                    - name: "SQUADOV_VOD_ROOT"
+                      value: "gs://squadov-vod-bucket"
+                    - name: "SQUADOV_BLOB_BUCKET"
+                      value: "squadov-blob-bucket"
+                    - name: "DISABLE_RABBITMQ"
+                      value: "1"
+                    - name: POSTGRES_USER
+                      valueFrom:
+                        secretKeyRef:
+                            name: postgres-secret
+                            key: username
+                    - name: POSTGRES_PASSWORD
+                      valueFrom:
+                        secretKeyRef:
+                            name: postgres-secret
+                            key: password
+                  resources:
+                    requests:
+                        cpu: "3000m"
+                    limits:
+                        cpu: "7890m"
+                - name: cloudsql-proxy
+                  image: gcr.io/cloudsql-docker/gce-proxy:1.16
+                  ports:
+                    - containerPort: 5432
+                  command: ["/cloud_sql_proxy",
+                             "-instances=squadov:us-central1:squadov-postgres=tcp:5432",
+                             "-credential_file=/secrets/gke/gcloud-service-account.json"]
+                  securityContext:
+                      runAsUser: 2  # non-root user
+                      allowPrivilegeEscalation: false
+                  volumeMounts:
+                      - name: gke-service-account
+                        mountPath: /secrets/gke
+                        readOnly: true
+                  resources:
+                    requests:
+                        cpu: "10m"
+                    limits:
+                        cpu: "100m"
+            volumes:
+                - name: gke-service-account
+                  secret:
+                    secretName: gke-service-account
+            imagePullSecrets:
+                - name: regcred
