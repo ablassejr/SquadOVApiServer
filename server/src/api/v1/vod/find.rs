@@ -54,6 +54,7 @@ impl api::ApiApplication {
                 ON u.uuid = v.user_uuid
             WHERE v.match_uuid = $1
                 AND u.id = $2
+                AND v.is_clip = FALSE
             ",
             match_uuid,
             user_id,
@@ -76,6 +77,7 @@ impl api::ApiApplication {
                 ON ora.squad_id = sra.squad_id
             WHERE v.match_uuid = $1 
                 AND (u.id = $2 OR ora.user_id = $2)
+                AND v.is_clip = FALSE
             ",
             match_uuid,
             user_id,

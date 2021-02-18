@@ -28,9 +28,9 @@ impl api::ApiApplication {
     async fn create_clip_for_vod(&self, vod_uuid: &Uuid, user_id: i64, title: &str, description: &str) -> Result<ClipResponse, SquadOvError> {
         let clip_uuid = Uuid::new_v4();
 
-        self.reserve_vod_uuid(&clip_uuid, "mp4", user_id).await?;
-
         let mut tx = self.pool.begin().await?;
+        self.reserve_vod_uuid(&mut tx, &clip_uuid, "mp4", user_id, true).await?;
+
         sqlx::query!(
             "
             INSERT INTO squadov.vod_clips (
@@ -41,13 +41,14 @@ impl api::ApiApplication {
                 description
             )
             VALUES (
-                gen_random_uuid(),
                 $1,
                 $2,
                 $3,
-                $4
+                $4,
+                $5
             )
             ",
+            clip_uuid,
             vod_uuid,
             user_id,
             title,

@@ -36,6 +36,8 @@ pub struct VodAssociation {
     pub end_time: Option<DateTime<Utc>>,
     #[serde(rename = "rawContainerFormat")]
     pub raw_container_format: String,
+    #[serde(rename = "isClip")]
+    pub is_clip: bool
 }
 
 #[derive(Serialize,Deserialize,Clone)]

@@ -1,11 +1,10 @@
 use crate::api;
 use actix_web::{web, HttpResponse, HttpRequest};
-use sqlx::{Executor};
 use crate::api::auth::SquadOVSession;
 use std::sync::Arc;
 use serde::{Deserialize};
 use uuid::Uuid;
-use sqlx::{Transaction, Postgres};
+use sqlx::{Transaction, Postgres, Executor};
 use squadov_common::vod::VodAssociation;
 
 #[derive(Deserialize)]
@@ -51,24 +50,24 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn reserve_vod_uuid(&self, vod_uuid: &Uuid, container_format: &str, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
-        let mut tx = self.pool.begin().await?;
-
+    pub async fn reserve_vod_uuid<'a, T>(&self, ex: T, vod_uuid: &Uuid, container_format: &str, user_id: i64, is_clip: bool) -> Result<(), squadov_common::SquadOvError>
+    where
+        T: Executor<'a, Database = Postgres>
+    {
         sqlx::query!(
             "
-            INSERT INTO squadov.vods (video_uuid, raw_container_format, user_uuid)
-            SELECT $1, $2, u.uuid
+            INSERT INTO squadov.vods (video_uuid, raw_container_format, user_uuid, is_clip)
+            SELECT $1, $2, u.uuid, $4
             FROM squadov.users AS u
             WHERE u.id = $3
             ",
             vod_uuid,
             container_format,
             user_id,
+            is_clip,
         )
-            .execute(&mut tx)
+            .execute(ex)
             .await?;
-
-        tx.commit().await?;
         Ok(())
     }
 
@@ -163,7 +162,9 @@ pub async fn create_vod_destination_handler(data : web::Json<VodCreateDestinatio
         None => return Err(squadov_common::SquadOvError::BadRequest)
     };
     
-    app.reserve_vod_uuid(&data.video_uuid, &data.container_format, session.user.id).await?;
+    let mut tx = app.pool.begin().await?;
+    app.reserve_vod_uuid(&mut tx, &data.video_uuid, &data.container_format, session.user.id, false).await?;
+    tx.commit().await?;
 
     let extension = squadov_common::container_format_to_extension(&data.container_format);
     let path = app.vod.get_segment_upload_uri(&squadov_common::VodSegmentId{
