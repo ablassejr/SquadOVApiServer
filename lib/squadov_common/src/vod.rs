@@ -11,6 +11,7 @@ use std::str;
 use std::clone::Clone;
 use crate::{
     SquadOvError,
+    SquadOvGames,
     rabbitmq::{
         RABBITMQ_DEFAULT_PRIORITY,
         RABBITMQ_HIGH_PRIORITY,
@@ -69,6 +70,36 @@ pub struct VodSegmentId {
     pub video_uuid: Uuid,
     pub quality: String,
     pub segment_name: String
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct VodClip {
+    pub clip: VodAssociation,
+    pub manifest: VodManifest,
+    pub title: String,
+    pub description: String,
+    pub clipper: String,
+    pub game: SquadOvGames,
+    pub tm: DateTime<Utc>,
+    pub views: i64,
+    pub reacts: i64,
+    pub comments: i64,
+}
+
+#[derive(Serialize,Deserialize,Clone)]
+#[serde(rename_all="camelCase")]
+pub struct ClipReact {
+}
+
+#[derive(Serialize,Deserialize,Clone)]
+#[serde(rename_all="camelCase")]
+pub struct ClipComment {
+    pub id: i64,
+    pub clip_uuid: Uuid,
+    pub username: String,
+    pub comment: String,
+    pub tm: DateTime<Utc>,
 }
 
 #[derive(Serialize,Deserialize)]

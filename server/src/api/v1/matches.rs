@@ -246,7 +246,7 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
     }
 
     // If the user already shared this match, reuse that token so we don't fill up our databases with a bunch of useless tokens.
-    let mut token = squadov_common::access::find_encrypted_access_token(&*app.pool, &path.match_uuid, session.user.id).await?;
+    let mut token = squadov_common::access::find_encrypted_access_token_for_match_user(&*app.pool, &path.match_uuid, session.user.id).await?;
 
     if token.is_none() {
         // Now that we've verified all these things we can go ahead and return to the user a fully fleshed out
@@ -255,10 +255,11 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
         let access_request = AccessTokenRequest{
             full_path: data.full_path.clone(),
             user_uuid: session.user.uuid.clone(),
-            match_uuid: path.match_uuid.clone(),
+            match_uuid: Some(path.match_uuid.clone()),
             video_uuid: app.find_vod_from_match_user_id(path.match_uuid.clone(), session.user.id).await?.map(|x| {
                 x.video_uuid
             }),
+            clip_uuid: None,
             graphql_stats: data.graphql_stats.clone(),
         };
 
@@ -272,7 +273,7 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
         // Store the encrypted token in our database and return to the user a URL with the unique ID and the IV.
         // This way we get a (relatively) shorter URL instead of a giant encrypted blob.
         let mut tx = app.pool.begin().await?;
-        let token_id = squadov_common::access::store_encrypted_access_token(&mut tx, &path.match_uuid, session.user.id, &encryption_token).await?;
+        let token_id = squadov_common::access::store_encrypted_access_token_for_match_user(&mut tx, &path.match_uuid, session.user.id, &encryption_token).await?;
         tx.commit().await?;
 
         token = Some(token_id);

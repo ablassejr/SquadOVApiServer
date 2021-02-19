@@ -1,6 +1,7 @@
 use serde_repr::{Serialize_repr, Deserialize_repr};
+use num_enum::TryFromPrimitive;
 
-#[derive(Copy, Clone, Serialize_repr, Deserialize_repr, Debug)]
+#[derive(Copy, Clone, Serialize_repr, Deserialize_repr, Debug, TryFromPrimitive)]
 #[repr(i32)]
 pub enum SquadOvGames {
     AimLab,

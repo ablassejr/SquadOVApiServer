@@ -56,7 +56,7 @@ impl super::AccessChecker<ShareTokenMetadata> for ShareTokenAccessRestricter {
         // match or video. Note that a specific route can also disable access to a shared token if
         // need be with a separate middleware object.
         if let Some(match_uuid) = data.path.get("match_uuid") {
-            if match_uuid.parse::<Uuid>()? != share_token.match_uuid {
+            if share_token.match_uuid.is_none() || &match_uuid.parse::<Uuid>()? != share_token.match_uuid.as_ref().unwrap()  {
                 return Ok(false);
             }
             granted_access = true;
@@ -64,6 +64,13 @@ impl super::AccessChecker<ShareTokenMetadata> for ShareTokenAccessRestricter {
         
         if let Some(video_uuid) = data.path.get("video_uuid") {
             if share_token.video_uuid.is_none() || &video_uuid.parse::<Uuid>()? != share_token.video_uuid.as_ref().unwrap() {
+                return Ok(false);
+            }
+            granted_access = true;
+        }
+
+        if let Some(clip_uuid) = data.path.get("clip_uuid") {
+            if share_token.clip_uuid.is_none() || &clip_uuid.parse::<Uuid>()? != share_token.clip_uuid.as_ref().unwrap() {
                 return Ok(false);
             }
             granted_access = true;

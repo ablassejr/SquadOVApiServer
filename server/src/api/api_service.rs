@@ -565,6 +565,46 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         )
                 )
                 .service(
+                    web::scope("/clip")
+                        .route("", web::get().to(v1::list_clips_for_user_handler))
+                        .service(
+                            web::scope("/{clip_uuid}")
+                                .route("", web::get().to(v1::get_clip_handler))
+                                .service(
+                                    web::scope("/share")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::DenyShareTokenAccess{}),
+                                        ))
+                                        .route("", web::post().to(v1::create_clip_share_signature_handler))
+                                )
+                                .service(
+                                    web::scope("/react")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::DenyShareTokenAccess{}),
+                                        ))
+                                        .route("", web::get().to(v1::get_clip_reacts_handler))
+                                        .route("", web::post().to(v1::add_react_to_clip_handler))
+                                        .route("", web::delete().to(v1::delete_react_from_clip_handler))
+                                )
+                                .service(
+                                    web::scope("/view")
+                                        .route("", web::post().to(v1::mark_clip_view_handler))
+                                )
+                                .service(
+                                    web::scope("/comments")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::DenyShareTokenAccess{}),
+                                        ))
+                                        .route("", web::get().to(v1::get_clip_comments_handler))
+                                        .route("", web::post().to(v1::create_clip_comment_handler))
+                                        .service(
+                                            web::scope("/{comment_id}")
+                                                .route("", web::delete().to(v1::delete_clip_comment_handler))
+                                        )
+                                )
+                        )
+                )
+                .service(
                     web::scope("/squad")
                         .wrap(access::ApiAccess::new(
                             Box::new(access::DenyShareTokenAccess{}),
