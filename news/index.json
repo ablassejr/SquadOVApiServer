@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.6.0",
+        "description": "Clip sharing at long last!",
+        "timestamp": 1613762989000,
+        "data": "data/update-v0.6.0.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.5.16",
         "description": "Audio controls and more!",
         "timestamp": 1613431309000,

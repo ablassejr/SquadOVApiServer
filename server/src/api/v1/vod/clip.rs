@@ -152,7 +152,7 @@ impl api::ApiApplication {
     async fn list_user_accessible_clips(&self, user_id: i64, start: i64, end: i64) -> Result<Vec<VodClip>, SquadOvError> {
         let clips = sqlx::query!(
             "
-            SELECT vc.clip_uuid
+            SELECT DISTINCT vc.clip_uuid
             FROM squadov.vod_clips AS vc
             LEFT JOIN squadov.squad_role_assignments AS sra
                 ON sra.user_id = vc.clip_user_id
@@ -176,7 +176,7 @@ impl api::ApiApplication {
     async fn list_user_accessible_clips_for_match(&self, user_id: i64, match_uuid: &Uuid, start: i64, end: i64) -> Result<Vec<VodClip>, SquadOvError> {
         let clips = sqlx::query!(
             "
-            SELECT vc.clip_uuid
+            SELECT DISTINCT vc.clip_uuid
             FROM squadov.vod_clips AS vc
             INNER JOIN squadov.vods AS v
                 ON v.video_uuid = vc.clip_uuid
