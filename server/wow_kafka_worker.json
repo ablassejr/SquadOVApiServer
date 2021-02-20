@@ -964,6 +964,29 @@
       "nullable": []
     }
   },
+  "32da91a268f4d0e8634e671928aa75df437156a4f441f38717a10a50499f2a90": {
+    "query": "\n            SELECT DISTINCT vc.clip_uuid\n            FROM squadov.vod_clips AS vc\n            INNER JOIN squadov.vods AS v\n                ON v.video_uuid = vc.clip_uuid\n            LEFT JOIN squadov.squad_role_assignments AS sra\n                ON sra.user_id = vc.clip_user_id\n            LEFT JOIN squadov.squad_role_assignments AS ora\n                ON ora.squad_id = sra.squad_id\n            WHERE (vc.clip_user_id = $1 OR ora.user_id = $1)\n                AND v.match_uuid = $2\n            LIMIT $3 OFFSET $4\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "clip_uuid",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "34f4fc408057807c2ac9915e4a889298b271c661c58b821b1adbb2ef48f86fb5": {
     "query": "\n        SELECT\n            enable_lol,\n            enable_tft\n        FROM squadov.user_feature_flags\n        WHERE user_id = $1\n        ",
     "describe": {
@@ -1988,29 +2011,6 @@
       "nullable": []
     }
   },
-  "5d5e89e0bbd29dcd3083ccfe2d822789f85e446f71ad1dd98b2116700b38fb09": {
-    "query": "\n            SELECT vc.clip_uuid\n            FROM squadov.vod_clips AS vc\n            INNER JOIN squadov.vods AS v\n                ON v.video_uuid = vc.clip_uuid\n            LEFT JOIN squadov.squad_role_assignments AS sra\n                ON sra.user_id = vc.clip_user_id\n            LEFT JOIN squadov.squad_role_assignments AS ora\n                ON ora.squad_id = sra.squad_id\n            WHERE (vc.clip_user_id = $1 OR ora.user_id = $1)\n                AND v.match_uuid = $2\n            LIMIT $3 OFFSET $4\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "clip_uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Uuid",
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
   "60e3cb60e5410cbca07c82b0ae07451ccdeff55ab54214b2bca0d9487e752bdf": {
     "query": "\n                SELECT EXISTS (\n                    SELECT 1\n                    FROM squadov.vod_clips AS vc\n                    LEFT JOIN squadov.squad_role_assignments AS sra\n                        ON sra.user_id = vc.clip_user_id\n                    LEFT JOIN squadov.squad_role_assignments AS ora\n                        ON ora.squad_id = sra.squad_id\n                    WHERE vc.clip_uuid = $1\n                        AND (vc.clip_user_id = $2 OR ora.user_id = $2)\n                    LIMIT 1\n                ) AS \"exists!\"\n                ",
     "describe": {
@@ -2136,6 +2136,28 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "62e36552410a978a9d6c581f5b36de22999bc36a0c62318b87cfa89746b6fe7d": {
+    "query": "\n            SELECT DISTINCT vc.clip_uuid\n            FROM squadov.vod_clips AS vc\n            LEFT JOIN squadov.squad_role_assignments AS sra\n                ON sra.user_id = vc.clip_user_id\n            LEFT JOIN squadov.squad_role_assignments AS ora\n                ON ora.squad_id = sra.squad_id\n            WHERE (vc.clip_user_id = $1 OR ora.user_id = $1)\n            LIMIT $2 OFFSET $3\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "clip_uuid",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "6412558f5640b1d52778c2c00c210e336edb18f0bac695ec540c80fa6552bea9": {
@@ -4806,28 +4828,6 @@
         false,
         true,
         false,
-        false
-      ]
-    }
-  },
-  "fc882070732357421b12119987c672b14168c95818da7ec9b2d904dd97ccf0b7": {
-    "query": "\n            SELECT vc.clip_uuid\n            FROM squadov.vod_clips AS vc\n            LEFT JOIN squadov.squad_role_assignments AS sra\n                ON sra.user_id = vc.clip_user_id\n            LEFT JOIN squadov.squad_role_assignments AS ora\n                ON ora.squad_id = sra.squad_id\n            WHERE (vc.clip_user_id = $1 OR ora.user_id = $1)\n            LIMIT $2 OFFSET $3\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "clip_uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8"
-        ]
-      },
-      "nullable": [
         false
       ]
     }
