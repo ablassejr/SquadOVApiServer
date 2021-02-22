@@ -5,7 +5,7 @@ metadata:
     labels:
         task: vod
 spec:
-    replicas: 1
+    replicas: 6
     selector:
         matchLabels:
             task: vod
@@ -28,6 +28,8 @@ spec:
                       value: "gs://squadov-vod-bucket"
                     - name: "SQUADOV_BLOB_BUCKET"
                       value: "squadov-blob-bucket"
+                    - name: "FFMPEG_BINARY_PATH"
+                      value: "ffmpeg"
                     - name: POSTGRES_USER
                       valueFrom:
                         secretKeyRef:
