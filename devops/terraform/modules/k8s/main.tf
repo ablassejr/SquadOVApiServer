@@ -32,3 +32,30 @@ resource "google_container_node_pool" "primary_wow_worker_nodes" {
         max_node_count = 1
     }
 }
+
+resource "google_container_node_pool" "vod_worker_nodes" {
+    name = "squadov-primary-vod-worker-nodes"
+    location = "us-central1-c"
+    cluster = google_container_cluster.primary.name
+    initial_node_count =  1
+    lifecycle {
+        ignore_changes = [
+            initial_node_count
+        ]
+    }
+    
+    node_config {
+        labels = {
+            task = "vod"
+        }
+        disk_size_gb = 30
+        disk_type = "pd-ssd"
+        machine_type = "e2-custom-4-8192"
+        image_type = "COS"
+    }
+
+    autoscaling {
+        min_node_count = 1
+        max_node_count = 8
+    }
+}

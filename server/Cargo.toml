@@ -54,3 +54,7 @@ path = "src/main.rs"
 [[bin]]
 name = "wow_kafka_worker"
 path = "src/wow_kafka_worker.rs"
+
+[[bin]]
+name = "vod_processing_worker"
+path = "src/vod_processing_worker.rs"

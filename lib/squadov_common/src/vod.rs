@@ -193,7 +193,10 @@ impl VodProcessingInterface {
             }
         }
 
+        log::info!("Get VOD Association");
         let vod = db::get_vod_association(&*self.db, vod_uuid).await?;
+
+        log::info!("Get Container Extension");
         let raw_extension = container_format_to_extension(&vod.raw_container_format);
 
         // We do *ALL* processing on the VOD here (for better or worse).
@@ -205,6 +208,7 @@ impl VodProcessingInterface {
         // 4) Upload the processed video and the preview using the VOD manager.
         // 5) Mark the video as being "fastified" (I really need a better word).
         // 6) Mark the video as having a preview.
+        log::info!("Generate Input Temp File");
         let input_filename = NamedTempFile::new()?.into_temp_path();
         log::info!("Download VOD - {}", vod_uuid);
         self.vod.download_vod_to_path(&VodSegmentId{

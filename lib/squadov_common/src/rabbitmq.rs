@@ -21,10 +21,15 @@ const RABBITMQ_PREFETCH_COUNT: u16 = 2;
 #[derive(Deserialize,Debug,Clone)]
 pub struct RabbitMqConfig {
     pub amqp_url: String,
+    pub enable_rso: bool,
     pub rso_queue: String,
+    pub enable_valorant: bool,
     pub valorant_queue: String,
+    pub enable_lol: bool,
     pub lol_queue: String,
+    pub enable_tft: bool,
     pub tft_queue: String,
+    pub enable_vod: bool,
     pub vod_queue: String,
 }
 

@@ -184,7 +184,7 @@ impl ApiApplication {
         // Use TOML config to create application - e.g. for
         // database configuration, external API client configuration, etc.
         let pool = Arc::new(PgPoolOptions::new()
-            .min_connections(4)
+            .min_connections(1)
             .max_connections(config.database.connections)
             .max_lifetime(std::time::Duration::from_secs(6*60*60))
             .idle_timeout(std::time::Duration::from_secs(3*60*60))
@@ -193,7 +193,7 @@ impl ApiApplication {
             .unwrap());
 
         let heavy_pool = Arc::new(PgPoolOptions::new()
-            .min_connections(4)
+            .min_connections(1)
             .max_connections(config.database.heavy_connections)
             .max_lifetime(std::time::Duration::from_secs(3*60*60))
             .idle_timeout(std::time::Duration::from_secs(1*60*60))
@@ -223,10 +223,21 @@ impl ApiApplication {
         let tft_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, tft_api.clone(), rabbitmq.clone(), pool.clone()));
 
         if !disable_rabbitmq {
-            RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.rso_queue.clone(), rso_itf.clone()).await.unwrap();
-            RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.valorant_queue.clone(), valorant_itf.clone()).await.unwrap();
-            RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.lol_queue.clone(), lol_itf.clone()).await.unwrap();
-            RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.tft_queue.clone(), tft_itf.clone()).await.unwrap();
+            if config.rabbitmq.enable_rso {
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.rso_queue.clone(), rso_itf.clone()).await.unwrap();
+            }
+
+            if config.rabbitmq.enable_valorant {
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.valorant_queue.clone(), valorant_itf.clone()).await.unwrap();
+            }
+
+            if config.rabbitmq.enable_lol {
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.lol_queue.clone(), lol_itf.clone()).await.unwrap();
+            }
+
+            if config.rabbitmq.enable_tft {
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.tft_queue.clone(), tft_itf.clone()).await.unwrap();
+            }
         }
 
         let vod_manager = match vod::manager::get_current_vod_manager_type() {
@@ -236,7 +247,7 @@ impl ApiApplication {
 
         // One VOD interface for publishing - individual interfaces for consuming.
         let vod_itf = Arc::new(VodProcessingInterface::new(&config.rabbitmq.vod_queue, rabbitmq.clone(), pool.clone(), vod_manager.clone()));
-        if !disable_rabbitmq {
+        if !disable_rabbitmq && config.rabbitmq.enable_vod {
             for _i in 0..config.vod.fastify_threads {
                 let process_itf = Arc::new(VodProcessingInterface::new(&config.rabbitmq.vod_queue, rabbitmq.clone(), pool.clone(), vod_manager.clone()));
                 RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.vod_queue.clone(), process_itf).await.unwrap();
