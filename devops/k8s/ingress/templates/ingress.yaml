@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+    name: external-squadov-ingress
+    annotations:
+        kubernetes.io/ingress.global-static-ip-name: squadov-static-ip
+        networking.gke.io/v1beta1.FrontendConfig: "squadov-frontend-config"
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        acme.cert-manager.io/http01-edit-in-place: "true"
+    labels:
+        task: global
+spec:
+    rules:
+        - http:
+            paths:
+            - backend:
+                serviceName: internal-support-service
+                servicePort: 8080
+    tls:
+        - hosts:
+            - "support.squadov.gg"
+          secretName: squadov-cert-prod

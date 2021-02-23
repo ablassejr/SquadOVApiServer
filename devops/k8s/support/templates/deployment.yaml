@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: support
+    labels:
+        task: support
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            task: support
+    template:
+        metadata:
+            labels:
+                task: support
+        spec:
+            nodeSelector:
+                task: static
+            containers:
+                - name: support
+                  image: "registry.gitlab.com/squadov/squadovapiserver/squadov/squadov_support:latest"
+                  resources:
+                    requests:
+                        cpu: "500m"
+                    limits:
+                        cpu: "1000m"
+            imagePullSecrets:
+                - name: regcred
