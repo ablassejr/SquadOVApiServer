@@ -18,7 +18,7 @@ spec:
                 task: static
             containers:
                 - name: support
-                  image: "registry.gitlab.com/squadov/squadovapiserver/squadov/squadov_support:latest"
+                  image: registry.gitlab.com/squadov/squadovapiserver/squadov/squadov_support:{{ .Values.commitHash }}
                   resources:
                     requests:
                         cpu: "400m"
