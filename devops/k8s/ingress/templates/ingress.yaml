@@ -11,12 +11,26 @@ metadata:
         task: global
 spec:
     rules:
-        - http:
+        - host: "support.squadov.gg"
+          http:
             paths:
             - backend:
                 serviceName: internal-support-service
                 servicePort: 8080
+        - host: "squadov.gg"
+          http:
+            paths:
+            - backend:
+                serviceName: internal-landing-service
+                servicePort: 8080
+        - host: "www.squadov.gg"
+          http:
+            paths:
+            - backend:
+                serviceName: internal-landing-service
+                servicePort: 8080
     tls:
         - hosts:
             - "support.squadov.gg"
+            - "www.squadov.gg"
           secretName: squadov-cert-prod

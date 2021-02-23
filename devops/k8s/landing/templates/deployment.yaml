@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-    name: support
+    name: landing
     labels:
-        task: support
+        task: landing
 spec:
     replicas: 1
     selector:
         matchLabels:
-            task: support
+            task: landing
     template:
         metadata:
             labels:
-                task: support
+                task: landing
         spec:
             nodeSelector:
                 task: static
             containers:
                 - name: support
-                  image: "registry.gitlab.com/squadov/squadovapiserver/squadov/squadov_support:latest"
+                  image: registry.gitlab.com/squadov/squadovapiserver/squadov/squadov_landing:{{ .Values.commitHash }}
                   resources:
                     requests:
                         cpu: "400m"
