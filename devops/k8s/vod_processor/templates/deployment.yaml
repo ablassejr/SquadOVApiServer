@@ -5,7 +5,7 @@ metadata:
     labels:
         task: vod
 spec:
-    replicas: 6
+    replicas: 12
     selector:
         matchLabels:
             task: vod
