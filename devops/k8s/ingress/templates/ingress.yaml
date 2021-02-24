@@ -29,8 +29,27 @@ spec:
             - backend:
                 serviceName: internal-landing-service
                 servicePort: 8080
+        - host: "auth2.squadov.gg"
+          http:
+            paths:
+            - backend:
+                serviceName: internal-fusionauth-service
+                servicePort: 9011
+        - host: "api2.squadov.gg"
+          http:
+            paths:
+            - backend:
+                serviceName: internal-api-service
+                servicePort: 8080
+        - host: "app2.squadov.gg"
+          http:
+            paths:
+            - backend:
+                serviceName: internal-app-service
+                servicePort: 3000
     tls:
         - hosts:
             - "support.squadov.gg"
             - "www.squadov.gg"
+            - "auth2.squadov.gg"
           secretName: squadov-cert-prod

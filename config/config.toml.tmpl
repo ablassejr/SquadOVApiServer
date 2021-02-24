@@ -1,24 +1,24 @@
 [fusionauth]
-host = "http://${FUSIONAUTH_HOST}"
+host = "http://internal-fusionauth-service"
 port = 9011
 api_key = "${FUSIONAUTH_API_KEY}"
 tenant_id = "${FUSIONAUTH_TENANT_ID}"
 application_id = "${FUSIONAUTH_CLIENT_ID}"
 
 [database]
-url = "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}/squadov"
+url = "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1/squadov"
 connections = 32
-heavy_connections = 128
+heavy_connections = 32
 
 [cors]
-domain = "https://app.${DEPLOYMENT_DOMAIN}"
+domain = "https://app2.${DEPLOYMENT_DOMAIN}"
 
 [gcp]
 enabled = true
 service_account_key = "gcp/${GCP_PROJECT}.json"
 
 [server]
-domain = "api.${DEPLOYMENT_DOMAIN}"
+domain = "api2.${DEPLOYMENT_DOMAIN}"
 graphql_debug = false
 
 [gitlab]
@@ -39,7 +39,7 @@ key = "${KAFKA_SERVER_KEY}"
 secret= "${KAFKA_SERVER_SECRET}"
 
 [vod]
-fastify_threads = ${VOD_FASTIFY_THREADS}
+fastify_threads = 0
 
 [riot]
 rso_url = "https://auth.riotgames.com/authorize?client_id=squadov&redirect_uri=https://app.squadov.gg/riot/oauth-callback&response_type=code&scope=openid+offline_access+cpid"
@@ -108,6 +108,6 @@ postmark_api_key = "${POSTMARK_API_KEY}"
 invite_template = "squad-invitation"
 
 [squadov]
-app_url = "https://app.${DEPLOYMENT_DOMAIN}"
+app_url = "https://app2.${DEPLOYMENT_DOMAIN}"
 invite_key = "${INVITE_HMAC_KEY}"
 share_key = "${SHARE_ENCRYPTION_KEY}"

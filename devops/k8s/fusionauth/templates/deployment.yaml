@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: fusionauth
+    labels:
+        task: fusionauth
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            task: fusionauth
+    template:
+        metadata:
+            labels:
+                task: fusionauth
+        spec:
+            nodeSelector:
+                task: infra
+            containers:
+                - name: fusionauth
+                  image: fusionauth/fusionauth-app:1.19.8
+                  ports:
+                    - containerPort: 9011
+                  livenessProbe:
+                    httpGet:
+                        path: /api/status
+                        port: 9011
+                    initialDelaySeconds: 10
+                    periodSeconds: 5
+                  readinessProbe:
+                    httpGet:
+                        path: /api/status
+                        port: 9011
+                  resources:
+                    requests:
+                        cpu: "400m"
+                    limits:
+                        cpu: "2000m"
+                  env:
+                    - name: DATABASE_URL
+                      value: "jdbc:postgresql://127.0.0.1:5432/fusionauth?timezone=UTC"
+                    - name: FUSIONAUTH_MEMORY
+                      value: 1G
+                    - name: FUSIONAUTH_SEARCH_ENGINE_TYPE
+                      value: database
+                    - name: DATABASE_ROOT_USER
+                      valueFrom:
+                        secretKeyRef:
+                            name: postgres-secret
+                            key: username
+                    - name: DATABASE_ROOT_PASSWORD
+                      valueFrom:
+                        secretKeyRef:
+                            name: postgres-secret
+                            key: password
+                    - name: DATABASE_USER
+                      valueFrom:
+                        secretKeyRef:
+                            name: fusionauth-db-secret
+                            key: username
+                    - name: DATABASE_PASSWORD
+                      valueFrom:
+                        secretKeyRef:
+                            name: fusionauth-db-secret
+                            key: password
+                - name: cloudsql-proxy
+                  image: gcr.io/cloudsql-docker/gce-proxy:1.16
+                  ports:
+                    - containerPort: 5432
+                  command: ["/cloud_sql_proxy",
+                             "-instances=squadov:us-central1:squadov-postgres=tcp:5432",
+                             "-credential_file=/secrets/gke/gcloud-service-account.json"]
+                  securityContext:
+                      runAsUser: 2  # non-root user
+                      allowPrivilegeEscalation: false
+                  volumeMounts:
+                      - name: gke-service-account
+                        mountPath: /secrets/gke
+                        readOnly: true
+                  resources:
+                    requests:
+                        cpu: "10m"
+                    limits:
+                        cpu: "100m"
+            volumes:
+                - name: gke-service-account
+                  secret:
+                    secretName: gke-service-account
