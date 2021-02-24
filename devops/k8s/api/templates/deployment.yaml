@@ -19,6 +19,8 @@ spec:
             containers:
                 - name: api
                   image: registry.gitlab.com/squadov/squadovapiserver/squadov/squadov_api_server:{{ .Values.commitHash }}
+                  ports:
+                    - containerPort: 8080
                   livenessProbe:
                     httpGet:
                         path: /healthz
@@ -57,9 +59,9 @@ spec:
                         readOnly: true
                   resources:
                     requests:
-                        cpu: "10m"
+                        cpu: "500m"
                     limits:
-                        cpu: "100m"
+                        cpu: "1000m"
             volumes:
                 - name: gke-service-account
                   secret:

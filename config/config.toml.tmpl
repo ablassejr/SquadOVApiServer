@@ -11,14 +11,14 @@ connections = 32
 heavy_connections = 32
 
 [cors]
-domain = "https://app2.${DEPLOYMENT_DOMAIN}"
+domain = "https://app.${DEPLOYMENT_DOMAIN}"
 
 [gcp]
 enabled = true
 service_account_key = "gcp/${GCP_PROJECT}.json"
 
 [server]
-domain = "api2.${DEPLOYMENT_DOMAIN}"
+domain = "api.${DEPLOYMENT_DOMAIN}"
 graphql_debug = false
 
 [gitlab]
@@ -108,6 +108,6 @@ postmark_api_key = "${POSTMARK_API_KEY}"
 invite_template = "squad-invitation"
 
 [squadov]
-app_url = "https://app2.${DEPLOYMENT_DOMAIN}"
+app_url = "https://app.${DEPLOYMENT_DOMAIN}"
 invite_key = "${INVITE_HMAC_KEY}"
 share_key = "${SHARE_ENCRYPTION_KEY}"
