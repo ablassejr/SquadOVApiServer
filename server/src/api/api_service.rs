@@ -1,4 +1,4 @@
-use actix_web::{web, FromRequest};
+use actix_web::{web, FromRequest, HttpResponse};
 use actix_web::dev::{HttpServiceFactory};
 use super::auth;
 use super::v1;
@@ -7,10 +7,15 @@ use super::graphql;
 use super::admin;
 use std::vec::Vec;
 use std::boxed::Box;
-use squadov_common::AimlabTask;
+use squadov_common::{AimlabTask, SquadOvError};
+
+async fn health_check() -> Result<HttpResponse, SquadOvError> {
+    Ok(HttpResponse::Ok().finish())
+}
 
 pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
     let mut scope = web::scope("")
+        .route("/healthz", web::get().to(health_check))
         .service(
             web::scope("/admin")
                 .wrap(access::ApiAccess::new(

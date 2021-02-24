@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-    name: internal-api-service
+    name: internal-app-service
     labels:
-        task: api
+        task: app
 spec:
     type: NodePort
     ports:
-        - port: 8080
+        - port: 3000
           protocol: TCP
     selector:
-        task: api
+        task: app

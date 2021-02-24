@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: app
+    labels:
+        task: app
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            task: app
+    template:
+        metadata:
+            labels:
+                task: app
+        spec:
+            nodeSelector:
+                task: infra
+            containers:
+                - name: app
+                  image: registry.gitlab.com/squadov/squadovapiserver/squadov/squadov_webapp:{{ .Values.commitHash }}
+                  resources:
+                    requests:
+                        cpu: "500m"
+                    limits:
+                        cpu: "1000m"
+            imagePullSecrets:
+                - name: regcred

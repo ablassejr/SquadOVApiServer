@@ -1,28 +1,68 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-    name: support
+    name: api
     labels:
-        task: support
+        task: api
 spec:
     replicas: 1
     selector:
         matchLabels:
-            task: support
+            task: api
     template:
         metadata:
             labels:
-                task: support
+                task: api
         spec:
             nodeSelector:
-                task: static
+                task: infra
             containers:
-                - name: support
-                  image: registry.gitlab.com/squadov/squadovapiserver/squadov/squadov_support:{{ .Values.commitHash }}
+                - name: api
+                  image: registry.gitlab.com/squadov/squadovapiserver/squadov/squadov_api_server:{{ .Values.commitHash }}
+                  livenessProbe:
+                    httpGet:
+                        path: /healthz
+                        port: 8080
+                    initialDelaySeconds: 10
+                    periodSeconds: 5
+                  readinessProbe:
+                    httpGet:
+                        path: /healthz
+                        port: 8080
                   resources:
                     requests:
-                        cpu: "400m"
-                    limits:
                         cpu: "1000m"
+                    limits:
+                        cpu: "2000m"
+                  env:
+                    - name: SQUADOV_VOD_ROOT
+                      value: gs://{{ .Values.vodBucket }}
+                    - name: SQUADOV_BLOB_BUCKET
+                      value: {{ .Values.blobBucket }}
+                    - name: FFMPEG_BINARY_PATH
+                      value: ffmpeg
+                - name: cloudsql-proxy
+                  image: gcr.io/cloudsql-docker/gce-proxy:1.16
+                  ports:
+                    - containerPort: 5432
+                  command: ["/cloud_sql_proxy",
+                             "-instances=squadov:us-central1:squadov-postgres=tcp:5432",
+                             "-credential_file=/secrets/gke/gcloud-service-account.json"]
+                  securityContext:
+                      runAsUser: 2  # non-root user
+                      allowPrivilegeEscalation: false
+                  volumeMounts:
+                      - name: gke-service-account
+                        mountPath: /secrets/gke
+                        readOnly: true
+                  resources:
+                    requests:
+                        cpu: "10m"
+                    limits:
+                        cpu: "100m"
+            volumes:
+                - name: gke-service-account
+                  secret:
+                    secretName: gke-service-account
             imagePullSecrets:
                 - name: regcred
