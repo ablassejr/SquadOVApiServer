@@ -2,6 +2,8 @@ apiVersion: v1
 kind: Service
 metadata:
     name: internal-api-service
+    annotations:
+        cloud.google.com/backend-config: '{"default": "api-backendconfig"}'
     labels:
         task: api
 spec:
