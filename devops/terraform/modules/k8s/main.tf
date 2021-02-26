@@ -54,7 +54,7 @@ resource "google_container_node_pool" "vod_worker_nodes" {
         }
         disk_size_gb = 30
         disk_type = "pd-ssd"
-        machine_type = "e2-custom-4-8192"
+        machine_type = "e2-custom-4-12288"
         image_type = "COS"
     }
 
