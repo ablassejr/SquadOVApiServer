@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.6.4",
+        "description": "Performance improvements - SquadOV goes zoom.",
+        "timestamp": 1614390069000,
+        "data": "data/update-v0.6.4.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.6.0",
         "description": "Clip sharing at long last!",
         "timestamp": 1613762989000,
