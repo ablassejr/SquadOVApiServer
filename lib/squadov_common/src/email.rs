@@ -6,6 +6,7 @@ use std::collections::HashMap;
 pub struct EmailConfig {
     pub postmark_api_key: String,
     pub invite_template: String,
+    pub welcome_template: String,
 }
 
 pub struct EmailClient {

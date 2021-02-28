@@ -29,6 +29,7 @@ impl super::FusionAuthClient {
             registration: super::FusionAuthRegistration{
                 application_id: self.cfg.application_id.clone(),
                 username: Some(username.clone()),
+                insert_instant: 0,
             },
             user: super::FusionSingleAppAuthUser{
                 email: email,

@@ -158,6 +158,28 @@ impl api::ApiApplication {
         Ok(())
     }
 
+    pub async fn force_add_user_to_squad(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, user_id: i64) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            "
+            INSERT INTO squadov.squad_role_assignments (
+                squad_id,
+                user_id,
+                squad_role
+            )
+            VALUES (
+                $1,
+                $2,
+                'Member'
+            )
+            ",
+            squad_id,
+            user_id,
+        )
+            .execute(tx)
+            .await?;
+        Ok(())
+    }
+
     pub async fn add_user_to_squad_from_invite(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, invite_uuid: &Uuid) -> Result<(), SquadOvError> {
         sqlx::query!(
             "

@@ -80,7 +80,9 @@ impl SessionManager {
                 u.uuid AS \"user_uuid\",
                 u.is_test AS \"is_test\",
                 u.is_admin AS \"is_admin\",
-                us.is_temp AS \"is_temp\"
+                us.is_temp AS \"is_temp\",
+                u.welcome_sent AS \"welcome_sent\",
+                u.registration_time AS \"registration_time\"
             FROM squadov.user_sessions AS us
             INNER JOIN squadov.users AS u
                 ON u.id = us.user_id
@@ -100,6 +102,8 @@ impl SessionManager {
                     uuid: x.user_uuid,
                     is_test: x.is_test,
                     is_admin: x.is_admin,
+                    welcome_sent: x.welcome_sent,
+                    registration_time: x.registration_time,
                 },
                 access_token: x.access_token,
                 refresh_token: x.refresh_token,

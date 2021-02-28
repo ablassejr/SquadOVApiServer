@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse, HttpRequest};
 use serde::Deserialize;
 use crate::api;
-use crate::api::auth::SquadOVSession;
+use crate::api::auth::{SquadOVSession, SquadOVUser};
 use std::sync::Arc;
 use squadov_common::SquadOvError;
 use sqlx::{Transaction, Executor, Postgres};
@@ -17,6 +17,19 @@ pub struct CreateSquadInput {
 }
 
 impl api::ApiApplication {
+    pub async fn create_default_squad(&self, tx: &mut Transaction<'_, Postgres>, user: &SquadOVUser) -> Result<(), SquadOvError> {
+        let group = user.username.clone();
+        let name = format!("{}'s Squad", &user.username);
+        let squad_id = self.create_squad(&mut *tx, &group, &name, user.id).await?;
+
+        // Mike
+        self.force_add_user_to_squad(&mut *tx, squad_id, 1).await?;
+
+        // Derek
+        self.force_add_user_to_squad(&mut *tx, squad_id, 4).await?;
+        Ok(())
+    }
+
     async fn create_squad(&self, tx: &mut Transaction<'_, Postgres>, squad_group: &str, squad_name: &str, owner_id: i64) -> Result<i64, SquadOvError> {
         let squad_id: i64 = tx.fetch_one(
             sqlx::query!(

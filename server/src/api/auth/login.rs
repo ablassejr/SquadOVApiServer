@@ -6,6 +6,7 @@ use squadov_common;
 use crate::logged_error;
 use uuid::Uuid;
 use std::sync::Arc;
+use chrono::{DateTime, Utc, NaiveDateTime};
 
 #[derive(Deserialize)]
 pub struct LoginData {
@@ -41,11 +42,13 @@ async fn login(fa: &fusionauth::FusionAuthClient, data: LoginData, ip: Option<&s
                             Some(y) => y.clone(),
                             None => String::from(""),
                         },
-                        email: result.user.email,
+                        email: result.user.email.clone(),
                         verified: result.user.verified,
                         uuid: Uuid::nil(), // We'll pull this later along with the id.
                         is_test: false,
                         is_admin: false,
+                        welcome_sent: false,
+                        registration_time: Some(DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(x.insert_instant / 1000, 0), Utc)),
                     },
                     access_token: result.token,
                     refresh_token: result.refresh_token,
@@ -106,6 +109,12 @@ pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<Arc<api:
 
                 // Check for any pending squad invites and apply them.
                 app.associate_pending_invites_to_user(&user.email, user.id).await?;
+
+                // Create a default squad for this user. Hard code adding me and Derek as members of this squad
+                // to give it a sort of Myspace Tom feel.
+                let mut tx = app.pool.begin().await?;
+                app.create_default_squad(&mut tx, &user).await?;
+                tx.commit().await?;
 
                 user
             },

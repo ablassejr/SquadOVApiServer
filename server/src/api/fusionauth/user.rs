@@ -5,7 +5,9 @@ use derive_more::{Display};
 pub struct FusionAuthRegistration {
     #[serde(rename = "applicationId")]
     pub application_id: String,
-    pub username: Option<String>
+    pub username: Option<String>,
+    #[serde(rename = "insertInstant", skip_serializing)]
+    pub insert_instant: i64,
 }
 
 #[derive(Deserialize)]
@@ -69,8 +71,8 @@ impl super::FusionAuthClient {
         return None
     }
 
-    pub async fn find_user_from_email_verification_id(&self, id: &str) -> Result<FusionAuthUser, FusionAuthUserError> {
-        match self.client.get(self.build_url(format!("/api/user?verificationId={}", id).as_str()).as_str())
+    pub async fn find_user_generic(&self, key: &str, value: &str) -> Result<FusionAuthUser, FusionAuthUserError> {
+        match self.client.get(self.build_url(format!("/api/user?{}={}", key, value).as_str()).as_str())
             .send()
             .await {
             Ok(resp) => {
@@ -104,6 +106,14 @@ impl super::FusionAuthClient {
             },
             Err(err) => Err(FusionAuthUserError::Generic(format!("{}", err))),
         }
+    }
+
+    pub async fn find_user_from_email_address(&self, email: &str) -> Result<FusionAuthUser, FusionAuthUserError> {
+        Ok(self.find_user_generic("email", email).await?)
+    }
+
+    pub async fn find_user_from_email_verification_id(&self, id: &str) -> Result<FusionAuthUser, FusionAuthUserError> {
+        Ok(self.find_user_generic("verificationId", id).await?)
     }
 
     pub async fn resend_verify_email(&self, email: &str) -> Result<(), FusionAuthResendVerificationEmailError> {

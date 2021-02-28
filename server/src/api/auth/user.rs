@@ -3,6 +3,7 @@ use sqlx::postgres::PgPool;
 use serde::Serialize;
 use uuid::Uuid;
 use std::clone::Clone;
+use chrono::{DateTime, Utc};
 use squadov_common::SquadOvError;
 
 #[derive(Debug, Serialize, Clone)]
@@ -15,7 +16,11 @@ pub struct SquadOVUser {
     #[serde(skip_serializing)]
     pub is_test: bool,
     #[serde(skip_serializing)]
-    pub is_admin: bool
+    pub is_admin: bool,
+    #[serde(skip_serializing)]
+    pub welcome_sent: bool,
+    #[serde(rename="registrationTime")]
+    pub registration_time: Option<DateTime<Utc>>,
 }
 
 pub struct UserManager {
@@ -47,7 +52,9 @@ impl UserManager {
                 verified,
                 uuid,
                 is_test,
-                is_admin
+                is_admin,
+                welcome_sent,
+                registration_time
             FROM squadov.users
             WHERE email = $1
             ",
@@ -66,7 +73,9 @@ impl UserManager {
                 verified,
                 uuid,
                 is_test,
-                is_admin
+                is_admin,
+                welcome_sent,
+                registration_time
             FROM squadov.users
             WHERE id = $1
             ",
@@ -85,7 +94,9 @@ impl UserManager {
                 verified,
                 uuid,
                 is_test,
-                is_admin
+                is_admin,
+                welcome_sent,
+                registration_time
             FROM squadov.users
             WHERE uuid = $1
             ",
@@ -111,7 +122,9 @@ impl UserManager {
                 verified,
                 uuid,
                 is_test,
-                is_admin
+                is_admin,
+                welcome_sent,
+                registration_time
             ",
             user.email,
             user.username,

@@ -155,13 +155,13 @@ pub struct ApiConfig {
     pub squadov: SquadOvConfig,
 }
 
-struct ApiClients {
-    fusionauth: fusionauth::FusionAuthClient,
+pub struct ApiClients {
+    pub fusionauth: fusionauth::FusionAuthClient,
 }
 
 pub struct ApiApplication {
     pub config: ApiConfig,
-    clients: ApiClients,
+    pub clients: ApiClients,
     pub users: auth::UserManager,
     session: auth::SessionManager,
     vod: Arc<dyn VodManager + Send + Sync>,

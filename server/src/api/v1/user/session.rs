@@ -12,6 +12,26 @@ pub struct RefreshSessionInput {
     session_id: String
 }
 
+async fn handle_session_user_backfill_tasks(app : web::Data<Arc<api::ApiApplication>>, session: &SquadOVSession) -> Result<(), SquadOvError> {
+    if !session.user.welcome_sent {
+        app.send_welcome_email_to_user(&session.user).await?;
+    }
+
+    if session.user.registration_time.is_none() {
+        let fa_user = app.clients.fusionauth.find_user_from_email_address(&session.user.email).await.map_err(|x| {
+            SquadOvError::InternalError(format!("Failed to find user from email address: {:?}", x))
+        })?;
+        let reg = app.clients.fusionauth.find_auth_registration(&fa_user);
+        if reg.is_some() {
+            let reg_time = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(reg.as_ref().unwrap().insert_instant / 1000, 0), Utc);
+            app.update_user_registration_time(session.user.id, &reg_time).await?;
+        } else {
+            log::warn!("Failed to find FusionAuth registration for user: {}", session.user.id);
+        }
+    }
+    Ok(())
+}
+
 pub async fn refresh_user_session_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<RefreshSessionInput>) -> Result<HttpResponse, SquadOvError> {
     let session = app.session.get_session_from_id(&data.session_id, &app.pool).await?;
     if session.is_none() {
@@ -21,6 +41,9 @@ pub async fn refresh_user_session_handler(app : web::Data<Arc<api::ApiApplicatio
     // We do need to force the refresh here because the client will pre-emptively
     // request a new session to make sure it doesn't ever have an invalid session.
     let session = app.refresh_session_if_necessary(session.unwrap(), true).await?;
+
+    // This block of code isn't crucial to the task of refreshing the session so we can ignore errors here.
+    let _ = handle_session_user_backfill_tasks(app.clone(), &session).await;
 
     // Extract expiration from the access token JWT.
     let token = jsonwebtoken::dangerous_insecure_decode::<SessionJwtClaims>(&session.access_token)?;
