@@ -1,0 +1,12 @@
+# LANDING
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DEPLOYMENT_DOMAIN};
+
+    location / {
+        proxy_redirect http://$host:8080/ https://$host/;
+        include /etc/nginx/conf.d/common-http-headers.conf;
+        proxy_pass http://127.0.0.1:8080/;
+    }
+}

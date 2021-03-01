@@ -24,5 +24,12 @@ spec:
                         cpu: "400m"
                     limits:
                         cpu: "1000m"
+                - name: nginx
+                  image: registry.gitlab.com/squadov/squadovapiserver/squadov/support_nginx:{{ .Values.nginxHash }}
+                  resources:
+                    requests:
+                        cpu: "100m"
+                    limits:
+                        cpu: "1000m"
             imagePullSecrets:
                 - name: regcred

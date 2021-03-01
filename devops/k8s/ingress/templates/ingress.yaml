@@ -17,19 +17,19 @@ spec:
             paths:
             - backend:
                 serviceName: internal-support-service
-                servicePort: 8080
+                servicePort: 80
         - host: "squadov.gg"
           http:
             paths:
             - backend:
                 serviceName: internal-landing-service
-                servicePort: 8080
+                servicePort: 80
         - host: "www.squadov.gg"
           http:
             paths:
             - backend:
                 serviceName: internal-landing-service
-                servicePort: 8080
+                servicePort: 80
         - host: "auth.squadov.gg"
           http:
             paths:
