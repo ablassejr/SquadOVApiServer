@@ -17,11 +17,18 @@ spec:
             nodeSelector:
                 task: static
             containers:
-                - name: support
+                - name: landing
                   image: registry.gitlab.com/squadov/squadovapiserver/squadov/squadov_landing:{{ .Values.commitHash }}
                   resources:
                     requests:
                         cpu: "400m"
+                    limits:
+                        cpu: "1000m"
+                - name: nginx
+                  image: registry.gitlab.com/squadov/squadovapiserver/squadov/landing_nginx:{{ .Values.commitHash }}
+                  resources:
+                    requests:
+                        cpu: "100m"
                     limits:
                         cpu: "1000m"
             imagePullSecrets:
