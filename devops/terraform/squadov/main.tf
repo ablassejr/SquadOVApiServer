@@ -27,6 +27,10 @@ module "database" {
     postgres_user = var.postgres_user
     postgres_password = var.postgres_password
     postgres_instance_name = var.postgres_instance_name
+
+    mysql_user = var.mysql_user
+    mysql_password = var.mysql_password
+    mysql_instance_name = var.mysql_instance_name
 }
 
 module "vm" {

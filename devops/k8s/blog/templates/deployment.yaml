@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: blog
+    labels:
+        task: blog
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            task: blog
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                task: blog
+        spec:
+            nodeSelector:
+                task: static
+            containers:
+                - name: blog
+                  image: wordpress:5.6.2
+                  ports:
+                    - containerPort: 80
+                  resources:
+                    requests:
+                        cpu: "100m"
+                    limits:
+                        cpu: "1000m"
+                  env:
+                    - name: WORDPRESS_DB_HOST
+                      value: 127.0.0.1:3306
+                    - name: WORDPRESS_DB_USER
+                      valueFrom:
+                        secretKeyRef:
+                            name: mysql-secret
+                            key: username
+                    - name: WORDPRESS_DB_PASSWORD
+                      valueFrom:
+                        secretKeyRef:
+                            name: mysql-secret
+                            key: password
+                  volumeMounts:
+                    - name: wordpress-persistent-storage
+                      mountPath: /var/www/html
+                - name: cloudsql-proxy
+                  image: gcr.io/cloudsql-docker/gce-proxy:1.16
+                  ports:
+                    - containerPort: 3306
+                  command: ["/cloud_sql_proxy",
+                             "-instances=squadov:us-central1:squadov-mysql=tcp:3306",
+                             "-credential_file=/secrets/gke/gcloud-service-account.json"]
+                  securityContext:
+                      runAsUser: 2  # non-root user
+                      allowPrivilegeEscalation: false
+                  volumeMounts:
+                      - name: gke-service-account
+                        mountPath: /secrets/gke
+                        readOnly: true
+                  resources:
+                    requests:
+                        cpu: "50m"
+                    limits:
+                        cpu: "500m"
+            volumes:
+                - name: gke-service-account
+                  secret:
+                    secretName: gke-service-account
+                - name: wordpress-persistent-storage
+                  persistentVolumeClaim:
+                    claimName: wp-pv-claim

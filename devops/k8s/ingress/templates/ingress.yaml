@@ -47,6 +47,12 @@ spec:
             - backend:
                 serviceName: internal-app-service
                 servicePort: 3000
+        - host: "blog.squadov.gg"
+          http:
+            paths:
+            - backend:
+                serviceName: internal-blog-service
+                servicePort: 80
     tls:
         - hosts:
             - "support.squadov.gg"
@@ -54,4 +60,5 @@ spec:
             - "auth.squadov.gg"
             - "app.squadov.gg"
             - "api.squadov.gg"
+            - "blog.squadov.gg"
           secretName: squadov-cert-prod

@@ -4,6 +4,9 @@ cd $1
 export TF_VAR_postgres_user=$POSTGRES_USER
 export TF_VAR_postgres_password=$POSTGRES_PASSWORD
 export TF_VAR_postgres_instance_name=$POSTGRES_INSTANCE_NAME
+export TF_VAR_mysql_user=$MYSQL_USER
+export TF_VAR_mysql_password=$MYSQL_PASSWORD
+export TF_VAR_mysql_instance_name=$MYSQL_INSTANCE_NAME
 export TF_VAR_vod_storage_bucket=$VOD_BUCKET
 export TF_VAR_blob_storage_bucket=$BLOB_BUCKET
 
