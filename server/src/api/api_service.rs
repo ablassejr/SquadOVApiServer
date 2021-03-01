@@ -82,6 +82,11 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                     web::scope("/share/{access_token_id}")
                         .route("/exchange", web::post().to(v1::exchange_access_token_id_handler))
                 )
+                .service(
+                    web::scope("/landing")
+                        .route("/visit", web::get().to(v1::public_landing_visit_handler))
+                        .route("/download", web::get().to(v1::public_landing_download_handler))
+                )
         )
         .service(
             web::scope("/v1")
@@ -128,6 +133,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .route("/active", web::post().to(v1::mark_user_active_endpoint_handler))
                                 .route("/playtime", web::get().to(v1::get_user_recorded_playtime_handler))
                                 .route("/recent", web::get().to(v1::get_recent_matches_for_me_handler))
+                                .route("/referral", web::get().to(v1::get_user_me_referral_link_handler))
                         )
                         .service(
                             web::scope("/{user_id}")

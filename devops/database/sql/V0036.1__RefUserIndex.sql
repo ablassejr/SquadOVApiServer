@@ -1,0 +1,1 @@
+CREATE INDEX ON referral_codes (user_id);

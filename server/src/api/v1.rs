@@ -12,6 +12,7 @@ mod lol;
 mod tft;
 mod oauth;
 mod features;
+mod analytics;
 
 pub use user::*;
 pub use matches::*;
@@ -27,3 +28,4 @@ pub use lol::*;
 pub use tft::*;
 pub use oauth::*;
 pub use features::*;
+pub use analytics::*;
