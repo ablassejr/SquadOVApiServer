@@ -57,7 +57,7 @@ impl api::ApiApplication {
             SELECT u.id, u.email AS "email!"
             FROM UNNEST($2::VARCHAR[]) AS a(username)
             INNER JOIN squadov.users AS u
-                ON u.username = a.username
+                ON LOWER(u.username) = LOWER(a.username)
             LEFT JOIN squadov.squad_role_assignments AS sra
                 ON sra.user_id = u.id
             WHERE sra.squad_id != $1 OR sra.squad_id IS NULL
