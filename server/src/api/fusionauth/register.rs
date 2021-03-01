@@ -1,5 +1,7 @@
+use squadov_common::SquadOvError;
 use serde::{Deserialize, Serialize};
-use derive_more::{Display};
+use std::collections::HashMap;
+
 #[derive(Serialize)]
 pub struct FusionAuthRegisterInput {
     registration: super::FusionAuthRegistration,
@@ -14,13 +16,35 @@ pub struct FusionAuthRegisterResult {
     pub refresh_token: String
 }
 
-#[derive(Debug, Display)]
-pub enum FusionAuthRegisterError {
-    InvalidRequest(String),
-    ServerAuth,
-    InternalError,
-    Search(String),
-    Generic(String)
+#[derive(Deserialize)]
+struct InternalFusionAuthRegistrationError {
+    code: String,
+}
+
+impl InternalFusionAuthRegistrationError {
+    fn is_duplicate(&self) -> bool {
+        self.code.contains("[duplicate]")
+    }
+}
+
+#[derive(Deserialize)]
+struct InternalFusionAuthRegistrationErrorResponse {
+    #[serde(rename="fieldErrors")]
+    field_errors: HashMap<String, Vec<InternalFusionAuthRegistrationError>>
+}
+
+impl InternalFusionAuthRegistrationErrorResponse {
+    fn has_duplicate(&self) -> bool {
+        for (_, arr) in &self.field_errors {
+            for v in arr {
+                if v.is_duplicate() {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 }
 
 impl super::FusionAuthClient {
@@ -39,43 +63,26 @@ impl super::FusionAuthClient {
         }
     }
 
-    pub async fn register(&self, input : FusionAuthRegisterInput) -> Result<FusionAuthRegisterResult, FusionAuthRegisterError> {
+    pub async fn register(&self, input : FusionAuthRegisterInput) -> Result<FusionAuthRegisterResult, SquadOvError> {
         let res = self.client.post(self.build_url("/api/user/registration").as_str())
             .json(&input)
             .send()
-            .await;
+            .await?;
 
-        match res {
-            Ok(resp) => {
-                let status = resp.status();
-                match status.as_u16() {
-                    200 => {
-                        let body = resp.json::<FusionAuthRegisterResult>().await;
-                        match body {
-                            Ok(j) => Ok(j),
-                            Err(err) => Err(FusionAuthRegisterError::Generic(format!("{}", err))),
-                        }
-                    },
-                    400 => {
-                        let body = resp.text().await;
-                        match body {
-                            Ok(j) => Err(FusionAuthRegisterError::InvalidRequest(j)),
-                            Err(err) => Err(FusionAuthRegisterError::Generic(format!("{}", err))),
-                        }
-                    }
-                    401 => Err(FusionAuthRegisterError::ServerAuth),
-                    500 => Err(FusionAuthRegisterError::InternalError),
-                    503 => {
-                        let body = resp.text().await;
-                        match body {
-                            Ok(j) => Err(FusionAuthRegisterError::Search(j)),
-                            Err(err) => Err(FusionAuthRegisterError::Generic(format!("{}", err))),
-                        }
-                    },
-                    _ => Err(FusionAuthRegisterError::Generic(format!("Unknown Fusion Auth Error: {}", status.as_u16())))
+        let status = res.status();
+        match status.as_u16() {
+            200 => Ok(res.json::<FusionAuthRegisterResult>().await?),
+            400 => {
+                let data = res.json::<InternalFusionAuthRegistrationErrorResponse>().await?;
+                if data.has_duplicate() {
+                    Err(SquadOvError::Duplicate)
+                } else {
+                    Err(SquadOvError::BadRequest)
                 }
             },
-            Err(err) => Err(FusionAuthRegisterError::Generic(format!("{}", err))),
+            401 => Err(SquadOvError::Unauthorized),
+            500 | 503 => Err(SquadOvError::InternalError(String::from("FusionAuth Internval Error"))),
+            _ => Err(SquadOvError::InternalError(String::from("FusionAuth Internval Error"))),
         }
     }
 }

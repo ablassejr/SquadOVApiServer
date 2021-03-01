@@ -22,16 +22,13 @@ pub struct RegisterParams {
 }
 
 async fn register(fa: &fusionauth::FusionAuthClient, data: RegisterData) -> Result<(), SquadOvError> {
-    let res = fa.register(fa.build_register_input(
+    let _ = fa.register(fa.build_register_input(
         data.username,
         data.email,
         data.password,
-    )).await;
+    )).await?;
 
-    match res {
-        Ok(_) => Ok(()),
-        Err(err) => Err(SquadOvError::InternalError(format!("Register {}", err))),
-    }
+    Ok(())
 }
 
 /// Handles collecting the user data and passing it to FusionAuth for registration.
