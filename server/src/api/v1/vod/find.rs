@@ -63,7 +63,7 @@ impl api::ApiApplication {
             .await?)
     }
 
-    pub async fn find_accessible_vods_in_match_for_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<VodAssociation>, squadov_common::SquadOvError> {
+    pub async fn find_accessible_vods_in_match_for_user(&self, match_uuid: &Uuid, user_id: i64, limit_to_user: bool) -> Result<Vec<VodAssociation>, squadov_common::SquadOvError> {
         Ok(sqlx::query_as!(
             VodAssociation,
             "
@@ -76,11 +76,12 @@ impl api::ApiApplication {
             LEFT JOIN squadov.squad_role_assignments AS ora
                 ON ora.squad_id = sra.squad_id
             WHERE v.match_uuid = $1 
-                AND (u.id = $2 OR ora.user_id = $2)
+                AND (u.id = $2 OR (ora.user_id = $2 AND $3))
                 AND v.is_clip = FALSE
             ",
             match_uuid,
             user_id,
+            !limit_to_user,
         )
             .fetch_all(&*self.pool)
             .await?)

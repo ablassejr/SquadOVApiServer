@@ -6,8 +6,9 @@ use squadov_common::{
     SquadOvError,
 };
 use crate::api;
+use crate::api::auth::SquadOVSession;
 use squadov_common::vod::VodAssociation;
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpResponse, HttpRequest};
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use std::vec::Vec;
@@ -131,11 +132,17 @@ struct ValorantUserAccessibleVodOutput {
     pub user_mapping: HashMap<Uuid, String>
 }
 
-pub async fn get_valorant_match_user_accessible_vod_handler(data: web::Path<ValorantMatchUserVodAccessInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_valorant_match_user_accessible_vod_handler(data: web::Path<ValorantMatchUserVodAccessInput>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return Err(SquadOvError::Unauthorized),
+    };
+
     // We need to get a list of VOD information for each player in the match filtered by
     // the users that the input user has access to. We assume that the ACL on the user_id is
     // appropriate and taken care of externally.
-    let vods = app.find_accessible_vods_in_match_for_user(&data.match_uuid, data.user_id).await?;
+    let vods = app.find_accessible_vods_in_match_for_user(&data.match_uuid, data.user_id, session.share_token.is_some()).await?;
 
     // Note that for each VOD we also need to figure out the mapping from user uuid to puuid.
     let user_uuids: Vec<Uuid> = vods.iter()
