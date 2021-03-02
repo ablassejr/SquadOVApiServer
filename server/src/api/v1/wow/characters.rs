@@ -202,7 +202,6 @@ impl api::ApiApplication {
                     let relevant_ilvls: Vec<i32> = serde_json::from_value::<Vec<i32>>(x.items)
                         .unwrap_or(vec![])
                         .into_iter()
-                        .filter(|x| { *x > 0 })
                         .collect();
 
                     WoWCharacter {
