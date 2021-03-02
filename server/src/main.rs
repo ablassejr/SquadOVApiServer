@@ -101,6 +101,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Cors::new()
                             .allowed_origin(&config.cors.domain)
                             .allowed_origin("http://127.0.0.1:8080")
+                            .allowed_origin("https://www.squadov.gg")
                             .allowed_origin_fn(|req| {
                                 req.headers
                                     .get(http::header::ORIGIN)
