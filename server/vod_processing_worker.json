@@ -515,6 +515,26 @@
       ]
     }
   },
+  "144aaf7369577646a25177869adbf5502d70bee2173a05fc5e8613934740c57f": {
+    "query": "\n                SELECT region\n                FROM squadov.wow_realms\n                WHERE LOWER(name) = LOWER($1) OR LOWER(slug) = LOWER($1)\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "region",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "1451fca1a2b315bb09b30353cd140dd4edea985c2a2780cae56b69192aa958c7": {
     "query": "\n            UPDATE squadov.users\n            SET registration_time = $2\n            WHERE id = $1\n            ",
     "describe": {
@@ -3099,6 +3119,64 @@
       "nullable": []
     }
   },
+  "978c67b35a70d33d92a8ff42ce97daa6b26b8dec8bdeed43ff2f7bebab2c6daf": {
+    "query": "\n            SELECT DISTINCT v.*\n            FROM squadov.vods AS v\n            INNER JOIN squadov.users AS u\n                ON u.uuid = v.user_uuid\n            LEFT JOIN squadov.squad_role_assignments AS sra\n                ON sra.user_id = u.id\n            LEFT JOIN squadov.squad_role_assignments AS ora\n                ON ora.squad_id = sra.squad_id\n            WHERE v.match_uuid = $1 \n                AND (u.id = $2 OR (ora.user_id = $2 AND $3))\n                AND v.is_clip = FALSE\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "user_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 3,
+          "name": "start_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "end_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "raw_container_format",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "is_clip",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8",
+          "Bool"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        false,
+        true,
+        true,
+        false,
+        false
+      ]
+    }
+  },
   "98d7c92af613902ddfddbba7badd87c4e94de184e488e58aba0beb3822b4cb8f": {
     "query": "\n            SELECT hm.match_uuid as \"uuid\"\n            FROM squadov.hearthstone_matches AS hm\n            WHERE hm.match_day = $1\n                AND hm.server_ip = $2\n                AND hm.port = $3\n                AND hm.game_id = $4\n            ",
     "describe": {
@@ -4181,63 +4259,6 @@
         true,
         true,
         null,
-        false,
-        false
-      ]
-    }
-  },
-  "cc502b7e8f919ea6a99ed3a754c0bcce54767e0aa33300fee627d26ce87b0839": {
-    "query": "\n            SELECT DISTINCT v.*\n            FROM squadov.vods AS v\n            INNER JOIN squadov.users AS u\n                ON u.uuid = v.user_uuid\n            LEFT JOIN squadov.squad_role_assignments AS sra\n                ON sra.user_id = u.id\n            LEFT JOIN squadov.squad_role_assignments AS ora\n                ON ora.squad_id = sra.squad_id\n            WHERE v.match_uuid = $1 \n                AND (u.id = $2 OR ora.user_id = $2)\n                AND v.is_clip = FALSE\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "user_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 2,
-          "name": "video_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 3,
-          "name": "start_time",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "end_time",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 5,
-          "name": "raw_container_format",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 6,
-          "name": "is_clip",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        true,
-        true,
-        false,
-        true,
-        true,
         false,
         false
       ]
