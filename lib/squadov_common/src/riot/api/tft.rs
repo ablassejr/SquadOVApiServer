@@ -53,7 +53,7 @@ impl super::RiotApiApplicationInterface {
             platform: String::from(platform),
             region: String::from(region),
             game_id,
-        })?, priority).await;
+        })?, priority, -1).await;
         Ok(())
     }
 
@@ -112,7 +112,7 @@ impl super::RiotApiApplicationInterface {
         self.rmq.publish(&self.mqconfig.tft_queue, serde_json::to_vec(&RiotApiTask::TftBackfill{
             puuid: summoner.puuid.clone(),
             region: String::from(region),
-        })?, RABBITMQ_DEFAULT_PRIORITY).await;
+        })?, RABBITMQ_DEFAULT_PRIORITY, -1).await;
         Ok(())
     }
 

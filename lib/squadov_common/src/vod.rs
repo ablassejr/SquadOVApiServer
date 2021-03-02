@@ -23,6 +23,8 @@ use std::sync::Arc;
 use tempfile::NamedTempFile;
 use chrono::{DateTime, Utc};
 
+const VOD_MAX_AGE_SECONDS: i64 = 21600; // 6 hours
+
 #[derive(Serialize,Deserialize, Clone)]
 pub struct VodAssociation {
     #[serde(rename = "matchUuid")]
@@ -174,7 +176,7 @@ impl VodProcessingInterface {
         self.rmq.publish(&self.queue, serde_json::to_vec(&VodProcessingTask::Process{
             vod_uuid: vod_uuid.clone(),
             session_id,
-        })?, if high_priority { RABBITMQ_HIGH_PRIORITY } else { RABBITMQ_DEFAULT_PRIORITY }).await;
+        })?, if high_priority { RABBITMQ_HIGH_PRIORITY } else { RABBITMQ_DEFAULT_PRIORITY }, VOD_MAX_AGE_SECONDS).await;
         Ok(())
     }
 

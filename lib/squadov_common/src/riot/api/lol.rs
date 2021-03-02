@@ -68,7 +68,7 @@ impl super::RiotApiApplicationInterface {
         self.rmq.publish(&self.mqconfig.lol_queue, serde_json::to_vec(&RiotApiTask::LolMatch{
             platform: String::from(platform),
             game_id,
-        })?, priority).await;
+        })?, priority, -1).await;
         Ok(())
     }
 
@@ -138,7 +138,7 @@ impl super::RiotApiApplicationInterface {
         self.rmq.publish(&self.mqconfig.lol_queue, serde_json::to_vec(&RiotApiTask::LolBackfill{
             account_id,
             platform: String::from(platform),
-        })?, RABBITMQ_DEFAULT_PRIORITY).await;
+        })?, RABBITMQ_DEFAULT_PRIORITY, -1).await;
         Ok(())
     }
 
