@@ -1,0 +1,7 @@
+CREATE TABLE wow_realms (
+    id BIGINT PRIMARY KEY,
+    name VARCHAR NOT NULL UNIQUE,
+    slug VARCHAR NOT NULL UNIQUE,
+    region VARCHAR NOT NULL
+);
+CREATE INDEX ON wow_realms(region);

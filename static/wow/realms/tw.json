@@ -1,0 +1,209 @@
+{
+  "_links": {
+    "self": {
+      "href": "https://tw.api.blizzard.com/data/wow/realm/?namespace=dynamic-tw"
+    }
+  },
+  "realms": [
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/963?namespace=dynamic-tw"
+      },
+      "name": "Shadowmoon",
+      "id": 963,
+      "slug": "shadowmoon"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/964?namespace=dynamic-tw"
+      },
+      "name": "Spirestone",
+      "id": 964,
+      "slug": "spirestone"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/965?namespace=dynamic-tw"
+      },
+      "name": "Stormscale",
+      "id": 965,
+      "slug": "stormscale"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/966?namespace=dynamic-tw"
+      },
+      "name": "Dragonmaw",
+      "id": 966,
+      "slug": "dragonmaw"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/977?namespace=dynamic-tw"
+      },
+      "name": "Frostmane",
+      "id": 977,
+      "slug": "frostmane"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/978?namespace=dynamic-tw"
+      },
+      "name": "Sundown Marsh",
+      "id": 978,
+      "slug": "sundown-marsh"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/979?namespace=dynamic-tw"
+      },
+      "name": "Hellscream",
+      "id": 979,
+      "slug": "hellscream"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/980?namespace=dynamic-tw"
+      },
+      "name": "Skywall",
+      "id": 980,
+      "slug": "skywall"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/982?namespace=dynamic-tw"
+      },
+      "name": "World Tree",
+      "id": 982,
+      "slug": "world-tree"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/985?namespace=dynamic-tw"
+      },
+      "name": "Crystalpine Stinger",
+      "id": 985,
+      "slug": "crystalpine-stinger"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/999?namespace=dynamic-tw"
+      },
+      "name": "Zealot Blade",
+      "id": 999,
+      "slug": "zealot-blade"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/1001?namespace=dynamic-tw"
+      },
+      "name": "Chillwind Point",
+      "id": 1001,
+      "slug": "chillwind-point"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/1006?namespace=dynamic-tw"
+      },
+      "name": "Menethil",
+      "id": 1006,
+      "slug": "menethil"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/1023?namespace=dynamic-tw"
+      },
+      "name": "Demon Fall Canyon",
+      "id": 1023,
+      "slug": "demon-fall-canyon"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/1033?namespace=dynamic-tw"
+      },
+      "name": "Whisperwind",
+      "id": 1033,
+      "slug": "whisperwind"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/1037?namespace=dynamic-tw"
+      },
+      "name": "Bleeding Hollow",
+      "id": 1037,
+      "slug": "bleeding-hollow"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/1038?namespace=dynamic-tw"
+      },
+      "name": "Arygos",
+      "id": 1038,
+      "slug": "arygos"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/1043?namespace=dynamic-tw"
+      },
+      "name": "Nightsong",
+      "id": 1043,
+      "slug": "nightsong"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/1046?namespace=dynamic-tw"
+      },
+      "name": "Light's Hope",
+      "id": 1046,
+      "slug": "lights-hope"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/1048?namespace=dynamic-tw"
+      },
+      "name": "Silverwing Hold",
+      "id": 1048,
+      "slug": "silverwing-hold"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/1049?namespace=dynamic-tw"
+      },
+      "name": "Wrathbringer",
+      "id": 1049,
+      "slug": "wrathbringer"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/1054?namespace=dynamic-tw"
+      },
+      "name": "Arthas",
+      "id": 1054,
+      "slug": "arthas"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/1056?namespace=dynamic-tw"
+      },
+      "name": "Quel'dorei",
+      "id": 1056,
+      "slug": "queldorei"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/1057?namespace=dynamic-tw"
+      },
+      "name": "Icecrown",
+      "id": 1057,
+      "slug": "icecrown"
+    },
+    {
+      "key": {
+        "href": "https://tw.api.blizzard.com/data/wow/realm/2075?namespace=dynamic-tw"
+      },
+      "name": "Order of the Cloud Serpent",
+      "id": 2075,
+      "slug": "order-of-the-cloud-serpent"
+    }
+  ]
+}

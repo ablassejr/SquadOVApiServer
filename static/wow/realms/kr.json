@@ -1,0 +1,153 @@
+{
+  "_links": {
+    "self": {
+      "href": "https://kr.api.blizzard.com/data/wow/realm/?namespace=dynamic-kr"
+    }
+  },
+  "realms": [
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/201?namespace=dynamic-kr"
+      },
+      "name": "Burning Legion",
+      "id": 201,
+      "slug": "burning-legion"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/205?namespace=dynamic-kr"
+      },
+      "name": "Azshara",
+      "id": 205,
+      "slug": "azshara"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/207?namespace=dynamic-kr"
+      },
+      "name": "Dalaran",
+      "id": 207,
+      "slug": "dalaran"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/210?namespace=dynamic-kr"
+      },
+      "name": "Durotan",
+      "id": 210,
+      "slug": "durotan"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/211?namespace=dynamic-kr"
+      },
+      "name": "Norgannon",
+      "id": 211,
+      "slug": "norgannon"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/212?namespace=dynamic-kr"
+      },
+      "name": "Garona",
+      "id": 212,
+      "slug": "garona"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/214?namespace=dynamic-kr"
+      },
+      "name": "Windrunner",
+      "id": 214,
+      "slug": "windrunner"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/215?namespace=dynamic-kr"
+      },
+      "name": "Gul'dan",
+      "id": 215,
+      "slug": "guldan"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/258?namespace=dynamic-kr"
+      },
+      "name": "Alexstrasza",
+      "id": 258,
+      "slug": "alexstrasza"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/264?namespace=dynamic-kr"
+      },
+      "name": "Malfurion",
+      "id": 264,
+      "slug": "malfurion"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/293?namespace=dynamic-kr"
+      },
+      "name": "Hellscream",
+      "id": 293,
+      "slug": "hellscream"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/2079?namespace=dynamic-kr"
+      },
+      "name": "Wildhammer",
+      "id": 2079,
+      "slug": "wildhammer"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/2106?namespace=dynamic-kr"
+      },
+      "name": "Rexxar",
+      "id": 2106,
+      "slug": "rexxar"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/2107?namespace=dynamic-kr"
+      },
+      "name": "Hyjal",
+      "id": 2107,
+      "slug": "hyjal"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/2108?namespace=dynamic-kr"
+      },
+      "name": "Deathwing",
+      "id": 2108,
+      "slug": "deathwing"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/2110?namespace=dynamic-kr"
+      },
+      "name": "Cenarius",
+      "id": 2110,
+      "slug": "cenarius"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/2111?namespace=dynamic-kr"
+      },
+      "name": "Stormrage",
+      "id": 2111,
+      "slug": "stormrage"
+    },
+    {
+      "key": {
+        "href": "https://kr.api.blizzard.com/data/wow/realm/2116?namespace=dynamic-kr"
+      },
+      "name": "Zul'jin",
+      "id": 2116,
+      "slug": "zuljin"
+    }
+  ]
+}

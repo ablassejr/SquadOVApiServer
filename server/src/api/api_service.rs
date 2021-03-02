@@ -420,6 +420,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .route("", web::post().to(v1::create_wow_combat_log_handler))
                         )
                         .service(
+                            web::scope("/characters/{character_name}")
+                                .route("/armory", web::get().to(v1::get_wow_armory_link_for_character_handler))
+                        )
+                        .service(
                             web::scope("/match")
                                 .service(
                                     web::scope("/encounter")
