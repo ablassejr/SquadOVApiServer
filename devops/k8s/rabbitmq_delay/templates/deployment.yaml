@@ -1,48 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-    name: vod-processor
+    name: rabbitmq-delay
     labels:
-        task: vod
+        task: rabbitmq-delay
 spec:
-    replicas: 12
+    replicas: 1
     selector:
         matchLabels:
-            task: vod
+            task: rabbitmq-delay
     template:
         metadata:
             labels:
-                task: vod
+                task: rabbitmq-delay
         spec:
             nodeSelector:
-                task: vod
+                task: infra
             containers:
-                - name: processor
-                  image: "registry.gitlab.com/squadov/squadovapiserver/squadov/vod_processor:{{ .Values.commitHash }}"
-                  env:
-                    - name: DB_CONNS
-                      value: "2"
-                    - name: PROCESSING_THREADS
-                      value: "1"
-                    - name: "SQUADOV_VOD_ROOT"
-                      value: "gs://squadov-vod-bucket"
-                    - name: "SQUADOV_BLOB_BUCKET"
-                      value: "squadov-blob-bucket"
-                    - name: "FFMPEG_BINARY_PATH"
-                      value: "ffmpeg"
-                    - name: POSTGRES_USER
-                      valueFrom:
-                        secretKeyRef:
-                            name: postgres-secret
-                            key: username
-                    - name: POSTGRES_PASSWORD
-                      valueFrom:
-                        secretKeyRef:
-                            name: postgres-secret
-                            key: password
+                - name: delay
+                  image: "registry.gitlab.com/squadov/squadovapiserver/squadov/rabbitmq_delay_handler:{{ .Values.commitHash }}"
                   resources:
                     requests:
-                        cpu: "490m"
+                        cpu: "90m"
                     limits:
                         cpu: "1000m"
                 - name: cloudsql-proxy

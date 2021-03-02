@@ -16,6 +16,7 @@ COPY lib /squadov/lib
 COPY server /squadov/server
 COPY tools /squadov/tools
 COPY deps /squadov/deps
+COPY msa /squadov/msa
 COPY config/$GCP_PROJECT.toml /squadov/config/config.toml
 COPY Cargo.toml /squadov/
 COPY Cargo.lock /squadov/
