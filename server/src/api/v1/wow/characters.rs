@@ -18,14 +18,16 @@ pub struct WowCharacterPathInput {
 fn compute_wow_character_ilvl(items: &[i32]) -> i32 {
     let mut relevant_ilvls: Vec<i32> = items.iter().map(|x| { *x }).collect();
 
-    // We need to filter out shirts and tabards from the ilvl of the character.
-    // In the case where the character has a 2-handed weapon equipped, that weapon needs to
-    // count for double. Right now we have no way of determining the type of any particular item
-    // so we do our best guesses on how to best filter this stuff.
-    // There's 18 item slots and item index 15 is the primary weapon and index 16 is the off-hand weapon.
-    // If the off-hand weapon has an ilvl of 0 then we assume that the user is using a two-handed.
-    if relevant_ilvls[15] > 0 && relevant_ilvls[16] == 0 {
-        relevant_ilvls[15] = relevant_ilvls[15] * 2;
+    if relevant_ilvls.len() == 18 {
+        // We need to filter out shirts and tabards from the ilvl of the character.
+        // In the case where the character has a 2-handed weapon equipped, that weapon needs to
+        // count for double. Right now we have no way of determining the type of any particular item
+        // so we do our best guesses on how to best filter this stuff.
+        // There's 18 item slots and item index 15 is the primary weapon and index 16 is the off-hand weapon.
+        // If the off-hand weapon has an ilvl of 0 then we assume that the user is using a two-handed.
+        if relevant_ilvls[15] > 0 && relevant_ilvls[16] == 0 {
+            relevant_ilvls[15] = relevant_ilvls[15] * 2;
+        }
     }
 
     let relevant_ilvls: Vec<i32> = relevant_ilvls.into_iter().filter(|x| {
