@@ -15,6 +15,26 @@ pub struct WowCharacterPathInput {
     character_name: String,
 }
 
+fn compute_wow_character_ilvl(items: &[i32]) -> i32 {
+    let mut relevant_ilvls: Vec<i32> = items.iter().map(|x| { *x }).collect();
+
+    // We need to filter out shirts and tabards from the ilvl of the character.
+    // In the case where the character has a 2-handed weapon equipped, that weapon needs to
+    // count for double. Right now we have no way of determining the type of any particular item
+    // so we do our best guesses on how to best filter this stuff.
+    // There's 18 item slots and item index 15 is the primary weapon and index 16 is the off-hand weapon.
+    // If the off-hand weapon has an ilvl of 0 then we assume that the user is using a two-handed.
+    if relevant_ilvls[15] > 0 && relevant_ilvls[16] == 0 {
+        relevant_ilvls[15] = relevant_ilvls[15] * 2;
+    }
+
+    let relevant_ilvls: Vec<i32> = relevant_ilvls.into_iter().filter(|x| {
+        *x > 1
+    }).collect();
+    
+    (relevant_ilvls.iter().sum::<i32>() as f32 / 16.0).floor() as i32
+}
+
 impl api::ApiApplication {
     pub async fn list_wow_characters_for_match(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<WoWCharacter>, SquadOvError> {
         let mss = self.get_wow_match_start_stop(match_uuid).await?;
@@ -90,30 +110,16 @@ impl api::ApiApplication {
         
         Ok(
             characters.into_iter().map(|x| {
-                let mut relevant_ilvls: Vec<i32> = serde_json::from_value::<Vec<i32>>(x.items)
+                let relevant_ilvls: Vec<i32> = serde_json::from_value::<Vec<i32>>(x.items)
                     .unwrap_or(vec![])
                     .into_iter()
                     .collect();
-
-                // We need to filter out shirts and tabards from the ilvl of the character.
-                // In the case where the character has a 2-handed weapon equipped, that weapon needs to
-                // count for double. Right now we have no way of determining the type of any particular item
-                // so we do our best guesses on how to best filter this stuff.
-                // There's 18 item slots and item index 15 is the primary weapon and index 16 is the off-hand weapon.
-                // If the off-hand weapon has an ilvl of 0 then we assume that the user is using a two-handed.
-                if relevant_ilvls[15] > 0 && relevant_ilvls[16] == 0 {
-                    relevant_ilvls[15] = relevant_ilvls[15] * 2;
-                }
-
-                let relevant_ilvls: Vec<i32> = relevant_ilvls.into_iter().filter(|x| {
-                    *x > 1
-                }).collect();
 
                 let nm = guid_to_name.get(&x.guid).unwrap_or(&String::from("<Unknown>")).clone();
                 WoWCharacter{
                     guid: x.guid,
                     name: nm,
-                    ilvl: (relevant_ilvls.iter().sum::<i32>() as f32 / relevant_ilvls.len() as f32).floor() as i32,
+                    ilvl: compute_wow_character_ilvl(&relevant_ilvls) as i32,
                     spec_id: x.spec_id,
                     team: x.team,
                 }
@@ -202,7 +208,7 @@ impl api::ApiApplication {
                     WoWCharacter {
                         guid: x.guid,
                         name: x.name.unwrap_or(String::from("<Unknown>")),
-                        ilvl: (relevant_ilvls.iter().sum::<i32>() as f32 / relevant_ilvls.len() as f32).floor() as i32,
+                        ilvl: compute_wow_character_ilvl(&relevant_ilvls),
                         spec_id: x.spec_id,
                         team: 0,
                     }
