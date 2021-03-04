@@ -94,10 +94,13 @@ impl api::ApiApplication {
             )
         } else {
             // If combatant guids exist, then we know we can look up combatant info in this match.
+            // However, in the case of keystones, there could be multiple combatant info logs within the
+            // same match. In that case we'll just take the first one since we'll just assume they're
+            // all the same.
             Ok(
                 sqlx::query!(
                     r#"
-                    SELECT
+                    SELECT DISTINCT
                         wcp.unit_guid AS "guid",
                         COALESCE(wcp.unit_name, '') AS "name!",
                         COALESCE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS "items!",
@@ -113,7 +116,7 @@ impl api::ApiApplication {
                         ON wci.event_id = wvc.event_id
                     WHERE wmv.match_uuid = $1
                         AND wmv.user_id = $2
-                    GROUP BY wcp.unit_guid, wcp.unit_name, wvc.spec_id, wvc.team
+                    GROUP BY wcp.unit_guid, wcp.unit_name, wvc.spec_id, wvc.team, wvc.event_id
                     "#,
                     match_uuid,
                     user_id
