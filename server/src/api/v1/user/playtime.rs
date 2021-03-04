@@ -79,17 +79,17 @@ impl api::ApiApplication {
                         SELECT (
                             SELECT COALESCE(SUM(rm.duration)::BIGINT,0)
                             FROM relevant_matches AS rm
-                            INNER JOIN squadov.wow_challenges AS wc
+                            INNER JOIN squadov.new_wow_challenges AS wc
                                 ON wc.match_uuid = rm.match_uuid
                         ) + (
                             SELECT COALESCE(SUM(rm.duration)::BIGINT,0)
                             FROM relevant_matches AS rm
-                            INNER JOIN squadov.wow_encounters AS we
+                            INNER JOIN squadov.new_wow_encounters AS we
                                 ON we.match_uuid = rm.match_uuid
                         ) + (
                             SELECT COALESCE(SUM(rm.duration)::BIGINT,0)
                             FROM relevant_matches AS rm
-                            INNER JOIN squadov.wow_arenas AS wa
+                            INNER JOIN squadov.new_wow_arenas AS wa
                                 ON wa.match_uuid = rm.match_uuid
                         )
                     ) AS "wow_ms!"

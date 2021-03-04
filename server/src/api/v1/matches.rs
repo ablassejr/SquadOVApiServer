@@ -124,10 +124,10 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
     
     let aimlab_tasks = app.list_aimlab_matches_for_uuids(&match_uuids).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, AimlabTask>>();
     let lol_matches = db::list_lol_match_summaries_for_uuids(&*app.pool, &match_uuids).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, LolPlayerMatchSummary>>();
-    let wow_encounters = app.list_wow_encounter_for_uuids(&match_uuids).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, WoWEncounter>>();
-    let wow_challenges = app.list_wow_challenges_for_uuids(&match_uuids).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, WoWChallenge>>();
     let hearthstone_matches = app.filter_hearthstone_match_uuids(&match_uuids).await?.into_iter().collect::<HashSet<Uuid>>();
-    // TFT, Valorant, and WoW arenas are different because the match summary is player dependent.
+    // TFT, Valorant, and WoW is different because the match summary is player dependent.
+    let mut wow_encounters = app.list_wow_encounter_for_uuids(&match_player_pairs).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWEncounter>>();
+    let mut wow_challenges = app.list_wow_challenges_for_uuids(&match_player_pairs).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWChallenge>>();
     let mut wow_arenas = app.list_wow_arenas_for_uuids(&match_player_pairs).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWArena>>();
     let tft_match_uuids: HashSet<Uuid> = db::filter_tft_match_uuids(&*app.pool, &match_uuids).await?.into_iter().collect();
     let mut tft_matches = db::list_tft_match_summaries_for_uuids(&*app.pool, &match_player_pairs)
@@ -156,8 +156,8 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
         let lol_match = lol_matches.get(&x.match_uuid);
         let tft_match = tft_matches.remove(&key_pair);
         let valorant_match = valorant_matches.remove(&key_pair);
-        let wow_encounter = wow_encounters.get(&x.match_uuid);
-        let wow_challenge = wow_challenges.get(&x.match_uuid);
+        let wow_encounter = wow_encounters.remove(&key_pair);
+        let wow_challenge = wow_challenges.remove(&key_pair);
         let wow_arena = wow_arenas.remove(&key_pair);
 
         Ok(RecentMatch {
@@ -190,8 +190,8 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
             lol_match: lol_match.cloned(),
             tft_match,
             valorant_match,
-            wow_challenge: wow_challenge.cloned(),
-            wow_encounter: wow_encounter.cloned(),
+            wow_challenge,
+            wow_encounter,
             wow_arena,
         })
     }).collect::<Result<Vec<RecentMatch>, SquadOvError>>()?, &req, &query, expected_total == got_total)?)) 

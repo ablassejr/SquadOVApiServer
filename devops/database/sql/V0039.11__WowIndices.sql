@@ -1,0 +1,1 @@
+CREATE INDEX ON wow_match_view_combatants(character_id);

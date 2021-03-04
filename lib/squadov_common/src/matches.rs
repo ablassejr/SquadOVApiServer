@@ -19,6 +19,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 
+#[derive(Debug)]
 pub struct MatchPlayerPair {
     pub match_uuid: Uuid,
     pub player_uuid: Uuid,

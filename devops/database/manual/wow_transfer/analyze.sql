@@ -1,0 +1,17 @@
+ANALYZE wow_match_view;
+ANALYZE wow_arena_view;
+ANALYZE wow_encounter_view;
+ANALYZE wow_challenge_view;
+ANALYZE new_wow_arenas;
+ANALYZE new_wow_encounters;
+ANALYZE new_wow_challenges;
+ANALYZE wow_match_view_character_presence;
+ANALYZE wow_match_view_events;
+ANALYZE wow_match_view_combatants;
+ANALYZE wow_match_view_combatant_items;
+ANALYZE wow_user_character_cache;
+ANALYZE wow_match_view_damage_events;
+ANALYZE wow_match_view_healing_events;
+ANALYZE wow_match_view_aura_events;
+ANALYZE wow_match_view_summon_events;
+ANALYZE wow_match_view_resurrect_events;

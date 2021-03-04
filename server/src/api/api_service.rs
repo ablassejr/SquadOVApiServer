@@ -416,10 +416,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 .service(
                     web::scope("/wow")
                         .service(
-                            web::scope("/combatlog")
-                                .route("", web::post().to(v1::create_wow_combat_log_handler))
-                        )
-                        .service(
                             web::scope("/characters/{character_name}")
                                 .route("/armory", web::get().to(v1::get_wow_armory_link_for_character_handler))
                         )
@@ -429,7 +425,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::scope("/encounter")
                                         .route("", web::post().to(v1::create_wow_encounter_match_handler))
                                         .service(
-                                            web::scope("/{match_uuid}")
+                                            web::scope("/{view_uuid}")
                                                 .route("", web::post().to(v1::finish_wow_encounter_handler))
                                         )
                                 )
@@ -437,7 +433,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::scope("/challenge")
                                         .route("", web::post().to(v1::create_wow_challenge_match_handler))
                                         .service(
-                                            web::scope("/{match_uuid}")
+                                            web::scope("/{view_uuid}")
                                                 .route("", web::post().to(v1::finish_wow_challenge_handler))
                                         )
                                 )
@@ -445,7 +441,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::scope("/arena")
                                         .route("", web::post().to(v1::create_wow_arena_match_handler))
                                         .service(
-                                            web::scope("/{match_uuid}")
+                                            web::scope("/{view_uuid}")
                                                 .route("", web::post().to(v1::finish_wow_arena_handler))
                                         )
                                 )
@@ -454,7 +450,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .service(
                                             web::scope("/users/{user_id}")
                                                 .wrap(access::ApiAccess::new(
-                                                    Box::new(access::UserSpecificAccessChecker{
+                                                    Box::new(access::SameSquadAccessChecker{
                                                         obtainer: access::UserIdPathSetObtainer{
                                                             key: "user_id"
                                                         },

@@ -11,6 +11,7 @@ use squadov_common::{
     WoWArena,
     WoWCombatantInfo,
     matches::MatchPlayerPair,
+    generate_combatants_key,
 };
 use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
@@ -18,766 +19,738 @@ use crate::api::auth::SquadOVSession;
 use squadov_common::vod::VodAssociation;
 use std::sync::Arc;
 use uuid::Uuid;
-use sqlx::{Executor, Postgres};
+use sqlx::{Postgres, Transaction};
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
-use super::WowMatchStartStop;
 
 #[derive(Deserialize)]
 pub struct GenericMatchCreationRequest<T> {
     pub timestamp: DateTime<Utc>,
-    pub combatants: Vec<WoWCombatantInfo>,
     pub data: T,
-    #[serde(rename="combatLogUuid")]
-    pub combat_log_uuid: Uuid
 }
 
 #[derive(Deserialize)]
 pub struct GenericMatchFinishCreationRequest<T> {
     pub timestamp: DateTime<Utc>,
     pub data: T,
+    pub combatants: Vec<WoWCombatantInfo>,
 }
 
 impl api::ApiApplication {
-    pub async fn get_wow_match_start_stop(&self, match_uuid: &Uuid) -> Result<WowMatchStartStop, SquadOvError> {
+    async fn filter_valid_wow_match_player_pairs(&self, uuids: &[MatchPlayerPair]) -> Result<(Vec<Uuid>, Vec<i64>), SquadOvError> {
+        let match_uuids = uuids.iter().map(|x| { x.match_uuid.clone() }).collect::<Vec<Uuid>>();
+        let player_uuids = uuids.iter().map(|x| { x.player_uuid.clone() }).collect::<Vec<Uuid>>();
+        
+        let final_identifiers = sqlx::query!(
+            r#"
+            SELECT
+                inp.match_uuid AS "match_uuid!",
+                u.id AS "user_id!"
+            FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, player_uuid)
+            INNER JOIN squadov.users AS u
+                ON u.uuid = inp.player_uuid
+            INNER JOIN squadov.wow_match_view AS wmv
+                ON wmv.user_id = u.id
+                    AND wmv.match_uuid = inp.match_uuid
+            "#,
+            &match_uuids,
+            &player_uuids,
+        )
+            .fetch_all(&*self.heavy_pool)
+            .await?
+            .into_iter()
+            .map(|x| {
+                (x.match_uuid, x.user_id)
+            })
+            .collect::<Vec<(Uuid, i64)>>();
+        
+        let match_uuids = final_identifiers.iter().map(|x| { x.0.clone() }).collect::<Vec<Uuid>>();
+        let player_ids = final_identifiers.iter().map(|x| { x.1 }).collect::<Vec<i64>>();
+        Ok((match_uuids, player_ids))
+    }
+
+    async fn list_wow_encounters_for_character(&self, character_guid: &str, user_id: i64, start: i64, end: i64) -> Result<Vec<WoWEncounter>, SquadOvError> {
+        let pairs = sqlx::query_as!(
+            MatchPlayerPair,
+            r#"
+            SELECT
+                wmv.match_uuid AS "match_uuid!",
+                u.uuid AS "player_uuid!"
+            FROM squadov.wow_match_view AS wmv
+            INNER JOIN squadov.wow_encounter_view AS wav
+                ON wav.view_id = wmv.id
+            INNER JOIN squadov.wow_match_view_character_presence AS wcp
+                ON wcp.view_id = wmv.id
+            INNER JOIN squadov.users AS u
+                ON u.id = wmv.user_id
+            WHERE wmv.user_id = $2
+                AND wcp.unit_guid = $1
+            ORDER BY wmv.start_tm DESC
+            LIMIT $3 OFFSET $4
+            "#,
+            character_guid,
+            user_id,
+            end - start,
+            start
+        )
+            .fetch_all(&*self.heavy_pool)
+            .await?;
+        Ok(self.list_wow_encounter_for_uuids(&pairs).await?)
+    }
+
+    pub async fn list_wow_encounter_for_uuids(&self, uuids: &[MatchPlayerPair]) -> Result<Vec<WoWEncounter>, SquadOvError> {
+        let (match_uuids, user_ids) = self.filter_valid_wow_match_player_pairs(uuids).await?;
+
         Ok(
             sqlx::query_as!(
-                WowMatchStartStop,
+                WoWEncounter,
                 r#"
-                SELECT COALESCE(we.tm, wc.tm, wa.tm, NOW()) AS "start!", COALESCE(we.finish_time, wc.finish_time, wa.finish_time, NOW()) AS "end!"
-                FROM squadov.matches AS m
-                LEFT JOIN squadov.wow_encounters AS we
-                    ON we.match_uuid = m.uuid
-                LEFT JOIN squadov.wow_challenges AS wc
-                    ON wc.match_uuid = m.uuid
-                LEFT JOIN squadov.wow_arenas AS wa
-                    ON wa.match_uuid = m.uuid
-                WHERE m.uuid = $1
+                SELECT
+                    wmv.match_uuid AS "match_uuid!",
+                    wmv.start_tm AS "tm!",
+                    wmv.end_tm AS "finish_time", 
+                    wmv.build_version AS "build!",
+                    u.uuid AS "user_uuid!",
+                    wa.combatants_key,
+                    wav.encounter_id,
+                    wav.encounter_name,
+                    wav.difficulty,
+                    wav.num_players,
+                    wav.instance_id,
+                    COALESCE(wav.success, FALSE) AS "success!"
+                FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
+                INNER JOIN squadov.wow_match_view AS wmv
+                    ON wmv.match_uuid = inp.match_uuid
+                        AND wmv.user_id = inp.user_id
+                INNER JOIN squadov.new_wow_encounters AS wa
+                    ON wa.match_uuid = wmv.match_uuid
+                INNER JOIN squadov.wow_encounter_view AS wav
+                    ON wav.view_id = wmv.id
+                INNER JOIN squadov.users AS u
+                    ON u.id = wmv.user_id
+                ORDER BY wmv.start_tm DESC
                 "#,
-                match_uuid
+                &match_uuids,
+                &user_ids,
             )
-                .fetch_one(&*self.pool)
+                .fetch_all(&*self.heavy_pool)
                 .await?
         )
     }
 
-    async fn find_ongoing_wow_encounter_match<'a, T>(&self, ex: T, encounter: &WoWEncounterStart, combatants: &[WoWCombatantInfo]) -> Result<Option<Uuid>, SquadOvError>
-    where
-        T: Executor<'a, Database = Postgres>
-    {
+    async fn list_wow_challenges_for_character(&self, character_guid: &str, user_id: i64, start: i64, end: i64) -> Result<Vec<WoWChallenge>, SquadOvError> {
+        let pairs = sqlx::query_as!(
+            MatchPlayerPair,
+            r#"
+            SELECT
+                wmv.match_uuid AS "match_uuid!",
+                u.uuid AS "player_uuid!"
+            FROM squadov.wow_match_view AS wmv
+            INNER JOIN squadov.wow_challenge_view AS wav
+                ON wav.view_id = wmv.id
+            INNER JOIN squadov.wow_match_view_character_presence AS wcp
+                ON wcp.view_id = wmv.id
+            INNER JOIN squadov.users AS u
+                ON u.id = wmv.user_id
+            WHERE wmv.user_id = $2
+                AND wcp.unit_guid = $1
+            ORDER BY wmv.start_tm DESC
+            LIMIT $3 OFFSET $4
+            "#,
+            character_guid,
+            user_id,
+            end - start,
+            start
+        )
+            .fetch_all(&*self.heavy_pool)
+            .await?;
+        Ok(self.list_wow_challenges_for_uuids(&pairs).await?)
+    }
+
+    pub async fn list_wow_challenges_for_uuids(&self, uuids: &[MatchPlayerPair]) -> Result<Vec<WoWChallenge>, SquadOvError> {
+        let (match_uuids, user_ids) = self.filter_valid_wow_match_player_pairs(uuids).await?;
+
         Ok(
-            sqlx::query_scalar(
-                "
-                SELECT match_uuid
-                FROM squadov.wow_encounters
-                WHERE encounter_id = $1
-                    AND difficulty = $2
-                    AND combatants_key = $3
-                    AND finish_time IS NULL
-                "
+            sqlx::query_as!(
+                WoWChallenge,
+                r#"
+                SELECT
+                    wmv.match_uuid AS "match_uuid!",
+                    wmv.start_tm AS "tm!",
+                    wmv.end_tm AS "finish_time", 
+                    wmv.build_version AS "build!",
+                    u.uuid AS "user_uuid!",
+                    wa.combatants_key,
+                    wav.challenge_name,
+                    wav.instance_id,
+                    wav.keystone_level,
+                    COALESCE(wav.time_ms, 0) AS "time_ms!",
+                    COALESCE(wav.success, FALSE) AS "success!"
+                FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
+                INNER JOIN squadov.wow_match_view AS wmv
+                    ON wmv.match_uuid = inp.match_uuid
+                        AND wmv.user_id = inp.user_id
+                INNER JOIN squadov.new_wow_challenges AS wa
+                    ON wa.match_uuid = wmv.match_uuid
+                INNER JOIN squadov.wow_challenge_view AS wav
+                    ON wav.view_id = wmv.id
+                INNER JOIN squadov.users AS u
+                    ON u.id = wmv.user_id
+                ORDER BY wmv.start_tm DESC
+                "#,
+                &match_uuids,
+                &user_ids,
             )
-                .bind(encounter.encounter_id)
-                .bind(encounter.difficulty)
-                .bind(squadov_common::generate_combatants_key(combatants))
-                .fetch_optional(ex)
+                .fetch_all(&*self.heavy_pool)
                 .await?
         )
     }
 
-    async fn add_wow_combatants_to_match<'a, T>(&self, ex: T, uuid: &Uuid, combatants: &[WoWCombatantInfo]) -> Result<(), SquadOvError>
-    where
-        T: Executor<'a, Database = Postgres>
-    {
-        sqlx::query!(
-            "
-            INSERT INTO squadov.wow_match_combatants (
-                match_uuid,
-                combatant_guid
-            )
-            SELECT $1, *
-            FROM UNNEST($2::VARCHAR[])
-            ON CONFLICT DO NOTHING
-            ",
-            uuid,
-            &combatants.iter().map(|x| { x.guid.clone() }).collect::<Vec<String>>()
+    async fn list_wow_arenas_for_character(&self, character_guid: &str, user_id: i64, start: i64, end: i64) -> Result<Vec<WoWArena>, SquadOvError> {
+        let pairs = sqlx::query_as!(
+            MatchPlayerPair,
+            r#"
+            SELECT
+                wmv.match_uuid AS "match_uuid!",
+                u.uuid AS "player_uuid!"
+            FROM squadov.wow_match_view AS wmv
+            INNER JOIN squadov.wow_arena_view AS wav
+                ON wav.view_id = wmv.id
+            INNER JOIN squadov.wow_match_view_character_presence AS wcp
+                ON wcp.view_id = wmv.id
+            INNER JOIN squadov.users AS u
+                ON u.id = wmv.user_id
+            WHERE wmv.user_id = $2
+                AND wcp.unit_guid = $1
+            ORDER BY wmv.start_tm DESC
+            LIMIT $3 OFFSET $4
+            "#,
+            character_guid,
+            user_id,
+            end - start,
+            start
         )
-            .execute(ex)
+            .fetch_all(&*self.heavy_pool)
             .await?;
-        Ok(())
+        Ok(self.list_wow_arenas_for_uuids(&pairs).await?)
     }
 
-    async fn link_wow_combat_log_to_match<'a, T>(&self, ex: T, match_uuid: &Uuid, log_uuid: &Uuid) -> Result<(), SquadOvError>
-    where
-        T: Executor<'a, Database = Postgres>
-    {
-        sqlx::query!(
-            "
-            INSERT INTO squadov.wow_match_combat_log_association (
-                match_uuid,
-                combat_log_uuid
-            )
-            VALUES (
-                $1,
-                $2
-            )
-            ON CONFLICT DO NOTHING
-            ",
-            match_uuid,
-            log_uuid
-        )
-            .execute(ex)
-            .await?;
-        Ok(())
-    }
+    pub async fn list_wow_arenas_for_uuids(&self, uuids: &[MatchPlayerPair]) -> Result<Vec<WoWArena>, SquadOvError> {
+        let (match_uuids, user_ids) = self.filter_valid_wow_match_player_pairs(uuids).await?;
 
-    async fn create_wow_encounter_match<'a, T>(&self, ex: T, uuid: &Uuid, encounter: &WoWEncounterStart, combatants: &[WoWCombatantInfo], timestamp: &DateTime<Utc>) -> Result<(), SquadOvError>
-    where
-        T: Executor<'a, Database = Postgres>
-    {
-        sqlx::query!(
-            "
-            INSERT INTO squadov.wow_encounters (
-                match_uuid,
-                tm,
-                combatants_key,
-                encounter_id,
-                encounter_name,
-                difficulty,
-                num_players,
-                instance_id,
-                success
-            )
-            VALUES (
-                $1,
-                $2,
-                $3,
-                $4,
-                $5,
-                $6,
-                $7,
-                $8,
-                false
-            )
-            ",
-            uuid,
-            timestamp,
-            squadov_common::generate_combatants_key(combatants),
-            encounter.encounter_id,
-            encounter.encounter_name,
-            encounter.difficulty,
-            encounter.num_players,
-            encounter.instance_id
-        )
-            .execute(ex)
-            .await?;
-        Ok(())
-    }
-
-    async fn finish_wow_encounter<'a, T>(&self, ex: T, match_uuid: &Uuid, timestamp: &DateTime<Utc>, encounter: &WoWEncounterEnd) -> Result<(), SquadOvError>
-    where
-        T: Executor<'a, Database = Postgres>
-    {
-        sqlx::query!(
-            "
-            UPDATE squadov.wow_encounters
-            SET finish_time = $2,
-                success = $3
-            WHERE match_uuid = $1
-                AND finish_time IS NULL
-            ",
-            match_uuid,
-            timestamp,
-            encounter.success
-        )
-            .execute(ex)
-            .await?;
-        Ok(())
-    }
-
-    async fn find_ongoing_wow_challenge_match<'a, T>(&self, ex: T, challenge: &WoWChallengeStart, combatants: &[WoWCombatantInfo]) -> Result<Option<Uuid>, SquadOvError>
-    where
-        T: Executor<'a, Database = Postgres>
-    {
         Ok(
-            sqlx::query_scalar(
-                "
-                SELECT match_uuid
-                FROM squadov.wow_challenges
-                WHERE instance_id = $1
-                    AND keystone_level = $2
-                    AND combatants_key = $3
-                    AND finish_time IS NULL
-                "
+            sqlx::query_as!(
+                WoWArena,
+                r#"
+                SELECT
+                    wmv.match_uuid AS "match_uuid!",
+                    wmv.start_tm AS "tm!",
+                    wmv.end_tm AS "finish_time", 
+                    wmv.build_version AS "build!",
+                    wa.combatants_key,
+                    wav.instance_id,
+                    wav.arena_type,
+                    wav.winning_team_id,
+                    wav.match_duration_seconds,
+                    wav.new_ratings,
+                    u.uuid AS "user_uuid",
+                    (
+                        CASE WHEN wvc.event_id IS NOT NULL THEN wvc.team = wav.winning_team_id
+                             ELSE FALSE
+                        END
+                    ) AS "success!"
+                FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
+                INNER JOIN squadov.wow_match_view AS wmv
+                    ON wmv.match_uuid = inp.match_uuid
+                        AND wmv.user_id = inp.user_id
+                INNER JOIN squadov.new_wow_arenas AS wa
+                    ON wa.match_uuid = wmv.match_uuid
+                INNER JOIN squadov.wow_arena_view AS wav
+                    ON wav.view_id = wmv.id
+                INNER JOIN squadov.wow_match_view_character_presence AS wcp
+                    ON wcp.view_id = wmv.id
+                LEFT JOIN squadov.wow_match_view_combatants AS wvc
+                    ON wvc.character_id = wcp.character_id
+                INNER JOIN squadov.wow_user_character_cache AS wucc
+                    ON wucc.unit_guid = wcp.unit_guid
+                        AND wucc.user_id = inp.user_id
+                INNER JOIN squadov.users AS u
+                    ON u.id = wmv.user_id
+                ORDER BY wmv.start_tm DESC
+                "#,
+                &match_uuids,
+                &user_ids,
             )
-                .bind(challenge.instance_id)
-                .bind(challenge.keystone_level)
-                .bind(squadov_common::generate_combatants_key(combatants))
-                .fetch_optional(ex)
+                .fetch_all(&*self.heavy_pool)
                 .await?
         )
     }
 
-    async fn create_wow_challenge_match<'a, T>(&self, ex: T, uuid: &Uuid, challenge: &WoWChallengeStart, combatants: &[WoWCombatantInfo], timestamp: &DateTime<Utc>) -> Result<(), SquadOvError>
-    where
-        T: Executor<'a, Database = Postgres>
-    {
-        sqlx::query!(
-            "
-            INSERT INTO squadov.wow_challenges (
-                match_uuid,
-                tm,
-                combatants_key,
-                challenge_name,
-                instance_id,
-                keystone_level,
-                success,
-                time_ms
-            )
-            VALUES (
-                $1,
-                $2,
-                $3,
-                $4,
-                $5,
-                $6,
-                false,
-                0
-            )
-            ",
-            uuid,
-            timestamp,
-            squadov_common::generate_combatants_key(combatants),
-            challenge.challenge_name,
-            challenge.instance_id,
-            challenge.keystone_level,
-        )
-            .execute(ex)
-            .await?;
-        Ok(())
+    async fn find_wow_challenge(&self, match_uuid: &Uuid, user_uuid: &Uuid) -> Result<Option<WoWChallenge>, SquadOvError> {
+        let pairs = vec![MatchPlayerPair{
+            match_uuid: match_uuid.clone(),
+            player_uuid: user_uuid.clone(),
+        }];
+
+        let mut challenges = self.list_wow_challenges_for_uuids(&pairs).await?;
+        Ok(challenges.pop())
     }
 
-    async fn finish_wow_challenge<'a, T>(&self, ex: T, match_uuid: &Uuid, timestamp: &DateTime<Utc>, challenge: &WoWChallengeEnd) -> Result<(), SquadOvError>
-    where
-        T: Executor<'a, Database = Postgres>
-    {
-        sqlx::query!(
-            "
-            UPDATE squadov.wow_challenges
-            SET finish_time = $2,
-                success = $3,
-                time_ms = $4
-            WHERE match_uuid = $1
-                AND finish_time IS NULL
-            ",
-            match_uuid,
-            timestamp,
-            challenge.success,
-            challenge.time_ms
-        )
-            .execute(ex)
-            .await?;
-        Ok(())
+    async fn find_wow_encounter(&self, match_uuid: &Uuid, user_uuid: &Uuid) -> Result<Option<WoWEncounter>, SquadOvError> {
+        let pairs = vec![MatchPlayerPair{
+            match_uuid: match_uuid.clone(),
+            player_uuid: user_uuid.clone(),
+        }];
+
+        let mut encounters = self.list_wow_encounter_for_uuids(&pairs).await?;
+        Ok(encounters.pop())
     }
 
-    async fn find_ongoing_wow_arena_match<'a, T>(&self, ex: T, arena: &WoWArenaStart, combatants: &[WoWCombatantInfo]) -> Result<Option<Uuid>, SquadOvError>
-    where
-        T: Executor<'a, Database = Postgres>
-    {
+    async fn find_wow_arena(&self, match_uuid: &Uuid, user_uuid: &Uuid) -> Result<Option<WoWArena>, SquadOvError> {
+        let pairs = vec![MatchPlayerPair{
+            match_uuid: match_uuid.clone(),
+            player_uuid: user_uuid.clone(),
+        }];
+
+        let mut arenas = self.list_wow_arenas_for_uuids(&pairs).await?;
+        Ok(arenas.pop())
+    }
+
+    pub async fn get_wow_match_view_for_user_match(&self, user_id: i64, match_uuid: &Uuid) -> Result<Option<Uuid>, SquadOvError> {
         Ok(
             sqlx::query!(
                 "
-                SELECT match_uuid
-                FROM squadov.wow_arenas
-                WHERE instance_id = $1
-                    AND arena_type = $2
-                    AND combatants_key = $3
-                    AND finish_time IS NULL
+                SELECT id
+                FROM squadov.wow_match_view
+                WHERE user_id = $1
+                    AND match_uuid = $2
                 ",
-                arena.instance_id,
-                arena.arena_type,
-                squadov_common::generate_combatants_key(combatants),
+                user_id,
+                match_uuid
             )
-                .fetch_optional(ex)
+                .fetch_optional(&*self.pool)
                 .await?
                 .map(|x| {
-                    x.match_uuid
+                    x.id
                 })
         )
     }
 
-    async fn create_wow_arena_match<'a, T>(&self, ex: T, uuid: &Uuid, arena: &WoWArenaStart, combatants: &[WoWCombatantInfo], timestamp: &DateTime<Utc>) -> Result<(), SquadOvError>
-    where
-        T: Executor<'a, Database = Postgres>
-    {
+    async fn create_generic_wow_match_view(&self, tx: &mut Transaction<'_, Postgres>, tm: &DateTime<Utc>, user_id: i64) -> Result<Uuid, SquadOvError> {
+        Ok(
+            sqlx::query!(
+                r#"
+                INSERT INTO squadov.wow_match_view (
+                    id,
+                    user_id,
+                    start_tm
+                )
+                VALUES (
+                    gen_random_uuid(),
+                    $1,
+                    $2
+                )
+                RETURNING id
+                "#,
+                user_id,
+                tm,
+            )
+                .fetch_one(tx)
+                .await?
+                .id
+        )
+    }
+
+    pub async fn create_wow_encounter_match_view(&self, tx: &mut Transaction<'_, Postgres>, tm: &DateTime<Utc>, user_id: i64, game: &WoWEncounterStart) -> Result<Uuid, SquadOvError> {
+        let uuid = self.create_generic_wow_match_view(&mut *tx, tm, user_id).await?;
         sqlx::query!(
             "
-            INSERT INTO squadov.wow_arenas (
+            INSERT INTO squadov.wow_encounter_view (
+                view_id,
+                encounter_id,
+                encounter_name,
+                difficulty,
+                num_players,
+                instance_id
+            )
+            VALUES (
+                $1,
+                $2,
+                $3,
+                $4,
+                $5,
+                $6
+            )
+            ",
+            &uuid,
+            game.encounter_id,
+            &game.encounter_name,
+            game.difficulty,
+            game.num_players,
+            game.instance_id,
+        )
+            .execute(&mut *tx)
+            .await?;
+        Ok(uuid)
+    }
+
+    pub async fn finish_wow_encounter(&self, tx: &mut Transaction<'_, Postgres>, view_uuid: &Uuid, match_uuid: &Uuid, tm: &DateTime<Utc>, game: &WoWEncounterEnd, key: &str) -> Result<(), SquadOvError> {
+        // Insert into wow encounters table.
+        sqlx::query!(
+            "
+            INSERT INTO squadov.new_wow_encounters (
                 match_uuid,
-                tm,
+                tr,
                 combatants_key,
+                encounter_id,
+                difficulty,
+                instance_id
+            )
+            SELECT
+                $1,
+                tstzrange(wmv.start_tm, $4, '[]'),
+                $2,
+                wev.encounter_id,
+                wev.difficulty,
+                wev.instance_id
+            FROM squadov.wow_match_view AS wmv
+            INNER JOIN squadov.wow_encounter_view AS wev
+                ON wev.view_id = wmv.id
+            WHERE wmv.id = $3
+            ",
+            match_uuid,
+            key,
+            view_uuid,
+            tm,
+        )
+            .execute(&mut *tx)
+            .await?;
+
+        // Modify view to link to the new match and to update the end time as well.
+        sqlx::query!(
+            "
+            UPDATE squadov.wow_match_view
+            SET end_tm = $2,
+                match_uuid = $3
+            WHERE id = $1
+            ",
+            view_uuid,
+            tm,
+            match_uuid,
+        )
+            .execute(&mut *tx)
+            .await?;
+
+        // Modify game specific view with data parameters.
+        sqlx::query!(
+            "
+            UPDATE squadov.wow_encounter_view
+            SET success = $2
+            WHERE view_id = $1
+            ",
+            view_uuid,
+            game.success,
+        )
+            .execute(&mut *tx)
+            .await?;
+        
+        Ok(())
+    }
+
+    pub async fn create_wow_challenge_match_view(&self, tx: &mut Transaction<'_, Postgres>, tm: &DateTime<Utc>, user_id: i64, game: &WoWChallengeStart) -> Result<Uuid, SquadOvError> {
+        let uuid = self.create_generic_wow_match_view(&mut *tx, tm, user_id).await?;
+        sqlx::query!(
+            "
+            INSERT INTO squadov.wow_challenge_view (
+                view_id,
+                challenge_name,
+                instance_id,
+                keystone_level
+            )
+            VALUES (
+                $1,
+                $2,
+                $3,
+                $4
+            )
+            ",
+            &uuid,
+            &game.challenge_name,
+            game.instance_id,
+            game.keystone_level,
+        )
+            .execute(&mut *tx)
+            .await?;
+        Ok(uuid)
+    }
+
+    pub async fn finish_wow_challenge(&self, tx: &mut Transaction<'_, Postgres>, view_uuid: &Uuid, match_uuid: &Uuid, tm: &DateTime<Utc>, game: &WoWChallengeEnd, key: &str) -> Result<(), SquadOvError> {
+        // Insert into wow encounters table.
+        sqlx::query!(
+            "
+            INSERT INTO squadov.new_wow_challenges (
+                match_uuid,
+                tr,
+                combatants_key,
+                instance_id,
+                keystone_level
+            )
+            SELECT
+                $1,
+                tstzrange(wmv.start_tm, $4, '[]'),
+                $2,
+                wcv.instance_id,
+                wcv.keystone_level
+            FROM squadov.wow_match_view AS wmv
+            INNER JOIN squadov.wow_challenge_view AS wcv
+                ON wcv.view_id = wmv.id
+            WHERE wmv.id = $3
+            ",
+            match_uuid,
+            key,
+            view_uuid,
+            tm,
+        )
+            .execute(&mut *tx)
+            .await?;
+
+        // Modify view to link to the new match and to update the end time as well.
+        sqlx::query!(
+            "
+            UPDATE squadov.wow_match_view
+            SET end_tm = $2,
+                match_uuid = $3
+            WHERE id = $1
+            ",
+            view_uuid,
+            tm,
+            match_uuid,
+        )
+            .execute(&mut *tx)
+            .await?;
+
+        // Modify game specific view with data parameters.
+        sqlx::query!(
+            "
+            UPDATE squadov.wow_challenge_view
+            SET success = $2,
+                time_ms = $3
+            WHERE view_id = $1
+            ",
+            view_uuid,
+            game.success,
+            game.time_ms,
+        )
+            .execute(&mut *tx)
+            .await?;
+        
+        Ok(())
+    }
+
+    pub async fn create_wow_arena_match_view(&self, tx: &mut Transaction<'_, Postgres>, tm: &DateTime<Utc>, user_id: i64, game: &WoWArenaStart) -> Result<Uuid, SquadOvError> {
+        let uuid = self.create_generic_wow_match_view(&mut *tx, tm, user_id).await?;
+        sqlx::query!(
+            "
+            INSERT INTO squadov.wow_arena_view (
+                view_id,
                 instance_id,
                 arena_type
             )
             VALUES (
                 $1,
                 $2,
-                $3,
-                $4,
-                $5
+                $3
             )
             ",
-            uuid,
-            timestamp,
-            squadov_common::generate_combatants_key(combatants),
-            arena.instance_id,
-            &arena.arena_type,
+            &uuid,
+            game.instance_id,
+            &game.arena_type
         )
-            .execute(ex)
+            .execute(&mut *tx)
             .await?;
-        Ok(())
+        Ok(uuid)
     }
 
-    async fn finish_wow_arena<'a, T>(&self, ex: T, match_uuid: &Uuid, timestamp: &DateTime<Utc>, arena: &WoWArenaEnd) -> Result<(), SquadOvError>
-    where
-        T: Executor<'a, Database = Postgres>
-    {
+    pub async fn finish_wow_arena(&self, tx: &mut Transaction<'_, Postgres>, view_uuid: &Uuid, match_uuid: &Uuid, tm: &DateTime<Utc>, game: &WoWArenaEnd, key: &str) -> Result<(), SquadOvError> {
+        // Insert into wow encounters table.
         sqlx::query!(
             "
-            UPDATE squadov.wow_arenas
-            SET finish_time = $2,
-                winning_team_id = $3,
-                match_duration_seconds = $4,
-                new_ratings = $5
-            WHERE match_uuid = $1
-                AND finish_time IS NULL
+            INSERT INTO squadov.new_wow_arenas (
+                match_uuid,
+                tr,
+                combatants_key,
+                instance_id,
+                arena_type
+            )
+            SELECT
+                $1,
+                tstzrange(wmv.start_tm, $4, '[]'),
+                $2,
+                wav.instance_id,
+                wav.arena_type
+            FROM squadov.wow_match_view AS wmv
+            INNER JOIN squadov.wow_arena_view AS wav
+                ON wav.view_id = wmv.id
+            WHERE wmv.id = $3
             ",
             match_uuid,
-            timestamp,
-            arena.winning_team_id,
-            arena.match_duration_seconds,
-            &arena.new_ratings,
+            key,
+            view_uuid,
+            tm,
         )
-            .execute(ex)
+            .execute(&mut *tx)
             .await?;
+
+        // Modify view to link to the new match and to update the end time as well.
+        sqlx::query!(
+            "
+            UPDATE squadov.wow_match_view
+            SET end_tm = $2,
+                match_uuid = $3
+            WHERE id = $1
+            ",
+            view_uuid,
+            tm,
+            match_uuid,
+        )
+            .execute(&mut *tx)
+            .await?;
+
+        // Modify game specific view with data parameters.
+        sqlx::query!(
+            "
+            UPDATE squadov.wow_arena_view
+            SET winning_team_id = $2,
+                match_duration_seconds = $3,
+                new_ratings = $4
+            WHERE view_id = $1
+            ",
+            view_uuid,
+            game.winning_team_id,
+            game.match_duration_seconds,
+            &game.new_ratings,
+        )
+            .execute(&mut *tx)
+            .await?;
+        
         Ok(())
     }
-
-    async fn list_wow_encounters_for_character(&self, character_guid: &str, start: i64, end: i64) -> Result<Vec<WoWEncounter>, SquadOvError> {
-        Ok(
-            sqlx::query_as!(
-                WoWEncounter,
-                r#"
-                SELECT DISTINCT we.*, wcl.build_version AS "build"
-                FROM squadov.wow_encounters AS we
-                INNER JOIN squadov.wow_match_combatants AS wmc
-                    ON wmc.match_uuid = we.match_uuid
-                INNER JOIN squadov.wow_match_combat_log_association AS cla
-                    ON cla.match_uuid = we.match_uuid
-                INNER JOIN squadov.wow_combat_logs AS wcl
-                    ON wcl.uuid = cla.combat_log_uuid
-                WHERE wmc.combatant_guid = $1
-                ORDER BY tm DESC
-                LIMIT $2 OFFSET $3
-                "#,
-                character_guid,
-                end - start,
-                start
-            )
-                .fetch_all(&*self.pool)
-                .await?
-        )
-    }
-
-    pub async fn list_wow_encounter_for_uuids(&self, uuids: &[Uuid]) -> Result<Vec<WoWEncounter>, SquadOvError> {
-        Ok(
-            sqlx::query_as!(
-                WoWEncounter,
-                r#"
-                SELECT DISTINCT we.*, wcl.build_version AS "build"
-                FROM squadov.wow_encounters AS we
-                INNER JOIN squadov.wow_match_combatants AS wmc
-                    ON wmc.match_uuid = we.match_uuid
-                INNER JOIN squadov.wow_match_combat_log_association AS cla
-                    ON cla.match_uuid = we.match_uuid
-                INNER JOIN squadov.wow_combat_logs AS wcl
-                    ON wcl.uuid = cla.combat_log_uuid
-                WHERE we.match_uuid = ANY($1)
-                "#,
-                uuids,
-            )
-                .fetch_all(&*self.pool)
-                .await?
-        )
-    }
-
-    async fn list_wow_challenges_for_character(&self, character_guid: &str, start: i64, end: i64) -> Result<Vec<WoWChallenge>, SquadOvError> {
-        Ok(
-            sqlx::query_as!(
-                WoWChallenge,
-                r#"
-                SELECT DISTINCT wc.*, wcl.build_version AS "build"
-                FROM squadov.wow_challenges AS wc
-                INNER JOIN squadov.wow_match_combatants AS wmc
-                    ON wmc.match_uuid = wc.match_uuid
-                INNER JOIN squadov.wow_match_combat_log_association AS cla
-                    ON cla.match_uuid = wc.match_uuid
-                INNER JOIN squadov.wow_combat_logs AS wcl
-                    ON wcl.uuid = cla.combat_log_uuid
-                WHERE wmc.combatant_guid = $1
-                ORDER BY tm DESC
-                LIMIT $2 OFFSET $3
-                "#,
-                character_guid,
-                end - start,
-                start
-            )
-                .fetch_all(&*self.pool)
-                .await?
-        )
-    }
-
-    pub async fn list_wow_challenges_for_uuids(&self, uuids: &[Uuid]) -> Result<Vec<WoWChallenge>, SquadOvError> {
-        Ok(
-            sqlx::query_as!(
-                WoWChallenge,
-                r#"
-                SELECT DISTINCT wc.*, wcl.build_version AS "build"
-                FROM squadov.wow_challenges AS wc
-                INNER JOIN squadov.wow_match_combatants AS wmc
-                    ON wmc.match_uuid = wc.match_uuid
-                INNER JOIN squadov.wow_match_combat_log_association AS cla
-                    ON cla.match_uuid = wc.match_uuid
-                INNER JOIN squadov.wow_combat_logs AS wcl
-                    ON wcl.uuid = cla.combat_log_uuid
-                WHERE wc.match_uuid = ANY($1)
-                "#,
-                uuids,
-            )
-                .fetch_all(&*self.pool)
-                .await?
-        )
-    }
-
-    async fn list_wow_arenas_for_character(&self, character_guid: &str, start: i64, end: i64) -> Result<Vec<WoWArena>, SquadOvError> {
-        Ok(
-            sqlx::query_as!(
-                WoWArena,
-                r#"
-                SELECT DISTINCT
-                    wa.*,
-                    (wcle.evt->>'team')::INTEGER = wa.winning_team_id AS "success!",
-                    u.uuid AS "user_uuid!",
-                    wcl.build_version AS "build"
-                FROM squadov.wow_arenas AS wa
-                INNER JOIN squadov.wow_match_combatants AS wmc
-                    ON wmc.match_uuid = wa.match_uuid
-                INNER JOIN squadov.wow_match_combat_log_association AS cla
-                    ON cla.match_uuid = wa.match_uuid
-                INNER JOIN squadov.wow_combat_logs AS wcl
-                    ON wcl.uuid = cla.combat_log_uuid
-                INNER JOIN squadov.wow_combat_log_events AS wcle
-                    ON wcle.combat_log_uuid = wcl.uuid
-                        AND wcle.evt->>'type' = 'CombatantInfo'
-                        AND wcle.evt->>'guid' = wmc.combatant_guid
-                        AND wcle.tm BETWEEN wa.tm AND LEAST(wcle.tm + INTERVAL '30 minutes', COALESCE(wa.finish_time, wcle.tm + INTERVAL '10 minutes'))
-                INNER JOIN squadov.wow_user_character_association AS wuca
-                    ON wuca.guid = wmc.combatant_guid
-                INNER JOIN squadov.users AS u
-                    ON u.id = wuca.user_id
-                WHERE wmc.combatant_guid = $1
-                    AND wa.finish_time IS NOT NULL
-                ORDER BY tm DESC
-                LIMIT $2 OFFSET $3
-                "#,
-                character_guid,
-                end - start,
-                start
-            )
-                .fetch_all(&*self.heavy_pool)
-                .await?
-        )
-    }
-
-    pub async fn list_wow_arenas_for_uuids(&self, uuids: &[MatchPlayerPair]) -> Result<Vec<WoWArena>, SquadOvError> {
-        let match_uuids = uuids.iter().map(|x| { x.match_uuid.clone() }).collect::<Vec<Uuid>>();
-        let player_uuids = uuids.iter().map(|x| { x.player_uuid.clone() }).collect::<Vec<Uuid>>();
-
-        // We need to get the final list of match uuids to obtain since not all the match UUID/player UUID pairs
-        // that we got are valid WoW arena runs. Return a list of (match uuid, player uuid, combatant guid).
-        let final_identifiers = sqlx::query!(
-            r#"
-            SELECT
-                inp.match_uuid AS "match_uuid!",
-                inp.player_uuid AS "user_uuid!",
-                wmc.combatant_guid AS "character_guid"
-            FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, player_uuid)
-            INNER JOIN squadov.wow_match_combatants AS wmc
-                ON wmc.match_uuid = inp.match_uuid
-            INNER JOIN squadov.wow_user_character_association AS wuca
-                ON wuca.guid = wmc.combatant_guid
-            INNER JOIN squadov.users AS u
-                ON u.id = wuca.user_id
-                    AND u.uuid = inp.player_uuid
-            "#,
-            &match_uuids,
-            &player_uuids,
-        )
-            .fetch_all(&*self.pool)
-            .await?
-            .into_iter()
-            .map(|x| {
-                (x.match_uuid, x.user_uuid, x.character_guid)
-            })
-            .collect::<Vec<(Uuid, Uuid, String)>>();
-        
-        let match_uuids = final_identifiers.iter().map(|x| { x.0.clone() }).collect::<Vec<Uuid>>();
-        let player_uuids = final_identifiers.iter().map(|x| { x.1.clone() }).collect::<Vec<Uuid>>();
-        let character_guids = final_identifiers.iter().map(|x| { x.2.clone() }).collect::<Vec<String>>();
-
-        Ok(
-            sqlx::query_as!(
-                WoWArena,
-                r#"
-                SELECT DISTINCT
-                    wa.*,
-                    (wcle.evt->>'team')::INTEGER = wa.winning_team_id AS "success!",
-                    inp.player_uuid AS "user_uuid!",
-                    wcl.build_version AS "build"
-                FROM UNNEST($1::UUID[], $2::UUID[], $3::VARCHAR[]) AS inp(match_uuid, player_uuid, combatant_guid)
-                INNER JOIN squadov.wow_arenas AS wa
-                    ON wa.match_uuid = inp.match_uuid
-                INNER JOIN squadov.wow_match_combatants AS wmc
-                    ON wmc.match_uuid = wa.match_uuid
-                        AND wmc.combatant_guid = inp.combatant_guid
-                INNER JOIN squadov.wow_match_combat_log_association AS cla
-                    ON cla.match_uuid = wa.match_uuid
-                INNER JOIN squadov.wow_combat_logs AS wcl
-                    ON wcl.uuid = cla.combat_log_uuid
-                INNER JOIN squadov.wow_combat_log_events AS wcle
-                    ON wcle.combat_log_uuid = wcl.uuid
-                        AND wcle.evt->>'type' = 'CombatantInfo'
-                        AND wcle.evt->>'guid' = wmc.combatant_guid
-                        AND wcle.tm BETWEEN wa.tm AND LEAST(wcle.tm + INTERVAL '30 minutes', COALESCE(wa.finish_time, wcle.tm + INTERVAL '10 minutes'))
-                "#,
-                &match_uuids,
-                &player_uuids,
-                &character_guids,
-            )
-                .fetch_all(&*self.heavy_pool)
-                .await?
-        )
-    }
-
-    async fn find_wow_challenge(&self, match_uuid: &Uuid) -> Result<Option<WoWChallenge>, SquadOvError> {
-        Ok(
-            sqlx::query_as!(
-                WoWChallenge,
-                r#"
-                SELECT DISTINCT wc.*, wcl.build_version AS "build"
-                FROM squadov.wow_challenges AS wc
-                INNER JOIN squadov.wow_match_combatants AS wmc
-                    ON wmc.match_uuid = wc.match_uuid
-                INNER JOIN squadov.wow_match_combat_log_association AS cla
-                    ON cla.match_uuid = wc.match_uuid
-                INNER JOIN squadov.wow_combat_logs AS wcl
-                    ON wcl.uuid = cla.combat_log_uuid
-                WHERE wc.match_uuid = $1
-                "#,
-                match_uuid
-            )
-                .fetch_optional(&*self.pool)
-                .await?
-        )
-    }
-
-    async fn find_wow_encounter(&self, match_uuid: &Uuid) -> Result<Option<WoWEncounter>, SquadOvError> {
-        Ok(
-            sqlx::query_as!(
-                WoWEncounter,
-                r#"
-                SELECT DISTINCT we.*, wcl.build_version AS "build"
-                FROM squadov.wow_encounters AS we
-                INNER JOIN squadov.wow_match_combatants AS wmc
-                    ON wmc.match_uuid = we.match_uuid
-                INNER JOIN squadov.wow_match_combat_log_association AS cla
-                    ON cla.match_uuid = we.match_uuid
-                INNER JOIN squadov.wow_combat_logs AS wcl
-                    ON wcl.uuid = cla.combat_log_uuid
-                WHERE we.match_uuid = $1
-                "#,
-                match_uuid
-            )
-                .fetch_optional(&*self.pool)
-                .await?
-        )
-    }
-
-    async fn find_wow_arena(&self, match_uuid: &Uuid, user_id: i64) -> Result<Option<WoWArena>, SquadOvError> {
-        Ok(
-            sqlx::query_as!(
-                WoWArena,
-                r#"
-                SELECT DISTINCT
-                    wa.*,
-                    (wcle.evt->>'team')::INTEGER = wa.winning_team_id AS "success!",
-                    u.uuid AS "user_uuid!",
-                    wcl.build_version AS "build"
-                FROM squadov.wow_arenas AS wa
-                INNER JOIN squadov.wow_match_combatants AS wmc
-                    ON wmc.match_uuid = wa.match_uuid
-                INNER JOIN squadov.wow_match_combat_log_association AS cla
-                    ON cla.match_uuid = wa.match_uuid
-                INNER JOIN squadov.wow_combat_logs AS wcl
-                    ON wcl.uuid = cla.combat_log_uuid
-                INNER JOIN squadov.wow_combat_log_events AS wcle
-                    ON wcle.combat_log_uuid = wcl.uuid
-                        AND wcle.evt->>'type' = 'CombatantInfo'
-                        AND wcle.evt->>'guid' = wmc.combatant_guid
-                        AND wcle.tm BETWEEN wa.tm AND LEAST(wcle.tm + INTERVAL '30 minutes', COALESCE(wa.finish_time, wcle.tm + INTERVAL '10 minutes'))
-                INNER JOIN squadov.wow_user_character_association AS wuca
-                    ON wuca.guid = wmc.combatant_guid
-                INNER JOIN squadov.users AS u
-                    ON u.id = wuca.user_id
-                WHERE wa.match_uuid = $1 AND u.id = $2
-                "#,
-                match_uuid,
-                user_id,
-            )
-                .fetch_optional(&*self.heavy_pool)
-                .await?
-        )
-    }
 }
 
-pub async fn create_wow_encounter_match_handler(app : web::Data<Arc<api::ApiApplication>>, input_match: web::Json<GenericMatchCreationRequest<WoWEncounterStart>>) -> Result<HttpResponse, SquadOvError> {
-    // Need to retry just in case we get a conflict.
+pub async fn create_wow_encounter_match_handler(app : web::Data<Arc<api::ApiApplication>>, input_match: web::Json<GenericMatchCreationRequest<WoWEncounterStart>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(x) => x,
+        None => return Err(SquadOvError::BadRequest)
+    };
+
+    let mut tx = app.pool.begin().await?;
+    let uuid = app.create_wow_encounter_match_view(&mut tx, &input_match.timestamp, session.user.id, &input_match.data).await?;
+    tx.commit().await?;
+    Ok(HttpResponse::Ok().json(uuid))
+}
+
+pub async fn create_wow_challenge_match_handler(app : web::Data<Arc<api::ApiApplication>>, input_match: web::Json<GenericMatchCreationRequest<WoWChallengeStart>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(x) => x,
+        None => return Err(SquadOvError::BadRequest)
+    };
+
+    let mut tx = app.pool.begin().await?;
+    let uuid = app.create_wow_challenge_match_view(&mut tx, &input_match.timestamp, session.user.id, &input_match.data).await?;
+    tx.commit().await?;
+    Ok(HttpResponse::Ok().json(uuid))
+}
+
+pub async fn create_wow_arena_match_handler(app : web::Data<Arc<api::ApiApplication>>, input_match: web::Json<GenericMatchCreationRequest<WoWArenaStart>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(x) => x,
+        None => return Err(SquadOvError::BadRequest)
+    };
+
+    let mut tx = app.pool.begin().await?;
+    let uuid = app.create_wow_arena_match_view(&mut tx, &input_match.timestamp, session.user.id, &input_match.data).await?;
+    tx.commit().await?;
+    Ok(HttpResponse::Ok().json(uuid))
+}
+
+pub async fn finish_wow_encounter_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<GenericMatchFinishCreationRequest<WoWEncounterEnd>>, path: web::Path<super::WoWViewPath>) -> Result<HttpResponse, SquadOvError> {
+    let combatants_key = generate_combatants_key(&data.combatants);
     for _i in 0i32..2 {
         let mut tx = app.pool.begin().await?;
-        let match_uuid = match app.find_ongoing_wow_encounter_match(&mut tx, &input_match.data, &input_match.combatants).await? {
-            Some(uuid) => uuid,
-            None => {
-                let internal_match = app.create_new_match(&mut tx).await?;
-                match app.create_wow_encounter_match(&mut tx, &internal_match.uuid, &input_match.data, &input_match.combatants, &input_match.timestamp).await {
-                    Ok(_) => (),
-                    Err(err) => match err {
-                        squadov_common::SquadOvError::Duplicate => {
-                            // This indicates that the match UUID is INVALID because a match with the same
-                            // match ID already exists. Retry!
-                            log::warn!("Caught duplicate WoW encounter...retrying!");
-                            tx.rollback().await?;
-                            continue;
-                        },
-                        _ => return Err(err)
-                    }
-                }
-
-                app.add_wow_combatants_to_match(&mut tx, &internal_match.uuid, &input_match.combatants).await?;
-                internal_match.uuid
+        let new_match = app.create_new_match(&mut tx).await?;
+        match app.finish_wow_encounter(&mut tx, &path.view_uuid, &new_match.uuid, &data.timestamp, &data.data, &combatants_key).await {
+            Ok(_) => (),
+            Err(err) => match err {
+                SquadOvError::Duplicate => {
+                    // This indicates that the match UUID is INVALID because a match with the same
+                    // match ID already exists. Retry!
+                    log::warn!("Caught duplicate WoW encounter...retrying!");
+                    continue;
+                },
+                _ => return Err(err)
             }
         };
-
-        // This needs to be outside the match block as this needs to be done regardless whether or not the incoming match is a duplicate!
-        app.link_wow_combat_log_to_match(&mut tx, &match_uuid, &input_match.combat_log_uuid).await?;
         tx.commit().await?;
-        return Ok(HttpResponse::Ok().json(match_uuid));
+        return Ok(HttpResponse::Ok().json(new_match.uuid));
     }
-    Err(squadov_common::SquadOvError::InternalError(String::from("WoW Encounter Match Retry Threshold")))
+    Err(SquadOvError::InternalError(String::from("Too many errors in finishing WoW encounter...Retry limit reached.")))
 }
 
-pub async fn create_wow_challenge_match_handler(app : web::Data<Arc<api::ApiApplication>>, input_match: web::Json<GenericMatchCreationRequest<WoWChallengeStart>>) -> Result<HttpResponse, SquadOvError> {
-    // Need to retry just in case we get a conflict.
+pub async fn finish_wow_challenge_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<GenericMatchFinishCreationRequest<WoWChallengeEnd>>, path: web::Path<super::WoWViewPath>) -> Result<HttpResponse, SquadOvError> {
+    let combatants_key = generate_combatants_key(&data.combatants);
     for _i in 0i32..2 {
         let mut tx = app.pool.begin().await?;
-        let match_uuid = match app.find_ongoing_wow_challenge_match(&mut tx, &input_match.data, &input_match.combatants).await? {
-            Some(uuid) => uuid,
-            None => {
-                let internal_match = app.create_new_match(&mut tx).await?;
-                match app.create_wow_challenge_match(&mut tx, &internal_match.uuid, &input_match.data, &input_match.combatants, &input_match.timestamp).await {
-                    Ok(_) => (),
-                    Err(err) => match err {
-                        squadov_common::SquadOvError::Duplicate => {
-                            // This indicates that the match UUID is INVALID because a match with the same
-                            // match ID already exists. Retry!
-                            log::warn!("Caught duplicate WoW challenge...retrying!");
-                            tx.rollback().await?;
-                            continue;
-                        },
-                        _ => return Err(err)
-                    }
-                }
-                app.add_wow_combatants_to_match(&mut tx, &internal_match.uuid, &input_match.combatants).await?;
-                internal_match.uuid
+        let new_match = app.create_new_match(&mut tx).await?;
+        match app.finish_wow_challenge(&mut tx, &path.view_uuid, &new_match.uuid, &data.timestamp, &data.data, &combatants_key).await {
+            Ok(_) => (),
+            Err(err) => match err {
+                SquadOvError::Duplicate => {
+                    // This indicates that the match UUID is INVALID because a match with the same
+                    // match ID already exists. Retry!
+                    log::warn!("Caught duplicate WoW challenge...retrying!");
+                    continue;
+                },
+                _ => return Err(err)
             }
         };
-
-        // This needs to be outside the match block as this needs to be done regardless whether or not the incoming match is a duplicate!
-        app.link_wow_combat_log_to_match(&mut tx, &match_uuid, &input_match.combat_log_uuid).await?;
         tx.commit().await?;
-        return Ok(HttpResponse::Ok().json(match_uuid));
+        return Ok(HttpResponse::Ok().json(new_match.uuid));
     }
-    Err(squadov_common::SquadOvError::InternalError(String::from("WoW Challenge Match Retry Threshold")))
+    Err(SquadOvError::InternalError(String::from("Too many errors in finishing WoW challenge...Retry limit reached.")))
 }
 
-pub async fn create_wow_arena_match_handler(app : web::Data<Arc<api::ApiApplication>>, input_match: web::Json<GenericMatchCreationRequest<WoWArenaStart>>) -> Result<HttpResponse, SquadOvError> {
-    // Need to retry just in case we get a conflict.
+pub async fn finish_wow_arena_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<GenericMatchFinishCreationRequest<WoWArenaEnd>>, path: web::Path<super::WoWViewPath>) -> Result<HttpResponse, SquadOvError> {
+    let combatants_key = generate_combatants_key(&data.combatants);
     for _i in 0i32..2 {
         let mut tx = app.pool.begin().await?;
-        let match_uuid = match app.find_ongoing_wow_arena_match(&mut tx, &input_match.data, &input_match.combatants).await? {
-            Some(uuid) => uuid,
-            None => {
-                let internal_match = app.create_new_match(&mut tx).await?;
-                match app.create_wow_arena_match(&mut tx, &internal_match.uuid, &input_match.data, &input_match.combatants, &input_match.timestamp).await {
-                    Ok(_) => (),
-                    Err(err) => match err {
-                        squadov_common::SquadOvError::Duplicate => {
-                            // This indicates that the match UUID is INVALID because a match with the same
-                            // match ID already exists. Retry!
-                            log::warn!("Caught duplicate WoW arena...retrying!");
-                            tx.rollback().await?;
-                            continue;
-                        },
-                        _ => return Err(err)
-                    }
-                }
-                app.add_wow_combatants_to_match(&mut tx, &internal_match.uuid, &input_match.combatants).await?;
-                internal_match.uuid
+        let new_match = app.create_new_match(&mut tx).await?;
+        match app.finish_wow_arena(&mut tx, &path.view_uuid, &new_match.uuid, &data.timestamp, &data.data, &combatants_key).await {
+            Ok(_) => (),
+            Err(err) => match err {
+                SquadOvError::Duplicate => {
+                    // This indicates that the match UUID is INVALID because a match with the same
+                    // match ID already exists. Retry!
+                    log::warn!("Caught duplicate WoW arena...retrying!");
+                    continue;
+                },
+                _ => return Err(err)
             }
         };
-
-        // This needs to be outside the match block as this needs to be done regardless whether or not the incoming match is a duplicate!
-        app.link_wow_combat_log_to_match(&mut tx, &match_uuid, &input_match.combat_log_uuid).await?;
         tx.commit().await?;
-        return Ok(HttpResponse::Ok().json(match_uuid));
+        return Ok(HttpResponse::Ok().json(new_match.uuid));
     }
-    Err(squadov_common::SquadOvError::InternalError(String::from("WoW Arena Match Retry Threshold")))
-}
-
-pub async fn finish_wow_encounter_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<GenericMatchFinishCreationRequest<WoWEncounterEnd>>, path: web::Path<super::WoWMatchPath>) -> Result<HttpResponse, SquadOvError> {
-    let mut tx = app.pool.begin().await?;
-    app.finish_wow_encounter(&mut tx, &path.match_uuid, &data.timestamp, &data.data).await?;
-    tx.commit().await?;
-    Ok(HttpResponse::Ok().finish())
-}
-
-pub async fn finish_wow_challenge_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<GenericMatchFinishCreationRequest<WoWChallengeEnd>>, path: web::Path<super::WoWMatchPath>) -> Result<HttpResponse, SquadOvError> {
-    let mut tx = app.pool.begin().await?;
-    app.finish_wow_challenge(&mut tx, &path.match_uuid, &data.timestamp, &data.data).await?;
-    tx.commit().await?;
-    Ok(HttpResponse::Ok().finish())
-}
-
-pub async fn finish_wow_arena_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<GenericMatchFinishCreationRequest<WoWArenaEnd>>, path: web::Path<super::WoWMatchPath>) -> Result<HttpResponse, SquadOvError> {
-    let mut tx = app.pool.begin().await?;
-    app.finish_wow_arena(&mut tx, &path.match_uuid, &data.timestamp, &data.data).await?;
-    tx.commit().await?;
-    Ok(HttpResponse::Ok().finish())
+    Err(SquadOvError::InternalError(String::from("Too many errors in finishing WoW arena...Retry limit reached.")))
 }
 
 pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let query = query.into_inner();
     let encounters = app.list_wow_encounters_for_character(
         &path.character_guid,
+        path.user_id,
         query.start,
         query.end,
     ).await?;
@@ -791,6 +764,7 @@ pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::
     let query = query.into_inner();
     let challenges = app.list_wow_challenges_for_character(
         &path.character_guid,
+        path.user_id,
         query.start,
         query.end,
     ).await?;
@@ -804,6 +778,7 @@ pub async fn list_wow_arenas_for_character_handler(app : web::Data<Arc<api::ApiA
     let query = query.into_inner();
     let challenges = app.list_wow_arenas_for_character(
         &path.character_guid,
+        path.user_id,
         query.start,
         query.end,
     ).await?;
@@ -822,10 +797,11 @@ pub async fn get_wow_match_handler(app : web::Data<Arc<api::ApiApplication>>, pa
         arena: Option<WoWArena>,
     }
 
+    let uuid = app.user_id_to_uuid(path.user_id).await?;
     Ok(HttpResponse::Ok().json(Response{
-        encounter: app.find_wow_encounter(&path.match_uuid).await?,
-        challenge: app.find_wow_challenge(&path.match_uuid).await?,
-        arena: app.find_wow_arena(&path.match_uuid, path.user_id).await?,
+        encounter: app.find_wow_encounter(&path.match_uuid, &uuid).await?,
+        challenge: app.find_wow_challenge(&path.match_uuid, &uuid).await?,
+        arena: app.find_wow_arena(&path.match_uuid, &uuid).await?,
     }))
 }
 

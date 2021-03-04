@@ -39,7 +39,9 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
                 return Err(SquadOvError::BadRequest);
             }
             let key = std::str::from_utf8(key.unwrap())?;
-            let combat_log_uuid = Uuid::parse_str(&key)?;
+            let match_view_uuid = Uuid::parse_str(&key)?;
+            
+            /*
             let combat_log = opaque.app.get_wow_combat_log(&combat_log_uuid).await?;
 
             // Note that the client does a simple split on the commas which is insufficient for advanced parsing
@@ -90,8 +92,9 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
                 let mut events = opaque.events.write().await;
                 events.clear();
             }
+            */
 
-            Ok(handle_events)
+            Ok(false)
         }).await;
     })
 }

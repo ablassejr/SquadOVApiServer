@@ -46,6 +46,8 @@ pub struct WoWEncounter {
     #[serde(rename="finishTime")]
     pub finish_time: Option<DateTime<Utc>>,
     pub success: bool,
+    #[serde(rename="userUuid")]
+    pub user_uuid: Uuid,
     pub build: String
 }
 
@@ -88,6 +90,8 @@ pub struct WoWChallenge {
     #[serde(rename="timeMs")]
     pub time_ms: i64,
     pub success: bool,
+    #[serde(rename="userUuid")]
+    pub user_uuid: Uuid,
     pub build: String
 }
 

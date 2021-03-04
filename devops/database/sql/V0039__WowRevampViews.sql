@@ -3,7 +3,10 @@ CREATE TABLE wow_match_view (
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     start_tm TIMESTAMPTZ NOT NULL,
     end_tm TIMESTAMPTZ,
-    match_uuid UUID REFERENCES matches(uuid) ON DELETE CASCADE
+    match_uuid UUID REFERENCES matches(uuid) ON DELETE CASCADE,
+    combat_log_version VARCHAR NOT NULL,
+    advanced_log BOOLEAN NOT NULL,
+    build_version VARCHAR NOT NULL
 );
 
 CREATE UNIQUE INDEX ON wow_match_view (match_uuid, user_id);
