@@ -41,8 +41,7 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
             let key = std::str::from_utf8(key.unwrap())?;
             let match_view_uuid = Uuid::parse_str(&key)?;
             
-            /*
-            let combat_log = opaque.app.get_wow_combat_log(&combat_log_uuid).await?;
+            let match_view = squadov_common::get_generic_wow_match_view_from_id(&*opaque.app.pool, &match_view_uuid).await?;
 
             // Note that the client does a simple split on the commas which is insufficient for advanced parsing
             // so we need to reparse so that at least the upper level parts corresponds to each logical section of
@@ -52,9 +51,9 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
 
             let mut manual_handle_flags = false;
             if parsed_payload.is_finish_token() {
-                log::info!("Detect Finish Token for WoW Combat Log: {}", &combat_log_uuid);
+                log::info!("Detect Finish Token for WoW Match View: {}", &match_view_uuid);
             } else {
-                let parsed_event = squadov_common::parse_raw_wow_combat_log_payload(&combat_log_uuid, &combat_log.state, &parsed_payload)?;
+                let parsed_event = squadov_common::parse_raw_wow_combat_log_payload(&match_view_uuid, match_view.user_id, &match_view.combat_log_state(), &parsed_payload)?;
                 if parsed_event.is_some() {
                     let mut events = opaque.events.write().await;
                     let new_event = parsed_event.unwrap();
@@ -83,18 +82,14 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
                     events.clone()
                 };
                 log::info!("Handling {} WoW Combat Log Events", events.len());
-                let (unit_ownership, char_ownership, char_presence) = squadov_common::store_wow_combat_log_events(&mut tx, &events).await?;
-                squadov_common::store_combat_log_unit_ownership_mapping(&mut tx, &unit_ownership).await?;
-                squadov_common::store_combat_log_user_character_mapping(&mut tx, &char_ownership).await?;
-                squadov_common::store_combat_log_character_presence(&mut tx, &char_presence).await?;
+                squadov_common::store_wow_combat_log_events(&mut tx, events).await?;
                 tx.commit().await?;
 
                 let mut events = opaque.events.write().await;
                 events.clear();
             }
-            */
 
-            Ok(false)
+            Ok(handle_events)
         }).await;
     })
 }

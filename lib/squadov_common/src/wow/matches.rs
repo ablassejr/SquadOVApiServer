@@ -1,6 +1,9 @@
+use crate::SquadOvError;
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
+use sqlx::{Executor, Postgres};
+use super::WoWCombatLogState;
 
 #[derive(Deserialize)]
 pub struct WoWEncounterStart {
@@ -128,4 +131,40 @@ pub struct WoWArena {
     pub user_uuid: Uuid,
     pub success: bool,
     pub build: String
+}
+
+pub struct GenericWoWMatchView {
+    pub user_id: i64,
+    combat_log_version: String,
+    advanced_log: bool,
+    build_version: String,
+}
+
+pub async fn get_generic_wow_match_view_from_id<'a, T>(ex: T, id: &Uuid) -> Result<GenericWoWMatchView, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            GenericWoWMatchView,
+            "
+            SELECT user_id, combat_log_version, advanced_log, build_version
+            FROM squadov.wow_match_view
+            WHERE id = $1
+            ",
+            id,
+        )
+            .fetch_one(ex)
+            .await?
+    )
+}
+
+impl GenericWoWMatchView {
+    pub fn combat_log_state(&self) -> WoWCombatLogState {
+        WoWCombatLogState {
+            combat_log_version: self.combat_log_version.clone(),
+            advanced_log: self.advanced_log,
+            build_version: self.build_version.clone(),
+        }
+    }
 }

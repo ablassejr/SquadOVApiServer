@@ -69,7 +69,7 @@ impl From<sqlx::Error> for SquadOvError {
                 // more context to the user.
                 if code.is_some() {
                     let code = code.unwrap();
-                    if code == "23505" {
+                    if code == "23505" || code == "23P01" {
                         Self::Duplicate
                     } else {
                         generic_error

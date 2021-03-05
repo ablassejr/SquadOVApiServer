@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use chrono::{DateTime, Utc};
-use sqlx::{Executor, Postgres};
+use sqlx::{Transaction, Postgres, Row};
 use uuid::Uuid;
 use std::convert::TryInto;
 use std::cmp::PartialEq;
@@ -8,7 +8,7 @@ use std::str::FromStr;
 use crate::SquadOvError;
 use unicode_segmentation::UnicodeSegmentation;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Deserialize)]
 pub struct WoWCombatLogState {
@@ -143,21 +143,21 @@ impl RawWoWCombatLogPayload {
     }
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct WoWSpellInfo {
     id: i64,
     name: String,
     school: i64
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[serde(tag="type")]
 pub enum WoWDamageType {
     SwingDamage,
     SpellDamage(WoWSpellInfo)
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[serde(tag="type")]
 pub enum WoWSpellAuraType {
     Buff,
@@ -177,7 +177,17 @@ impl FromStr for WoWSpellAuraType {
     }
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+impl ToString for WoWSpellAuraType {
+    fn to_string(&self) -> String {
+        String::from(match self {
+            WoWSpellAuraType::Buff => "BUFF",
+            WoWSpellAuraType::Debuff => "DEBUFF",
+            WoWSpellAuraType::Unknown => "UNKNOWN"
+        })
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct WoWItemInfo {
     item_id: i64,
     ilvl: i32
@@ -195,7 +205,7 @@ fn parse_wow_item_info_from_str(s: &str) -> Result<Vec<WoWItemInfo>, SquadOvErro
     }).collect())
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[serde(tag="type")]
 pub enum WoWCombatLogEventType {
     UnitDied,
@@ -266,7 +276,7 @@ pub enum WoWCombatLogEventType {
     Unknown
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct WoWCombatLogSourceDest {
     guid: String,
     name: String,
@@ -285,7 +295,7 @@ impl WoWCombatLogSourceDest {
     }
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[serde(tag="type")]
 pub enum WoWGenericLevel {
     ItemLevel{
@@ -296,7 +306,7 @@ pub enum WoWGenericLevel {
     }
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[serde(tag="type")]
 pub struct WoWCombatLogAdvancedCVars {
     unit_guid: String,
@@ -347,9 +357,10 @@ impl WoWCombatLogAdvancedCVars {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct WoWCombatLogEvent {
-    combat_log_id: Uuid,
+    view_id: Uuid,
+    user_id: i64,
     log_line: i64,
     timestamp: DateTime<Utc>,
     source: Option<WoWCombatLogSourceDest>,
@@ -493,7 +504,7 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
     }
 }
 
-pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, state: &WoWCombatLogState, payload: &RawWoWCombatLogPayload) -> Result<Option<WoWCombatLogEvent>, crate::SquadOvError> {
+pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, user_id: i64, state: &WoWCombatLogState, payload: &RawWoWCombatLogPayload) -> Result<Option<WoWCombatLogEvent>, crate::SquadOvError> {
     let (advanced, event) = parse_advanced_cvars_and_event_from_wow_combat_log(state, payload)?;
     if event == WoWCombatLogEventType::Unknown {
         return Ok(None)
@@ -514,7 +525,8 @@ pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, state: &WoWCombatLogState, 
     };
 
     Ok(Some(WoWCombatLogEvent{
-        combat_log_id: uuid.clone(),
+        view_id: uuid.clone(),
+        user_id,
         log_line: payload.log_line,
         timestamp: payload.timestamp.clone(),
         source: if has_source_dest { Some(WoWCombatLogSourceDest::new(payload.parts[1..5].try_into()?)?) } else { None },
@@ -524,201 +536,855 @@ pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, state: &WoWCombatLogState, 
     }))
 }
 
-pub type WowCombatLogUnitOwnershipMapping = HashMap<Uuid, (String, String)>;
-pub type WowCombatLogCharacterOwnershipMapping = HashMap<Uuid, String>;
-pub struct WowCombatLogCharacterPresence {
-    combatlog: Uuid,
-    guid: String
-}
-
-pub async fn store_combat_log_character_presence<'a, T>(ex: &'a mut T, present: &[WowCombatLogCharacterPresence]) -> Result<(), crate::SquadOvError>
-where
-    &'a mut T: Executor<'a, Database = Postgres>
-{
-    if present.is_empty() {
-        return Ok(());
-    }
-
-    let mut values: Vec<String> = Vec::new();
-    for p in present {
-        values.push(format!(
-            "('{combat_log_uuid}', '{guid}')",
-            combat_log_uuid=p.combatlog.clone(),
-            guid=p.guid.clone(),
-        ));
-    }
-
-    sqlx::query(&format!(
-        "
-        INSERT INTO squadov.wow_combat_log_character_presence (combat_log_uuid, guid)
-        VALUES {values}
-        ON CONFLICT DO NOTHING
-        ",
-        values=values.join(",")
-    ))
-        .execute(ex)
-        .await?;
-
-    Ok(())
-}
-
-pub async fn store_combat_log_unit_ownership_mapping<'a, T>(ex: &'a mut T, mapping: &WowCombatLogUnitOwnershipMapping) -> Result<(), crate::SquadOvError>
-where
-    &'a mut T: Executor<'a, Database = Postgres>
-{
-    if mapping.is_empty() {
-        return Ok(());
-    }
-
-    let mut values: Vec<String> = Vec::new();
-    for (combatlog, (unit_guid, owner_guid)) in mapping {
-        values.push(format!(
-            "('{combat_log_uuid}', '{unit_guid}', '{owner_guid}')",
-            combat_log_uuid=combatlog.to_string(),
-            unit_guid=unit_guid,
-            owner_guid=owner_guid,
-        ));
-    }
-
-    sqlx::query(&format!(
-        "
-        INSERT INTO squadov.wow_combatlog_unit_ownership (combat_log_uuid, unit_guid, owner_guid)
-        VALUES {values}
-        ON CONFLICT DO NOTHING
-        ",
-        values=values.join(",")
-    ))
-        .execute(ex)
-        .await?;
-
-    Ok(())
-}
-
-pub async fn store_combat_log_user_character_mapping<'a, T>(ex: &'a mut T, mapping: &WowCombatLogCharacterOwnershipMapping) -> Result<(), crate::SquadOvError>
-where
-    &'a mut T: Executor<'a, Database = Postgres>
-{
-    if mapping.is_empty() {
-        return Ok(());
-    }
-
-    let mut values: Vec<String> = Vec::new();
-    for (combatlog, guid) in mapping {
-        values.push(format!(
-            "('{combatlog}', '{guid}')",
-            combatlog=combatlog.to_string(),
-            guid=guid
-        ));
-    }
-
-    sqlx::query(&format!(
-        "
-        INSERT INTO squadov.wow_user_character_association (user_id, guid)
-        SELECT wcl.user_id, v.guid
-        FROM (VALUES {values}) AS v(combatlog_id, guid)
-        INNER JOIN squadov.wow_combat_logs AS wcl
-            ON wcl.uuid = v.combatlog_id::UUID
-        ON CONFLICT DO NOTHING
-        ",
-        values=values.join(",")
-    ))
-        .execute(ex)
-        .await?;
-
-    Ok(())
-}
-
-pub async fn store_wow_combat_log_events<'a, T>(ex: &'a mut T, events: &[WoWCombatLogEvent]) -> Result<(WowCombatLogUnitOwnershipMapping, WowCombatLogCharacterOwnershipMapping, Vec<WowCombatLogCharacterPresence>), crate::SquadOvError>
-where
-    &'a mut T: Executor<'a, Database = Postgres>
-{
-    if events.is_empty() {
-        return Ok((HashMap::new(), HashMap::new(), Vec::new()));
-    }
-
+async fn insert_missing_wow_character_presence_for_events(tx: &mut Transaction<'_, Postgres>, events: &[WoWCombatLogEvent]) -> Result<(), SquadOvError> {
     let mut sql: Vec<String> = Vec::new();
     sql.push(String::from("
-        INSERT INTO squadov.wow_combat_log_events (
-            combat_log_uuid,
-            log_line,
-            tm,
-            source,
-            dest,
-            advanced,
-            evt
+        INSERT INTO squadov.wow_match_view_character_presence (
+            view_id,
+            unit_guid,
+            unit_name,
+            owner_guid,
+            flags,
+            has_combatant_info
         )
         VALUES
     "));
 
-    let mut combatlog_current_players: WowCombatLogCharacterOwnershipMapping = HashMap::new();
-    let mut combatlog_ownership: WowCombatLogUnitOwnershipMapping = HashMap::new();
-    let mut combatlog_presence: Vec<WowCombatLogCharacterPresence> = Vec::new();
-
-    for eve in events {
-        sql.push(format!("(
-            '{uuid}',
-            {log_line},
-            {tm},
-            {source},
-            {dest},
-            {advanced},
-            {evt}
-        )",
-            uuid=&eve.combat_log_id,
-            log_line=eve.log_line,
-            tm=crate::sql_format_time(&eve.timestamp),
-            source=crate::sql_format_option_json(&eve.source)?,
-            dest=crate::sql_format_option_json(&eve.dest)?,
-            advanced=crate::sql_format_option_json(&eve.advanced)?,
-            evt=crate::sql_format_json(&eve.event)?,
-        ));
-        sql.push(String::from(","));
-
-        // If source/dest is not none then we need to check the flags on the
-        // relevant object and extract that information if necessary. In 
-        // particular, we're interested in whether or not this player is the
-        // "current player" for the uploader of the combat log.
-        if eve.source.is_some() {
-            let source = eve.source.as_ref().unwrap();
-            if source.flags & crate::COMBATLOG_FILTER_ME == crate::COMBATLOG_FILTER_ME && source.guid != crate::NIL_WOW_GUID {
-                combatlog_current_players.insert(eve.combat_log_id.clone(), source.guid.clone());
-            }
-        }
-
-        if eve.dest.is_some() {
-            let dest = eve.source.as_ref().unwrap();
-            if dest.flags & crate::COMBATLOG_FILTER_ME == crate::COMBATLOG_FILTER_ME && dest.guid != crate::NIL_WOW_GUID {
-                combatlog_current_players.insert(eve.combat_log_id.clone(), dest.guid.clone());
-            }
-        }
-
-        if eve.advanced.is_some() {
-            let advanced = eve.advanced.as_ref().unwrap();
+    let mut added = 0;
+    for e in events {
+        let owner_guid;
+        let pet_guid;
+        
+        if let Some(advanced) = &e.advanced {
             if advanced.owner_guid != crate::NIL_WOW_GUID && advanced.unit_guid != crate::NIL_WOW_GUID {
-                combatlog_ownership.insert(eve.combat_log_id.clone(), (advanced.unit_guid.clone(), advanced.owner_guid.clone()));
+                owner_guid = Some(advanced.owner_guid.clone());
+                pet_guid = Some(advanced.unit_guid.clone());
+            } else {
+                owner_guid = None;
+                pet_guid = None;
+            }
+        } else {
+            owner_guid = None;
+            pet_guid = None;
+        };
+
+        if let Some(source) = &e.source {
+            if source.guid != crate::NIL_WOW_GUID {
+                let matches_pet = pet_guid.as_ref().unwrap_or(&String::from(crate::NIL_WOW_GUID)) == &source.guid;
+                sql.push(format!("(
+                    '{view_id}',
+                    '{unit_guid}',
+                    {unit_name},
+                    {owner_guid},
+                    {flags},
+                    FALSE
+                )",
+                    view_id=&e.view_id,
+                    unit_guid=&source.guid,
+                    unit_name=&crate::sql_format_string(&source.name),
+                    owner_guid=crate::sql_format_option_string(if matches_pet { &owner_guid } else { &None }),
+                    flags=source.flags,
+
+                ));
+                sql.push(String::from(","));
+                added += 1;
+            }
+        } 
+
+        if let Some(dest) = &e.dest {
+            if dest.guid != crate::NIL_WOW_GUID {
+                let matches_pet = pet_guid.as_ref().unwrap_or(&String::from(crate::NIL_WOW_GUID)) == &dest.guid;
+                sql.push(format!("(
+                    '{view_id}',
+                    '{unit_guid}',
+                    {unit_name},
+                    {owner_guid},
+                    {flags},
+                    FALSE
+                )",
+                    view_id=&e.view_id,
+                    unit_guid=&dest.guid,
+                    unit_name=&crate::sql_format_string(&dest.name),
+                    owner_guid=crate::sql_format_option_string(if matches_pet { &owner_guid } else { &None }),
+                    flags=dest.flags,
+
+                ));
+                sql.push(String::from(","));
+                added += 1;
             }
         }
-
-        match &eve.event {
-            WoWCombatLogEventType::SpellSummon(_) => {
-                if eve.source.is_some() && eve.dest.is_some() {
-                    let source = eve.source.as_ref().unwrap();
-                    let dest = eve.dest.as_ref().unwrap();
-                    combatlog_ownership.insert(eve.combat_log_id.clone(), (dest.guid.clone(), source.guid.clone()));
-                }
-            },
-            WoWCombatLogEventType::CombatantInfo{guid, ..} => combatlog_presence.push(WowCombatLogCharacterPresence{
-                combatlog: eve.combat_log_id.clone(),
-                guid: guid.clone(),
-            }),
-            _ => ()
+        
+        if let WoWCombatLogEventType::CombatantInfo{guid, ..} = &e.event {
+            sql.push(format!("(
+                '{view_id}',
+                '{unit_guid}',
+                NULL,
+                NULL,
+                0,
+                TRUE
+            )",
+                view_id=&e.view_id,
+                unit_guid=&guid,
+            ));
+            sql.push(String::from(","));
+            added += 1;
         }
     }
 
+    if added == 0 {
+        return Ok(());
+    }
+
     sql.truncate(sql.len() - 1);
+    // We use ON CONFLICT DO NOTHING to ignore things that alreazdy exist.
     sql.push(String::from(" ON CONFLICT DO NOTHING"));
-    sqlx::query(&sql.join("")).execute(ex).await?;
-    Ok((combatlog_ownership, combatlog_current_players, combatlog_presence))
+    sqlx::query(&sql.join("")).execute(tx).await?;
+
+    // We could probably save some cycles by keeping track of which items were inserted so that
+    // we can do less work in the update function, but I think that's probably an over-optimization
+    // and not needed (at least at the current moment in time).
+    Ok(())
+}
+
+// The returned hashmap is keyed by (View UUID, Character GUID). Its value is the character_id in our "wow_match_view_character_presence" table.
+type WowCharacterIdMap = HashMap<(Uuid, String), i64>;
+
+async fn update_wow_character_presence_for_events(tx: &mut Transaction<'_, Postgres>, events: &[WoWCombatLogEvent]) -> Result<WowCharacterIdMap, SquadOvError> {
+    let mut sql: Vec<String> = Vec::new();
+
+    // DO NOT UPDATE THE "has_combatant_info" FLAG HERE AS IT MIGHT
+    // OVERRIDE A VALID TRUE VALUE IN THE CASE WHERE WE'RE HANDLING
+    // A NON-COMBATANT_INFO EVENT.
+    // 
+    // By that same logic, we don't set it to true in the case of a
+    // combatant_info event because we don't want to clear out flags
+    // that were previously set.
+    sql.push(String::from("
+        UPDATE squadov.wow_match_view_character_presence AS wcp
+        SET unit_name = sub.unit_name,
+            owner_guid = sub.owner_guid,
+            flags = sub.flags
+        FROM ( VALUES
+    "));
+
+    let mut added = 0;
+    for e in events {
+        // It'd be nice to share some of this code with the insert functiona bove.
+        let owner_guid;
+        let pet_guid;
+        
+        if let Some(advanced) = &e.advanced {
+            if advanced.owner_guid != crate::NIL_WOW_GUID && advanced.unit_guid != crate::NIL_WOW_GUID {
+                owner_guid = Some(advanced.owner_guid.clone());
+                pet_guid = Some(advanced.unit_guid.clone());
+            } else {
+                owner_guid = None;
+                pet_guid = None;
+            }
+        } else {
+            owner_guid = None;
+            pet_guid = None;
+        };
+
+        if let Some(source) = &e.source {
+            if source.guid != crate::NIL_WOW_GUID {
+                let matches_pet = pet_guid.as_ref().unwrap_or(&String::from(crate::NIL_WOW_GUID)) == &source.guid;
+                sql.push(format!("(
+                    '{view_id}',
+                    '{unit_guid}',
+                    {unit_name},
+                    {owner_guid},
+                    {flags}
+                )",
+                    view_id=&e.view_id,
+                    unit_guid=&source.guid,
+                    unit_name=&crate::sql_format_string(&source.name),
+                    owner_guid=crate::sql_format_option_string(if matches_pet { &owner_guid } else { &None }),
+                    flags=source.flags,
+                ));
+                sql.push(String::from(","));
+                added += 1;
+            }
+        }
+
+        if let Some(dest) = &e.dest {
+            if dest.guid != crate::NIL_WOW_GUID {
+                let matches_pet = pet_guid.as_ref().unwrap_or(&String::from(crate::NIL_WOW_GUID)) == &dest.guid;
+                sql.push(format!("(
+                    '{view_id}',
+                    '{unit_guid}',
+                    {unit_name},
+                    {owner_guid},
+                    {flags}
+                )",
+                    view_id=&e.view_id,
+                    unit_guid=&dest.guid,
+                    unit_name=&crate::sql_format_string(&dest.name),
+                    owner_guid=crate::sql_format_option_string(if matches_pet { &owner_guid } else { &None }),
+                    flags=dest.flags,
+                ));
+                sql.push(String::from(","));
+                added += 1;
+            }
+        }
+    }
+
+    if added == 0 {
+        return Ok(HashMap::new());
+    }
+
+    sql.truncate(sql.len() - 1);
+    sql.push(String::from("
+        ) AS sub(view_id, unit_guid, unit_name, owner_guid, flags)
+        WHERE wcp.view_id = (sub.view_id)::UUID
+            AND wcp.unit_guid = sub.unit_guid
+        RETURNING wcp.view_id, wcp.unit_guid, wcp.character_id
+    "));
+
+    Ok(
+        sqlx::query(&sql.join(""))
+            .fetch_all(&mut *tx)
+            .await?
+            .into_iter()
+            .map(|x| {
+                Ok(((x.try_get("view_id")?, x.try_get("unit_guid")?), x.try_get("character_id")?))
+            })
+            .collect::<Result<WowCharacterIdMap, SquadOvError>>()?
+    )
+}
+
+
+// (View UUID, Log Line) -> Event Id
+// Note that we need to do this instead of just returning a vector and mapping 1-1 with the events vector because
+// *technically* the database doesn't guarantee any ordering of the INSERT and the resulting RETURNING so I don't
+// want to risk relying on it. Instead we know for certain that a given (View UUID, Log Line) is unique so we can
+// just rely on the caller-provided unique ID instead.
+type WowEventIdMap = HashMap<(Uuid, i64), i64>;
+
+// Returns the "event_id" for each input event.
+async fn create_wow_events(tx: &mut Transaction<'_, Postgres>, events: &[WoWCombatLogEvent], mapping: &WowCharacterIdMap) -> Result<WowEventIdMap, SquadOvError> {
+    if events.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let mut sql: Vec<String> = Vec::new();
+    sql.push(String::from("
+        INSERT INTO squadov.wow_match_view_events (
+            view_id,
+            log_line,
+            source_char,
+            dest_char,
+            tm
+        )
+        VALUES
+    "));
+
+    for e in events {
+        let source_tuple = if let Some(source) = &e.source {
+            Some((e.view_id.clone(), source.guid.clone()))
+        } else {
+            None
+        };
+        let dest_tuple = if let Some(dest) = &e.dest {
+            Some((e.view_id.clone(), dest.guid.clone()))
+        } else {
+            None
+        };
+
+        sql.push(format!("(
+            '{view_id}',
+            {log_line},
+            {source_char},
+            {dest_char},
+            {tm}
+        )",
+            view_id=&e.view_id,
+            log_line=e.log_line,
+            source_char=crate::sql_format_option_value(&if let Some(tup) = source_tuple { mapping.get(&tup).copied() } else { None }),
+            dest_char=crate::sql_format_option_value(&if let Some(tup) = dest_tuple { mapping.get(&tup).copied() } else { None }),
+            tm=crate::sql_format_time(&e.timestamp)
+        ));
+        sql.push(String::from(","));
+    }
+
+    sql.truncate(sql.len() - 1);
+    sql.push(String::from(" RETURNING view_id, log_line, event_id"));
+
+    Ok(
+        sqlx::query(&sql.join(""))
+            .fetch_all(&mut *tx)
+            .await?
+            .into_iter()
+            .map(|x| {
+                Ok(((x.try_get("view_id")?, x.try_get("log_line")?), x.try_get("event_id")?))
+            })
+            .collect::<Result<WowEventIdMap, SquadOvError>>()?
+    )
+}
+
+async fn bulk_insert_wow_combatant_events(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>, ids: &WowEventIdMap, mapping: &WowCharacterIdMap) -> Result<(), SquadOvError> {
+    if events.is_empty() {
+        return Ok(());
+    }
+
+    let mut event_sql: Vec<String> = Vec::new();
+    event_sql.push(String::from("
+        INSERT INTO squadov.wow_match_view_combatants (
+            event_id,
+            character_id,
+            team,
+            spec_id
+        )
+        VALUES
+    "));
+
+    let mut items_sql: Vec<String> = Vec::new();
+    items_sql.push(String::from("
+        INSERT INTO squadov.wow_match_view_combatant_items (
+            event_id,
+            character_id,
+            idx,
+            item_id,
+            ilvl
+        )
+        VALUES
+    "));
+
+    // The entries in the "wow_match_view_character_presence" table that
+    // need to have has_combatant_info set to true.
+    let mut bulk_combatants: HashSet<i64> = HashSet::new();
+
+    for e in events {
+        if let WoWCombatLogEventType::CombatantInfo{guid, team, spec_id, items, ..} = e.event {
+            let char_key = (e.view_id.clone(), guid.clone());
+            let event_key = (e.view_id.clone(), e.log_line);
+            let character_id = mapping.get(&char_key).ok_or(SquadOvError::NotFound)?;
+            let event_id = ids.get(&event_key).ok_or(SquadOvError::NotFound)?;
+
+            event_sql.push(format!("
+                (
+                    {event_id},
+                    {character_id},
+                    {team},
+                    {spec_id}
+                )
+            ",
+                event_id=event_id,
+                character_id=character_id,
+                team=team,
+                spec_id=spec_id,
+            ));
+            event_sql.push(String::from(","));
+
+            for (idx, item) in items.iter().enumerate() {
+                items_sql.push(format!("
+                    (
+                        {event_id},
+                        {character_id},
+                        {idx},
+                        {item_id},
+                        {ilvl}
+                    )
+                ",
+                    event_id=event_id,
+                    character_id=character_id,
+                    idx=idx,
+                    item_id=item.item_id,
+                    ilvl=item.ilvl,
+                ));
+                items_sql.push(String::from(","));
+            }
+            
+            bulk_combatants.insert(*character_id);
+        } else {
+            return Err(SquadOvError::BadRequest);
+        }
+    }
+
+    event_sql.truncate(event_sql.len() - 1);
+    sqlx::query(&event_sql.join("")).execute(&mut *tx).await?;
+
+    items_sql.truncate(items_sql.len() - 1);
+    sqlx::query(&items_sql.join("")).execute(&mut *tx).await?;
+
+    sqlx::query!(
+        "
+        UPDATE squadov.wow_match_view_character_presence
+        SET has_combatant_info = TRUE
+        WHERE character_id = ANY($1)
+        ",
+        &bulk_combatants.into_iter().collect::<Vec<i64>>()
+    )
+        .execute(&mut *tx)
+        .await?;
+
+    Ok(())
+}
+
+type WowUserCharacterCacheUpdate = HashMap<(i64, String), Uuid>;
+async fn bulk_update_wow_user_character_cache(tx: &mut Transaction<'_, Postgres>, update: WowUserCharacterCacheUpdate) -> Result<(), SquadOvError> {
+    if update.is_empty() {
+        return Ok(())
+    }
+
+    let mut values: Vec<String> = Vec::new();
+    for ((user_id, unit_guid), view_id) in update {
+        values.push(
+            format!("
+                (
+                    {user_id},
+                    '{unit_guid}',
+                    '{view_id}'
+                )
+            ",
+                user_id=user_id,
+                unit_guid=&unit_guid,
+                view_id=&view_id,
+            )
+        );
+    }
+
+    sqlx::query(
+        &format!("
+            INSERT INTO squadov.wow_user_character_cache (
+                user_id,
+                unit_guid,
+                event_id,
+                cache_time
+            )
+            SELECT DISTINCT ON (data.user_id, data.unit_guid)
+                data.user_id,
+                data.unit_guid,
+                wvc.event_id,
+                NOW()
+            FROM (
+                VALUES {}
+            ) AS data(user_id, unit_guid, view_id)
+            INNER JOIN squadov.wow_match_view_character_presence AS wcp
+                ON wcp.view_id = (data.view_id)::UUID
+                    AND wcp.unit_guid = data.unit_guid
+            INNER JOIN squadov.wow_match_view_combatants AS wvc
+                ON wvc.character_id = wcp.character_id
+            ORDER BY data.user_id, data.unit_guid, wvc.event_id DESC
+            ON CONFLICT (user_id, unit_guid) DO UPDATE SET
+                event_id = EXCLUDED.event_id,
+                cache_time = EXCLUDED.cache_time
+        ", values.join(","))
+    )
+        .execute(&mut *tx)
+        .await?;
+    Ok(())
+}
+
+async fn bulk_insert_wow_damage_events(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>, ids: &WowEventIdMap) -> Result<(), SquadOvError> {
+    if events.is_empty() {
+        return Ok(());
+    }
+
+    let mut sql: Vec<String> = Vec::new();
+    sql.push(String::from("
+        INSERT INTO squadov.wow_match_view_damage_events (
+            event_id,
+            spell_id,
+            amount,
+            overkill
+        )
+        VALUES
+    "));
+
+    for x in events {
+        let event_key = (x.view_id.clone(), x.log_line);
+        let event_id = ids.get(&event_key).ok_or(SquadOvError::NotFound)?;
+        if let WoWCombatLogEventType::DamageDone{damage, amount, overkill} = x.event {
+            sql.push(format!("(
+                {event_id},
+                {spell_id},
+                {amount},
+                {overkill}
+            )",
+                event_id=event_id,
+                spell_id=crate::sql_format_option_value(&if let WoWDamageType::SpellDamage(spell) = damage {
+                    Some(spell.id)
+                } else {
+                    None
+                }),
+                amount=amount,
+                overkill=overkill,
+            ));
+        } else {
+            return Err(SquadOvError::BadRequest);
+        }
+        sql.push(String::from(","));
+    }
+
+    sql.truncate(sql.len() - 1);
+    sqlx::query(&sql.join("")).execute(tx).await?;
+    Ok(())
+}
+
+async fn bulk_insert_wow_healing_events(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>, ids: &WowEventIdMap) -> Result<(), SquadOvError> {
+    if events.is_empty() {
+        return Ok(());
+    }
+
+    let mut sql: Vec<String> = Vec::new();
+    sql.push(String::from("
+        INSERT INTO squadov.wow_match_view_healing_events (
+            event_id,
+            spell_id,
+            amount,
+            overheal,
+            absorbed
+        )
+        VALUES
+    "));
+
+    for x in events {
+        let event_key = (x.view_id.clone(), x.log_line);
+        let event_id = ids.get(&event_key).ok_or(SquadOvError::NotFound)?;
+        if let WoWCombatLogEventType::Healing{spell, amount, overheal, absorbed} = x.event {
+            sql.push(format!("(
+                {event_id},
+                {spell_id},
+                {amount},
+                {overheal},
+                {absorbed}
+            )",
+                event_id=event_id,
+                spell_id=spell.id,
+                amount=amount,
+                overheal=overheal,
+                absorbed=absorbed,
+            ));
+        } else {
+            return Err(SquadOvError::BadRequest);
+        }
+        sql.push(String::from(","));
+    }
+
+    sql.truncate(sql.len() - 1);
+    sqlx::query(&sql.join("")).execute(tx).await?;
+    Ok(())
+}
+
+async fn bulk_insert_wow_auras_events(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>, ids: &WowEventIdMap) -> Result<(), SquadOvError> {
+    if events.is_empty() {
+        return Ok(());
+    }
+
+    let mut sql: Vec<String> = Vec::new();
+    sql.push(String::from("
+        INSERT INTO squadov.wow_match_view_aura_events (
+            event_id,
+            spell_id,
+            aura_type,
+            applied
+        )
+        VALUES
+    "));
+
+    for x in events {
+        let event_key = (x.view_id.clone(), x.log_line);
+        let event_id = ids.get(&event_key).ok_or(SquadOvError::NotFound)?;
+        if let WoWCombatLogEventType::SpellAura{spell, aura_type, applied} = x.event {
+            sql.push(format!("(
+                {event_id},
+                {spell_id},
+                '{aura_type}',
+                {applied}
+            )",
+                event_id=event_id,
+                spell_id=spell.id,
+                aura_type=aura_type.to_string(),
+                applied=crate::sql_format_bool(applied),
+            ));
+        } else {
+            return Err(SquadOvError::BadRequest);
+        }
+        sql.push(String::from(","));
+    }
+
+    sql.truncate(sql.len() - 1);
+    sqlx::query(&sql.join("")).execute(tx).await?;
+    Ok(())
+}
+
+async fn bulk_insert_wow_summon_events(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>, ids: &WowEventIdMap) -> Result<(), SquadOvError> {
+    if events.is_empty() {
+        return Ok(());
+    }
+
+    let mut sql: Vec<String> = Vec::new();
+    sql.push(String::from("
+        INSERT INTO squadov.wow_match_view_summon_events (
+            event_id,
+            spell_id
+        )
+        VALUES
+    "));
+
+    for x in events {
+        let event_key = (x.view_id.clone(), x.log_line);
+        let event_id = ids.get(&event_key).ok_or(SquadOvError::NotFound)?;
+        if let WoWCombatLogEventType::SpellSummon(spell) = &x.event {
+            sql.push(format!("(
+                {event_id},
+                {spell_id}
+            )",
+                event_id=event_id,
+                spell_id=spell.id,
+            ));
+        } else {
+            return Err(SquadOvError::BadRequest);
+        }
+        sql.push(String::from(","));
+    }
+
+    sql.truncate(sql.len() - 1);
+    sqlx::query(&sql.join("")).execute(tx).await?;
+    Ok(())
+}
+
+async fn bulk_insert_wow_resurrect_events(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>, ids: &WowEventIdMap) -> Result<(), SquadOvError> {
+    if events.is_empty() {
+        return Ok(());
+    }
+
+    let mut sql: Vec<String> = Vec::new();
+    sql.push(String::from("
+        INSERT INTO squadov.wow_match_view_resurrect_events (
+            event_id,
+            spell_id
+        )
+        VALUES
+    "));
+
+    for x in events {
+        let event_key = (x.view_id.clone(), x.log_line);
+        let event_id = ids.get(&event_key).ok_or(SquadOvError::NotFound)?;
+        if let WoWCombatLogEventType::Resurrect(spell) = &x.event {
+            sql.push(format!("(
+                {event_id},
+                {spell_id}
+            )",
+                event_id=event_id,
+                spell_id=spell.id,
+            ));
+        } else {
+            return Err(SquadOvError::BadRequest);
+        }
+        sql.push(String::from(","));
+    }
+
+    sql.truncate(sql.len() - 1);
+    sqlx::query(&sql.join("")).execute(tx).await?;
+    Ok(())
+}
+
+async fn bulk_insert_wow_subencounter_events(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>, ids: &WowEventIdMap) -> Result<(), SquadOvError> {
+    if events.is_empty() {
+        return Ok(());
+    }
+
+    let mut sql: Vec<String> = Vec::new();
+    sql.push(String::from("
+        INSERT INTO squadov.wow_match_view_subencounter_events (
+            event_id,
+            encounter_id,
+            encounter_name,
+            is_start
+        )
+        VALUES
+    "));
+
+    for x in events {
+        let event_key = (x.view_id.clone(), x.log_line);
+        let event_id = ids.get(&event_key).ok_or(SquadOvError::NotFound)?;
+        if let WoWCombatLogEventType::EncounterStart{encounter_id, encounter_name, ..} = &x.event {
+            sql.push(format!("(
+                {event_id},
+                {encounter_id},
+                {encounter_name},
+                TRUE
+            )",
+                event_id=event_id,
+                encounter_id=encounter_id,
+                encounter_name=&crate::sql_format_string(&encounter_name),
+            ));
+        } else if let WoWCombatLogEventType::EncounterEnd{encounter_id, encounter_name, ..} = &x.event {
+            sql.push(format!("(
+                {event_id},
+                {encounter_id},
+                {encounter_name},
+                FALSE
+            )",
+                event_id=event_id,
+                encounter_id=encounter_id,
+                encounter_name=&crate::sql_format_string(encounter_name),
+            ));
+        } else {
+            return Err(SquadOvError::BadRequest);
+        }
+        sql.push(String::from(","));
+    }
+
+    sql.truncate(sql.len() - 1);
+    sqlx::query(&sql.join("")).execute(tx).await?;
+    Ok(())
+}
+
+async fn bulk_insert_wow_death_events(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>, ids: &WowEventIdMap) -> Result<(), SquadOvError> {
+    if events.is_empty() {
+        return Ok(());
+    }
+
+    let mut sql: Vec<String> = Vec::new();
+    sql.push(String::from("
+        INSERT INTO squadov.wow_match_view_death_events (
+            event_id
+        )
+        VALUES
+    "));
+
+    for x in events {
+        let event_key = (x.view_id.clone(), x.log_line);
+        sql.push(format!("(
+            {event_id}
+        )",
+            event_id=ids.get(&event_key).ok_or(SquadOvError::NotFound)?,
+        ));
+        sql.push(String::from(","));
+    }
+
+    sql.truncate(sql.len() - 1);
+    sqlx::query(&sql.join("")).execute(tx).await?;
+    Ok(())
+}
+
+async fn bulk_insert_wow_events(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>, ids: &WowEventIdMap, mapping: &WowCharacterIdMap) -> Result<(), SquadOvError> {
+    // We first split the input events into individual vectors that are split according to how our database tables are split.
+    // This way we can do a O(N) operation to parse out the bulk inserts instead of a M O(N) operation (where M is the number of tables we have).
+    // M is just a constant factor but I'd rather avoid it. Note that we also want to update the "wow_user_character_cache" table here if we 
+    // encounter events that have the appropriate combat log flag set.
+    let mut combatant_events: Vec<WoWCombatLogEvent> = vec![];
+    let mut damage_events: Vec<WoWCombatLogEvent> = vec![];
+    let mut healing_events: Vec<WoWCombatLogEvent> = vec![];
+    let mut auras_events: Vec<WoWCombatLogEvent> = vec![];
+    let mut summon_events: Vec<WoWCombatLogEvent> = vec![];
+    let mut resurrect_events: Vec<WoWCombatLogEvent> = vec![];
+    let mut subencounter_events: Vec<WoWCombatLogEvent> = vec![];
+    let mut death_events: Vec<WoWCombatLogEvent> = vec![];
+
+    // (User ID, Unit GUID) -> View UUID. This way we are able to do an upsert
+    // via an INSERT/SELECT to find the combatant info in the view for this unit.
+    let mut user_character_cache: HashMap<(i64, String), Uuid> = HashMap::new();
+
+    events.into_iter().for_each(|x| {
+        if let Some(source) = &x.source {
+            if source.flags & crate::COMBATLOG_FILTER_ME == crate::COMBATLOG_FILTER_ME && source.guid != crate::NIL_WOW_GUID {
+                user_character_cache.insert((x.user_id, source.guid.clone()), x.view_id.clone());
+            }
+        }
+
+        if let Some(dest) = &x.dest {
+            if dest.flags & crate::COMBATLOG_FILTER_ME == crate::COMBATLOG_FILTER_ME && dest.guid != crate::NIL_WOW_GUID {
+                user_character_cache.insert((x.user_id, dest.guid.clone()), x.view_id.clone());
+            }
+        }
+
+        match x.event {
+            WoWCombatLogEventType::CombatantInfo{..} => combatant_events.push(x),
+            WoWCombatLogEventType::DamageDone{..} => damage_events.push(x),
+            WoWCombatLogEventType::Healing{..} => healing_events.push(x),
+            WoWCombatLogEventType::SpellAura{..} => auras_events.push(x),
+            WoWCombatLogEventType::SpellSummon(..) => summon_events.push(x),
+            WoWCombatLogEventType::Resurrect(..) => resurrect_events.push(x),
+            WoWCombatLogEventType::EncounterStart{..} | WoWCombatLogEventType::EncounterEnd{..} => subencounter_events.push(x),
+            WoWCombatLogEventType::UnitDied{..} => death_events.push(x),
+            _ => log::warn!("Handling an event that can't be parsed into a table? {:?}", x),
+        }
+    });
+
+    bulk_insert_wow_combatant_events(&mut *tx, combatant_events, ids, mapping).await?;
+    bulk_insert_wow_damage_events(&mut *tx, damage_events, ids).await?;
+    bulk_insert_wow_healing_events(&mut *tx, healing_events, ids).await?;
+    bulk_insert_wow_auras_events(&mut *tx, auras_events, ids).await?;
+    bulk_insert_wow_summon_events(&mut *tx, summon_events, ids).await?;
+    bulk_insert_wow_resurrect_events(&mut *tx, resurrect_events, ids).await?;
+    bulk_insert_wow_subencounter_events(&mut *tx, subencounter_events, ids).await?;
+    bulk_insert_wow_death_events(&mut *tx, death_events, ids).await?;
+    bulk_update_wow_user_character_cache(&mut *tx, user_character_cache).await?;
+
+    Ok(())
+}
+
+pub async fn store_wow_combat_log_events(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>) -> Result<(), SquadOvError> {
+    // First we filter out events we don't need. We're parsing more events than we care to store at the moment.
+    // That is NOT an error in parsing as some events are crucial for our Kafka logic such as knowing when to
+    // store an updated offset/commit events.
+    let events: Vec<_> = events.into_iter().filter(|x| {
+        match &x.event {
+            WoWCombatLogEventType::ArenaStart{..} | 
+                WoWCombatLogEventType::ArenaEnd{..} | 
+                WoWCombatLogEventType::ChallengeModeStart{..} | 
+                WoWCombatLogEventType::ChallengeModeEnd{..} | 
+                WoWCombatLogEventType::Unknown => false,
+            _ => true,
+        }
+    }).collect();
+
+    if events.is_empty() {
+        return Ok(());
+    }
+
+    // For every event that comes through, we need to add an entry to the "wow_match_view_events" table.
+    // If the event has a "source" or "dest" field:
+    //  1) Insert or update an entry in the "wow_match_view_character_presence" table.
+    // If the event is COMBATANT_INFO:
+    //  1) Insert or update an entry in the "wow_match_view_character_presence" table (with NULL name, flags, and owner guid).
+    //  2) Create a new event in the "wow_match_view_events" table.
+    //  3) Insert combatant info into the "wow_match_view_combatants" and "wow_match_view_combatant_items" tables.
+    //  4) Link the new combatant info into the "wow_user_character_cache" if the character belongs to the owner of the combat log.
+    // For all other events:
+    //  1) Create a new event in the "wow_match_view_events" table.
+    //  2) Create a new event in the corresponding event table:
+    //         - wow_match_view_damage_events
+    //         - wow_match_view_healing_events
+    //         - wow_match_view_aura_events
+    //         - wow_match_view_summon_events
+    //         - wow_match_view_resurrect_events
+    //         - wow_match_view_subencounter_events
+    //         - wow_match_view_death_events
+    // We want to try and be efficient about this by sending multi-row inserts as much as possible.
+    // Thus, we use this order of operations:
+    //  1) Perform inserts into "wow_match_view_character_presence" for only the characters that are missing (source/dest/combatant info).
+    //     We need to limit this to missing characters because it's a possibility that we can have multiple
+    //     events that reference the same character. Thus, any sort of bulk upsert would fail.
+    insert_missing_wow_character_presence_for_events(&mut *tx, &events).await?;
+
+    //  2) Perform updates on "wow_match_view_character_presence". Now that we're guaranteed that every event's source/dest
+    //     is in the "wow_match_view_character_presence" table, we can perform a regular UPDATE (instead of an INSERT) and thus
+    //     multiple events can touch the same row no problem.
+    //
+    //     Data that we'd want to update are:
+    //          1) Flags
+    //          2) Owner GUID
+    //          3) Unit Name
+    let character_id_map = update_wow_character_presence_for_events(&mut *tx, &events).await?;
+
+    //  3) Bullk add into the "wow_match_view_events". We are able to obtain proper values for source_char and dest_char
+    //     from the previous two operations.
+    let event_ids = create_wow_events(&mut *tx, &events, &character_id_map).await?;
+
+    //  4) AT THIS POINT THE LOGIC MUST SPLIT DEPENDING ON THE TYPE OF THE INCOMING EVENT.
+    //     a) COMBATANT_INFO: We can pull character_id from steps #1 and #2. So it becomes trivial to
+    //                        bulk add into the wow_match_view_combatants and wow_match_view_combatant_items tables.
+    //                        
+    //                        It's also when processing the COMBATANT_INFO can we also finally update the "wow_match_view_character_presence"
+    //                        table to know that the combatant info exists.
+    //     b) All other events are trivially bulk insertable - the only thing that changes between them is the table/data that we insert into.
+    bulk_insert_wow_events(&mut *tx, events, &event_ids, &character_id_map).await?;
+    Ok(())
 }
 
 #[cfg(test)]

@@ -10,6 +10,7 @@ use squadov_common::{
     WoWChallenge,
     WoWArena,
     WoWCombatantInfo,
+    WoWCombatLogState,
     matches::MatchPlayerPair,
     generate_combatants_key,
 };
@@ -28,6 +29,7 @@ use std::collections::HashMap;
 pub struct GenericMatchCreationRequest<T> {
     pub timestamp: DateTime<Utc>,
     pub data: T,
+    pub cl: WoWCombatLogState,
 }
 
 #[derive(Deserialize)]
@@ -337,24 +339,33 @@ impl api::ApiApplication {
         )
     }
 
-    async fn create_generic_wow_match_view(&self, tx: &mut Transaction<'_, Postgres>, tm: &DateTime<Utc>, user_id: i64) -> Result<Uuid, SquadOvError> {
+    async fn create_generic_wow_match_view(&self, tx: &mut Transaction<'_, Postgres>, tm: &DateTime<Utc>, user_id: i64, cl: &WoWCombatLogState) -> Result<Uuid, SquadOvError> {
         Ok(
             sqlx::query!(
                 r#"
                 INSERT INTO squadov.wow_match_view (
                     id,
                     user_id,
-                    start_tm
+                    start_tm,
+                    combat_log_version,
+                    advanced_log,
+                    build_version
                 )
                 VALUES (
                     gen_random_uuid(),
                     $1,
-                    $2
+                    $2,
+                    $3,
+                    $4,
+                    $5
                 )
                 RETURNING id
                 "#,
                 user_id,
                 tm,
+                &cl.combat_log_version,
+                cl.advanced_log,
+                &cl.build_version,
             )
                 .fetch_one(tx)
                 .await?
@@ -362,8 +373,8 @@ impl api::ApiApplication {
         )
     }
 
-    pub async fn create_wow_encounter_match_view(&self, tx: &mut Transaction<'_, Postgres>, tm: &DateTime<Utc>, user_id: i64, game: &WoWEncounterStart) -> Result<Uuid, SquadOvError> {
-        let uuid = self.create_generic_wow_match_view(&mut *tx, tm, user_id).await?;
+    pub async fn create_wow_encounter_match_view(&self, tx: &mut Transaction<'_, Postgres>, tm: &DateTime<Utc>, user_id: i64, game: &WoWEncounterStart, cl: &WoWCombatLogState) -> Result<Uuid, SquadOvError> {
+        let uuid = self.create_generic_wow_match_view(&mut *tx, tm, user_id, cl).await?;
         sqlx::query!(
             "
             INSERT INTO squadov.wow_encounter_view (
@@ -395,7 +406,38 @@ impl api::ApiApplication {
         Ok(uuid)
     }
 
-    pub async fn finish_wow_encounter(&self, tx: &mut Transaction<'_, Postgres>, view_uuid: &Uuid, match_uuid: &Uuid, tm: &DateTime<Utc>, game: &WoWEncounterEnd, key: &str) -> Result<(), SquadOvError> {
+    pub async fn find_existing_wow_encounter_match(&self, view_uuid: &Uuid, tm: &DateTime<Utc>, key: &str) -> Result<Option<Uuid>, SquadOvError> {
+        Ok(
+            sqlx::query!(
+                "
+                SELECT match_uuid
+                FROM squadov.new_wow_encounters AS wc
+                CROSS JOIN (
+                    SELECT wmv.start_tm, wcv.encounter_id, wcv.difficulty, wcv.instance_id
+                    FROM squadov.wow_match_view AS wmv
+                    INNER JOIN squadov.wow_encounter_view AS wcv
+                        ON wcv.view_id = wmv.id
+                    WHERE wmv.id = $2
+                ) AS wmv(start_tm, encounter_id, difficulty, instance_id)
+                WHERE wc.tr && tstzrange(wmv.start_tm, $3, '[]')
+                    AND wc.combatants_key = $1
+                    AND wc.encounter_id = wmv.encounter_id
+                    AND wc.difficulty = wmv.difficulty
+                    AND wc.instance_id = wmv.instance_id
+                ",
+                key,
+                view_uuid,
+                tm,
+            )
+                .fetch_optional(&*self.pool)
+                .await?
+                .map(|x| {
+                    x.match_uuid
+                })
+        )
+    }
+
+    pub async fn finish_wow_encounter_match(&self, tx: &mut Transaction<'_, Postgres>, view_uuid: &Uuid, match_uuid: &Uuid, tm: &DateTime<Utc>, key: &str) -> Result<(), SquadOvError> {
         // Insert into wow encounters table.
         sqlx::query!(
             "
@@ -427,6 +469,10 @@ impl api::ApiApplication {
             .execute(&mut *tx)
             .await?;
 
+        Ok(())
+    }
+
+    pub async fn finish_wow_encounter_view(&self, tx: &mut Transaction<'_, Postgres>, view_uuid: &Uuid, match_uuid: &Uuid, tm: &DateTime<Utc>, game: &WoWEncounterEnd) -> Result<(), SquadOvError> {
         // Modify view to link to the new match and to update the end time as well.
         sqlx::query!(
             "
@@ -458,8 +504,8 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn create_wow_challenge_match_view(&self, tx: &mut Transaction<'_, Postgres>, tm: &DateTime<Utc>, user_id: i64, game: &WoWChallengeStart) -> Result<Uuid, SquadOvError> {
-        let uuid = self.create_generic_wow_match_view(&mut *tx, tm, user_id).await?;
+    pub async fn create_wow_challenge_match_view(&self, tx: &mut Transaction<'_, Postgres>, tm: &DateTime<Utc>, user_id: i64, game: &WoWChallengeStart, cl: &WoWCombatLogState) -> Result<Uuid, SquadOvError> {
+        let uuid = self.create_generic_wow_match_view(&mut *tx, tm, user_id, cl).await?;
         sqlx::query!(
             "
             INSERT INTO squadov.wow_challenge_view (
@@ -485,36 +531,37 @@ impl api::ApiApplication {
         Ok(uuid)
     }
 
-    pub async fn finish_wow_challenge(&self, tx: &mut Transaction<'_, Postgres>, view_uuid: &Uuid, match_uuid: &Uuid, tm: &DateTime<Utc>, game: &WoWChallengeEnd, key: &str) -> Result<(), SquadOvError> {
-        // Insert into wow encounters table.
-        sqlx::query!(
-            "
-            INSERT INTO squadov.new_wow_challenges (
-                match_uuid,
-                tr,
-                combatants_key,
-                instance_id,
-                keystone_level
+    pub async fn find_existing_wow_challenge_match(&self, view_uuid: &Uuid, tm: &DateTime<Utc>, key: &str) -> Result<Option<Uuid>, SquadOvError> {
+        Ok(
+            sqlx::query!(
+                "
+                SELECT match_uuid
+                FROM squadov.new_wow_challenges AS wc
+                CROSS JOIN (
+                    SELECT wmv.start_tm, wcv.instance_id, wcv.keystone_level
+                    FROM squadov.wow_match_view AS wmv
+                    INNER JOIN squadov.wow_challenge_view AS wcv
+                        ON wcv.view_id = wmv.id
+                    WHERE wmv.id = $2
+                ) AS wmv(start_tm, instance_id, keystone_level)
+                WHERE wc.tr && tstzrange(wmv.start_tm, $3, '[]')
+                    AND wc.combatants_key = $1
+                    AND wc.instance_id = wmv.instance_id
+                    AND wc.keystone_level = wmv.keystone_level
+                ",
+                key,
+                view_uuid,
+                tm,
             )
-            SELECT
-                $1,
-                tstzrange(wmv.start_tm, $4, '[]'),
-                $2,
-                wcv.instance_id,
-                wcv.keystone_level
-            FROM squadov.wow_match_view AS wmv
-            INNER JOIN squadov.wow_challenge_view AS wcv
-                ON wcv.view_id = wmv.id
-            WHERE wmv.id = $3
-            ",
-            match_uuid,
-            key,
-            view_uuid,
-            tm,
+                .fetch_optional(&*self.pool)
+                .await?
+                .map(|x| {
+                    x.match_uuid
+                })
         )
-            .execute(&mut *tx)
-            .await?;
+    }
 
+    pub async fn finish_wow_challenge_view(&self, tx: &mut Transaction<'_, Postgres>, view_uuid: &Uuid, match_uuid: &Uuid, tm: &DateTime<Utc>, game: &WoWChallengeEnd) -> Result<(), SquadOvError> {
         // Modify view to link to the new match and to update the end time as well.
         sqlx::query!(
             "
@@ -548,8 +595,41 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn create_wow_arena_match_view(&self, tx: &mut Transaction<'_, Postgres>, tm: &DateTime<Utc>, user_id: i64, game: &WoWArenaStart) -> Result<Uuid, SquadOvError> {
-        let uuid = self.create_generic_wow_match_view(&mut *tx, tm, user_id).await?;
+    pub async fn finish_wow_challenge_match(&self, tx: &mut Transaction<'_, Postgres>, view_uuid: &Uuid, match_uuid: &Uuid, tm: &DateTime<Utc>, key: &str) -> Result<(), SquadOvError> {
+        // Insert into wow encounters table.
+        sqlx::query!(
+            "
+            INSERT INTO squadov.new_wow_challenges (
+                match_uuid,
+                tr,
+                combatants_key,
+                instance_id,
+                keystone_level
+            )
+            SELECT
+                $1,
+                tstzrange(wmv.start_tm, $4, '[]'),
+                $2,
+                wcv.instance_id,
+                wcv.keystone_level
+            FROM squadov.wow_match_view AS wmv
+            INNER JOIN squadov.wow_challenge_view AS wcv
+                ON wcv.view_id = wmv.id
+            WHERE wmv.id = $3
+            ON CONFLICT (match_uuid) DO NOTHING
+            ",
+            match_uuid,
+            key,
+            view_uuid,
+            tm,
+        )
+            .execute(&mut *tx)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn create_wow_arena_match_view(&self, tx: &mut Transaction<'_, Postgres>, tm: &DateTime<Utc>, user_id: i64, game: &WoWArenaStart, cl: &WoWCombatLogState) -> Result<Uuid, SquadOvError> {
+        let uuid = self.create_generic_wow_match_view(&mut *tx, tm, user_id, cl).await?;
         sqlx::query!(
             "
             INSERT INTO squadov.wow_arena_view (
@@ -572,7 +652,37 @@ impl api::ApiApplication {
         Ok(uuid)
     }
 
-    pub async fn finish_wow_arena(&self, tx: &mut Transaction<'_, Postgres>, view_uuid: &Uuid, match_uuid: &Uuid, tm: &DateTime<Utc>, game: &WoWArenaEnd, key: &str) -> Result<(), SquadOvError> {
+    pub async fn find_existing_wow_arena_match(&self, view_uuid: &Uuid, tm: &DateTime<Utc>, key: &str) -> Result<Option<Uuid>, SquadOvError> {
+        Ok(
+            sqlx::query!(
+                "
+                SELECT match_uuid
+                FROM squadov.new_wow_arenas AS wc
+                CROSS JOIN (
+                    SELECT wmv.start_tm, wcv.instance_id, wcv.arena_type
+                    FROM squadov.wow_match_view AS wmv
+                    INNER JOIN squadov.wow_arena_view AS wcv
+                        ON wcv.view_id = wmv.id
+                    WHERE wmv.id = $2
+                ) AS wmv(start_tm, instance_id, arena_type)
+                WHERE wc.tr && tstzrange(wmv.start_tm, $3, '[]')
+                    AND wc.combatants_key = $1
+                    AND wc.instance_id = wmv.instance_id
+                    AND wc.arena_type = wmv.arena_type
+                ",
+                key,
+                view_uuid,
+                tm,
+            )
+                .fetch_optional(&*self.pool)
+                .await?
+                .map(|x| {
+                    x.match_uuid
+                })
+        )
+    }
+
+    pub async fn finish_wow_arena_match(&self, tx: &mut Transaction<'_, Postgres>, view_uuid: &Uuid, match_uuid: &Uuid, tm: &DateTime<Utc>, key: &str) -> Result<(), SquadOvError> {
         // Insert into wow encounters table.
         sqlx::query!(
             "
@@ -601,7 +711,10 @@ impl api::ApiApplication {
         )
             .execute(&mut *tx)
             .await?;
+        Ok(())
+    }
 
+    pub async fn finish_wow_arena_view(&self, tx: &mut Transaction<'_, Postgres>, view_uuid: &Uuid, match_uuid: &Uuid, tm: &DateTime<Utc>, game: &WoWArenaEnd) -> Result<(), SquadOvError> {
         // Modify view to link to the new match and to update the end time as well.
         sqlx::query!(
             "
@@ -646,7 +759,7 @@ pub async fn create_wow_encounter_match_handler(app : web::Data<Arc<api::ApiAppl
     };
 
     let mut tx = app.pool.begin().await?;
-    let uuid = app.create_wow_encounter_match_view(&mut tx, &input_match.timestamp, session.user.id, &input_match.data).await?;
+    let uuid = app.create_wow_encounter_match_view(&mut tx, &input_match.timestamp, session.user.id, &input_match.data, &input_match.cl).await?;
     tx.commit().await?;
     Ok(HttpResponse::Ok().json(uuid))
 }
@@ -659,7 +772,7 @@ pub async fn create_wow_challenge_match_handler(app : web::Data<Arc<api::ApiAppl
     };
 
     let mut tx = app.pool.begin().await?;
-    let uuid = app.create_wow_challenge_match_view(&mut tx, &input_match.timestamp, session.user.id, &input_match.data).await?;
+    let uuid = app.create_wow_challenge_match_view(&mut tx, &input_match.timestamp, session.user.id, &input_match.data, &input_match.cl).await?;
     tx.commit().await?;
     Ok(HttpResponse::Ok().json(uuid))
 }
@@ -672,7 +785,7 @@ pub async fn create_wow_arena_match_handler(app : web::Data<Arc<api::ApiApplicat
     };
 
     let mut tx = app.pool.begin().await?;
-    let uuid = app.create_wow_arena_match_view(&mut tx, &input_match.timestamp, session.user.id, &input_match.data).await?;
+    let uuid = app.create_wow_arena_match_view(&mut tx, &input_match.timestamp, session.user.id, &input_match.data, &input_match.cl).await?;
     tx.commit().await?;
     Ok(HttpResponse::Ok().json(uuid))
 }
@@ -681,21 +794,29 @@ pub async fn finish_wow_encounter_handler(app : web::Data<Arc<api::ApiApplicatio
     let combatants_key = generate_combatants_key(&data.combatants);
     for _i in 0i32..2 {
         let mut tx = app.pool.begin().await?;
-        let new_match = app.create_new_match(&mut tx).await?;
-        match app.finish_wow_encounter(&mut tx, &path.view_uuid, &new_match.uuid, &data.timestamp, &data.data, &combatants_key).await {
-            Ok(_) => (),
-            Err(err) => match err {
-                SquadOvError::Duplicate => {
-                    // This indicates that the match UUID is INVALID because a match with the same
-                    // match ID already exists. Retry!
-                    log::warn!("Caught duplicate WoW encounter...retrying!");
-                    continue;
-                },
-                _ => return Err(err)
+        let match_uuid = match app.find_existing_wow_encounter_match(&path.view_uuid, &data.timestamp, &combatants_key).await? {
+            Some(uuid) => uuid,
+            None => {
+                let new_match = app.create_new_match(&mut tx).await?;
+                match app.finish_wow_encounter_match(&mut tx, &path.view_uuid, &new_match.uuid, &data.timestamp, &combatants_key).await {
+                    Ok(_) => (),
+                    Err(err) => match err {
+                        SquadOvError::Duplicate => {
+                            // This indicates that the match UUID is INVALID because a match with the same
+                            // match ID already exists. Retry!
+                            log::warn!("Caught duplicate WoW encounter...retrying!");
+                            continue;
+                        },
+                        _ => return Err(err)
+                    }
+                };
+                new_match.uuid
             }
         };
+        app.finish_wow_encounter_view(&mut tx, &path.view_uuid, &match_uuid, &data.timestamp, &data.data).await?;
+        
         tx.commit().await?;
-        return Ok(HttpResponse::Ok().json(new_match.uuid));
+        return Ok(HttpResponse::Ok().json(match_uuid));
     }
     Err(SquadOvError::InternalError(String::from("Too many errors in finishing WoW encounter...Retry limit reached.")))
 }
@@ -704,21 +825,29 @@ pub async fn finish_wow_challenge_handler(app : web::Data<Arc<api::ApiApplicatio
     let combatants_key = generate_combatants_key(&data.combatants);
     for _i in 0i32..2 {
         let mut tx = app.pool.begin().await?;
-        let new_match = app.create_new_match(&mut tx).await?;
-        match app.finish_wow_challenge(&mut tx, &path.view_uuid, &new_match.uuid, &data.timestamp, &data.data, &combatants_key).await {
-            Ok(_) => (),
-            Err(err) => match err {
-                SquadOvError::Duplicate => {
-                    // This indicates that the match UUID is INVALID because a match with the same
-                    // match ID already exists. Retry!
-                    log::warn!("Caught duplicate WoW challenge...retrying!");
-                    continue;
-                },
-                _ => return Err(err)
+        let match_uuid = match app.find_existing_wow_challenge_match(&path.view_uuid, &data.timestamp, &combatants_key).await? {
+            Some(uuid) => uuid,
+            None => {
+                let new_match = app.create_new_match(&mut tx).await?;
+                match app.finish_wow_challenge_match(&mut tx, &path.view_uuid, &new_match.uuid, &data.timestamp, &combatants_key).await {
+                    Ok(_) => (),
+                    Err(err) => match err {
+                        SquadOvError::Duplicate => {
+                            // This indicates that the match UUID is INVALID because a match with the same
+                            // match ID already exists. Retry!
+                            log::warn!("Caught duplicate WoW challenge...retrying!");
+                            continue;
+                        },
+                        _ => return Err(err)
+                    }
+                };
+                new_match.uuid
             }
         };
+        app.finish_wow_challenge_view(&mut tx, &path.view_uuid, &match_uuid, &data.timestamp, &data.data).await?;
+        
         tx.commit().await?;
-        return Ok(HttpResponse::Ok().json(new_match.uuid));
+        return Ok(HttpResponse::Ok().json(match_uuid));
     }
     Err(SquadOvError::InternalError(String::from("Too many errors in finishing WoW challenge...Retry limit reached.")))
 }
@@ -727,21 +856,29 @@ pub async fn finish_wow_arena_handler(app : web::Data<Arc<api::ApiApplication>>,
     let combatants_key = generate_combatants_key(&data.combatants);
     for _i in 0i32..2 {
         let mut tx = app.pool.begin().await?;
-        let new_match = app.create_new_match(&mut tx).await?;
-        match app.finish_wow_arena(&mut tx, &path.view_uuid, &new_match.uuid, &data.timestamp, &data.data, &combatants_key).await {
-            Ok(_) => (),
-            Err(err) => match err {
-                SquadOvError::Duplicate => {
-                    // This indicates that the match UUID is INVALID because a match with the same
-                    // match ID already exists. Retry!
-                    log::warn!("Caught duplicate WoW arena...retrying!");
-                    continue;
-                },
-                _ => return Err(err)
+        let match_uuid = match app.find_existing_wow_arena_match(&path.view_uuid, &data.timestamp, &combatants_key).await? {
+            Some(uuid) => uuid,
+            None => {
+                let new_match = app.create_new_match(&mut tx).await?;
+                match app.finish_wow_arena_match(&mut tx, &path.view_uuid, &new_match.uuid, &data.timestamp, &combatants_key).await {
+                    Ok(_) => (),
+                    Err(err) => match err {
+                        SquadOvError::Duplicate => {
+                            // This indicates that the match UUID is INVALID because a match with the same
+                            // match ID already exists. Retry!
+                            log::warn!("Caught duplicate WoW arena...retrying!");
+                            continue;
+                        },
+                        _ => return Err(err)
+                    }
+                };
+                new_match.uuid
             }
         };
+        app.finish_wow_arena_view(&mut tx, &path.view_uuid, &match_uuid, &data.timestamp, &data.data).await?;
+        
         tx.commit().await?;
-        return Ok(HttpResponse::Ok().json(new_match.uuid));
+        return Ok(HttpResponse::Ok().json(match_uuid));
     }
     Err(SquadOvError::InternalError(String::from("Too many errors in finishing WoW arena...Retry limit reached.")))
 }

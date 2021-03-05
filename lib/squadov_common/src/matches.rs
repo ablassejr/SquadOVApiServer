@@ -165,10 +165,8 @@ where
                     r#"
                     SELECT EXISTS (
                         SELECT 1
-                        FROM squadov.wow_match_combatants AS wmc
-                        INNER JOIN squadov.wow_user_character_association AS wuca
-                            ON wuca.guid = wmc.combatant_guid
-                        WHERE wuca.user_id = $1 AND wmc.match_uuid = $2
+                        FROM squadov.wow_match_view AS wmv
+                        WHERE wmv.user_id = $1 AND wmv.match_uuid = $2
                     ) as "exists!"
                     "#,
                     user_id,

@@ -15,9 +15,11 @@ CREATE INDEX ON wow_match_view_character_presence(view_id, owner_guid);
 CREATE TABLE wow_match_view_events (
     event_id BIGSERIAL PRIMARY KEY,
     view_id UUID NOT NULL REFERENCES wow_match_view(id) ON DELETE CASCADE,
+    log_line BIGINT NOT NULL,
     source_char BIGINT REFERENCES wow_match_view_character_presence(character_id) ON DELETE CASCADE,
     dest_char BIGINT REFERENCES wow_match_view_character_presence(character_id) ON DELETE CASCADE,
-    tm TIMESTAMPTZ NOT NULL
+    tm TIMESTAMPTZ NOT NULL,
+    UNIQUE(view_id, log_line)
 );
 
 CREATE INDEX ON wow_match_view_events(view_id);
@@ -43,7 +45,6 @@ CREATE TABLE wow_match_view_combatant_items (
 CREATE TABLE wow_user_character_cache (
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     unit_guid VARCHAR NOT NULL,
-    unit_name VARCHAR NOT NULL,
     event_id BIGINT NOT NULL REFERENCES wow_match_view_combatants(event_id) ON DELETE RESTRICT,
     cache_time TIMESTAMPTZ NOT NULL,
     UNIQUE(user_id, unit_guid)

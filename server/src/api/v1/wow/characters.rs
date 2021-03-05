@@ -147,7 +147,7 @@ impl api::ApiApplication {
                 r#"
                 SELECT
                     wucc.unit_guid AS "guid",
-                    wucc.unit_name AS "name",
+                    COALESCE(wcp.unit_name, '') AS "name!",
                     COALESCE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS "items!",
                     wvc.spec_id,
                     wvc.team
@@ -159,7 +159,7 @@ impl api::ApiApplication {
                 LEFT JOIN squadov.wow_match_view_combatant_items AS wci
                     ON wci.event_id = wvc.event_id
                 WHERE wucc.user_id = $1
-                GROUP BY wucc.unit_guid, wucc.unit_name, wvc.spec_id, wvc.team
+                GROUP BY wucc.unit_guid, wcp.unit_name, wvc.spec_id, wvc.team
                 "#,
                 user_id,
             )

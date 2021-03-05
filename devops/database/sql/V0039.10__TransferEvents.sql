@@ -94,11 +94,13 @@ BEGIN
 
         INSERT INTO wow_match_view_events (
             view_id,
-            tm
+            tm,
+            log_line
         )
         VALUES (
             in_match_view_uuid,
-            tmp.tm
+            tmp.tm,
+            tmp.log_line
         )
         RETURNING event_id INTO new_event_id;
 
@@ -140,21 +142,17 @@ BEGIN
         INSERT INTO wow_user_character_cache (
             user_id,
             unit_guid,
-            unit_name,
             event_id,
             cache_time
         )
-        SELECT wcl.user_id, tmp.evt->>'guid', COALESCE(combatant_name, ''), new_event_id, tmp.tm
+        SELECT wcl.user_id, tmp.evt->>'guid', new_event_id, tmp.tm
         FROM wow_combat_logs AS wcl
         INNER JOIN wow_user_character_association AS wuca
             ON wuca.user_id = wcl.user_id
         WHERE wcl.uuid = in_combat_log_uuid
             AND wuca.guid = tmp.evt->>'guid'
         ON CONFLICT (user_id, unit_guid) DO UPDATE
-            SET unit_name = (CASE WHEN (EXCLUDED.cache_time >= wow_user_character_cache.cache_time AND EXCLUDED.unit_name != '') THEN EXCLUDED.unit_name
-                                                                                                  ELSE wow_user_character_cache.unit_name
-                           END),
-                event_id = (CASE WHEN (EXCLUDED.cache_time >= wow_user_character_cache.cache_time) THEN EXCLUDED.event_id
+            SET event_id = (CASE WHEN (EXCLUDED.cache_time >= wow_user_character_cache.cache_time) THEN EXCLUDED.event_id
                                                                                                   ELSE wow_user_character_cache.event_id
                            END),
                 cache_time = (CASE WHEN (EXCLUDED.cache_time >= wow_user_character_cache.cache_time) THEN EXCLUDED.cache_time
@@ -194,13 +192,15 @@ BEGIN
             view_id,
             source_char,
             dest_char,
-            tm
+            tm,
+            log_line
         )
         VALUES (
             in_match_view_uuid,
             source_char_id,
             dest_char_id,
-            tmp.tm
+            tmp.tm,
+            tmp.log_line
         )
         RETURNING event_id INTO new_event_id;
 
@@ -250,13 +250,15 @@ BEGIN
             view_id,
             source_char,
             dest_char,
-            tm
+            tm,
+            log_line
         )
         VALUES (
             in_match_view_uuid,
             source_char_id,
             dest_char_id,
-            tmp.tm
+            tmp.tm,
+            tmp.log_line
         )
         RETURNING event_id INTO new_event_id;
 
@@ -308,13 +310,15 @@ BEGIN
             view_id,
             source_char,
             dest_char,
-            tm
+            tm,
+            log_line
         )
         VALUES (
             in_match_view_uuid,
             source_char_id,
             dest_char_id,
-            tmp.tm
+            tmp.tm,
+            tmp.log_line
         )
         RETURNING event_id INTO new_event_id;
 
@@ -364,13 +368,15 @@ BEGIN
             view_id,
             source_char,
             dest_char,
-            tm
+            tm,
+            log_line
         )
         VALUES (
             in_match_view_uuid,
             source_char_id,
             dest_char_id,
-            tmp.tm
+            tmp.tm,
+            tmp.log_line
         )
         RETURNING event_id INTO new_event_id;
 
@@ -416,13 +422,15 @@ BEGIN
             view_id,
             source_char,
             dest_char,
-            tm
+            tm,
+            log_line
         )
         VALUES (
             in_match_view_uuid,
             source_char_id,
             dest_char_id,
-            tmp.tm
+            tmp.tm,
+            tmp.log_line
         )
         RETURNING event_id INTO new_event_id;
 
@@ -454,11 +462,13 @@ BEGIN
     LOOP
         INSERT INTO wow_match_view_events (
             view_id,
-            tm
+            tm,
+            log_line
         )
         VALUES (
             in_match_view_uuid,
-            tmp.tm
+            tmp.tm,
+            tmp.log_line
         )
         RETURNING event_id INTO new_event_id;
 
@@ -501,12 +511,14 @@ BEGIN
         INSERT INTO wow_match_view_events (
             view_id,
             dest_char,
-            tm
+            tm,
+            log_line
         )
         VALUES (
             in_match_view_uuid,
             dest_char_id,
-            tmp.tm
+            tmp.tm,
+            tmp.log_line
         )
         RETURNING event_id INTO new_event_id;
 

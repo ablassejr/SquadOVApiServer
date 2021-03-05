@@ -446,7 +446,7 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_match_game_blocks(&self, tx: &mut Transaction<'_, Postgres> , logs: Arc<RwLock<HearthstoneGameLog>>, uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn store_hearthstone_match_game_blocks(&self, tx: &mut Transaction<'_, Postgres>, logs: Arc<RwLock<HearthstoneGameLog>>, uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
         // Each snapshot contains information that needs to be inserted into 3 different tables:
         // 1) hearthstone_snapshots: Contains general information about the snapshot (time, turn, etc)
         // 2) hearthstone_snapshots_player_map: Contains information about what we know about the player name -> player id -> entity id map at that point in time.
