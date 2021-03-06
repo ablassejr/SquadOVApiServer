@@ -11,8 +11,10 @@ use uuid::Uuid;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-pub struct WowCharacterPathInput {
+#[serde(rename_all="camelCase")]
+pub struct WowCharacterDataInput {
     character_name: String,
+    character_guid: String,
 }
 
 fn compute_wow_character_ilvl(items: &[i32]) -> i32 {
@@ -214,24 +216,23 @@ impl api::ApiApplication {
         )
     }
 
-    async fn get_wow_realm_region(&self, realm: &str) -> Result<Vec<String>, SquadOvError> {
+    async fn get_wow_realm_region(&self, realm_id: i64) -> Result<String, SquadOvError> {
         Ok(
-            // I have no idea if the incoming name is going to be the name or the slug SOOO...
             sqlx::query!(
-                "
-                SELECT region
+                r#"
+                SELECT region AS "region!"
                 FROM squadov.wow_realms
-                WHERE LOWER(name) = LOWER($1) OR LOWER(slug) = LOWER($1)
-                ",
-                realm,
+                WHERE id = $1
+                UNION
+                SELECT region AS "region!"
+                FROM squadov.wow_connected_realms
+                WHERE id = $1
+                "#,
+                realm_id,
             )
-                .fetch_all(&*self.pool)
+                .fetch_one(&*self.pool)
                 .await?
-                .into_iter()
-                .map(|x| {
-                    x.region
-                })
-                .collect()
+                .region
         )
     }
 }
@@ -257,28 +258,32 @@ pub async fn list_wow_characters_association_for_squad_in_match_handler(app : we
     Ok(HttpResponse::Ok().json(chars))
 }
 
-pub async fn get_wow_armory_link_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<WowCharacterPathInput>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_wow_armory_link_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<WowCharacterDataInput>) -> Result<HttpResponse, SquadOvError> {
     // Get character name for this GUID which is composed of the CHARACTER NAME-SERVER NAME.
     // Next, obtain the region for the extracted server name.
-    let name_parts: Vec<&str> = path.character_name.split("-").into_iter().collect();
+    let name_parts: Vec<&str> = data.character_name.split("-").into_iter().collect();
     if name_parts.len() != 2 {
-        return Err(SquadOvError::InternalError(format!("Unexpected WoW name: {}", &path.character_name)));
+        return Err(SquadOvError::InternalError(format!("Unexpected WoW name: {}", &data.character_name)));
     }
 
     let char_name = name_parts[0];
     let server_name = name_parts[1];
-    let regions= app.get_wow_realm_region(&server_name).await?;
+
+    let guid_parts: Vec<&str> = data.character_guid.split("-").into_iter().collect();
+    if guid_parts.len() != 3 {
+        return Err(SquadOvError::InternalError(format!("Unexpected WoW GUID: {}", &data.character_guid)));
+    }
+    let region_id = guid_parts[1].parse::<i64>()?;
+    let region = app.get_wow_realm_region(region_id).await?;
 
     // Finally compose the WoW armory link: 
     // https://worldofwarcraft.com/en-us/character/REGION/SERVER NAME/CHARACTER NAME
-    // There's going to be multiple possible armory links for this character depending on the server name...not sure which one to choose.
-    // Have client open all of them? LOL.
-    Ok(HttpResponse::Ok().json(regions.into_iter().map(|r| {
+    Ok(HttpResponse::Ok().json(
         format!(
             "https://worldofwarcraft.com/en-us/character/{region}/{server}/{character}",
-            region=r,
+            region=region,
             server=server_name,
             character=char_name,
         )
-    }).collect::<Vec<String>>()))
+    ))
 }
