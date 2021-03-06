@@ -650,15 +650,11 @@ async fn insert_missing_wow_character_presence_for_events(tx: &mut Transaction<'
 type WowCharacterIdMap = HashMap<(Uuid, String), i64>;
 
 async fn update_wow_character_presence_for_events(tx: &mut Transaction<'_, Postgres>, events: &[WoWCombatLogEvent]) -> Result<WowCharacterIdMap, SquadOvError> {
+    // We need two sets of SQL statements here - one for the combatant info events
+    // and one for the everything else. We need a separate one for combatant info
+    // events because otherwise we'll be overwriting valid unit names and guids and flags
+    // since the ONLY thing the combatant info stuff needs to do is set the flag to true.
     let mut sql: Vec<String> = Vec::new();
-
-    // DO NOT UPDATE THE "has_combatant_info" FLAG HERE AS IT MIGHT
-    // OVERRIDE A VALID TRUE VALUE IN THE CASE WHERE WE'RE HANDLING
-    // A NON-COMBATANT_INFO EVENT.
-    // 
-    // By that same logic, we don't set it to true in the case of a
-    // combatant_info event because we don't want to clear out flags
-    // that were previously set.
     sql.push(String::from("
         UPDATE squadov.wow_match_view_character_presence AS wcp
         SET unit_name = sub.unit_name,
@@ -666,6 +662,10 @@ async fn update_wow_character_presence_for_events(tx: &mut Transaction<'_, Postg
             flags = sub.flags
         FROM ( VALUES
     "));
+
+    // The entries in the "wow_match_view_character_presence" table that
+    // need to have has_combatant_info set to true (view id, unit guid).
+    let mut bulk_combatants: HashSet<(Uuid, String)> = HashSet::new();
 
     let mut added = 0;
     for e in events {
@@ -685,6 +685,12 @@ async fn update_wow_character_presence_for_events(tx: &mut Transaction<'_, Postg
             owner_guid = None;
             pet_guid = None;
         };
+
+        // We need to do an update on combatant info here so that the RETURNING statement returns the combatant info too.
+        // The combatant info should always come first if it exists so we won't be overriding any important flags here.
+        if let WoWCombatLogEventType::CombatantInfo{guid, ..} = &e.event {
+            bulk_combatants.insert((e.view_id.clone(), guid.clone()));
+        }
 
         if let Some(source) = &e.source {
             if source.guid != crate::NIL_WOW_GUID {
@@ -729,28 +735,60 @@ async fn update_wow_character_presence_for_events(tx: &mut Transaction<'_, Postg
         }
     }
 
-    if added == 0 {
-        return Ok(HashMap::new());
+    let mut ret_map: WowCharacterIdMap = HashMap::new();
+
+    if !bulk_combatants.is_empty() {
+        let mut view_ids: Vec<Uuid> = vec![];
+        let mut unit_guids: Vec<String> = vec![];
+
+        bulk_combatants.into_iter().for_each(|(view, unit)| {
+            view_ids.push(view);
+            unit_guids.push(unit);
+        });
+
+        sqlx::query!(
+            "
+            UPDATE squadov.wow_match_view_character_presence AS wcp
+            SET has_combatant_info = TRUE
+            FROM UNNEST($1::UUID[], $2::VARCHAR[]) AS sub(view_id, unit_guid)
+            WHERE wcp.view_id = sub.view_id AND wcp.unit_guid = sub.unit_guid
+            RETURNING wcp.view_id, wcp.unit_guid, wcp.character_id
+            ",
+            &view_ids,
+            &unit_guids,
+        )
+            .fetch_all(&mut *tx)
+            .await?
+            .into_iter()
+            .for_each(|x| {
+                ret_map.insert((x.view_id, x.unit_guid), x.character_id);
+            });
     }
 
-    sql.truncate(sql.len() - 1);
-    sql.push(String::from("
-        ) AS sub(view_id, unit_guid, unit_name, owner_guid, flags)
-        WHERE wcp.view_id = (sub.view_id)::UUID
-            AND wcp.unit_guid = sub.unit_guid
-        RETURNING wcp.view_id, wcp.unit_guid, wcp.character_id
-    "));
-
-    Ok(
-        sqlx::query(&sql.join(""))
+    if added > 0 {
+        sql.truncate(sql.len() - 1);
+        sql.push(String::from("
+            ) AS sub(view_id, unit_guid, unit_name, owner_guid, flags)
+            WHERE wcp.view_id = (sub.view_id)::UUID
+                AND wcp.unit_guid = sub.unit_guid
+            RETURNING wcp.view_id, wcp.unit_guid, wcp.character_id
+        "));
+        
+        let tmp_map = sqlx::query(&sql.join(""))
             .fetch_all(&mut *tx)
             .await?
             .into_iter()
             .map(|x| {
                 Ok(((x.try_get("view_id")?, x.try_get("unit_guid")?), x.try_get("character_id")?))
             })
-            .collect::<Result<WowCharacterIdMap, SquadOvError>>()?
-    )
+            .collect::<Result<WowCharacterIdMap, SquadOvError>>()?;
+
+        for ((view_id, unit_guid), character_id) in tmp_map {
+            ret_map.insert((view_id, unit_guid), character_id);
+        }
+    }
+
+    Ok(ret_map)
 }
 
 
@@ -850,16 +888,12 @@ async fn bulk_insert_wow_combatant_events(tx: &mut Transaction<'_, Postgres>, ev
         VALUES
     "));
 
-    // The entries in the "wow_match_view_character_presence" table that
-    // need to have has_combatant_info set to true.
-    let mut bulk_combatants: HashSet<i64> = HashSet::new();
-
     for e in events {
         if let WoWCombatLogEventType::CombatantInfo{guid, team, spec_id, items, ..} = e.event {
             let char_key = (e.view_id.clone(), guid.clone());
             let event_key = (e.view_id.clone(), e.log_line);
-            let character_id = mapping.get(&char_key).ok_or(SquadOvError::NotFound)?;
-            let event_id = ids.get(&event_key).ok_or(SquadOvError::NotFound)?;
+            let character_id = mapping.get(&char_key).ok_or(SquadOvError::InternalError(format!("COMBATANT: Failed to find char key: {:?}", &char_key)))?;
+            let event_id = ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("COMBATANT: Failed to find event key: {:?}", &event_key)))?;
 
             event_sql.push(format!("
                 (
@@ -894,8 +928,6 @@ async fn bulk_insert_wow_combatant_events(tx: &mut Transaction<'_, Postgres>, ev
                 ));
                 items_sql.push(String::from(","));
             }
-            
-            bulk_combatants.insert(*character_id);
         } else {
             return Err(SquadOvError::BadRequest);
         }
@@ -906,17 +938,6 @@ async fn bulk_insert_wow_combatant_events(tx: &mut Transaction<'_, Postgres>, ev
 
     items_sql.truncate(items_sql.len() - 1);
     sqlx::query(&items_sql.join("")).execute(&mut *tx).await?;
-
-    sqlx::query!(
-        "
-        UPDATE squadov.wow_match_view_character_presence
-        SET has_combatant_info = TRUE
-        WHERE character_id = ANY($1)
-        ",
-        &bulk_combatants.into_iter().collect::<Vec<i64>>()
-    )
-        .execute(&mut *tx)
-        .await?;
 
     Ok(())
 }
@@ -994,7 +1015,7 @@ async fn bulk_insert_wow_damage_events(tx: &mut Transaction<'_, Postgres>, event
 
     for x in events {
         let event_key = (x.view_id.clone(), x.log_line);
-        let event_id = ids.get(&event_key).ok_or(SquadOvError::NotFound)?;
+        let event_id = ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("DAMAGE: Failed to get event key {:?}", &event_key)))?;
         if let WoWCombatLogEventType::DamageDone{damage, amount, overkill} = x.event {
             sql.push(format!("(
                 {event_id},
@@ -1041,7 +1062,7 @@ async fn bulk_insert_wow_healing_events(tx: &mut Transaction<'_, Postgres>, even
 
     for x in events {
         let event_key = (x.view_id.clone(), x.log_line);
-        let event_id = ids.get(&event_key).ok_or(SquadOvError::NotFound)?;
+        let event_id = ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("HEALING: Failed to get event key {:?}", &event_key)))?;
         if let WoWCombatLogEventType::Healing{spell, amount, overheal, absorbed} = x.event {
             sql.push(format!("(
                 {event_id},
@@ -1085,7 +1106,7 @@ async fn bulk_insert_wow_auras_events(tx: &mut Transaction<'_, Postgres>, events
 
     for x in events {
         let event_key = (x.view_id.clone(), x.log_line);
-        let event_id = ids.get(&event_key).ok_or(SquadOvError::NotFound)?;
+        let event_id = ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("AURAS: Failed to get event key {:?}", &event_key)))?;
         if let WoWCombatLogEventType::SpellAura{spell, aura_type, applied} = x.event {
             sql.push(format!("(
                 {event_id},
@@ -1125,7 +1146,7 @@ async fn bulk_insert_wow_summon_events(tx: &mut Transaction<'_, Postgres>, event
 
     for x in events {
         let event_key = (x.view_id.clone(), x.log_line);
-        let event_id = ids.get(&event_key).ok_or(SquadOvError::NotFound)?;
+        let event_id = ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("SUMMON: Failed to get event key {:?}", &event_key)))?;
         if let WoWCombatLogEventType::SpellSummon(spell) = &x.event {
             sql.push(format!("(
                 {event_id},
@@ -1161,7 +1182,7 @@ async fn bulk_insert_wow_resurrect_events(tx: &mut Transaction<'_, Postgres>, ev
 
     for x in events {
         let event_key = (x.view_id.clone(), x.log_line);
-        let event_id = ids.get(&event_key).ok_or(SquadOvError::NotFound)?;
+        let event_id = ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("RESURRECT: Failed to get event key {:?}", &event_key)))?;
         if let WoWCombatLogEventType::Resurrect(spell) = &x.event {
             sql.push(format!("(
                 {event_id},
@@ -1199,7 +1220,7 @@ async fn bulk_insert_wow_subencounter_events(tx: &mut Transaction<'_, Postgres>,
 
     for x in events {
         let event_key = (x.view_id.clone(), x.log_line);
-        let event_id = ids.get(&event_key).ok_or(SquadOvError::NotFound)?;
+        let event_id = ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("SUBENCOUNTER: Failed to get event key {:?}", &event_key)))?;
         if let WoWCombatLogEventType::EncounterStart{encounter_id, encounter_name, ..} = &x.event {
             sql.push(format!("(
                 {event_id},
@@ -1251,7 +1272,7 @@ async fn bulk_insert_wow_death_events(tx: &mut Transaction<'_, Postgres>, events
         sql.push(format!("(
             {event_id}
         )",
-            event_id=ids.get(&event_key).ok_or(SquadOvError::NotFound)?,
+            event_id=ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("DEATH: Failed to get event key {:?}", &event_key)))?,
         ));
         sql.push(String::from(","));
     }
