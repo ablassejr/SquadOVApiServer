@@ -134,6 +134,7 @@ pub struct WoWArena {
 }
 
 pub struct GenericWoWMatchView {
+    pub alt_id: i64,
     pub user_id: i64,
     combat_log_version: String,
     advanced_log: bool,
@@ -148,7 +149,7 @@ where
         sqlx::query_as!(
             GenericWoWMatchView,
             "
-            SELECT user_id, combat_log_version, advanced_log, build_version
+            SELECT alt_id, user_id, combat_log_version, advanced_log, build_version
             FROM squadov.wow_match_view
             WHERE id = $1
             ",

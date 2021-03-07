@@ -27,7 +27,7 @@ impl api::ApiApplication {
             INNER JOIN squadov.wow_match_view_events AS wve
                 ON wve.event_id = see.event_id
             INNER JOIN squadov.wow_match_view AS wmv
-                ON wmv.id = wve.view_id
+                ON wmv.alt_id = wve.view_id
             WHERE wmv.id = $1
             ORDER BY wve.tm ASC
             "#,
@@ -98,7 +98,7 @@ impl api::ApiApplication {
             INNER JOIN squadov.wow_match_view_character_presence AS dest
                 ON dest.character_id = wve.dest_char
             INNER JOIN squadov.wow_match_view AS wmv
-                ON wmv.id = wve.view_id
+                ON wmv.alt_id = wve.view_id
             WHERE wmv.id = $1
             ORDER BY wve.tm ASC
             "#,
@@ -179,7 +179,7 @@ impl api::ApiApplication {
                 INNER JOIN squadov.wow_match_view_character_presence AS dest
                     ON dest.character_id = wve.dest_char
                 INNER JOIN squadov.wow_match_view AS wmv
-                    ON wmv.id = wve.view_id
+                    ON wmv.alt_id = wve.view_id
                 WHERE wmv.id = $1
                 ORDER BY wve.tm ASC
                 "#,
@@ -206,7 +206,7 @@ impl api::ApiApplication {
                 INNER JOIN squadov.wow_match_view_character_presence AS dest
                     ON dest.character_id = wve.dest_char
                 INNER JOIN squadov.wow_match_view AS wmv
-                    ON wmv.id = wve.view_id
+                    ON wmv.alt_id = wve.view_id
                 WHERE wmv.id = $1
                 ORDER BY wve.tm ASC
                 "#,

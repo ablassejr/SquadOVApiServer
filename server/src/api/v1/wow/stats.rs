@@ -41,7 +41,7 @@ impl api::ApiApplication {
                 SUM(wde.amount) / CAST($6::BIGINT AS DOUBLE PRECISION) AS "amount"
             FROM squadov.wow_match_view AS wmv
             INNER JOIN squadov.wow_match_view_events AS wve
-                ON wve.view_id = wmv.id
+                ON wve.view_id = wmv.alt_id
             INNER JOIN squadov.wow_match_view_character_presence AS wcp
                 ON wcp.character_id = wve.source_char
             INNER JOIN squadov.wow_match_view_damage_events AS wde
@@ -96,7 +96,7 @@ impl api::ApiApplication {
                 SUM(GREATEST(whe.amount - whe.overheal, 0)) / CAST($6::BIGINT AS DOUBLE PRECISION) AS "amount"
             FROM squadov.wow_match_view AS wmv
             INNER JOIN squadov.wow_match_view_events AS wve
-                ON wve.view_id = wmv.id
+                ON wve.view_id = wmv.alt_id
             INNER JOIN squadov.wow_match_view_character_presence AS wcp
                 ON wcp.character_id = wve.dest_char
             INNER JOIN squadov.wow_match_view_healing_events AS whe
@@ -151,7 +151,7 @@ impl api::ApiApplication {
                 SUM(wde.amount) / CAST($6::BIGINT AS DOUBLE PRECISION) AS "amount"
             FROM squadov.wow_match_view AS wmv
             INNER JOIN squadov.wow_match_view_events AS wve
-                ON wve.view_id = wmv.id
+                ON wve.view_id = wmv.alt_id
             INNER JOIN squadov.wow_match_view_character_presence AS wcp
                 ON wcp.character_id = wve.dest_char
             INNER JOIN squadov.wow_match_view_damage_events AS wde

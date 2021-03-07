@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_characters(in_match_view_uuid UUID, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
+CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_characters(in_match_view_uuid UUID, in_match_view_alt_id BIGINT, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
 RETURNS VOID AS $$
 BEGIN
     INSERT INTO wow_match_view_character_presence (
@@ -57,7 +57,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_combatant_events(in_match_view_uuid UUID, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
+CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_combatant_events(in_match_view_uuid UUID, in_match_view_alt_id BIGINT, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
 RETURNS VOID AS $$
 DECLARE
     tmp RECORD;
@@ -98,7 +98,7 @@ BEGIN
             log_line
         )
         VALUES (
-            in_match_view_uuid,
+            in_match_view_alt_id,
             tmp.tm,
             tmp.log_line
         )
@@ -162,7 +162,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_damage_events(in_match_view_uuid UUID, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
+CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_damage_events(in_match_view_uuid UUID, in_match_view_alt_id BIGINT, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
 RETURNS VOID AS $$
 DECLARE
     tmp RECORD;
@@ -196,7 +196,7 @@ BEGIN
             log_line
         )
         VALUES (
-            in_match_view_uuid,
+            in_match_view_alt_id,
             source_char_id,
             dest_char_id,
             tmp.tm,
@@ -220,7 +220,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_healing_events(in_match_view_uuid UUID, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
+CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_healing_events(in_match_view_uuid UUID, in_match_view_alt_id BIGINT, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
 RETURNS VOID AS $$
 DECLARE
     tmp RECORD;
@@ -254,7 +254,7 @@ BEGIN
             log_line
         )
         VALUES (
-            in_match_view_uuid,
+            in_match_view_alt_id,
             source_char_id,
             dest_char_id,
             tmp.tm,
@@ -280,7 +280,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_auras_events(in_match_view_uuid UUID, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
+CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_auras_events(in_match_view_uuid UUID, in_match_view_alt_id BIGINT, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
 RETURNS VOID AS $$
 DECLARE
     tmp RECORD;
@@ -314,7 +314,7 @@ BEGIN
             log_line
         )
         VALUES (
-            in_match_view_uuid,
+            in_match_view_alt_id,
             source_char_id,
             dest_char_id,
             tmp.tm,
@@ -338,7 +338,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_summons_events(in_match_view_uuid UUID, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
+CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_summons_events(in_match_view_uuid UUID, in_match_view_alt_id BIGINT, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
 RETURNS VOID AS $$
 DECLARE
     tmp RECORD;
@@ -372,7 +372,7 @@ BEGIN
             log_line
         )
         VALUES (
-            in_match_view_uuid,
+            in_match_view_alt_id,
             source_char_id,
             dest_char_id,
             tmp.tm,
@@ -392,7 +392,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_resurrects_events(in_match_view_uuid UUID, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
+CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_resurrects_events(in_match_view_uuid UUID, in_match_view_alt_id BIGINT, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
 RETURNS VOID AS $$
 DECLARE
     tmp RECORD;
@@ -426,7 +426,7 @@ BEGIN
             log_line
         )
         VALUES (
-            in_match_view_uuid,
+            in_match_view_alt_id,
             source_char_id,
             dest_char_id,
             tmp.tm,
@@ -446,7 +446,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_subencounter_events(in_match_view_uuid UUID, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
+CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_subencounter_events(in_match_view_uuid UUID, in_match_view_alt_id BIGINT, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
 RETURNS VOID AS $$
 DECLARE
     tmp RECORD;
@@ -466,7 +466,7 @@ BEGIN
             log_line
         )
         VALUES (
-            in_match_view_uuid,
+            in_match_view_alt_id,
             tmp.tm,
             tmp.log_line
         )
@@ -488,7 +488,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_death_events(in_match_view_uuid UUID, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
+CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_death_events(in_match_view_uuid UUID, in_match_view_alt_id BIGINT, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
 RETURNS VOID AS $$
 DECLARE
     tmp RECORD;
@@ -515,7 +515,7 @@ BEGIN
             log_line
         )
         VALUES (
-            in_match_view_uuid,
+            in_match_view_alt_id,
             dest_char_id,
             tmp.tm,
             tmp.log_line
@@ -532,21 +532,21 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_events(old_match_uuid UUID, new_match_uuid UUID, in_match_view_uuid UUID, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
+CREATE OR REPLACE FUNCTION transfer_wow_match_combat_log_events(old_match_uuid UUID, new_match_uuid UUID, in_match_view_uuid UUID, in_match_view_alt_id BIGINT, in_combat_log_uuid UUID, in_start TIMESTAMPTZ, in_end TIMESTAMPTZ)
 RETURNS VOID AS $$
 DECLARE
     start_tm TIMESTAMPTZ := clock_timestamp();
 BEGIN
     RAISE NOTICE 'Start Transferring % - % - %', old_match_uuid, in_match_view_uuid, in_combat_log_uuid;
-    PERFORM transfer_wow_match_combat_log_characters(in_match_view_uuid, in_combat_log_uuid, in_start, in_end);
-    PERFORM transfer_wow_match_combat_log_combatant_events(in_match_view_uuid, in_combat_log_uuid, in_start, in_end);
-    PERFORM transfer_wow_match_combat_log_damage_events(in_match_view_uuid, in_combat_log_uuid, in_start, in_end);
-    PERFORM transfer_wow_match_combat_log_healing_events(in_match_view_uuid, in_combat_log_uuid, in_start, in_end);
-    PERFORM transfer_wow_match_combat_log_auras_events(in_match_view_uuid, in_combat_log_uuid, in_start, in_end);
-    PERFORM transfer_wow_match_combat_log_summons_events(in_match_view_uuid, in_combat_log_uuid, in_start, in_end);
-    PERFORM transfer_wow_match_combat_log_resurrects_events(in_match_view_uuid, in_combat_log_uuid, in_start, in_end);
-    PERFORM transfer_wow_match_combat_log_subencounter_events(in_match_view_uuid, in_combat_log_uuid, in_start, in_end);
-    PERFORM transfer_wow_match_combat_log_death_events(in_match_view_uuid, in_combat_log_uuid, in_start, in_end);
+    PERFORM transfer_wow_match_combat_log_characters(in_match_view_uuid, in_match_view_alt_id, in_combat_log_uuid, in_start, in_end);
+    PERFORM transfer_wow_match_combat_log_combatant_events(in_match_view_uuid, in_match_view_alt_id, in_combat_log_uuid, in_start, in_end);
+    PERFORM transfer_wow_match_combat_log_damage_events(in_match_view_uuid, in_match_view_alt_id, in_combat_log_uuid, in_start, in_end);
+    PERFORM transfer_wow_match_combat_log_healing_events(in_match_view_uuid, in_match_view_alt_id, in_combat_log_uuid, in_start, in_end);
+    PERFORM transfer_wow_match_combat_log_auras_events(in_match_view_uuid, in_match_view_alt_id, in_combat_log_uuid, in_start, in_end);
+    PERFORM transfer_wow_match_combat_log_summons_events(in_match_view_uuid, in_match_view_alt_id, in_combat_log_uuid, in_start, in_end);
+    PERFORM transfer_wow_match_combat_log_resurrects_events(in_match_view_uuid, in_match_view_alt_id, in_combat_log_uuid, in_start, in_end);
+    PERFORM transfer_wow_match_combat_log_subencounter_events(in_match_view_uuid, in_match_view_alt_id, in_combat_log_uuid, in_start, in_end);
+    PERFORM transfer_wow_match_combat_log_death_events(in_match_view_uuid, in_match_view_alt_id, in_combat_log_uuid, in_start, in_end);
 
     UPDATE vods
     SET match_uuid = new_match_uuid
@@ -561,6 +561,7 @@ RETURNS VOID AS $$
 DECLARE 
     new_match_uuid UUID;
     new_view_uuid UUID;
+    new_view_alt_id BIGINT;
     tmp RECORD;
 BEGIN
     INSERT INTO matches (
@@ -616,7 +617,7 @@ BEGIN
             tmp.advanced_log,
             tmp.build_version
         )
-        RETURNING id INTO new_view_uuid;
+        RETURNING id, alt_id INTO new_view_uuid, new_view_alt_id;
 
         INSERT INTO wow_arena_view (
             view_id,
@@ -635,7 +636,7 @@ BEGIN
             tmp.new_ratings
         );
 
-        PERFORM transfer_wow_match_combat_log_events(tmp.match_uuid, new_match_uuid, new_view_uuid, tmp.combat_log_uuid, tmp.tm, tmp.finish_time);
+        PERFORM transfer_wow_match_combat_log_events(tmp.match_uuid, new_match_uuid, new_view_uuid, new_view_alt_id, tmp.combat_log_uuid, tmp.tm, tmp.finish_time);
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
@@ -645,6 +646,7 @@ RETURNS VOID AS $$
 DECLARE 
     new_match_uuid UUID;
     new_view_uuid UUID;
+    new_view_alt_id BIGINT;
     tmp RECORD;
 BEGIN
     INSERT INTO matches (
@@ -700,7 +702,7 @@ BEGIN
             tmp.advanced_log,
             tmp.build_version
         )
-        RETURNING id INTO new_view_uuid;
+        RETURNING id, alt_id INTO new_view_uuid, new_view_alt_id;
 
         INSERT INTO wow_challenge_view (
             view_id,
@@ -719,7 +721,7 @@ BEGIN
             tmp.success
         );
 
-        PERFORM transfer_wow_match_combat_log_events(tmp.match_uuid, new_match_uuid, new_view_uuid, tmp.combat_log_uuid, tmp.tm, tmp.finish_time);
+        PERFORM transfer_wow_match_combat_log_events(tmp.match_uuid, new_match_uuid, new_view_uuid, new_view_alt_id, tmp.combat_log_uuid, tmp.tm, tmp.finish_time);
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
@@ -729,6 +731,7 @@ RETURNS VOID AS $$
 DECLARE 
     new_match_uuid UUID;
     new_view_uuid UUID;
+    new_view_alt_id BIGINT;
     tmp RECORD;
 BEGIN
     INSERT INTO matches (
@@ -786,7 +789,7 @@ BEGIN
             tmp.advanced_log,
             tmp.build_version
         )
-        RETURNING id INTO new_view_uuid;
+        RETURNING id, alt_id INTO new_view_uuid, new_view_alt_id;
 
         INSERT INTO wow_encounter_view (
             view_id,
@@ -807,7 +810,7 @@ BEGIN
             tmp.success
         );
 
-        PERFORM transfer_wow_match_combat_log_events(tmp.match_uuid, new_match_uuid, new_view_uuid, tmp.combat_log_uuid, tmp.tm, tmp.finish_time);
+        PERFORM transfer_wow_match_combat_log_events(tmp.match_uuid, new_match_uuid, new_view_uuid, new_view_alt_id, tmp.combat_log_uuid, tmp.tm, tmp.finish_time);
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;

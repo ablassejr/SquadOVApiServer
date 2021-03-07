@@ -1,5 +1,6 @@
 CREATE TABLE wow_match_view (
     id UUID PRIMARY KEY,
+    alt_id BIGSERIAL NOT NULL UNIQUE,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     start_tm TIMESTAMPTZ NOT NULL,
     end_tm TIMESTAMPTZ,

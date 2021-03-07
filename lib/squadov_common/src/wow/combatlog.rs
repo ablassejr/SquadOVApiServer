@@ -360,6 +360,7 @@ impl WoWCombatLogAdvancedCVars {
 #[derive(Clone,Debug)]
 pub struct WoWCombatLogEvent {
     view_id: Uuid,
+    alt_view_id: i64,
     user_id: i64,
     log_line: i64,
     timestamp: DateTime<Utc>,
@@ -504,7 +505,7 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
     }
 }
 
-pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, user_id: i64, state: &WoWCombatLogState, payload: &RawWoWCombatLogPayload) -> Result<Option<WoWCombatLogEvent>, crate::SquadOvError> {
+pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, alt_id: i64, user_id: i64, state: &WoWCombatLogState, payload: &RawWoWCombatLogPayload) -> Result<Option<WoWCombatLogEvent>, crate::SquadOvError> {
     let (advanced, event) = parse_advanced_cvars_and_event_from_wow_combat_log(state, payload)?;
     if event == WoWCombatLogEventType::Unknown {
         return Ok(None)
@@ -526,6 +527,7 @@ pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, user_id: i64, state: &WoWCo
 
     Ok(Some(WoWCombatLogEvent{
         view_id: uuid.clone(),
+        alt_view_id: alt_id,
         user_id,
         log_line: payload.log_line,
         timestamp: payload.timestamp.clone(),
@@ -797,7 +799,7 @@ async fn update_wow_character_presence_for_events(tx: &mut Transaction<'_, Postg
 // *technically* the database doesn't guarantee any ordering of the INSERT and the resulting RETURNING so I don't
 // want to risk relying on it. Instead we know for certain that a given (View UUID, Log Line) is unique so we can
 // just rely on the caller-provided unique ID instead.
-type WowEventIdMap = HashMap<(Uuid, i64), i64>;
+type WowEventIdMap = HashMap<(i64, i64), i64>;
 
 // Returns the "event_id" for each input event.
 async fn create_wow_events(tx: &mut Transaction<'_, Postgres>, events: &[WoWCombatLogEvent], mapping: &WowCharacterIdMap) -> Result<WowEventIdMap, SquadOvError> {
@@ -830,13 +832,13 @@ async fn create_wow_events(tx: &mut Transaction<'_, Postgres>, events: &[WoWComb
         };
 
         sql.push(format!("(
-            '{view_id}',
+            {view_id},
             {log_line},
             {source_char},
             {dest_char},
             {tm}
         )",
-            view_id=&e.view_id,
+            view_id=e.alt_view_id,
             log_line=e.log_line,
             source_char=crate::sql_format_option_value(&if let Some(tup) = source_tuple { mapping.get(&tup).copied() } else { None }),
             dest_char=crate::sql_format_option_value(&if let Some(tup) = dest_tuple { mapping.get(&tup).copied() } else { None }),
@@ -854,7 +856,10 @@ async fn create_wow_events(tx: &mut Transaction<'_, Postgres>, events: &[WoWComb
             .await?
             .into_iter()
             .map(|x| {
-                Ok(((x.try_get("view_id")?, x.try_get("log_line")?), x.try_get("event_id")?))
+                Ok((
+                    (x.try_get("view_id")?, x.try_get("log_line")?),
+                    x.try_get("event_id")?)
+                )
             })
             .collect::<Result<WowEventIdMap, SquadOvError>>()?
     )
@@ -891,7 +896,7 @@ async fn bulk_insert_wow_combatant_events(tx: &mut Transaction<'_, Postgres>, ev
     for e in events {
         if let WoWCombatLogEventType::CombatantInfo{guid, team, spec_id, items, ..} = e.event {
             let char_key = (e.view_id.clone(), guid.clone());
-            let event_key = (e.view_id.clone(), e.log_line);
+            let event_key = (e.alt_view_id, e.log_line);
             let character_id = mapping.get(&char_key).ok_or(SquadOvError::InternalError(format!("COMBATANT: Failed to find char key: {:?}", &char_key)))?;
             let event_id = ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("COMBATANT: Failed to find event key: {:?}", &event_key)))?;
 
@@ -1014,7 +1019,7 @@ async fn bulk_insert_wow_damage_events(tx: &mut Transaction<'_, Postgres>, event
     "));
 
     for x in events {
-        let event_key = (x.view_id.clone(), x.log_line);
+        let event_key = (x.alt_view_id, x.log_line);
         let event_id = ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("DAMAGE: Failed to get event key {:?}", &event_key)))?;
         if let WoWCombatLogEventType::DamageDone{damage, amount, overkill} = x.event {
             sql.push(format!("(
@@ -1061,7 +1066,7 @@ async fn bulk_insert_wow_healing_events(tx: &mut Transaction<'_, Postgres>, even
     "));
 
     for x in events {
-        let event_key = (x.view_id.clone(), x.log_line);
+        let event_key = (x.alt_view_id, x.log_line);
         let event_id = ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("HEALING: Failed to get event key {:?}", &event_key)))?;
         if let WoWCombatLogEventType::Healing{spell, amount, overheal, absorbed} = x.event {
             sql.push(format!("(
@@ -1105,7 +1110,7 @@ async fn bulk_insert_wow_auras_events(tx: &mut Transaction<'_, Postgres>, events
     "));
 
     for x in events {
-        let event_key = (x.view_id.clone(), x.log_line);
+        let event_key = (x.alt_view_id, x.log_line);
         let event_id = ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("AURAS: Failed to get event key {:?}", &event_key)))?;
         if let WoWCombatLogEventType::SpellAura{spell, aura_type, applied} = x.event {
             sql.push(format!("(
@@ -1145,7 +1150,7 @@ async fn bulk_insert_wow_summon_events(tx: &mut Transaction<'_, Postgres>, event
     "));
 
     for x in events {
-        let event_key = (x.view_id.clone(), x.log_line);
+        let event_key = (x.alt_view_id, x.log_line);
         let event_id = ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("SUMMON: Failed to get event key {:?}", &event_key)))?;
         if let WoWCombatLogEventType::SpellSummon(spell) = &x.event {
             sql.push(format!("(
@@ -1181,7 +1186,7 @@ async fn bulk_insert_wow_resurrect_events(tx: &mut Transaction<'_, Postgres>, ev
     "));
 
     for x in events {
-        let event_key = (x.view_id.clone(), x.log_line);
+        let event_key = (x.alt_view_id, x.log_line);
         let event_id = ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("RESURRECT: Failed to get event key {:?}", &event_key)))?;
         if let WoWCombatLogEventType::Resurrect(spell) = &x.event {
             sql.push(format!("(
@@ -1219,7 +1224,7 @@ async fn bulk_insert_wow_subencounter_events(tx: &mut Transaction<'_, Postgres>,
     "));
 
     for x in events {
-        let event_key = (x.view_id.clone(), x.log_line);
+        let event_key = (x.alt_view_id, x.log_line);
         let event_id = ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("SUBENCOUNTER: Failed to get event key {:?}", &event_key)))?;
         if let WoWCombatLogEventType::EncounterStart{encounter_id, encounter_name, ..} = &x.event {
             sql.push(format!("(
@@ -1268,7 +1273,7 @@ async fn bulk_insert_wow_death_events(tx: &mut Transaction<'_, Postgres>, events
     "));
 
     for x in events {
-        let event_key = (x.view_id.clone(), x.log_line);
+        let event_key = (x.alt_view_id, x.log_line);
         sql.push(format!("(
             {event_id}
         )",

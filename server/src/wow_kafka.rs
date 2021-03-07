@@ -53,7 +53,7 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
             if parsed_payload.is_finish_token() {
                 log::info!("Detect Finish Token for WoW Match View: {}", &match_view_uuid);
             } else {
-                let parsed_event = squadov_common::parse_raw_wow_combat_log_payload(&match_view_uuid, match_view.user_id, &match_view.combat_log_state(), &parsed_payload)?;
+                let parsed_event = squadov_common::parse_raw_wow_combat_log_payload(&match_view_uuid, match_view.alt_id, match_view.user_id, &match_view.combat_log_state(), &parsed_payload)?;
                 if parsed_event.is_some() {
                     let mut events = opaque.events.write().await;
                     let new_event = parsed_event.unwrap();
