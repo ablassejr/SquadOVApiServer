@@ -138,5 +138,6 @@ async fn main() -> Result<(), SquadOvError> {
         let _ = hnd.await;
     }
 
+    log::info!("Finish migration.");
     Ok(())
 }

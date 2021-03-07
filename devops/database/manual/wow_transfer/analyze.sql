@@ -15,3 +15,5 @@ ANALYZE wow_match_view_healing_events;
 ANALYZE wow_match_view_aura_events;
 ANALYZE wow_match_view_summon_events;
 ANALYZE wow_match_view_resurrect_events;
+ANALYZE wow_match_view_subencounter_events;
+ANALYZE wow_match_view_death_events;
