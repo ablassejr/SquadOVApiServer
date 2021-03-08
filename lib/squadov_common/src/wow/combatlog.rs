@@ -31,6 +31,7 @@ pub struct RawWoWCombatLogPayload {
     pub parts: Vec<String>,
     #[serde(rename="logLine")]
     pub log_line: i64,
+    pub version: i32,
 }
 
 fn split_wow_combat_log_tokens(full_log: &str) -> Vec<String> {
@@ -1429,14 +1430,16 @@ mod tests {
         let t1 = RawWoWCombatLogPayload{
             timestamp: Utc::now(),
             parts: vec![String::from("Test"), String::from("1")],
-            log_line: 1
+            log_line: 1,
+            version: 2,
         };
         assert_eq!(t1.is_finish_token(), false);
 
         let t2 = RawWoWCombatLogPayload{
             timestamp: Utc::now(),
             parts: vec![String::from("SQUADOV_END_COMBAT_LOG")],
-            log_line: 1
+            log_line: 1,
+            version: 2,
         };
         assert_eq!(t2.is_finish_token(), true);
     }

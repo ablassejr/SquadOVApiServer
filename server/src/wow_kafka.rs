@@ -47,6 +47,11 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
             // so we need to reparse so that at least the upper level parts corresponds to each logical section of
             // the log (i.e. for COMBATANT_INFO, the 29th element should be a string representing an array of all the user's items).
             let mut parsed_payload: RawWoWCombatLogPayload = serde_json::from_str(payload)?;
+            if parsed_payload.version < 2 {
+                log::warn!("Skipping WoW combat log due to old version.");
+                return Err(SquadOvError::BadRequest);
+            }
+
             parsed_payload.redo_parts();
 
             let mut manual_handle_flags = false;
