@@ -21,7 +21,7 @@ spec:
                   image: registry.gitlab.com/squadov/squadovapiserver/squadov/squadov_landing:{{ .Values.commitHash }}
                   resources:
                     requests:
-                        cpu: "400m"
+                        cpu: "100m"
                     limits:
                         cpu: "1000m"
                 - name: nginx
