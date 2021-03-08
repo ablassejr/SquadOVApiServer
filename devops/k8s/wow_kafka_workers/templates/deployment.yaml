@@ -18,7 +18,7 @@ spec:
                 task: wowkafka
             containers:
                 - name: webserver-container
-                  image: "registry.gitlab.com/squadov/squadovapiserver/squadov/wow_kafka_worker:latest"
+                  image: registry.gitlab.com/squadov/squadovapiserver/squadov/wow_kafka_worker:{{ .Values.commitHash }}
                   env:
                     - name: DB_CONNS
                       value: "128"
