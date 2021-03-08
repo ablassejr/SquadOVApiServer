@@ -115,7 +115,7 @@ pub async fn public_landing_download_handler(app : web::Data<Arc<api::ApiApplica
             Err(err) => log::warn!("Failed to mark referral download: {:?}", err)
         };
     }
-    Ok(HttpResponse::TemporaryRedirect().header("Location", STATIC_DOWNLOAD_LINK).finish())
+    Ok(HttpResponse::Ok().finish())
 }
 
 pub async fn get_user_me_referral_link_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
