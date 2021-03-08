@@ -52,7 +52,7 @@ resource "google_container_node_pool" "vod_worker_nodes" {
         labels = {
             task = "vod"
         }
-        disk_size_gb = 30
+        disk_size_gb = 50
         disk_type = "pd-ssd"
         machine_type = "e2-custom-4-12288"
         image_type = "COS"
