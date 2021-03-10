@@ -1,0 +1,1 @@
+Another hotfix to handle the new combat log naming format from the latest WoW patch (9.0.5).

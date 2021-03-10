@@ -53,6 +53,12 @@ spec:
             - backend:
                 serviceName: internal-blog-service
                 servicePort: 80
+        - host: "eagle.squadov.gg"
+          http:
+            paths:
+            - backend:
+                serviceName: internal-admin-service
+                servicePort: 3000
     tls:
         - hosts:
             - "support.squadov.gg"
@@ -61,4 +67,5 @@ spec:
             - "app.squadov.gg"
             - "api.squadov.gg"
             - "blog.squadov.gg"
+            - "eagle.squadov.gg"
           secretName: squadov-cert-prod

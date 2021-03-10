@@ -1,5 +1,19 @@
 [
     {
+        "title": "SquadOV v0.7.4",
+        "description": "Urgent hotfix to handle thew latest WoW patch!",
+        "timestamp": 1615329482000,
+        "data": "data/hotfix-v0.7.4.md",
+        "type": "hotfix"
+    },
+    {
+        "title": "SquadOV v0.7.3",
+        "description": "Urgent hotfix - update now to resolve issues with WoW!",
+        "timestamp": 1615315799000,
+        "data": "data/hotfix-v0.7.3.md",
+        "type": "hotfix"
+    },
+    {
         "title": "SquadOV v0.7.0",
         "description": "Reducing our database size from 1TB to 100GB!",
         "timestamp": 1614631465000,

@@ -1,0 +1,1 @@
+This is a hotfix to fix issues caused by the recent patches that would cause users using HW acceleration to not be able to record World of Warcraft games properly.
