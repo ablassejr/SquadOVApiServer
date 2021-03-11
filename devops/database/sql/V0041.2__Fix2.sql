@@ -1,0 +1,1 @@
+DROP INDEX CONCURRENTLY wow_match_view_events_view_id_log_line_idx;
