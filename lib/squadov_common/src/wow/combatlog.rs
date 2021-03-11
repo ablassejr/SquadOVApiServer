@@ -849,6 +849,7 @@ async fn create_wow_events(tx: &mut Transaction<'_, Postgres>, events: &[WoWComb
     }
 
     sql.truncate(sql.len() - 1);
+    sql.push(String::from(" ON CONFLICT DO NOTHING"))
     sql.push(String::from(" RETURNING view_id, log_line, event_id"));
 
     Ok(
@@ -1045,6 +1046,7 @@ async fn bulk_insert_wow_damage_events(tx: &mut Transaction<'_, Postgres>, event
     }
 
     sql.truncate(sql.len() - 1);
+    sql.push(String::from(" ON CONFLICT DO NOTHING"))
     sqlx::query(&sql.join("")).execute(tx).await?;
     Ok(())
 }
@@ -1090,6 +1092,7 @@ async fn bulk_insert_wow_healing_events(tx: &mut Transaction<'_, Postgres>, even
     }
 
     sql.truncate(sql.len() - 1);
+    sql.push(String::from(" ON CONFLICT DO NOTHING"))
     sqlx::query(&sql.join("")).execute(tx).await?;
     Ok(())
 }
@@ -1132,6 +1135,8 @@ async fn bulk_insert_wow_auras_events(tx: &mut Transaction<'_, Postgres>, events
     }
 
     sql.truncate(sql.len() - 1);
+    sql.push(String::from(" ON CONFLICT DO NOTHING"))
+
     sqlx::query(&sql.join("")).execute(tx).await?;
     Ok(())
 }
@@ -1168,6 +1173,8 @@ async fn bulk_insert_wow_summon_events(tx: &mut Transaction<'_, Postgres>, event
     }
 
     sql.truncate(sql.len() - 1);
+    sql.push(String::from(" ON CONFLICT DO NOTHING"))
+
     sqlx::query(&sql.join("")).execute(tx).await?;
     Ok(())
 }
@@ -1204,6 +1211,8 @@ async fn bulk_insert_wow_resurrect_events(tx: &mut Transaction<'_, Postgres>, ev
     }
 
     sql.truncate(sql.len() - 1);
+    sql.push(String::from(" ON CONFLICT DO NOTHING"))
+
     sqlx::query(&sql.join("")).execute(tx).await?;
     Ok(())
 }
@@ -1256,6 +1265,8 @@ async fn bulk_insert_wow_subencounter_events(tx: &mut Transaction<'_, Postgres>,
     }
 
     sql.truncate(sql.len() - 1);
+    sql.push(String::from(" ON CONFLICT DO NOTHING"))
+
     sqlx::query(&sql.join("")).execute(tx).await?;
     Ok(())
 }
@@ -1284,6 +1295,8 @@ async fn bulk_insert_wow_death_events(tx: &mut Transaction<'_, Postgres>, events
     }
 
     sql.truncate(sql.len() - 1);
+    sql.push(String::from(" ON CONFLICT DO NOTHING"))
+    
     sqlx::query(&sql.join("")).execute(tx).await?;
     Ok(())
 }
