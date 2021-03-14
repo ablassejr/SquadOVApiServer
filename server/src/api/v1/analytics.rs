@@ -11,8 +11,6 @@ pub struct ReferralQuery {
     pub referral_code: Option<String>,
 }
 
-const STATIC_DOWNLOAD_LINK: &'static str = "https://us-central1.content.squadov.gg/builds/SquadOV.exe";
-
 impl api::ApiApplication {
     pub async fn get_user_referral_code(&self, user_id: i64) -> Result<Option<String>, SquadOvError> {
         Ok(

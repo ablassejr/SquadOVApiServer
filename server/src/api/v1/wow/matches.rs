@@ -88,6 +88,7 @@ impl api::ApiApplication {
                 ON u.id = wmv.user_id
             WHERE wmv.user_id = $2
                 AND wcp.unit_guid = $1
+                AND wmv.match_uuid IS NOT NULL
             ORDER BY wmv.start_tm DESC
             LIMIT $3 OFFSET $4
             "#,
@@ -157,6 +158,7 @@ impl api::ApiApplication {
                 ON u.id = wmv.user_id
             WHERE wmv.user_id = $2
                 AND wcp.unit_guid = $1
+                AND wmv.match_uuid IS NOT NULL
             ORDER BY wmv.start_tm DESC
             LIMIT $3 OFFSET $4
             "#,
@@ -225,6 +227,7 @@ impl api::ApiApplication {
                 ON u.id = wmv.user_id
             WHERE wmv.user_id = $2
                 AND wcp.unit_guid = $1
+                AND wmv.match_uuid IS NOT NULL
             ORDER BY wmv.start_tm DESC
             LIMIT $3 OFFSET $4
             "#,
