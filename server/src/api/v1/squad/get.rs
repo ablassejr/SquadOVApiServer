@@ -176,23 +176,56 @@ impl api::ApiApplication {
         })
     }
 
-    pub async fn get_user_ids_in_same_squad_as_users(&self, user_ids: &[i64]) -> Result<Vec<i64>, SquadOvError> {
-        Ok(sqlx::query_scalar(
-            "
-            WITH user_squads AS (
-                SELECT squad_id
-                FROM squadov.squad_role_assignments
-                WHERE user_id = any($1)
-            )
-            SELECT DISTINCT sra.user_id
-            FROM squadov.squad_role_assignments AS sra
-            INNER JOIN user_squads AS us
-                ON us.squad_id = sra.squad_id
-            "
+    pub async fn get_user_ids_in_same_squad_as_users(&self, user_ids: &[i64], squad_filter: Option<&Vec<i64>>) -> Result<Vec<i64>, SquadOvError> {
+        Ok(
+            if let Some(squads) = squad_filter {
+                sqlx::query!(
+                    r#"
+                    WITH user_squads AS (
+                        SELECT squad_id
+                        FROM squadov.squad_role_assignments
+                        WHERE user_id = any($1)
+                    )
+                    SELECT DISTINCT sra.user_id AS "user_id"
+                    FROM squadov.squad_role_assignments AS sra
+                    INNER JOIN user_squads AS us
+                        ON us.squad_id = sra.squad_id
+                    WHERE us.squad_id = ANY($2)
+                    "#,
+                    user_ids,
+                    squads
+                )
+                    .fetch_all(&*self.pool)
+                    .await?
+                    .into_iter()
+                    .map(|x| {
+                        x.user_id
+                    })
+                    .collect()
+            } else {
+                sqlx::query!(
+                    r#"
+                    WITH user_squads AS (
+                        SELECT squad_id
+                        FROM squadov.squad_role_assignments
+                        WHERE user_id = any($1)
+                    )
+                    SELECT DISTINCT sra.user_id AS "user_id"
+                    FROM squadov.squad_role_assignments AS sra
+                    INNER JOIN user_squads AS us
+                        ON us.squad_id = sra.squad_id
+                    "#,
+                    user_ids,
+                )
+                    .fetch_all(&*self.pool)
+                    .await?
+                    .into_iter()
+                    .map(|x| {
+                        x.user_id
+                    })
+                    .collect()
+            }
         )
-            .bind(user_ids)
-            .fetch_all(&*self.pool)
-            .await?)
     }
 }
 

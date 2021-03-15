@@ -1,4 +1,5 @@
 use squadov_common;
+use squadov_common::SquadOvGames;
 use squadov_common::hearthstone;
 use squadov_common::hearthstone::{HearthstoneRawLog, power_parser::{HearthstonePowerLogParser, HearthstoneGameState} };
 use squadov_common::hearthstone::game_state::{HearthstoneGameLog};
@@ -57,7 +58,7 @@ impl api::ApiApplication {
                 if info.reconnecting {
                     return Err(squadov_common::SquadOvError::NotFound);
                 } else {
-                    let mt = self.create_new_match(tx).await?;
+                    let mt = self.create_new_match(tx, SquadOvGames::Hearthstone).await?;
                     sqlx::query!(
                         "
                         INSERT INTO squadov.hearthstone_matches (

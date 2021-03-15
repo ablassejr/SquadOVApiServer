@@ -1,5 +1,6 @@
 use crate::{
     SquadOvError,
+    games::SquadOvGames,
     riot::games::valorant::{
         ValorantMatchDto,
         ValorantMatchInfoDto,
@@ -507,7 +508,7 @@ pub async fn create_or_get_match_uuid_for_valorant_match(ex: &mut Transaction<'_
     Ok(match super::get_valorant_match_uuid_if_exists(&mut *ex, match_id).await? {
         Some(x) => x,
         None => {
-            let match_uuid = matches::create_new_match(&mut *ex).await?;
+            let match_uuid = matches::create_new_match(&mut *ex, SquadOvGames::Valorant).await?;
             link_match_uuid_to_valorant_match_id(&mut *ex, &match_uuid, match_id).await?;
             match_uuid
         }

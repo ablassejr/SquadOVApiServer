@@ -1,4 +1,5 @@
 use squadov_common;
+use squadov_common::SquadOvGames;
 use squadov_common::AimlabTask;
 use crate::api;
 use actix_web::{web, HttpResponse, HttpRequest};
@@ -126,7 +127,7 @@ pub async fn create_new_aimlab_task_handler(data : web::Json<AimlabTask>, app : 
 
     let mut tx = app.pool.begin().await?;
     // Create a new match ID and then create the match.
-    let internal_match = app.create_new_match(&mut tx).await?;
+    let internal_match = app.create_new_match(&mut tx, SquadOvGames::AimLab).await?;
     app.create_new_aimlab_task(&mut tx, &internal_match.uuid, raw_data).await?;
     tx.commit().await?;
 
@@ -149,7 +150,7 @@ pub async fn bulk_create_aimlab_task_handler(data : web::Json<Vec<AimlabTask>>, 
     };
 
     let mut tx = app.pool.begin().await?;
-    let internal_matches = app.bullk_create_matches(&mut tx, raw_data.len()).await?;
+    let internal_matches = app.bullk_create_matches(&mut tx, raw_data.len(), SquadOvGames::AimLab).await?;
     for (idx, data) in raw_data.iter_mut().enumerate() {
         data.user_id = session.user.id;
         data.match_uuid = internal_matches[idx].uuid.clone();

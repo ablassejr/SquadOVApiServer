@@ -1,5 +1,6 @@
 use squadov_common::{
     SquadOvError,
+    SquadOvGames,
     WoWEncounterStart,
     WoWChallengeStart,
     WoWArenaStart,
@@ -800,7 +801,7 @@ pub async fn finish_wow_encounter_handler(app : web::Data<Arc<api::ApiApplicatio
         let match_uuid = match app.find_existing_wow_encounter_match(&path.view_uuid, &data.timestamp, &combatants_key).await? {
             Some(uuid) => uuid,
             None => {
-                let new_match = app.create_new_match(&mut tx).await?;
+                let new_match = app.create_new_match(&mut tx, SquadOvGames::WorldOfWarcraft).await?;
                 match app.finish_wow_encounter_match(&mut tx, &path.view_uuid, &new_match.uuid, &data.timestamp, &combatants_key).await {
                     Ok(_) => (),
                     Err(err) => match err {
@@ -831,7 +832,7 @@ pub async fn finish_wow_challenge_handler(app : web::Data<Arc<api::ApiApplicatio
         let match_uuid = match app.find_existing_wow_challenge_match(&path.view_uuid, &data.timestamp, &combatants_key).await? {
             Some(uuid) => uuid,
             None => {
-                let new_match = app.create_new_match(&mut tx).await?;
+                let new_match = app.create_new_match(&mut tx, SquadOvGames::WorldOfWarcraft).await?;
                 match app.finish_wow_challenge_match(&mut tx, &path.view_uuid, &new_match.uuid, &data.timestamp, &combatants_key).await {
                     Ok(_) => (),
                     Err(err) => match err {
@@ -862,7 +863,7 @@ pub async fn finish_wow_arena_handler(app : web::Data<Arc<api::ApiApplication>>,
         let match_uuid = match app.find_existing_wow_arena_match(&path.view_uuid, &data.timestamp, &combatants_key).await? {
             Some(uuid) => uuid,
             None => {
-                let new_match = app.create_new_match(&mut tx).await?;
+                let new_match = app.create_new_match(&mut tx, SquadOvGames::WorldOfWarcraft).await?;
                 match app.finish_wow_arena_match(&mut tx, &path.view_uuid, &new_match.uuid, &data.timestamp, &combatants_key).await {
                     Ok(_) => (),
                     Err(err) => match err {

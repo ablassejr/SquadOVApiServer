@@ -25,17 +25,18 @@ pub struct MatchPlayerPair {
     pub player_uuid: Uuid,
 }
 
-pub async fn create_new_match<'a, T>(ex: T) -> Result<Uuid, SquadOvError>
+pub async fn create_new_match<'a, T>(ex: T, game: SquadOvGames) -> Result<Uuid, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
 {
     let uuid = Uuid::new_v4();
     sqlx::query!(
         "
-        INSERT INTO squadov.matches (uuid)
-        VALUES ($1)
+        INSERT INTO squadov.matches (uuid, game)
+        VALUES ($1, $2)
         ",
         &uuid,
+        game as i32,
     )
         .execute(ex)
         .await?;

@@ -26,7 +26,7 @@ impl SessionVerifier for api::ApiApplication {
     }
 
     async fn verify_user_access_to_users(&self, uid: i64, user_ids: &[i64]) -> Result<bool, SquadOvError> {
-        let same_squad_user_ids: HashSet<i64> = HashSet::from_iter(self.get_user_ids_in_same_squad_as_users(&[uid]).await?.into_iter());
+        let same_squad_user_ids: HashSet<i64> = HashSet::from_iter(self.get_user_ids_in_same_squad_as_users(&[uid], None).await?.into_iter());
         Ok(user_ids.iter().all(|x| {
             same_squad_user_ids.contains(x)
         }))

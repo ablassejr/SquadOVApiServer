@@ -1,5 +1,6 @@
 use crate::{
     SquadOvError,
+    games::SquadOvGames,
     matches,
     riot::games::{
         LolMatchDto,
@@ -64,7 +65,7 @@ pub async fn create_or_get_match_uuid_for_lol_match(ex: &mut Transaction<'_, Pos
             x
         },
         None => {
-            let match_uuid = matches::create_new_match(&mut *ex).await?;
+            let match_uuid = matches::create_new_match(&mut *ex, SquadOvGames::LeagueOfLegends).await?;
             link_match_uuid_to_lol_match(&mut *ex, &match_uuid, platform, game_id, game_start_time).await?;
             match_uuid
         }

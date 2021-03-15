@@ -134,6 +134,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .route("/playtime", web::get().to(v1::get_user_recorded_playtime_handler))
                                 .route("/recent", web::get().to(v1::get_recent_matches_for_me_handler))
                                 .route("/referral", web::get().to(v1::get_user_me_referral_link_handler))
+                                .route("/squadmates", web::get().to(v1::get_user_squadmates_handler))
                         )
                         .service(
                             web::scope("/{user_id}")

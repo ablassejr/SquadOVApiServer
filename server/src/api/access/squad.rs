@@ -85,7 +85,7 @@ impl super::AccessChecker<super::UserAccessSetBasicData> for SameSquadAccessChec
 
     async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: super::UserAccessSetBasicData) -> Result<bool, squadov_common::SquadOvError> {
         let user_ids: Vec<i64> = data.access_set.into_iter().collect();
-        let mut same_squad_user_ids: HashSet<i64> = HashSet::from_iter(app.get_user_ids_in_same_squad_as_users(&user_ids).await?.into_iter());
+        let mut same_squad_user_ids: HashSet<i64> = HashSet::from_iter(app.get_user_ids_in_same_squad_as_users(&user_ids, None).await?.into_iter());
 
         // Need to reinsert the user_ids into the HashSet just in case the user isn't in a squad in which
         // case their user id won't be returned by the get_user_ids_in_same_squad_as_users function.

@@ -23,6 +23,7 @@ pub mod email;
 pub mod aimlab;
 pub mod access;
 pub mod encrypt;
+pub mod http;
 
 pub use error::*;
 pub use parse::*;

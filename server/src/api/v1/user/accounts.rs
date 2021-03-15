@@ -3,7 +3,7 @@ mod riot;
 pub use riot::*;
 
 use crate::api;
-use crate::api::auth::SquadOVUser;
+use crate::api::auth::{SquadOVUser, SquadOVUserHandle};
 use squadov_common::{
     SquadOvError,
     EmailTemplate, EmailUser,
@@ -13,6 +13,22 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 
 impl api::ApiApplication {
+    pub async fn get_user_handles(&self, ids: &[i64]) -> Result<Vec<SquadOVUserHandle>, SquadOvError> {
+        Ok(
+            sqlx::query_as!(
+                SquadOVUserHandle,
+                "
+                SELECT u.id, u.username
+                FROM squadov.users AS u
+                WHERE u.id = ANY($1)
+                ",
+                ids,
+            )
+                .fetch_all(&*self.pool)
+                .await?
+        )
+    }
+
     pub async fn user_id_to_uuid(&self, user_id: i64) -> Result<Uuid, SquadOvError> {
         Ok(
             sqlx::query!(

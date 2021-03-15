@@ -25,8 +25,8 @@ toml = "0.5"
 structopt = "0.3"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 sqlx = { path="../deps/cargo/sqlx", version = "0.4.0-beta.1", default-features = false, features = [ "bigdecimal", "runtime-async-std", "macros", "postgres", "json", "ipnetwork", "uuid", "chrono", "offline"] }
-futures = "0.3.6"
-futures-util = "0.3.6"
+futures = "0.3.13"
+futures-util = "0.3.13"
 chrono = { version = "0.4.19", features = ["serde"] }
 url = "2.1.1"
 base64 = "0.13.0"
@@ -36,7 +36,7 @@ hex = "0.4.2"
 openssl = "0.10"
 openssl-sys = "0.9.58"
 percent-encoding = "2.1.0"
-juniper = { version = "0.15.2", features = ["scalar-naivetime"]}
+juniper = { version = "0.15.3", features = ["scalar-naivetime"]}
 ipnetwork = { version = "0.17.0", features = ["serde"] }
 squadov_common = { path="../lib/squadov_common" }
 flate2 = "1.0"
@@ -46,6 +46,7 @@ tempfile = "3.1.0"
 rand = "0.8.0"
 rdkafka = { version = "0.24", features = ["cmake-build", "ssl"] }
 num_enum = "0.5.1"
+serde_qs = { version = "0.8", features = ["actix"] }
 
 [[bin]]
 name = "squadov_api_server"

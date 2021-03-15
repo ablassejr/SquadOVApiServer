@@ -23,6 +23,12 @@ pub struct SquadOVUser {
     pub registration_time: Option<DateTime<Utc>>,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct SquadOVUserHandle {
+    pub id: i64,
+    pub username: String,
+}
+
 pub struct UserManager {
 }
 

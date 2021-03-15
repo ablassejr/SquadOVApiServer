@@ -30,10 +30,11 @@ use squadov_common::{
     stats::StatPermission,
 };
 use std::sync::Arc;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, TimeZone};
 use std::collections::{HashSet, HashMap};
 use serde::{Serialize, Deserialize};
 use url::Url;
+use serde_qs::actix::QsQuery;
 
 pub struct Match {
     pub uuid : Uuid
@@ -57,9 +58,21 @@ struct RawRecentMatchData {
     user_id: i64
 }
 
+
+#[derive(Deserialize)]
+pub struct RecentMatchQuery {
+    pub games: Option<Vec<SquadOvGames>>,
+    pub squads: Option<Vec<i64>>,
+    pub users: Option<Vec<i64>>,
+    #[serde(rename="timeStart")]
+    pub time_start: Option<i64>,
+    #[serde(rename="timeEnd")]
+    pub time_end: Option<i64>,
+}
+
 impl api::ApiApplication {
 
-    async fn get_recent_base_matches_for_user(&self, user_id: i64, start: i64, end: i64) -> Result<Vec<RawRecentMatchData>, SquadOvError> {
+    async fn get_recent_base_matches_for_user(&self, user_id: i64, start: i64, end: i64, filter: &RecentMatchQuery) -> Result<Vec<RawRecentMatchData>, SquadOvError> {
         Ok(
             sqlx::query_as!(
                 RawRecentMatchData,
@@ -81,17 +94,35 @@ impl api::ApiApplication {
                         OR ou.id = u.id
                 INNER JOIN squadov.vods AS v
                     ON v.user_uuid = ou.uuid
+                INNER JOIN squadov.matches AS m
+                    ON v.match_uuid = m.uuid
                 WHERE u.id = $1
                     AND v.match_uuid IS NOT NULL
                     AND v.user_uuid IS NOT NULL
                     AND v.start_time IS NOT NULL
                     AND v.end_time IS NOT NULL
+                    AND (CARDINALITY($4::INTEGER[]) = 0 OR m.game = ANY($4))
+                    AND (CARDINALITY($5::BIGINT[]) = 0 OR sra.squad_id = ANY($5))
+                    AND (CARDINALITY($6::BIGINT[]) = 0 OR ou.id = ANY($6))
+                    AND COALESCE(v.end_time >= $7, TRUE)
+                    AND COALESCE(v.end_time <= $8, TRUE)
                 ORDER BY v.end_time DESC
                 LIMIT $2 OFFSET $3
                 "#,
                 user_id,
                 end - start,
-                start
+                start,
+                &filter.games.as_ref().unwrap_or(&vec![]).iter().map(|x| {
+                    *x as i32
+                }).collect::<Vec<i32>>(),
+                &filter.squads.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i64>>(),
+                &filter.users.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i64>>(),
+                filter.time_start.map(|x| {
+                    Utc.timestamp_millis(x)
+                }),
+                filter.time_end.map(|x| {
+                    Utc.timestamp_millis(x)
+                }),
             )
                 .fetch_all(&*self.pool)
                 .await?
@@ -100,14 +131,14 @@ impl api::ApiApplication {
 
 }
 
-pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, query: web::Query<api::PaginationParameters>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, query: QsQuery<api::PaginationParameters>, filter: QsQuery<RecentMatchQuery>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    let raw_base_matches = app.get_recent_base_matches_for_user(session.user.id, query.start, query.end).await?;
+    let raw_base_matches = app.get_recent_base_matches_for_user(session.user.id, query.start, query.end, &filter).await?;
 
     // First grab all the relevant VOD manifests using all the unique VOD UUID's.
     let mut vod_manifests = app.get_vod(&raw_base_matches.iter().map(|x| { x.video_uuid.clone() }).collect::<Vec<Uuid>>()).await?;

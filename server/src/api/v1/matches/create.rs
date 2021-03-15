@@ -1,4 +1,4 @@
-use squadov_common;
+use squadov_common::SquadOvGames;
 use uuid::Uuid;
 use sqlx;
 use sqlx::{Executor, Transaction, Postgres};
@@ -14,7 +14,7 @@ impl crate::api::ApiApplication {
     // represent the same logical match. Thus, the match must be protected via a VALORANT
     // specific endpoint that only creates a new match for a new VALORANT match ID that
     // we haven't seen.
-    pub async fn create_new_match(&self, tx : &mut Transaction<'_, Postgres>) -> Result<super::Match, squadov_common::SquadOvError> {
+    pub async fn create_new_match(&self, tx : &mut Transaction<'_, Postgres>, game: SquadOvGames) -> Result<super::Match, squadov_common::SquadOvError> {
         let new_match = super::Match {
             uuid: Uuid::new_v4(),
         };
@@ -22,10 +22,11 @@ impl crate::api::ApiApplication {
         tx.execute(
             sqlx::query!(
                 "
-                INSERT INTO squadov.matches (uuid)
-                VALUES ($1)
+                INSERT INTO squadov.matches (uuid, game)
+                VALUES ($1, $2)
                 ",
-                new_match.uuid
+                new_match.uuid,
+                game as i32,
             )
         ).await?;
 
@@ -52,16 +53,17 @@ impl crate::api::ApiApplication {
         return Ok(new_collection);
     }
 
-    pub async fn bullk_create_matches(&self, tx : &mut Transaction<'_, Postgres>, count : usize) -> Result<Vec<super::Match>, squadov_common::SquadOvError> {
+    pub async fn bullk_create_matches(&self, tx : &mut Transaction<'_, Postgres>, count : usize, game: SquadOvGames) -> Result<Vec<super::Match>, squadov_common::SquadOvError> {
         let matches = sqlx::query_as!(
             super::Match,
             "
-            INSERT INTO squadov.matches (uuid)
-            SELECT gen_random_uuid()
+            INSERT INTO squadov.matches (uuid, game)
+            SELECT gen_random_uuid(), $2
             FROM generate_series(1, $1)
-            RETURNING *
+            RETURNING uuid
             ",
-            count as i32
+            count as i32,
+            game as i32,
         )
             .fetch_all(tx)
             .await?;
