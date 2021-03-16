@@ -7,6 +7,8 @@ use squadov_common::{
     SerializedWoWAura,
     SerializedWowEncounter,
     SerializedWoWResurrection,
+    SerializedWoWSpellCast,
+    SerializedWoWAuraBreak,
     WoWSpellAuraType
 };
 use uuid::Uuid;
@@ -216,15 +218,204 @@ impl api::ApiApplication {
                 .await?
         )
     }
+
+    async fn get_wow_match_aura_break_events(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWoWAuraBreak>, SquadOvError> {
+        Ok(
+            sqlx::query!(
+                r#"
+                SELECT
+                    source.unit_guid AS "source_guid",
+                    COALESCE(source.unit_name, source.unit_guid) AS "source_name!",
+                    source.flags AS "source_flags",
+                    dest.unit_guid AS "target_guid",
+                    COALESCE(dest.unit_name, dest.unit_guid) AS "target_name!",
+                    dest.flags AS "target_flags",
+                    wabe.aura_spell_id AS "aura_id!",
+                    wabe.aura_type AS "aura_type",
+                    wabe.removed_by_spell_id AS "spell_id",
+                    wve.tm
+                FROM squadov.wow_match_view_aura_break_events AS wabe
+                INNER JOIN squadov.wow_match_view_events AS wve
+                    ON wve.event_id = wabe.event_id
+                INNER JOIN squadov.wow_match_view_character_presence AS source
+                    ON source.character_id = wve.source_char
+                INNER JOIN squadov.wow_match_view_character_presence AS dest
+                    ON dest.character_id = wve.dest_char
+                INNER JOIN squadov.wow_match_view AS wmv
+                    ON wmv.alt_id = wve.view_id
+                WHERE wmv.id = $1
+                ORDER BY wve.tm ASC
+                "#,
+                view_uuid
+            )
+                .fetch_all(&*self.pool)
+                .await?
+                .into_iter()
+                .map(|x| {
+                    SerializedWoWAuraBreak{
+                        source_guid: x.source_guid,
+                        source_name: x.source_name,
+                        source_flags: x.source_flags,
+                        target_guid: x.target_guid,
+                        target_name: x.target_name,
+                        target_flags: x.target_flags,
+                        aura_id: x.aura_id,
+                        aura_type: WoWSpellAuraType::from_str(&x.aura_type).map_or(WoWSpellAuraType::Unknown, |x| { x }),
+                        spell_id: x.spell_id,
+                        tm: x.tm,
+                    }
+                })
+                .collect()
+        )
+    }
+
+    async fn get_wow_match_spell_cast_events(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWoWSpellCast>, SquadOvError> {
+        let raw_casts = sqlx::query!(
+            r#"
+            SELECT
+                source.unit_guid AS "source_guid",
+                COALESCE(source.unit_name, source.unit_guid) AS "source_name!",
+                source.flags AS "source_flags",
+                dest.unit_guid AS "target_guid?",
+                COALESCE(dest.unit_name, dest.unit_guid) AS "target_name?",
+                dest.flags AS "target_flags?",
+                msce.spell_id,
+                msce.is_start,
+                msce.is_finish,
+                msce.success,
+                wve.tm
+            FROM squadov.wow_match_view_spell_cast_events AS msce
+            INNER JOIN squadov.wow_match_view_events AS wve
+                ON wve.event_id = msce.event_id
+            INNER JOIN squadov.wow_match_view_character_presence AS source
+                ON source.character_id = wve.source_char
+            LEFT JOIN squadov.wow_match_view_character_presence AS dest
+                ON dest.character_id = wve.dest_char
+            INNER JOIN squadov.wow_match_view AS wmv
+                ON wmv.alt_id = wve.view_id
+            WHERE wmv.id = $1
+            ORDER BY wve.tm ASC
+            "#,
+            view_uuid
+        )
+            .fetch_all(&*self.pool)
+            .await?;
+
+        // Similar to the aura stuff, we want to match each user's spell casts from its start to its finish (or interrupt).
+        // However, note that in the case of spell casts, some spells are instantly cast or fail and don't have a "start".
+        let mut raw_start_casts: Vec<_> = vec![];
+
+        // If we didn't wrap the end casts in this structure to properly identify which end casts don't have a corresponding
+        // start cast we'd have to remove casts from the Vec<_> once a match has been found. I'm worried that doing too many
+        // O(M) shifts will be slow so instead of removing from the vec, we just flag all the casts that do have a match.
+        struct CastWrapper<T> {
+            used: bool,
+            data: T,
+        }
+
+        let mut raw_end_cast_hashmap: HashMap<String, HashMap<i64, Vec<CastWrapper<_>>>> = HashMap::new();
+
+        for c in raw_casts {
+            if c.is_start {
+                raw_start_casts.push(c);
+            } else if c.is_finish {
+                if !raw_end_cast_hashmap.contains_key(&c.source_guid) {
+                    raw_end_cast_hashmap.insert(c.source_guid.clone(), HashMap::new());
+                }
+    
+                let spell_id_hashmap = raw_end_cast_hashmap.get_mut(&c.source_guid).unwrap();
+                if !spell_id_hashmap.contains_key(&c.spell_id) {
+                    spell_id_hashmap.insert(c.spell_id, vec![]);
+                }
+    
+                let end_casts = spell_id_hashmap.get_mut(&c.spell_id).unwrap();
+                end_casts.push(CastWrapper{
+                    used: false,
+                    data: c,
+                });
+            }
+        }
+
+        // There's 3 classes of casts that we can find:
+        //  1) Instant cast - Success
+        //  2) Instant cast - Failure
+        //  3) Spell with Cast Time
+        // Thus, we first go through all the instances where we have a "cast start" and do our best to match
+        // them up with the end casts. Once we've done that, we can assume that the rest of the "end casts"
+        // are instant casts and we can use their internal booleans to determine whether it was a success or failure.
+        let mut serialized_casts: Vec<SerializedWoWSpellCast> = vec![];
+
+        raw_start_casts.into_iter().for_each(|x| {
+            if let Some(spell_id_hashmap) = raw_end_cast_hashmap.get_mut(&x.source_guid) {
+                if let Some(inner_vec) = spell_id_hashmap.get_mut(&x.spell_id) {
+                    let mut filtered_vec = inner_vec.iter_mut().filter(|x| { !x.used }).collect::<Vec<_>>();
+                    let idx = match filtered_vec.binary_search_by(|y| { y.data.tm.cmp(&x.tm) }) {
+                        Ok(x) => x,
+                        Err(x) => x
+                    };
+
+                    if idx < filtered_vec.len() {
+                        let mut removed = &mut filtered_vec[idx];
+                        serialized_casts.push(SerializedWoWSpellCast{
+                            source_guid: x.source_guid,
+                            source_name: x.source_name,
+                            source_flags: x.source_flags,
+                            target_guid: removed.data.target_guid.clone(),
+                            target_name: removed.data.target_name.clone(),
+                            target_flags: removed.data.target_flags,
+                            cast_start: Some(x.tm),
+                            cast_finish: removed.data.tm,
+                            success: removed.data.success,
+                            instant: false,
+                        });
+                        removed.used = true;
+                    }
+                }
+            }
+        });
+
+        raw_end_cast_hashmap.into_iter().for_each(|(_source, spell_id_hashmap)| {
+            spell_id_hashmap.into_iter().for_each(|(_spell, inner)| {
+                inner.into_iter().for_each(|wrapper| {
+                    if wrapper.used {
+                        return;
+                    }
+    
+                    serialized_casts.push(SerializedWoWSpellCast{
+                        source_guid: wrapper.data.source_guid,
+                        source_name: wrapper.data.source_name,
+                        source_flags: wrapper.data.source_flags,
+                        target_guid: wrapper.data.target_guid,
+                        target_name: wrapper.data.target_name,
+                        target_flags: wrapper.data.target_flags,
+                        cast_start: None,
+                        cast_finish: wrapper.data.tm,
+                        success: wrapper.data.success,
+                        instant: true,
+                    });
+                });
+            });
+        });
+
+        // Note that to be consistent with the rest of the event grabber functions we sort by time in ascending order.
+        serialized_casts.sort_by(|a, b| {
+            a.cast_finish.cmp(&b.cast_finish)
+        });
+
+        Ok(serialized_casts)
+    }
 }
 
 pub async fn list_wow_events_for_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>) -> Result<HttpResponse, SquadOvError> {
     #[derive(Serialize)]
+    #[serde(rename_all="camelCase")]
     struct Response {
         deaths: Vec<SerializedWoWDeath>,
         auras: Vec<SerializedWoWAura>,
         encounters: Vec<SerializedWowEncounter>,
-        resurrections: Vec<SerializedWoWResurrection>
+        resurrections: Vec<SerializedWoWResurrection>,
+        aura_breaks: Vec<SerializedWoWAuraBreak>,
+        spell_casts: Vec<SerializedWoWSpellCast>,
     }
 
     let view_uuid = app.get_wow_match_view_for_user_match(path.user_id, &path.match_uuid).await?.ok_or(SquadOvError::NotFound)?;
@@ -233,5 +424,7 @@ pub async fn list_wow_events_for_match_handler(app : web::Data<Arc<api::ApiAppli
         auras: app.get_wow_match_aura_events(&view_uuid).await?,
         encounters: app.get_wow_match_subencounters(&view_uuid).await?,
         resurrections: app.get_wow_match_resurrection_events(&view_uuid).await?,
+        aura_breaks: app.get_wow_match_aura_break_events(&view_uuid).await?,
+        spell_casts: app.get_wow_match_spell_cast_events(&view_uuid).await?,
     }))
 }

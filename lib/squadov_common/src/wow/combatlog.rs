@@ -227,6 +227,17 @@ pub enum WoWCombatLogEventType {
         aura_type: WoWSpellAuraType,
         applied: bool
     },
+    AuraBreak{
+        aura: WoWSpellInfo,
+        spell: Option<WoWSpellInfo>,
+        aura_type: WoWSpellAuraType,
+    },
+    SpellCast{
+        spell: WoWSpellInfo,
+        start: bool,
+        finish: bool,
+        success: bool,
+    },
     SpellSummon(WoWSpellInfo),
     CombatantInfo{
         guid: String,
@@ -318,10 +329,10 @@ pub struct WoWCombatLogAdvancedCVars {
     spell_power: i64,
     armor: i64,
     unk1: i64,
-    resource_type: i32,
-    current_resource: i64,
-    max_resource: i64,
-    resource_cost: i64,
+    resource_type: Vec<i32>,
+    current_resource: Vec<i64>,
+    max_resource: Vec<i64>,
+    resource_cost: Vec<i64>,
     coord0: f64,
     coord1: f64,
     map_id: i64,
@@ -332,6 +343,19 @@ pub struct WoWCombatLogAdvancedCVars {
 impl WoWCombatLogAdvancedCVars {
     fn new(data: &[String; 17], use_ilvl: bool) -> Result<Self, crate::SquadOvError> {
         let level: i32 = data[16].parse()?;
+        let resource_type: Vec<i32> = data[8].split('|').map(|x| {
+            Ok(x.parse()?)
+        }).collect::<Result<Vec<i32>, SquadOvError>>()?;
+        let current_resource: Vec<i64> = data[9].split('|').map(|x| {
+            Ok(x.parse()?)
+        }).collect::<Result<Vec<i64>, SquadOvError>>()?;
+        let max_resource: Vec<i64> = data[10].split('|').map(|x| {
+            Ok(x.parse()?)
+        }).collect::<Result<Vec<i64>, SquadOvError>>()?;
+        let resource_cost: Vec<i64> = data[11].split('|').map(|x| {
+            Ok(x.parse()?)
+        }).collect::<Result<Vec<i64>, SquadOvError>>()?;
+
         Ok(Self {
             unit_guid: data[0].clone(),
             owner_guid: data[1].clone(),
@@ -341,10 +365,10 @@ impl WoWCombatLogAdvancedCVars {
             spell_power: data[5].parse()?,
             armor: data[6].parse()?,
             unk1: data[7].parse()?,
-            resource_type: data[8].parse()?,
-            current_resource: data[9].parse()?,
-            max_resource: data[10].parse()?,
-            resource_cost: data[11].parse()?,
+            resource_type,
+            current_resource,
+            max_resource,
+            resource_cost,
             coord0: data[12].parse()?,
             coord1: data[13].parse()?,
             map_id: data[14].parse()?,
@@ -430,6 +454,55 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                             applied: false
                         })),
                         "SPELL_SUMMON" => Ok((None, WoWCombatLogEventType::SpellSummon(spell_info))),
+                        "SPELL_AURA_BROKEN_SPELL" => Ok({
+                            let by_spell = WoWSpellInfo{
+                                id: payload.parts[idx].parse()?,
+                                name: payload.parts[idx+1].clone(),
+                                // Not sure why but this one is decimal instead of hex.
+                                school: i64::from_str_radix(&payload.parts[idx+2][..], 10)?,
+                            };
+                            idx += 3;
+
+                            (None, WoWCombatLogEventType::AuraBreak{
+                                aura: spell_info,
+                                spell: Some(by_spell),
+                                aura_type: WoWSpellAuraType::from_str(&payload.parts[idx])?,
+                            })
+                        }),
+                        "SPELL_AURA_BROKEN" => Ok((None, WoWCombatLogEventType::AuraBreak{
+                            aura: spell_info,
+                            spell: None,
+                            aura_type: WoWSpellAuraType::from_str(&payload.parts[idx])?,
+                        })),
+                        "SPELL_CAST_START" => Ok((None, WoWCombatLogEventType::SpellCast{
+                            spell: spell_info,
+                            start: true,
+                            finish: false,
+                            success: false,
+                        })),
+                        "SPELL_CAST_SUCCESS" => Ok({
+                            let advanced = if state.advanced_log {
+                                Some(WoWCombatLogAdvancedCVars::new(payload.parts[idx..idx+17].try_into()?, true)?)
+                            } else {
+                                None
+                            };
+
+                            (
+                                advanced,
+                                WoWCombatLogEventType::SpellCast{
+                                    spell: spell_info,
+                                    start: false,
+                                    finish: true,
+                                    success: true,
+                                }
+                            )
+                        }),
+                        "SPELL_CAST_FAILED" => Ok((None, WoWCombatLogEventType::SpellCast{
+                            spell: spell_info,
+                            start: false,
+                            finish: true,
+                            success: false,
+                        })),
                         _ => Ok((None, WoWCombatLogEventType::Unknown)),
                     }
                 }
@@ -1301,6 +1374,91 @@ async fn bulk_insert_wow_death_events(tx: &mut Transaction<'_, Postgres>, events
     Ok(())
 }
 
+async fn bulk_insert_wow_aura_break_events(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>, ids: &WowEventIdMap) -> Result<(), SquadOvError> {
+    if events.is_empty() {
+        return Ok(());
+    }
+
+    let mut sql: Vec<String> = Vec::new();
+    sql.push(String::from("
+        INSERT INTO squadov.wow_match_view_aura_break_events (
+            event_id,
+            aura_spell_id,
+            aura_type,
+            removed_by_spell_id
+        )
+        VALUES
+    "));
+
+    for x in events {
+        let event_key = (x.alt_view_id, x.log_line);
+        if let WoWCombatLogEventType::AuraBreak{aura, spell, aura_type} = &x.event {
+            sql.push(format!("(
+                {event_id},
+                {aura_spell_id},
+                '{aura_type}',
+                {removed_by_spell_id}
+            )",
+                event_id=ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("AURA BREAK: Failed to get event key {:?}", &event_key)))?,
+                aura_spell_id=aura.id,
+                aura_type=aura_type.to_string(),
+                removed_by_spell_id=crate::sql_format_option_value(&spell.as_ref().map(|x| { x.id })),
+            ));
+            sql.push(String::from(","));
+        }
+    }
+
+    sql.truncate(sql.len() - 1);
+    sql.push(String::from(" ON CONFLICT DO NOTHING"));
+    
+    sqlx::query(&sql.join("")).execute(tx).await?;
+    Ok(())
+}
+
+async fn bulk_insert_wow_spell_cast_events(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>, ids: &WowEventIdMap) -> Result<(), SquadOvError> {
+    if events.is_empty() {
+        return Ok(());
+    }
+
+    let mut sql: Vec<String> = Vec::new();
+    sql.push(String::from("
+        INSERT INTO squadov.wow_match_view_spell_cast_events (
+            event_id,
+            spell_id,
+            is_start,
+            is_finish,
+            success
+        )
+        VALUES
+    "));
+
+    for x in events {
+        let event_key = (x.alt_view_id, x.log_line);
+        if let WoWCombatLogEventType::SpellCast{spell, start, finish, success} = &x.event {
+            sql.push(format!("(
+                {event_id},
+                {spell_id},
+                {is_start},
+                {is_finish},
+                {success}
+            )",
+                event_id=ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("AURA BREAK: Failed to get event key {:?}", &event_key)))?,
+                spell_id=spell.id,
+                is_start=crate::sql_format_bool(*start),
+                is_finish=crate::sql_format_bool(*finish),
+                success=crate::sql_format_bool(*success),
+            ));
+            sql.push(String::from(","));
+        }
+    }
+
+    sql.truncate(sql.len() - 1);
+    sql.push(String::from(" ON CONFLICT DO NOTHING"));
+    
+    sqlx::query(&sql.join("")).execute(tx).await?;
+    Ok(())
+}
+
 async fn bulk_insert_wow_events(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>, ids: &WowEventIdMap, mapping: &WowCharacterIdMap) -> Result<(), SquadOvError> {
     // We first split the input events into individual vectors that are split according to how our database tables are split.
     // This way we can do a O(N) operation to parse out the bulk inserts instead of a M O(N) operation (where M is the number of tables we have).
@@ -1314,6 +1472,8 @@ async fn bulk_insert_wow_events(tx: &mut Transaction<'_, Postgres>, events: Vec<
     let mut resurrect_events: Vec<WoWCombatLogEvent> = vec![];
     let mut subencounter_events: Vec<WoWCombatLogEvent> = vec![];
     let mut death_events: Vec<WoWCombatLogEvent> = vec![];
+    let mut aura_break_events: Vec<WoWCombatLogEvent> = vec![];
+    let mut spell_cast_events: Vec<WoWCombatLogEvent> = vec![];
 
     // (User ID, Unit GUID) -> View UUID. This way we are able to do an upsert
     // via an INSERT/SELECT to find the combatant info in the view for this unit.
@@ -1341,6 +1501,8 @@ async fn bulk_insert_wow_events(tx: &mut Transaction<'_, Postgres>, events: Vec<
             WoWCombatLogEventType::Resurrect(..) => resurrect_events.push(x),
             WoWCombatLogEventType::EncounterStart{..} | WoWCombatLogEventType::EncounterEnd{..} => subencounter_events.push(x),
             WoWCombatLogEventType::UnitDied{..} => death_events.push(x),
+            WoWCombatLogEventType::AuraBreak{..} => aura_break_events.push(x),
+            WoWCombatLogEventType::SpellCast{..} => spell_cast_events.push(x),
             _ => log::warn!("Handling an event that can't be parsed into a table? {:?}", x),
         }
     });
@@ -1353,6 +1515,8 @@ async fn bulk_insert_wow_events(tx: &mut Transaction<'_, Postgres>, events: Vec<
     bulk_insert_wow_resurrect_events(&mut *tx, resurrect_events, ids).await?;
     bulk_insert_wow_subencounter_events(&mut *tx, subencounter_events, ids).await?;
     bulk_insert_wow_death_events(&mut *tx, death_events, ids).await?;
+    bulk_insert_wow_aura_break_events(&mut *tx, aura_break_events, ids).await?;
+    bulk_insert_wow_spell_cast_events(&mut *tx, spell_cast_events, ids).await?;
     bulk_update_wow_user_character_cache(&mut *tx, user_character_cache).await?;
 
     Ok(())
