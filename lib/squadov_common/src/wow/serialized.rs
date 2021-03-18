@@ -57,6 +57,8 @@ pub struct SerializedWoWSpellCast {
     pub target_flags: Option<i64>,
     pub cast_start: Option<DateTime<Utc>>,
     pub cast_finish: DateTime<Utc>,
+    pub spell_id: i64,
+    pub spell_school: i32,
     pub success: bool,
     pub instant: bool,
 }

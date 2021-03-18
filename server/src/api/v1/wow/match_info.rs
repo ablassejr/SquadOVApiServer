@@ -280,10 +280,12 @@ impl api::ApiApplication {
                 COALESCE(dest.unit_name, dest.unit_guid) AS "target_name?",
                 dest.flags AS "target_flags?",
                 msce.spell_id,
+                msce.spell_school,
                 msce.is_start,
                 msce.is_finish,
                 msce.success,
-                wve.tm
+                wve.tm,
+                wve.log_line
             FROM squadov.wow_match_view_spell_cast_events AS msce
             INNER JOIN squadov.wow_match_view_events AS wve
                 ON wve.event_id = msce.event_id
@@ -294,7 +296,7 @@ impl api::ApiApplication {
             INNER JOIN squadov.wow_match_view AS wmv
                 ON wmv.alt_id = wve.view_id
             WHERE wmv.id = $1
-            ORDER BY wve.tm ASC
+            ORDER BY wve.log_line ASC
             "#,
             view_uuid
         )
@@ -313,10 +315,29 @@ impl api::ApiApplication {
             data: T,
         }
 
+        // In contrast to the aura stuff, the spell casts also need a map that keeps track of all the spell casts for that particular spell as well.
+        // Why? Because sometimes WoW doesn't feel like printing out spell success/failures! Thus you can get a CAST_START with no matching
+        // CAST_SUCCESS/FAILURE. To counteract this, we compare the next spell CAST_START with the same spell ID against the matching CAST_SUCCESS/FAILURE.
+        // If the next CAST_START exists and happens before the next CAST_SUCCESS/FAILURE, we know that the first CAST_START failed. We don't know when exactly
+        // but oh well.
+
+        let mut raw_start_cast_hashmap: HashMap<String, HashMap<i64, Vec<i64>>> = HashMap::new();
         let mut raw_end_cast_hashmap: HashMap<String, HashMap<i64, Vec<CastWrapper<_>>>> = HashMap::new();
 
         for c in raw_casts {
             if c.is_start {
+                if !raw_start_cast_hashmap.contains_key(&c.source_guid) {
+                    raw_start_cast_hashmap.insert(c.source_guid.clone(), HashMap::new());
+                }
+    
+                let spell_id_hashmap = raw_start_cast_hashmap.get_mut(&c.source_guid).unwrap();
+                if !spell_id_hashmap.contains_key(&c.spell_id) {
+                    spell_id_hashmap.insert(c.spell_id, vec![]);
+                }
+    
+                let raw_casts = spell_id_hashmap.get_mut(&c.spell_id).unwrap();
+                raw_casts.push(c.log_line);
+
                 raw_start_casts.push(c);
             } else if c.is_finish {
                 if !raw_end_cast_hashmap.contains_key(&c.source_guid) {
@@ -328,8 +349,8 @@ impl api::ApiApplication {
                     spell_id_hashmap.insert(c.spell_id, vec![]);
                 }
     
-                let end_casts = spell_id_hashmap.get_mut(&c.spell_id).unwrap();
-                end_casts.push(CastWrapper{
+                let raw_casts = spell_id_hashmap.get_mut(&c.spell_id).unwrap();
+                raw_casts.push(CastWrapper{
                     used: false,
                     data: c,
                 });
@@ -349,26 +370,62 @@ impl api::ApiApplication {
             if let Some(spell_id_hashmap) = raw_end_cast_hashmap.get_mut(&x.source_guid) {
                 if let Some(inner_vec) = spell_id_hashmap.get_mut(&x.spell_id) {
                     let mut filtered_vec = inner_vec.iter_mut().filter(|x| { !x.used }).collect::<Vec<_>>();
-                    let idx = match filtered_vec.binary_search_by(|y| { y.data.tm.cmp(&x.tm) }) {
+                    let idx = match filtered_vec.binary_search_by(|y| { y.data.log_line.cmp(&x.log_line) }) {
                         Ok(x) => x,
                         Err(x) => x
                     };
 
                     if idx < filtered_vec.len() {
                         let mut removed = &mut filtered_vec[idx];
-                        serialized_casts.push(SerializedWoWSpellCast{
-                            source_guid: x.source_guid,
-                            source_name: x.source_name,
-                            source_flags: x.source_flags,
-                            target_guid: removed.data.target_guid.clone(),
-                            target_name: removed.data.target_name.clone(),
-                            target_flags: removed.data.target_flags,
-                            cast_start: Some(x.tm),
-                            cast_finish: removed.data.tm,
-                            success: removed.data.success,
-                            instant: false,
-                        });
-                        removed.used = true;
+
+                        if let Some(start_id_hashmap) = raw_start_cast_hashmap.get(&x.source_guid) {
+                            if let Some(start_inner_vec) = start_id_hashmap.get(&x.spell_id) {
+                                // +1 because we're guaranteed to find an exact match so the NEXT cast is at the next index.
+                                let start_idx = match start_inner_vec.binary_search_by(|y| { y.cmp(&x.log_line )}) {
+                                    Ok(x) => x,
+                                    Err(x) => x,
+                                } + 1;
+
+                                let valid_pairing = if start_idx < start_inner_vec.len() {
+                                    start_inner_vec[start_idx] > removed.data.log_line
+                                } else {
+                                    true
+                                };
+
+                                if valid_pairing {
+                                    serialized_casts.push(SerializedWoWSpellCast{
+                                        source_guid: x.source_guid,
+                                        source_name: x.source_name,
+                                        source_flags: x.source_flags,
+                                        target_guid: removed.data.target_guid.clone(),
+                                        target_name: removed.data.target_name.clone(),
+                                        target_flags: removed.data.target_flags,
+                                        cast_start: Some(x.tm),
+                                        cast_finish: removed.data.tm,
+                                        spell_id: removed.data.spell_id,
+                                        spell_school: removed.data.spell_school,
+                                        success: removed.data.success,
+                                        instant: false,
+                                    });
+                                    removed.used = true;
+                                } else {
+                                    serialized_casts.push(SerializedWoWSpellCast{
+                                        source_guid: x.source_guid,
+                                        source_name: x.source_name,
+                                        source_flags: x.source_flags,
+                                        target_guid: None,
+                                        target_name: None,
+                                        target_flags: None,
+                                        cast_start: Some(x.tm),
+                                        cast_finish: x.tm,
+                                        spell_id: x.spell_id,
+                                        spell_school: x.spell_school,
+                                        success: false,
+                                        instant: false,
+                                    });
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -390,6 +447,8 @@ impl api::ApiApplication {
                         target_flags: wrapper.data.target_flags,
                         cast_start: None,
                         cast_finish: wrapper.data.tm,
+                        spell_id: wrapper.data.spell_id,
+                        spell_school: wrapper.data.spell_school,
                         success: wrapper.data.success,
                         instant: true,
                     });

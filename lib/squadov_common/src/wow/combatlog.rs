@@ -1425,6 +1425,7 @@ async fn bulk_insert_wow_spell_cast_events(tx: &mut Transaction<'_, Postgres>, e
         INSERT INTO squadov.wow_match_view_spell_cast_events (
             event_id,
             spell_id,
+            spell_school,
             is_start,
             is_finish,
             success
@@ -1438,12 +1439,14 @@ async fn bulk_insert_wow_spell_cast_events(tx: &mut Transaction<'_, Postgres>, e
             sql.push(format!("(
                 {event_id},
                 {spell_id},
+                {spell_school},
                 {is_start},
                 {is_finish},
                 {success}
             )",
                 event_id=ids.get(&event_key).ok_or(SquadOvError::InternalError(format!("AURA BREAK: Failed to get event key {:?}", &event_key)))?,
                 spell_id=spell.id,
+                spell_school=spell.school,
                 is_start=crate::sql_format_bool(*start),
                 is_finish=crate::sql_format_bool(*finish),
                 success=crate::sql_format_bool(*success),
