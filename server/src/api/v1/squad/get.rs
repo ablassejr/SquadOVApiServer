@@ -63,7 +63,10 @@ impl api::ApiApplication {
                 ON sra.squad_id = sq.id
             INNER JOIN squadov.users AS us
                 ON us.id = sra.user_id
+            INNER JOIN squadov.squads AS s
+                ON s.id = sq.id
             WHERE sra.user_id = $1
+                AND (NOT us.is_admin OR NOT s.is_default)
             ORDER BY sq.squad_name
             "#,
             user_id

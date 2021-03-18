@@ -20,7 +20,7 @@ impl api::ApiApplication {
     pub async fn create_default_squad(&self, tx: &mut Transaction<'_, Postgres>, user: &SquadOVUser) -> Result<(), SquadOvError> {
         let group = user.username.clone();
         let name = format!("{}'s Squad", &user.username);
-        let squad_id = self.create_squad(&mut *tx, &group, &name, user.id).await?;
+        let squad_id = self.create_squad(&mut *tx, &group, &name, user.id, true).await?;
 
         // Mike
         self.force_add_user_to_squad(&mut *tx, squad_id, 1).await?;
@@ -30,25 +30,28 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    async fn create_squad(&self, tx: &mut Transaction<'_, Postgres>, squad_group: &str, squad_name: &str, owner_id: i64) -> Result<i64, SquadOvError> {
+    async fn create_squad(&self, tx: &mut Transaction<'_, Postgres>, squad_group: &str, squad_name: &str, owner_id: i64, default: bool) -> Result<i64, SquadOvError> {
         let squad_id: i64 = tx.fetch_one(
             sqlx::query!(
                 "
                 INSERT INTO squadov.squads (
                     squad_group,
                     squad_name,
-                    creation_time
+                    creation_time,
+                    is_default
                 )
                 VALUES (
                     $1,
                     $2,
-                    $3
+                    $3,
+                    $4
                 )
                 RETURNING id
                 ",
                 squad_group,
                 squad_name,
-                Utc::now()
+                Utc::now(),
+                default
             )
         ).await?.get(0);
 
@@ -83,7 +86,7 @@ pub async fn create_squad_handler(app : web::Data<Arc<api::ApiApplication>>, dat
     };
 
     let mut tx = app.pool.begin().await?;
-    let squad_id = app.create_squad(&mut tx, &data.squad_group, &data.squad_name, session.user.id).await?;
+    let squad_id = app.create_squad(&mut tx, &data.squad_group, &data.squad_name, session.user.id, false).await?;
     tx.commit().await?;
     Ok(HttpResponse::Ok().json(squad_id))
 }
