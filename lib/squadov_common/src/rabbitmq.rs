@@ -19,7 +19,6 @@ use sqlx::PgPool;
 
 pub const RABBITMQ_DEFAULT_PRIORITY: u8 = 0;
 pub const RABBITMQ_HIGH_PRIORITY: u8 = 10;
-const RABBITMQ_PREFETCH_COUNT: u16 = 2;
 const RABBITMQ_MAX_DELAY_MS: i64 = 3600000; // 1 hour
 const SQUADOV_RETRY_COUNT_HEADER: &'static str = "x-squadov-retry-count";
 const SQUADOV_MESSAGE_MAX_AGE_HEADER: &'static str = "x-squadov-max-age";
@@ -29,6 +28,7 @@ const INFITE_MAX_AGE: i64 = -1;
 #[derive(Deserialize,Debug,Clone)]
 pub struct RabbitMqConfig {
     pub amqp_url: String,
+    pub prefetch_count: u16,
     pub enable_rso: bool,
     pub rso_queue: String,
     pub enable_valorant: bool,
@@ -275,11 +275,11 @@ impl RabbitMqConnectionBundle {
         });
     }
 
-    pub async fn begin_consuming(&self, itf: Arc<RabbitMqInterface>, queue: &str, requeue_callback: RequeueCallbackFn) -> Result<(), SquadOvError> {
+    pub async fn begin_consuming(&self, itf: Arc<RabbitMqInterface>, queue: &str, requeue_callback: RequeueCallbackFn, prefetch_count: u16) -> Result<(), SquadOvError> {
         // Each channel gets its own thread to start consuming from every channel.
         // I think we should probably only limit ourselves to having 1 consumer channel anyway.
         for ch in &self.channels {
-            ch.basic_qos(RABBITMQ_PREFETCH_COUNT, BasicQosOptions::default()).await?;
+            ch.basic_qos(prefetch_count, BasicQosOptions::default()).await?;
 
             let consumer = ch.basic_consume(
                 queue,
@@ -343,7 +343,7 @@ impl RabbitMqInterface {
         });
     }
 
-    pub async fn add_listener(itf: Arc<RabbitMqInterface>, queue: String, listener: Arc<dyn RabbitMqListener>) -> Result<(), SquadOvError> {
+    pub async fn add_listener(itf: Arc<RabbitMqInterface>, queue: String, listener: Arc<dyn RabbitMqListener>, prefetch_count: u16) -> Result<(), SquadOvError> {
         let mut consumers = itf.consumers.write().await;
         if !consumers.contains_key(&queue) {
             consumers.insert(queue.clone(), Vec::new());
@@ -365,7 +365,7 @@ impl RabbitMqInterface {
         }
 
         consumer_array.push(consumer.clone());
-        consumer.begin_consuming(itf.clone(), &queue, RabbitMqInterface::publish_direct).await?;
+        consumer.begin_consuming(itf.clone(), &queue, RabbitMqInterface::publish_direct, prefetch_count).await?;
         log::info!("\t...Success.");
         Ok(())
     }

@@ -225,19 +225,19 @@ impl ApiApplication {
 
         if !disable_rabbitmq {
             if config.rabbitmq.enable_rso {
-                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.rso_queue.clone(), rso_itf.clone()).await.unwrap();
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.rso_queue.clone(), rso_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
             }
 
             if config.rabbitmq.enable_valorant {
-                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.valorant_queue.clone(), valorant_itf.clone()).await.unwrap();
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.valorant_queue.clone(), valorant_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
             }
 
             if config.rabbitmq.enable_lol {
-                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.lol_queue.clone(), lol_itf.clone()).await.unwrap();
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.lol_queue.clone(), lol_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
             }
 
             if config.rabbitmq.enable_tft {
-                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.tft_queue.clone(), tft_itf.clone()).await.unwrap();
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.tft_queue.clone(), tft_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
             }
         }
 
@@ -251,7 +251,7 @@ impl ApiApplication {
         if !disable_rabbitmq && config.rabbitmq.enable_vod {
             for _i in 0..config.vod.fastify_threads {
                 let process_itf = Arc::new(VodProcessingInterface::new(&config.rabbitmq.vod_queue, rabbitmq.clone(), pool.clone(), vod_manager.clone()));
-                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.vod_queue.clone(), process_itf).await.unwrap();
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.vod_queue.clone(), process_itf, config.rabbitmq.prefetch_count).await.unwrap();
             }
         }
 
