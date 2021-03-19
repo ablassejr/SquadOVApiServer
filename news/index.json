@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.7.9",
+        "description": "Better WoW timeline and spell/aura analysis!",
+        "timestamp": 1616101680000,
+        "data": "data/update-v0.7.9.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.7.4",
         "description": "Urgent hotfix to handle thew latest WoW patch!",
         "timestamp": 1615329482000,
@@ -39,62 +46,6 @@
         "description": "Clip sharing at long last!",
         "timestamp": 1613762989000,
         "data": "data/update-v0.6.0.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.5.16",
-        "description": "Audio controls and more!",
-        "timestamp": 1613431309000,
-        "data": "data/update-v0.5.16.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.5.13",
-        "description": "Various video recording fixes.",
-        "timestamp": 1613200402000,
-        "data": "data/hotfix-v0.5.13.md",
-        "type": "hotfix"
-    },
-    {
-        "title": "SquadOV v0.5.12",
-        "description": "Minor bug fixes - welcome /r/wow and /r/worldofpvp.",
-        "timestamp": 1613157597000,
-        "data": "data/hotfix-v0.5.12.md",
-        "type": "hotfix"
-    },
-    {
-        "title": "SquadOV v0.5.11",
-        "description": "Minor bug fixes.",
-        "timestamp": 1613072693000,
-        "data": "data/hotfix-v0.5.11.md",
-        "type": "hotfix"
-    },
-    {
-        "title": "SquadOV v0.5.10",
-        "description": "Lots of bug fixes.",
-        "timestamp": 1613004928000,
-        "data": "data/update-v0.5.10.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.5.9",
-        "description": "Match URL sharing!",
-        "timestamp": 1612904888000,
-        "data": "data/update-v0.5.9.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.5.7",
-        "description": "Fixing an oopsie (:",
-        "timestamp": 1612558836000,
-        "data": "data/hotfix-v0.5.7.md",
-        "type": "hotfix"
-    },
-    {
-        "title": "SquadOV v0.5.6",
-        "description": "Better VOD support for World of Warcraft!",
-        "timestamp": 1612550110000,
-        "data": "data/update-v0.5.6.md",
         "type": "update"
     }
 ]

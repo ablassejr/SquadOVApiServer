@@ -1,17 +1,5 @@
 {
   "db": "PostgreSQL",
-  "012197f1535ebf241f90ec25ec5c22866a2ed2a54653daab5e8ae637e6f9612b": {
-    "query": "\n        INSERT INTO squadov.matches (uuid)\n        VALUES ($1)\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "020b942a27bb1ad47212f6634550b8a8fbdc309d83f1e8b5662f8297b271246e": {
     "query": "\n        INSERT INTO squadov.riot_accounts (\n            puuid,\n            account_id,\n            summoner_id,\n            summoner_name\n        )\n        VALUES (\n            $1,\n            $2,\n            $3,\n            $4\n        )\n        ON CONFLICT (puuid) DO UPDATE\n            SET account_id = EXCLUDED.account_id,\n                summoner_id = EXCLUDED.summoner_id,\n                summoner_name = EXCLUDED.summoner_name\n        ",
     "describe": {
@@ -2257,6 +2245,19 @@
         false,
         false
       ]
+    }
+  },
+  "8cc17cd623022c178a176e3d6f3b32bd8dc1e3b49d59ad6abb9ad84a5e7084fb": {
+    "query": "\n        INSERT INTO squadov.matches (uuid, game)\n        VALUES ($1, $2)\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int4"
+        ]
+      },
+      "nullable": []
     }
   },
   "8e0e514b947b6c6c89844fb840c0bf90bc35bfe3bdd6aa71b334339d08d68788": {
