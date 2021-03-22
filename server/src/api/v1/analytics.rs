@@ -103,7 +103,7 @@ pub async fn public_landing_visit_handler(app : web::Data<Arc<api::ApiApplicatio
             Err(err) => log::warn!("Failed to mark referral visit: {:?}", err)
         };
     }
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::NoContent().finish())
 }
 
 pub async fn public_landing_download_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<ReferralQuery>) -> Result<HttpResponse, SquadOvError> {
@@ -113,7 +113,7 @@ pub async fn public_landing_download_handler(app : web::Data<Arc<api::ApiApplica
             Err(err) => log::warn!("Failed to mark referral download: {:?}", err)
         };
     }
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::NoContent().finish())
 }
 
 pub async fn get_user_me_referral_link_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
