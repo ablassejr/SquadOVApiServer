@@ -97,6 +97,12 @@ impl api::ApiApplication {
                     ON v.user_uuid = ou.uuid
                 INNER JOIN squadov.matches AS m
                     ON v.match_uuid = m.uuid
+                LEFT JOIN squadov.user_favorite_matches AS ufm
+                    ON ufm.match_uuid = m.uuid
+                        AND ufm.user_id = ou.id
+                LEFT JOIN squadov.user_watchlist_vods AS uwv
+                    ON uwv.video_uuid = v.video_uuid
+                        AND uwv.user_id = ou.id
                 WHERE u.id = $1
                     AND v.match_uuid IS NOT NULL
                     AND v.user_uuid IS NOT NULL
@@ -107,6 +113,8 @@ impl api::ApiApplication {
                     AND (CARDINALITY($6::BIGINT[]) = 0 OR ou.id = ANY($6))
                     AND COALESCE(v.end_time >= $7, TRUE)
                     AND COALESCE(v.end_time <= $8, TRUE)
+                    AND (NOT $9::BOOLEAN OR ufm.match_uuid IS NOT NULL)
+                    AND (NOT $10::BOOLEAN OR uwv.video_uuid IS NOT NULL)
                 ORDER BY v.end_time DESC
                 LIMIT $2 OFFSET $3
                 "#,
@@ -124,6 +132,8 @@ impl api::ApiApplication {
                 filter.time_end.map(|x| {
                     Utc.timestamp_millis(x)
                 }),
+                filter.only_favorite,
+                filter.only_watchlist
             )
                 .fetch_all(&*self.pool)
                 .await?
