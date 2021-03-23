@@ -87,6 +87,8 @@ pub struct VodClip {
     pub views: i64,
     pub reacts: i64,
     pub comments: i64,
+    pub favorite_reason: Option<String>,
+    pub is_watchlist: bool,
 }
 
 #[derive(Serialize,Deserialize,Clone)]

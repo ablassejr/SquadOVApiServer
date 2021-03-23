@@ -12,6 +12,7 @@ pub use clip::*;
 
 use crate::api;
 use crate::api::auth::SquadOVSession;
+use crate::api::v1::FavoriteResponse;
 use uuid::Uuid;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -44,7 +45,7 @@ pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApp
     };
 
     // Only the owner of the clip can share.
-    let clips = app.get_vod_clip_from_clip_uuids(&[path.clip_uuid.clone()]).await?;
+    let clips = app.get_vod_clip_from_clip_uuids(&[path.clip_uuid.clone()], session.user.id).await?;
     if clips.is_empty() {
         return Err(SquadOvError::BadRequest);
     }
@@ -152,23 +153,21 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    async fn is_vod_favorite_for_user(&self, video_uuid: &Uuid, user_id: i64) -> Result<bool, SquadOvError> {
+    async fn is_vod_favorite_for_user(&self, video_uuid: &Uuid, user_id: i64) -> Result<Option<String>, SquadOvError> {
         Ok(
             sqlx::query!(
                 r#"
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM squadov.user_favorite_vods
-                    WHERE video_uuid = $1
-                        AND user_id = $2
-                ) AS "exists!"
+                SELECT reason
+                FROM squadov.user_favorite_vods
+                WHERE video_uuid = $1
+                    AND user_id = $2
                 "#,
                 video_uuid,
                 user_id,
             )
-                .fetch_one(&*self.pool)
+                .fetch_optional(&*self.pool)
                 .await?
-                .exists
+                .map(|x| { x.reason })
         )
     }
 
@@ -256,8 +255,13 @@ pub async fn check_favorite_vod_handler(app : web::Data<Arc<api::ApiApplication>
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
+
+    let reason = app.is_vod_favorite_for_user(&path.video_uuid, session.user.id).await?;
     Ok(HttpResponse::Ok().json(
-        app.is_vod_favorite_for_user(&path.video_uuid, session.user.id).await?
+        FavoriteResponse{
+            favorite: reason.is_some(),
+            reason,
+        }
     ))
 }
 

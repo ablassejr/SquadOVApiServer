@@ -29,3 +29,11 @@ pub use tft::*;
 pub use oauth::*;
 pub use features::*;
 pub use analytics::*;
+
+use serde::Serialize;
+
+#[derive(Serialize)]
+pub struct FavoriteResponse {
+    favorite: bool,
+    reason: Option<String>,
+}

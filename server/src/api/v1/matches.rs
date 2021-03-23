@@ -35,6 +35,7 @@ use std::collections::{HashSet, HashMap};
 use serde::{Serialize, Deserialize};
 use url::Url;
 use serde_qs::actix::QsQuery;
+use crate::api::v1::FavoriteResponse;
 
 pub struct Match {
     pub uuid : Uuid
@@ -55,7 +56,9 @@ struct RawRecentMatchData {
     user_uuid: Uuid,
     tm: DateTime<Utc>,
     username: String,
-    user_id: i64
+    user_id: i64,
+    favorite_reason: Option<String>,
+    is_watchlist: bool,
 }
 
 
@@ -84,7 +87,9 @@ impl api::ApiApplication {
                     v.user_uuid AS "user_uuid!",
                     v.end_time AS "tm!",
                     ou.username AS "username!",
-                    ou.id AS "user_id!"
+                    ou.id AS "user_id!",
+                    ufm.reason AS "favorite_reason?",
+                    uwv.video_uuid IS NOT NULL AS "is_watchlist!"
                 FROM squadov.users AS u
                 LEFT JOIN squadov.squad_role_assignments AS sra
                     ON sra.user_id = u.id
@@ -99,10 +104,10 @@ impl api::ApiApplication {
                     ON v.match_uuid = m.uuid
                 LEFT JOIN squadov.user_favorite_matches AS ufm
                     ON ufm.match_uuid = m.uuid
-                        AND ufm.user_id = ou.id
+                        AND ufm.user_id = $1
                 LEFT JOIN squadov.user_watchlist_vods AS uwv
                     ON uwv.video_uuid = v.video_uuid
-                        AND uwv.user_id = ou.id
+                        AND uwv.user_id = $1
                 WHERE u.id = $1
                     AND v.match_uuid IS NOT NULL
                     AND v.user_uuid IS NOT NULL
@@ -140,23 +145,22 @@ impl api::ApiApplication {
         )
     }
 
-    async fn is_match_favorite_by_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<bool, SquadOvError> {
+    async fn is_match_favorite_by_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<Option<String>, SquadOvError> {
         Ok(
             sqlx::query!(
                 r#"
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM squadov.user_favorite_matches
-                    WHERE match_uuid = $1
-                        AND user_id = $2
-                ) AS "exists!"
+                SELECT reason
+                FROM squadov.user_favorite_matches
+                WHERE match_uuid = $1
+                    AND user_id = $2
+
                 "#,
                 match_uuid,
                 user_id,
             )
-                .fetch_one(&*self.pool)
+                .fetch_optional(&*self.pool)
                 .await?
-                .exists
+                .map(|x| { x.reason })
         )
     }
 
@@ -284,6 +288,8 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
                 vod: vod_manifests.remove(&x.video_uuid).ok_or(SquadOvError::InternalError(String::from("Failed to find expected VOD manifest.")))?,
                 username: x.username,
                 user_id: x.user_id,
+                favorite_reason: x.favorite_reason,
+                is_watchlist: x.is_watchlist,
             },
             aimlab_task: aimlab_task.cloned(),
             lol_match: lol_match.cloned(),
@@ -415,8 +421,12 @@ pub async fn check_favorite_match_handler(app : web::Data<Arc<api::ApiApplicatio
         None => return Err(SquadOvError::Unauthorized),
     };
 
+    let reason = app.is_match_favorite_by_user(&path.match_uuid, session.user.id).await?;
     Ok(HttpResponse::Ok().json(
-        app.is_match_favorite_by_user(&path.match_uuid, session.user.id).await?
+        FavoriteResponse{
+            favorite: reason.is_some(),
+            reason,
+        }
     ))
 }
 

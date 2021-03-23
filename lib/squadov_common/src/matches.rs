@@ -53,6 +53,8 @@ pub struct BaseRecentMatch {
     pub vod: VodManifest,
     pub username: String,
     pub user_id: i64,
+    pub favorite_reason: Option<String>,
+    pub is_watchlist: bool,
 }
 
 #[derive(Serialize)]

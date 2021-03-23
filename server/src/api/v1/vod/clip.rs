@@ -101,7 +101,7 @@ impl api::ApiApplication {
         })
     }
 
-    pub async fn get_vod_clip_from_clip_uuids(&self, uuids: &[Uuid]) -> Result<Vec<VodClip>, SquadOvError> {
+    pub async fn get_vod_clip_from_clip_uuids(&self, uuids: &[Uuid], user_id: i64) -> Result<Vec<VodClip>, SquadOvError> {
         // This is a multi-pass solution to get all the data we need in the most efficient way.
         // First we get all the basic VOD clip data stored in the database. After that, the only thing
         // we need to take care of is grabbing the VodAssociation and VodManifest for each clip.
@@ -112,7 +112,9 @@ impl api::ApiApplication {
                 u.username AS "clipper",
                 COALESCE(rc.count, 0) AS "reacts!",
                 COALESCE(cc.count, 0) AS "comments!",
-                COALESCE(cv.count, 0) AS "views!"
+                COALESCE(cv.count, 0) AS "views!",
+                ufv.reason AS "favorite_reason?",
+                uwv.video_uuid IS NOT NULL AS "is_watchlist!"
             FROM squadov.vod_clips AS vc
             INNER JOIN squadov.users AS u
                 ON u.id = vc.clip_user_id
@@ -122,10 +124,17 @@ impl api::ApiApplication {
                 ON cc.clip_uuid = vc.clip_uuid
             LEFT JOIN squadov.view_clip_view_count AS cv
                 ON cv.clip_uuid = vc.clip_uuid
+            LEFT JOIN squadov.user_favorite_vods AS ufv
+                ON ufv.video_uuid = vc.clip_uuid
+                    AND ufv.user_id = $2
+            LEFT JOIN squadov.user_watchlist_vods AS uwv
+                ON uwv.video_uuid = vc.clip_uuid
+                    AND uwv.user_id = $2
             WHERE vc.clip_uuid = ANY($1)
             ORDER BY vc.tm DESC
             "#,
             uuids,
+            user_id,
         )
             .fetch_all(&*self.pool)
             .await?;
@@ -148,6 +157,8 @@ impl api::ApiApplication {
                 views: x.views,
                 reacts: x.reacts,
                 comments: x.comments,
+                favorite_reason: x.favorite_reason,
+                is_watchlist: x.is_watchlist,
             })
         }).collect::<Result<Vec<VodClip>, SquadOvError>>()?)
     }
@@ -170,10 +181,10 @@ impl api::ApiApplication {
                     OR ou.uuid = v.user_uuid
             LEFT JOIN squadov.user_favorite_vods AS ufv
                 ON ufv.video_uuid = v.video_uuid
-                    AND ufv.user_id = ou.id
+                    AND ufv.user_id = $1
             LEFT JOIN squadov.user_watchlist_vods AS uwv
                 ON uwv.video_uuid = v.video_uuid
-                    AND uwv.user_id = ou.id
+                    AND uwv.user_id = $1
             WHERE (vc.clip_user_id = $1 OR ora.user_id = $1)
                 AND ($4::UUID IS NULL OR m.uuid = $4)
                 AND (CARDINALITY($5::INTEGER[]) = 0 OR m.game = ANY($5))
@@ -208,7 +219,7 @@ impl api::ApiApplication {
             .into_iter()
             .map(|x| { x.clip_uuid })
             .collect::<Vec<Uuid>>();
-        Ok(self.get_vod_clip_from_clip_uuids(&clips).await?)
+        Ok(self.get_vod_clip_from_clip_uuids(&clips, user_id).await?)
     }
 
     async fn mark_clip_view(&self, clip_uuid: &Uuid, user_id: Option<i64>) -> Result<(), SquadOvError> {
@@ -423,8 +434,14 @@ pub async fn list_clips_for_user_handler(app : web::Data<Arc<api::ApiApplication
     Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(clips, &request, &page, expected_total == got_total)?)) 
 }
 
-pub async fn get_clip_handler(app : web::Data<Arc<api::ApiApplication>>, pth: web::Path<ClipPathInput>) -> Result<HttpResponse, SquadOvError> {
-    let clips = app.get_vod_clip_from_clip_uuids(&[pth.clip_uuid.clone()]).await?;
+pub async fn get_clip_handler(app : web::Data<Arc<api::ApiApplication>>, pth: web::Path<ClipPathInput>, request : HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = request.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return Err(SquadOvError::Unauthorized),
+    };
+
+    let clips = app.get_vod_clip_from_clip_uuids(&[pth.clip_uuid.clone()], session.user.id).await?;
 
     if clips.is_empty() {
         Err(SquadOvError::NotFound)
