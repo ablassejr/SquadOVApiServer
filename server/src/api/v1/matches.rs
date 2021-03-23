@@ -129,6 +129,67 @@ impl api::ApiApplication {
         )
     }
 
+    async fn is_match_favorite_by_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<bool, SquadOvError> {
+        Ok(
+            sqlx::query!(
+                r#"
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM squadov.user_favorite_matches
+                    WHERE match_uuid = $1
+                        AND user_id = $2
+                ) AS "exists!"
+                "#,
+                match_uuid,
+                user_id,
+            )
+                .fetch_one(&*self.pool)
+                .await?
+                .exists
+        )
+    }
+
+    async fn add_match_favorite_for_user(&self, match_uuid: &Uuid, user_id: i64, reason: &str) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            r#"
+            INSERT INTO squadov.user_favorite_matches (
+                match_uuid,
+                user_id,
+                reason
+            )
+            VALUES (
+                $1,
+                $2,
+                $3
+            )
+            ON CONFLICT DO NOTHING
+            "#,
+            match_uuid,
+            user_id,
+            reason,
+        )
+            .execute(&*self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn remove_match_favorite_for_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            r#"
+            DELETE FROM squadov.user_favorite_matches
+            WHERE match_uuid = $1 AND user_id = $2
+            "#,
+            match_uuid,
+            user_id,
+        )
+            .execute(&*self.pool)
+            .await?;
+        Ok(())
+    }
+}
+
+pub async fn get_favorite_matches_for_me_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, query: QsQuery<api::PaginationParameters>, filter: QsQuery<RecentMatchQuery>) -> Result<HttpResponse, SquadOvError> {
+    Ok(HttpResponse::Ok().finish())
 }
 
 pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, query: QsQuery<api::PaginationParameters>, filter: QsQuery<RecentMatchQuery>) -> Result<HttpResponse, SquadOvError> {
@@ -321,6 +382,46 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
         &app.config.cors.domain,
         &token,
     )))
+}
+
+#[derive(Deserialize,Debug)]
+#[serde(rename_all="camelCase")]
+pub struct MatchFavoriteData {
+    reason: String,
+}
+
+pub async fn favorite_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, data: web::Json<MatchFavoriteData>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return Err(SquadOvError::Unauthorized),
+    };
+
+    app.add_match_favorite_for_user(&path.match_uuid, session.user.id, &data.reason).await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn check_favorite_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return Err(SquadOvError::Unauthorized),
+    };
+
+    Ok(HttpResponse::Ok().json(
+        app.is_match_favorite_by_user(&path.match_uuid, session.user.id).await?
+    ))
+}
+
+pub async fn remove_favorite_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return Err(SquadOvError::Unauthorized),
+    };
+
+    app.remove_match_favorite_for_user(&path.match_uuid, session.user.id).await?;
+    Ok(HttpResponse::NoContent().finish())
 }
 
 #[derive(Deserialize,Debug)]

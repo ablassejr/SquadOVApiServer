@@ -1,11 +1,14 @@
 use crate::api;
 use crate::api::auth::SquadOVSession;
+use crate::api::v1::RecentMatchQuery;
 use actix_web::{web, HttpResponse, HttpRequest};
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use squadov_common::{SquadOvError, VodSegmentId, SquadOvGames, VodClip, ClipReact, ClipComment};
 use std::sync::Arc;
 use std::convert::TryFrom;
+use serde_qs::actix::QsQuery;
+use chrono::{Utc, TimeZone};
 
 #[derive(Deserialize)]
 pub struct CreateClipPathInput {
@@ -149,49 +152,46 @@ impl api::ApiApplication {
         }).collect::<Result<Vec<VodClip>, SquadOvError>>()?)
     }
 
-    async fn list_user_accessible_clips(&self, user_id: i64, start: i64, end: i64) -> Result<Vec<VodClip>, SquadOvError> {
-        let clips = sqlx::query!(
-            "
-            SELECT DISTINCT vc.clip_uuid
-            FROM squadov.vod_clips AS vc
-            LEFT JOIN squadov.squad_role_assignments AS sra
-                ON sra.user_id = vc.clip_user_id
-            LEFT JOIN squadov.squad_role_assignments AS ora
-                ON ora.squad_id = sra.squad_id
-            WHERE (vc.clip_user_id = $1 OR ora.user_id = $1)
-            LIMIT $2 OFFSET $3
-            ",
-            user_id,
-            end - start,
-            start,
-        )
-            .fetch_all(&*self.pool)
-            .await?
-            .into_iter()
-            .map(|x| { x.clip_uuid })
-            .collect::<Vec<Uuid>>();
-        Ok(self.get_vod_clip_from_clip_uuids(&clips).await?)
-    }
-
-    async fn list_user_accessible_clips_for_match(&self, user_id: i64, match_uuid: &Uuid, start: i64, end: i64) -> Result<Vec<VodClip>, SquadOvError> {
+    async fn list_user_accessible_clips(&self, user_id: i64, start: i64, end: i64, match_uuid: Option<Uuid>, filter: &RecentMatchQuery) -> Result<Vec<VodClip>, SquadOvError> {
         let clips = sqlx::query!(
             "
             SELECT DISTINCT vc.clip_uuid
             FROM squadov.vod_clips AS vc
             INNER JOIN squadov.vods AS v
                 ON v.video_uuid = vc.clip_uuid
+            INNER JOIN squadov.matches AS m
+                ON m.uuid = v.match_uuid
             LEFT JOIN squadov.squad_role_assignments AS sra
                 ON sra.user_id = vc.clip_user_id
             LEFT JOIN squadov.squad_role_assignments AS ora
                 ON ora.squad_id = sra.squad_id
+            INNER JOIN squadov.users AS ou
+                ON ou.id = ora.user_id
+                    OR ou.uuid = v.user_uuid
             WHERE (vc.clip_user_id = $1 OR ora.user_id = $1)
-                AND v.match_uuid = $2
-            LIMIT $3 OFFSET $4
+                AND ($4::UUID IS NULL OR m.uuid = $4)
+                AND (CARDINALITY($5::INTEGER[]) = 0 OR m.game = ANY($5))
+                AND (CARDINALITY($6::BIGINT[]) = 0 OR sra.squad_id = ANY($6))
+                AND (CARDINALITY($7::BIGINT[]) = 0 OR ora.user_id = ANY($7))
+                AND COALESCE(v.end_time >= $8, TRUE)
+                AND COALESCE(v.end_time <= $9, TRUE)
+            LIMIT $2 OFFSET $3
             ",
             user_id,
-            match_uuid,
             end - start,
             start,
+            match_uuid,
+            &filter.games.as_ref().unwrap_or(&vec![]).iter().map(|x| {
+                *x as i32
+            }).collect::<Vec<i32>>(),
+            &filter.squads.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i64>>(),
+            &filter.users.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i64>>(),
+            filter.time_start.map(|x| {
+                Utc.timestamp_millis(x)
+            }),
+            filter.time_end.map(|x| {
+                Utc.timestamp_millis(x)
+            }),
         )
             .fetch_all(&*self.pool)
             .await?
@@ -399,18 +399,14 @@ pub async fn create_clip_for_vod_handler(pth: web::Path<CreateClipPathInput>, da
     Ok(HttpResponse::Ok().json(&resp))
 }
 
-pub async fn list_clips_for_user_handler(app : web::Data<Arc<api::ApiApplication>>, page: web::Query<api::PaginationParameters>,  query: web::Query<ClipQuery>, request : HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_clips_for_user_handler(app : web::Data<Arc<api::ApiApplication>>, page: web::Query<api::PaginationParameters>,  query: web::Query<ClipQuery>, filter: QsQuery<RecentMatchQuery>, request : HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = request.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    let clips = if query.match_uuid.is_some() {
-        app.list_user_accessible_clips_for_match(session.user.id, &query.match_uuid.unwrap(), page.start, page.end).await?
-    } else {
-        app.list_user_accessible_clips(session.user.id, page.start, page.end).await?
-    };
+    let clips = app.list_user_accessible_clips(session.user.id, page.start, page.end, query.match_uuid.clone(), &filter).await?;
 
     let expected_total = page.end - page.start;
     let got_total = clips.len() as i64;

@@ -101,3 +101,35 @@ pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApp
         &token,
     )))
 }
+
+#[derive(Deserialize)]
+pub struct GenericVodPathInput {
+    video_uuid: Uuid
+}
+
+#[derive(Deserialize)]
+pub struct VodUserPathInput {
+    user_id: i64
+}
+
+#[derive(Deserialize,Debug)]
+#[serde(rename_all="camelCase")]
+pub struct VodFavoriteData {
+    reason: String,
+}
+
+pub async fn favorite_vod_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericVodPathInput>, data: web::Json<VodFavoriteData>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn watchlist_vod_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericVodPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn list_favorite_vod_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<VodUserPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    Ok(HttpResponse::Ok().finish())
+}
+
+pub async fn list_watchlist_vod_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<VodUserPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    Ok(HttpResponse::Ok().finish())
+}
