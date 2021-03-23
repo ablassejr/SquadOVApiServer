@@ -136,7 +136,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .route("/active", web::post().to(v1::mark_user_active_endpoint_handler))
                                 .route("/playtime", web::get().to(v1::get_user_recorded_playtime_handler))
                                 .route("/recent", web::get().to(v1::get_recent_matches_for_me_handler))
-                                .route("/favorite", web::get().to(v1::get_favorite_matches_for_me_handler))
                                 .route("/referral", web::get().to(v1::get_user_me_referral_link_handler))
                                 .route("/squadmates", web::get().to(v1::get_user_squadmates_handler))
                         )
@@ -556,6 +555,23 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route(web::post().to(v1::associate_vod_handler))
                                 )
                                 .service(
+                                    web::scope("/list")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::VodAccessChecker{
+                                                must_be_vod_owner: false,
+                                                obtainer: access::VodPathObtainer{
+                                                    video_uuid_key: "video_uuid"
+                                                },
+                                            }),
+                                        ))
+                                        .route("/favorite", web::post().to(v1::favorite_vod_handler))
+                                        .route("/favorite", web::delete().to(v1::remove_favorite_vod_handler))
+                                        .route("/favorite", web::get().to(v1::check_favorite_vod_handler))
+                                        .route("/watch", web::post().to(v1::watchlist_vod_handler))
+                                        .route("/watch", web::delete().to(v1::remove_watchlist_vod_handler))
+                                        .route("/watch", web::get().to(v1::check_watchlist_vod_handler))
+                                )
+                                .service(
                                     web::resource("/{quality}/{segment_name}")
                                         .wrap(access::ApiAccess::new(
                                             Box::new(access::VodAccessChecker{
@@ -579,31 +595,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         ))
                                         .route(web::post().to(v1::create_clip_for_vod_handler))
                                 )
-                                .service(
-                                    web::scope("/list")
-                                        .wrap(access::ApiAccess::new(
-                                            Box::new(access::VodAccessChecker{
-                                                must_be_vod_owner: false,
-                                                obtainer: access::VodPathObtainer{
-                                                    video_uuid_key: "video_uuid"
-                                                },
-                                            }),
-                                        ))
-                                        .route("/favorite", web::post().to(v1::favorite_vod_handler))
-                                        .route("/watch", web::post().to(v1::watchlist_vod_handler))
-                                )
-                        )
-                        .service(
-                            web::scope("/user/{user_id}")
-                                .wrap(access::ApiAccess::new(
-                                    Box::new(access::SameSquadAccessChecker{
-                                        obtainer: access::UserIdPathSetObtainer{
-                                            key: "user_id"
-                                        },
-                                    })
-                                ))
-                                .route("/favorite", web::get().to(v1::list_favorite_vod_handler))
-                                .route("/watch", web::get().to(v1::list_watchlist_vod_handler))
                         )
                 )
                 .service(

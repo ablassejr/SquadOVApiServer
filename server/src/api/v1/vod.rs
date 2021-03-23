@@ -107,29 +107,189 @@ pub struct GenericVodPathInput {
     video_uuid: Uuid
 }
 
-#[derive(Deserialize)]
-pub struct VodUserPathInput {
-    user_id: i64
-}
-
 #[derive(Deserialize,Debug)]
 #[serde(rename_all="camelCase")]
 pub struct VodFavoriteData {
     reason: String,
 }
 
+impl api::ApiApplication {
+    async fn add_vod_favorite_for_user(&self, video_uuid: &Uuid, user_id: i64, reason: &str) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            r#"
+            INSERT INTO squadov.user_favorite_vods (
+                video_uuid,
+                user_id,
+                reason
+            )
+            VALUES (
+                $1,
+                $2,
+                $3
+            )
+            ON CONFLICT DO NOTHING
+            "#,
+            video_uuid,
+            user_id,
+            reason,
+        )
+            .execute(&*self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn remove_vod_favorite_for_user(&self, video_uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            r#"
+            DELETE FROM squadov.user_favorite_vods
+            WHERE video_uuid = $1 AND user_id = $2
+            "#,
+            video_uuid,
+            user_id,
+        )
+            .execute(&*self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn is_vod_favorite_for_user(&self, video_uuid: &Uuid, user_id: i64) -> Result<bool, SquadOvError> {
+        Ok(
+            sqlx::query!(
+                r#"
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM squadov.user_favorite_vods
+                    WHERE video_uuid = $1
+                        AND user_id = $2
+                ) AS "exists!"
+                "#,
+                video_uuid,
+                user_id,
+            )
+                .fetch_one(&*self.pool)
+                .await?
+                .exists
+        )
+    }
+
+    async fn add_vod_watchlist_for_user(&self, video_uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            r#"
+            INSERT INTO squadov.user_watchlist_vods (
+                video_uuid,
+                user_id
+            )
+            VALUES (
+                $1,
+                $2
+            )
+            ON CONFLICT DO NOTHING
+            "#,
+            video_uuid,
+            user_id,
+        )
+            .execute(&*self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn remove_vod_watchlist_for_user(&self, video_uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            r#"
+            DELETE FROM squadov.user_watchlist_vods
+            WHERE video_uuid = $1 AND user_id = $2
+            "#,
+            video_uuid,
+            user_id,
+        )
+            .execute(&*self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn is_vod_watchlist_for_user(&self, video_uuid: &Uuid, user_id: i64) -> Result<bool, SquadOvError> {
+        Ok(
+            sqlx::query!(
+                r#"
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM squadov.user_watchlist_vods
+                    WHERE video_uuid = $1
+                        AND user_id = $2
+                ) AS "exists!"
+                "#,
+                video_uuid,
+                user_id,
+            )
+                .fetch_one(&*self.pool)
+                .await?
+                .exists
+        )
+    }
+}
+
 pub async fn favorite_vod_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericVodPathInput>, data: web::Json<VodFavoriteData>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return Err(SquadOvError::Unauthorized),
+    };
+
+    app.add_vod_favorite_for_user(&path.video_uuid, session.user.id, &data.reason).await?;
     Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn remove_favorite_vod_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericVodPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return Err(SquadOvError::Unauthorized),
+    };
+
+    app.remove_vod_favorite_for_user(&path.video_uuid, session.user.id).await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn check_favorite_vod_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericVodPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return Err(SquadOvError::Unauthorized),
+    };
+    Ok(HttpResponse::Ok().json(
+        app.is_vod_favorite_for_user(&path.video_uuid, session.user.id).await?
+    ))
 }
 
 pub async fn watchlist_vod_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericVodPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return Err(SquadOvError::Unauthorized),
+    };
+
+    app.add_vod_watchlist_for_user(&path.video_uuid, session.user.id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
-pub async fn list_favorite_vod_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<VodUserPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
-    Ok(HttpResponse::Ok().finish())
+pub async fn remove_watchlist_vod_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericVodPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return Err(SquadOvError::Unauthorized),
+    };
+
+    app.remove_vod_watchlist_for_user(&path.video_uuid, session.user.id).await?;
+    Ok(HttpResponse::NoContent().finish())
 }
 
-pub async fn list_watchlist_vod_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<VodUserPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
-    Ok(HttpResponse::Ok().finish())
+pub async fn check_watchlist_vod_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericVodPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = match extensions.get::<SquadOVSession>() {
+        Some(s) => s,
+        None => return Err(SquadOvError::Unauthorized),
+    };
+    Ok(HttpResponse::Ok().json(
+        app.is_vod_watchlist_for_user(&path.video_uuid, session.user.id).await?
+    ))
 }

@@ -60,14 +60,15 @@ struct RawRecentMatchData {
 
 
 #[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
 pub struct RecentMatchQuery {
     pub games: Option<Vec<SquadOvGames>>,
     pub squads: Option<Vec<i64>>,
     pub users: Option<Vec<i64>>,
-    #[serde(rename="timeStart")]
     pub time_start: Option<i64>,
-    #[serde(rename="timeEnd")]
     pub time_end: Option<i64>,
+    pub only_favorite: bool,
+    pub only_watchlist: bool,
 }
 
 impl api::ApiApplication {
@@ -186,10 +187,6 @@ impl api::ApiApplication {
             .await?;
         Ok(())
     }
-}
-
-pub async fn get_favorite_matches_for_me_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, query: QsQuery<api::PaginationParameters>, filter: QsQuery<RecentMatchQuery>) -> Result<HttpResponse, SquadOvError> {
-    Ok(HttpResponse::Ok().finish())
 }
 
 pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, query: QsQuery<api::PaginationParameters>, filter: QsQuery<RecentMatchQuery>) -> Result<HttpResponse, SquadOvError> {

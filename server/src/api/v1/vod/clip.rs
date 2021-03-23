@@ -168,6 +168,12 @@ impl api::ApiApplication {
             INNER JOIN squadov.users AS ou
                 ON ou.id = ora.user_id
                     OR ou.uuid = v.user_uuid
+            LEFT JOIN squadov.user_favorite_vods AS ufv
+                ON ufv.video_uuid = v.video_uuid
+                    AND ufv.user_id = ou.id
+            LEFT JOIN squadov.user_watchlist_vods AS uwv
+                ON uwv.video_uuid = v.video_uuid
+                    AND uwv.user_id = ou.id
             WHERE (vc.clip_user_id = $1 OR ora.user_id = $1)
                 AND ($4::UUID IS NULL OR m.uuid = $4)
                 AND (CARDINALITY($5::INTEGER[]) = 0 OR m.game = ANY($5))
@@ -175,6 +181,8 @@ impl api::ApiApplication {
                 AND (CARDINALITY($7::BIGINT[]) = 0 OR ora.user_id = ANY($7))
                 AND COALESCE(v.end_time >= $8, TRUE)
                 AND COALESCE(v.end_time <= $9, TRUE)
+                AND (NOT $10::BOOLEAN OR ufv.video_uuid IS NOT NULL)
+                AND (NOT $11::BOOLEAN OR uwv.video_uuid IS NOT NULL)
             LIMIT $2 OFFSET $3
             ",
             user_id,
@@ -192,6 +200,8 @@ impl api::ApiApplication {
             filter.time_end.map(|x| {
                 Utc.timestamp_millis(x)
             }),
+            filter.only_favorite,
+            filter.only_watchlist,
         )
             .fetch_all(&*self.pool)
             .await?
