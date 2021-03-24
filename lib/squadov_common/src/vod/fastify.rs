@@ -25,6 +25,8 @@ pub async fn fastify_mp4(input_fname: &str, container_format: &str, output_fname
         .arg("copy")
         .arg("-c:a")
         .arg("copy")
+        .arg("-max_muxing_queue_size")
+        .arg("9999")
         .arg("-movflags")
         .arg("+faststart")
         .arg("-f")
