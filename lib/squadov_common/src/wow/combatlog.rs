@@ -1014,9 +1014,11 @@ async fn bulk_insert_wow_combatant_events(tx: &mut Transaction<'_, Postgres>, ev
     }
 
     event_sql.truncate(event_sql.len() - 1);
+    event_sql.push(String::from(" ON CONFLICT DO NOTHING"));
     sqlx::query(&event_sql.join("")).execute(&mut *tx).await?;
 
     items_sql.truncate(items_sql.len() - 1);
+    items_sql.push(String::from(" ON CONFLICT DO NOTHING"));
     sqlx::query(&items_sql.join("")).execute(&mut *tx).await?;
 
     Ok(())
