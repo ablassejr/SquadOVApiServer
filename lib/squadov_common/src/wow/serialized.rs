@@ -13,7 +13,9 @@ pub struct SerializedWoWResurrection {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct SerializedWoWDeath {
+    pub event_id: i64,
     pub guid: String,
     pub name: String,
     pub flags: i64,

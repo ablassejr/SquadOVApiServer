@@ -9,15 +9,81 @@ use squadov_common::{
     SerializedWoWResurrection,
     SerializedWoWSpellCast,
     SerializedWoWAuraBreak,
-    WoWSpellAuraType
+    WoWSpellAuraType,
+    WowDeathRecap,
+    WowDeathRecapEvent,
 };
 use uuid::Uuid;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use std::str::FromStr;
 
 impl api::ApiApplication {
+    async fn get_wow_death_recap(&self, view_uuid: &Uuid, event_id: i64, seconds: i32) -> Result<WowDeathRecap, SquadOvError> {
+        let death_window = sqlx::query!(
+            r#"
+            SELECT 
+                wve.tm - $2::INTEGER * INTERVAL '1 second' AS "start!",
+                wve.tm AS "end!"
+            FROM squadov.wow_match_view_death_events AS wde
+            INNER JOIN squadov.wow_match_view_events AS wve
+                    ON wve.event_id = wde.event_id
+            WHERE wde.event_id = $1
+            "#,
+            event_id,
+            seconds
+        )
+            .fetch_one(&*self.pool)
+            .await?;
+
+        Ok(WowDeathRecap{
+            hp_events: sqlx::query_as!(
+                WowDeathRecapEvent,
+                r#"
+                SELECT
+                    data.tm AS "tm!",
+                    (EXTRACT(EPOCH FROM data.tm - $3) * 1000)::BIGINT AS "diff_ms!",
+                    (data.amount)::INTEGER AS "diff_hp!",
+                    data.spell_id AS "spell_id?"
+                FROM (
+                    SELECT
+                        wve.tm,
+                        wve.log_line,
+                        0-wde.amount AS "amount",
+                        wde.spell_id
+                    FROM squadov.wow_match_view_damage_events AS wde
+                    INNER JOIN squadov.wow_match_view_events AS wve
+                        ON wve.event_id = wde.event_id
+                    INNER JOIN squadov.wow_match_view AS wmv
+                        ON wmv.alt_id = wve.view_id
+                    WHERE wmv.id = $1
+                        AND wve.tm BETWEEN $2 AND $3
+                    UNION
+                    SELECT
+                        wve.tm,
+                        wve.log_line,
+                        whe.amount,
+                        whe.spell_id
+                    FROM squadov.wow_match_view_healing_events AS whe
+                    INNER JOIN squadov.wow_match_view_events AS wve
+                        ON wve.event_id = whe.event_id
+                    INNER JOIN squadov.wow_match_view AS wmv
+                        ON wmv.alt_id = wve.view_id
+                    WHERE wmv.id = $1
+                        AND wve.tm BETWEEN $2 AND $3
+                ) AS data
+                ORDER BY data.log_line DESC
+                "#,
+                view_uuid,
+                death_window.start,
+                death_window.end,
+            )
+                .fetch_all(&*self.pool)
+                .await?
+        })
+    }
+
     async fn get_wow_match_subencounters(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWowEncounter>, SquadOvError> {
         let subencounter_events = sqlx::query!(
             r#"
@@ -171,6 +237,7 @@ impl api::ApiApplication {
                 SerializedWoWDeath,
                 r#"
                 SELECT
+                    wde.event_id,
                     dest.unit_guid AS "guid",
                     COALESCE(dest.unit_name, dest.unit_guid) AS "name!",
                     dest.flags,
@@ -486,4 +553,24 @@ pub async fn list_wow_events_for_match_handler(app : web::Data<Arc<api::ApiAppli
         aura_breaks: app.get_wow_match_aura_break_events(&view_uuid).await?,
         spell_casts: app.get_wow_match_spell_cast_events(&view_uuid).await?,
     }))
+}
+
+#[derive(Deserialize)]
+pub struct WowEventIdPath {
+    event_id: i64
+}
+
+fn default_death_recap_query_seconds() -> i32 {
+    return 5
+}
+
+#[derive(Deserialize)]
+pub struct WowDeathRecapQuery {
+    #[serde(default="default_death_recap_query_seconds")]
+    seconds: i32
+}
+
+pub async fn get_death_recap_handler(app : web::Data<Arc<api::ApiApplication>>, match_path: web::Path<super::WoWUserMatchPath>, event_path: web::Path<WowEventIdPath>, query: web::Query<WowDeathRecapQuery>) -> Result<HttpResponse, SquadOvError> {
+    let view_uuid = app.get_wow_match_view_for_user_match(match_path.user_id, &match_path.match_uuid).await?.ok_or(SquadOvError::NotFound)?;
+    Ok(HttpResponse::Ok().json(app.get_wow_death_recap(&view_uuid, event_path.event_id, query.seconds).await?))
 }
