@@ -5,6 +5,9 @@ use std::sync::Arc;
 use squadov_common::{
     SquadOvError,
     WoWCharacter,
+    WowFullCharacter,
+    WowCovenant,
+    WowItem,
     WoWCharacterUserAssociation
 };
 use uuid::Uuid;
@@ -14,6 +17,11 @@ use serde::Deserialize;
 #[serde(rename_all="camelCase")]
 pub struct WowCharacterDataInput {
     character_name: String,
+    character_guid: String,
+}
+
+#[derive(Deserialize)]
+pub struct WowCharacterPath {
     character_guid: String,
 }
 
@@ -235,6 +243,43 @@ impl api::ApiApplication {
                 .region
         )
     }
+
+    async fn get_wow_character_covenant(&self, view_uuid: &Uuid, guid: &str) -> Result<Option<WowCovenant>, SquadOvError> {
+        Err(SquadOvError::NotFound)
+    }
+
+    async fn get_wow_full_character(&self, view_uuid: &Uuid, guid: &str) -> Result<WowFullCharacter, SquadOvError> {
+        let raw_data = sqlx::query!(
+            r#"
+            SELECT
+                COALESCE(ARRAY_AGG(wci.item_id ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS "items!",
+                COALESCE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS "ilvl!"
+            FROM squadov.wow_match_view_character_presence AS wcp
+            LEFT JOIN squadov.wow_match_view_combatant_items AS wci
+                ON wci.character_id = wcp.character_id
+            WHERE wcp.view_id = $1
+                AND wcp.unit_guid = $2
+            GROUP BY wcp.unit_guid
+            "#,
+            view_uuid,
+            guid,
+        )
+            .fetch_one(&*self.pool)
+            .await?;
+        
+        Ok(WowFullCharacter {
+            items: raw_data.items.iter().zip(raw_data.ilvl.iter()).map(|(item_id, ilvl)| {
+                WowItem{
+                    item_id: *item_id,
+                    ilvl: *ilvl,
+                }
+            }).collect(),
+            covenant: self.get_wow_character_covenant(view_uuid, guid).await?,
+            talents: vec![],
+            pvp_talents: vec![],
+            rating: 0,
+        })
+    }
 }
 
 pub async fn list_wow_characters_for_user_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserPath>) -> Result<HttpResponse, SquadOvError> {
@@ -286,4 +331,9 @@ pub async fn get_wow_armory_link_for_character_handler(app : web::Data<Arc<api::
             character=char_name,
         )
     ))
+}
+
+pub async fn get_full_wow_character_for_match_handler(app : web::Data<Arc<api::ApiApplication>>, match_path: web::Path<super::WoWUserMatchPath>, char_path: web::Path<WowCharacterPath>) -> Result<HttpResponse, SquadOvError> {
+    let view_uuid = app.get_wow_match_view_for_user_match(match_path.user_id, &match_path.match_uuid).await?.ok_or(SquadOvError::NotFound)?;
+    Ok(HttpResponse::Ok().json(app.get_wow_full_character(&view_uuid, &char_path.character_guid).await?))
 }

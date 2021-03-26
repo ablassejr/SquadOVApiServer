@@ -189,6 +189,52 @@ def extract_difficulty_to(data, interface, output):
             with open(diffOutput, 'w') as f:
                 json.dump(diffData, f)
 
+def extract_items_to(data, interface, listfile, output):
+    if not os.path.exists(output):
+        os.makedirs(output)
+
+    allItems = {}
+
+    with open(os.path.join(data, 'itemsparse.csv')) as items:
+        reader = csv.DictReader(items)
+        for row in reader:
+            allItems[row['ID']] = {
+                'id': int(row['ID']),
+                'name': row['Display_lang'],
+                'quality': int(row['OverallQualityID'])
+            }
+
+    with open(os.path.join(data, 'item.csv')) as items:
+        reader = csv.DictReader(items)
+        for row in reader:
+            if row['IconFileDataID'] == '0':
+                continue
+        
+            if not row['ID'] in allItems:
+                continue
+
+            allItems[row['ID']]['inventorySlot'] = int(row['InventoryType'])
+            allItems[row['ID']]['icon'] = listfile[row['IconFileDataID']]
+
+    for itemId, itemData in allItems.items():
+        itemFolder = os.path.join(output, itemId)
+        if not os.path.exists(itemFolder):
+            os.makedirs(itemFolder)
+
+        itemOutput = os.path.join(itemFolder, 'data.json')
+        if not os.path.exists(itemOutput):
+            with open(itemOutput, 'w') as f:
+                json.dump(itemData, f)
+
+        if 'icon' in itemData and itemData['icon'] is not None:
+            itemIconInput = os.path.join(interface, itemData['icon'].replace('blp', 'png').replace('interface/', ''))
+            if not os.path.exists(itemIconInput):
+                continue
+
+            itemIconOutput = os.path.join(itemFolder, 'icon.png')
+            if not os.path.exists(itemIconOutput):
+                shutil.copy(itemIconInput, itemIconOutput)
+
 def extract_data_to(data, interface, output):
     if not os.path.exists(output):
         os.makedirs(output)
@@ -198,6 +244,7 @@ def extract_data_to(data, interface, output):
     extract_classes_to(data, interface, listfile, os.path.join(output, 'class'), os.path.join(output, 'specs'))
     extract_instances_to(data, interface, listfile, os.path.join(output, 'instances'))
     extract_spells_to(data, interface, listfile, os.path.join(output, 'spells'))
+    extract_items_to(data, interface, listfile, os.path.join(output, 'items'))
 
 def main():
     parser = argparse.ArgumentParser()
