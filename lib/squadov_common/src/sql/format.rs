@@ -89,3 +89,14 @@ pub fn sql_format_integer_array(v: &[i32]) -> String {
         }).collect::<Vec<String>>().join(",")
     )
 }
+
+pub fn sql_format_bigint_array(v: &[i64]) -> String {
+    format!(
+        "ARRAY [
+            {}
+        ]::BIGINT[]",
+        v.iter().map(|x| {
+            format!("{}", x)
+        }).collect::<Vec<String>>().join(",")
+    )
+}

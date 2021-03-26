@@ -8,6 +8,7 @@ pub struct WoWCharacter {
     #[serde(rename="specId")]
     pub spec_id: i32,
     pub team: i32,
+    pub rating: i32,
 }
 
 #[derive(Serialize)]
@@ -40,5 +41,4 @@ pub struct WowFullCharacter {
     pub covenant: Option<WowCovenant>,
     pub talents: Vec<i32>,
     pub pvp_talents: Vec<i32>,
-    pub rating: i32,
 }

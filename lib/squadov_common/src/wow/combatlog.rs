@@ -152,6 +152,14 @@ pub struct WoWSpellInfo {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
+pub struct WowCovenantInfo {
+    covenant_id: i32,
+    soulbind_id: i32,
+    soulbind_traits: Vec<i32>,
+    conduits: Vec<WoWItemInfo>,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[serde(tag="type")]
 pub enum WoWDamageType {
     SwingDamage,
@@ -206,6 +214,35 @@ fn parse_wow_item_info_from_str(s: &str) -> Result<Vec<WoWItemInfo>, SquadOvErro
     }).collect())
 }
 
+fn parse_wow_talents_from_str(s: &str) -> Result<Vec<i32>, SquadOvError> {
+    let tokens = split_wow_combat_log_tokens(&s[1..s.len()-1]);
+    Ok(tokens.into_iter().map(|x| {
+        Ok(x.parse()?)
+    }).collect::<Result<Vec<i32>, SquadOvError>>()?)
+}
+
+fn parse_soulbind_traits_from_str(s: &str) -> Result<Vec<i32>, SquadOvError> {
+    let tokens = split_wow_combat_log_tokens(&s[1..s.len()-1]);
+    Ok(tokens.into_iter().map(|x| {
+        let inner = split_wow_combat_log_tokens(&x[1..x.len()-1]);
+        Ok(inner[0].parse()?)
+    }).collect::<Result<Vec<i32>, SquadOvError>>()?)
+}
+
+fn parse_wow_covenant_from_str(s: &str) -> Result<Option<WowCovenantInfo>, SquadOvError> {
+    let tokens = split_wow_combat_log_tokens(&s[1..s.len()-1]);
+    Ok(
+        Some(
+            WowCovenantInfo{
+                covenant_id: tokens[1].parse()?,
+                soulbind_id: tokens[0].parse()?,
+                soulbind_traits: parse_soulbind_traits_from_str(&tokens[3])?,
+                conduits: parse_wow_item_info_from_str(&tokens[4])?
+            }
+        )
+    )
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[serde(tag="type")]
 pub enum WoWCombatLogEventType {
@@ -248,7 +285,11 @@ pub enum WoWCombatLogEventType {
         intelligence: i32,
         armor: i32,
         spec_id: i32,
+        talents: Vec<i32>,
+        pvp_talents: Vec<i32>,
+        covenant: Option<WowCovenantInfo>,
         items: Vec<WoWItemInfo>,
+        rating: i32,
     },
     EncounterStart{
         encounter_id: i32,
@@ -534,7 +575,11 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                 intelligence: payload.parts[6].parse()?,
                 armor: payload.parts[23].parse()?,
                 spec_id: payload.parts[24].parse()?,
+                talents: parse_wow_talents_from_str(&payload.parts[25])?,
+                pvp_talents: parse_wow_talents_from_str(&payload.parts[26])?,
+                covenant: parse_wow_covenant_from_str(&payload.parts[27])?,
                 items: parse_wow_item_info_from_str(&payload.parts[28])?,
+                rating: payload.parts[32].parse()?,
             })),
             "ENCOUNTER_START" => Ok((None, WoWCombatLogEventType::EncounterStart{
                 encounter_id: payload.parts[1].parse()?,
@@ -951,7 +996,8 @@ async fn bulk_insert_wow_combatant_events(tx: &mut Transaction<'_, Postgres>, ev
             event_id,
             character_id,
             team,
-            spec_id
+            spec_id,
+            rating
         )
         VALUES
     "));
@@ -967,9 +1013,37 @@ async fn bulk_insert_wow_combatant_events(tx: &mut Transaction<'_, Postgres>, ev
         )
         VALUES
     "));
+    let mut has_items = false;
+
+    let mut talents_sql: Vec<String> = Vec::new();
+    talents_sql.push(String::from("
+        INSERT INTO squadov.wow_match_view_combatant_talents (
+            event_id,
+            character_id,
+            talent_id,
+            is_pvp
+        )
+        VALUES
+    "));
+    let mut has_talents = false;
+
+    let mut covenant_sql: Vec<String> = Vec::new();
+    covenant_sql.push(String::from("
+        INSERT INTO squadov.wow_match_view_combatant_covenants (
+            event_id,
+            character_id,
+            covenant_id,
+            soulbind_id,
+            soulbind_traits,
+            conduit_item_ids,
+            conduit_item_ilvls
+        )
+        VALUES
+    "));
+    let mut has_covenant = false;
 
     for e in events {
-        if let WoWCombatLogEventType::CombatantInfo{guid, team, spec_id, items, ..} = e.event {
+        if let WoWCombatLogEventType::CombatantInfo{guid, team, spec_id, items, rating, talents, pvp_talents, covenant, ..}= e.event {
             let char_key = (e.view_id.clone(), guid.clone());
             let event_key = (e.alt_view_id, e.log_line);
             let character_id = mapping.get(&char_key).ok_or(SquadOvError::InternalError(format!("COMBATANT: Failed to find char key: {:?}", &char_key)))?;
@@ -980,13 +1054,15 @@ async fn bulk_insert_wow_combatant_events(tx: &mut Transaction<'_, Postgres>, ev
                     {event_id},
                     {character_id},
                     {team},
-                    {spec_id}
+                    {spec_id},
+                    {rating}
                 )
             ",
                 event_id=event_id,
                 character_id=character_id,
                 team=team,
                 spec_id=spec_id,
+                rating=rating,
             ));
             event_sql.push(String::from(","));
 
@@ -1007,6 +1083,69 @@ async fn bulk_insert_wow_combatant_events(tx: &mut Transaction<'_, Postgres>, ev
                     ilvl=item.ilvl,
                 ));
                 items_sql.push(String::from(","));
+                has_items = true;
+            }
+
+            talents.iter().for_each(|tid| {
+                talents_sql.push(format!("
+                    (
+                        {event_id},
+                        {character_id},
+                        {talent_id},
+                        FALSE
+                    )
+                ",
+                    event_id=event_id,
+                    character_id=character_id,
+                    talent_id=tid,
+                ));
+                talents_sql.push(String::from(","));
+                has_talents = true;
+            });
+
+            pvp_talents.iter().for_each(|tid| {
+                talents_sql.push(format!("
+                    (
+                        {event_id},
+                        {character_id},
+                        {talent_id},
+                        TRUE
+                    )
+                ",
+                    event_id=event_id,
+                    character_id=character_id,
+                    talent_id=tid,
+                ));
+                talents_sql.push(String::from(","));
+                has_talents = true;
+            });
+
+            if let Some(cov) = covenant {
+                covenant_sql.push(format!("
+                    (
+                        {event_id},
+                        {character_id},
+                        {covenant_id},
+                        {soulbind_id},
+                        {soulbind_traits},
+                        {conduit_item_ids},
+                        {conduit_item_ilvls}
+                    )
+                ",
+                    event_id=event_id,
+                    character_id=character_id,
+                    covenant_id=cov.covenant_id,
+                    soulbind_id=cov.soulbind_id,
+                    soulbind_traits=crate::sql_format_integer_array(&cov.soulbind_traits),
+                    conduit_item_ids=crate::sql_format_bigint_array(&cov.conduits.iter().map(|x| {
+                        x.item_id
+                    }).collect::<Vec<i64>>()),
+                    conduit_item_ilvls=crate::sql_format_integer_array(&cov.conduits.iter().map(|x| {
+                        x.ilvl
+                    }).collect::<Vec<i32>>()),
+                ));
+                covenant_sql.push(String::from(","));
+                has_covenant = true;
             }
         } else {
             return Err(SquadOvError::BadRequest);
@@ -1017,9 +1156,23 @@ async fn bulk_insert_wow_combatant_events(tx: &mut Transaction<'_, Postgres>, ev
     event_sql.push(String::from(" ON CONFLICT DO NOTHING"));
     sqlx::query(&event_sql.join("")).execute(&mut *tx).await?;
 
-    items_sql.truncate(items_sql.len() - 1);
-    items_sql.push(String::from(" ON CONFLICT DO NOTHING"));
-    sqlx::query(&items_sql.join("")).execute(&mut *tx).await?;
+    if has_items {
+        items_sql.truncate(items_sql.len() - 1);
+        items_sql.push(String::from(" ON CONFLICT DO NOTHING"));
+        sqlx::query(&items_sql.join("")).execute(&mut *tx).await?;
+    }
+
+    if has_talents {
+        talents_sql.truncate(talents_sql.len() - 1);
+        talents_sql.push(String::from(" ON CONFLICT DO NOTHING"));
+        sqlx::query(&talents_sql.join("")).execute(&mut *tx).await?;
+    }
+
+    if has_covenant {
+        covenant_sql.truncate(covenant_sql.len() - 1);
+        covenant_sql.push(String::from(" ON CONFLICT DO NOTHING"));
+        sqlx::query(&covenant_sql.join("")).execute(&mut *tx).await?;
+    }
 
     Ok(())
 }
