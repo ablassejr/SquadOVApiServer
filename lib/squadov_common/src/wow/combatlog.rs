@@ -210,6 +210,13 @@ fn parse_wow_item_info_from_str(s: &str) -> Result<Vec<WoWItemInfo>, SquadOvErro
     let tokens = split_wow_combat_log_tokens(&s[1..s.len()-1]);
     // Each top level token is for one given item.
     Ok(tokens.into_iter().map(|x| {
+        if x.len() < 2 {
+            return WoWItemInfo {
+                item_id: -1,
+                ilvl: -1,
+            }
+        }
+
         let item_parts = split_wow_combat_log_tokens(&x[1..x.len()-1]);
         WoWItemInfo{
             item_id: item_parts[0].parse().unwrap_or(-1),
