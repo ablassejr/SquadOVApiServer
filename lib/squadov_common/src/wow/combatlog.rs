@@ -203,6 +203,10 @@ pub struct WoWItemInfo {
 }
 
 fn parse_wow_item_info_from_str(s: &str) -> Result<Vec<WoWItemInfo>, SquadOvError> {
+    if s.len() < 2 {
+        return Ok(vec![]);
+    }
+
     let tokens = split_wow_combat_log_tokens(&s[1..s.len()-1]);
     // Each top level token is for one given item.
     Ok(tokens.into_iter().map(|x| {
@@ -215,6 +219,10 @@ fn parse_wow_item_info_from_str(s: &str) -> Result<Vec<WoWItemInfo>, SquadOvErro
 }
 
 fn parse_wow_talents_from_str(s: &str) -> Result<Vec<i32>, SquadOvError> {
+    if s.len() < 2 {
+        return Ok(vec![]);
+    }
+    
     let tokens = split_wow_combat_log_tokens(&s[1..s.len()-1]);
     Ok(tokens.into_iter().map(|x| {
         Ok(x.parse()?)
@@ -222,14 +230,25 @@ fn parse_wow_talents_from_str(s: &str) -> Result<Vec<i32>, SquadOvError> {
 }
 
 fn parse_soulbind_traits_from_str(s: &str) -> Result<Vec<i32>, SquadOvError> {
+    if s.len() < 2 {
+        return Ok(vec![]);
+    }
+
     let tokens = split_wow_combat_log_tokens(&s[1..s.len()-1]);
     Ok(tokens.into_iter().map(|x| {
+        if x.len() < 2 {
+            return Ok(0);
+        }
         let inner = split_wow_combat_log_tokens(&x[1..x.len()-1]);
         Ok(inner[0].parse()?)
     }).collect::<Result<Vec<i32>, SquadOvError>>()?)
 }
 
 fn parse_wow_covenant_from_str(s: &str) -> Result<Option<WowCovenantInfo>, SquadOvError> {
+    if s.len() < 2 {
+        return Ok(None);
+    }
+
     let tokens = split_wow_combat_log_tokens(&s[1..s.len()-1]);
     Ok(
         Some(
