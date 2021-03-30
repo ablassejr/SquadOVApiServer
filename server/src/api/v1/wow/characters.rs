@@ -379,7 +379,7 @@ pub async fn get_wow_armory_link_for_character_handler(app : web::Data<Arc<api::
         format!(
             "https://worldofwarcraft.com/en-us/character/{region}/{server}/{character}",
             region=region,
-            server=server_name,
+            server=server_name.replace("'", "").replace(" ","-"),
             character=char_name,
         )
     ))
