@@ -110,7 +110,7 @@ impl api::ApiApplication {
             sqlx::query_as!(
                 WoWEncounter,
                 r#"
-                SELECT
+                SELECT DISTINCT ON (wmv.match_uuid)
                     wmv.match_uuid AS "match_uuid!",
                     wmv.start_tm AS "tm!",
                     wmv.end_tm AS "finish_time", 
@@ -133,7 +133,7 @@ impl api::ApiApplication {
                     ON wav.view_id = wmv.id
                 INNER JOIN squadov.users AS u
                     ON u.id = wmv.user_id
-                ORDER BY wmv.start_tm DESC
+                ORDER BY wmv.match_uuid, wmv.start_tm DESC
                 "#,
                 &match_uuids,
                 &user_ids,
@@ -180,7 +180,7 @@ impl api::ApiApplication {
             sqlx::query_as!(
                 WoWChallenge,
                 r#"
-                SELECT
+                SELECT DISTINCT ON (wmv.match_uuid)
                     wmv.match_uuid AS "match_uuid!",
                     wmv.start_tm AS "tm!",
                     wmv.end_tm AS "finish_time", 
@@ -202,7 +202,7 @@ impl api::ApiApplication {
                     ON wav.view_id = wmv.id
                 INNER JOIN squadov.users AS u
                     ON u.id = wmv.user_id
-                ORDER BY wmv.start_tm DESC
+                ORDER BY wmv.match_uuid, wmv.start_tm DESC
                 "#,
                 &match_uuids,
                 &user_ids,
@@ -249,7 +249,7 @@ impl api::ApiApplication {
             sqlx::query_as!(
                 WoWArena,
                 r#"
-                SELECT
+                SELECT DISTINCT ON (wmv.match_uuid)
                     wmv.match_uuid AS "match_uuid!",
                     wmv.start_tm AS "tm!",
                     wmv.end_tm AS "finish_time", 
@@ -283,7 +283,7 @@ impl api::ApiApplication {
                         AND wucc.user_id = inp.user_id
                 INNER JOIN squadov.users AS u
                     ON u.id = wmv.user_id
-                ORDER BY wmv.start_tm DESC
+                ORDER BY wmv.match_uuid, wmv.start_tm DESC
                 "#,
                 &match_uuids,
                 &user_ids,
