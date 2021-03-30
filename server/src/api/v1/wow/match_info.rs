@@ -45,16 +45,22 @@ impl api::ApiApplication {
                     data.tm AS "tm!",
                     (EXTRACT(EPOCH FROM data.tm - $3) * 1000)::BIGINT AS "diff_ms!",
                     (data.amount)::INTEGER AS "diff_hp!",
-                    data.spell_id AS "spell_id?"
+                    data.spell_id AS "spell_id?",
+                    data.source_guid AS "source_guid?",
+                    data.source_name AS "source_name?"
                 FROM (
                     SELECT
                         wve.tm,
                         wve.log_line,
                         0-wde.amount AS "amount",
-                        wde.spell_id
+                        wde.spell_id,
+                        wcp.unit_name AS "source_name",
+                        wcp.unit_guid AS "source_guid"
                     FROM squadov.wow_match_view_damage_events AS wde
                     INNER JOIN squadov.wow_match_view_events AS wve
                         ON wve.event_id = wde.event_id
+                    LEFT JOIN squadov.wow_match_view_character_presence AS wcp
+                        ON wcp.character_id = wve.source_char
                     INNER JOIN squadov.wow_match_view AS wmv
                         ON wmv.alt_id = wve.view_id
                     WHERE wmv.id = $1
@@ -64,10 +70,14 @@ impl api::ApiApplication {
                         wve.tm,
                         wve.log_line,
                         whe.amount,
-                        whe.spell_id
+                        whe.spell_id,
+                        wcp.unit_name AS "source_name",
+                        wcp.unit_guid AS "source_guid"
                     FROM squadov.wow_match_view_healing_events AS whe
                     INNER JOIN squadov.wow_match_view_events AS wve
                         ON wve.event_id = whe.event_id
+                    LEFT JOIN squadov.wow_match_view_character_presence AS wcp
+                        ON wcp.character_id = wve.source_char
                     INNER JOIN squadov.wow_match_view AS wmv
                         ON wmv.alt_id = wve.view_id
                     WHERE wmv.id = $1

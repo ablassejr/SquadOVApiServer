@@ -8,6 +8,8 @@ pub struct WowDeathRecapEvent {
     pub diff_ms: i64,
     pub diff_hp: i32,
     pub spell_id: Option<i64>,
+    pub source_guid: Option<String>,
+    pub source_name: Option<String>,
 }
 
 #[derive(Serialize)]
