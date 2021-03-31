@@ -348,6 +348,25 @@ pub struct LolPlayerMatchSummary {
     pub has_vod: bool,
 }
 
+impl LolPlayerMatchSummary {
+    fn did_win(&self) -> bool {
+        for x in &self.participants {
+            if x.participant_id == self.current_participant_id {
+                return x.win;
+            }
+        }
+        false
+    }
+
+    pub fn win_loss(&self) -> String {
+        if self.did_win() {
+            String::from("Win")
+        } else {
+            String::from("Loss")
+        }
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FullLolMatch {

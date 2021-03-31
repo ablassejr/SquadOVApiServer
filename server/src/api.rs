@@ -5,6 +5,7 @@ pub mod access;
 pub mod v1;
 pub mod graphql;
 pub mod admin;
+pub mod oembed;
 
 use serde::{Deserialize};
 use sqlx::postgres::{PgPool};
