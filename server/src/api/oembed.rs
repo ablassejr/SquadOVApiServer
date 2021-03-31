@@ -214,10 +214,10 @@ pub async fn oembed_handler(app : web::Data<Arc<api::ApiApplication>>, params: w
                 ),
                 width=video_width,
                 height=video_height,
-                title=resp.title.unwrap_or(String::from("SquadOV - Shared Content")),
+                title=resp.title.clone().unwrap_or(String::from("SquadOV - Shared Content")),
             ));
         }
     }
 
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::Ok().json(resp))
 }

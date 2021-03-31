@@ -31,11 +31,12 @@ use squadov_common::{
 };
 use std::sync::Arc;
 use chrono::{DateTime, Utc, TimeZone};
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap};
 use serde::{Serialize, Deserialize};
 use url::Url;
 use serde_qs::actix::QsQuery;
 use crate::api::v1::FavoriteResponse;
+use std::convert::TryFrom;
 
 pub struct Match {
     pub uuid : Uuid
@@ -59,6 +60,7 @@ pub struct RawRecentMatchData {
     user_id: i64,
     favorite_reason: Option<String>,
     is_watchlist: bool,
+    game: SquadOvGames,
 }
 
 
@@ -74,12 +76,33 @@ pub struct RecentMatchQuery {
     pub only_watchlist: bool,
 }
 
+fn filter_recent_match_data_by_game(data: &[RawRecentMatchData], game: SquadOvGames) -> Vec<&RawRecentMatchData> {
+    data
+        .iter()
+        .filter(|x| {
+            x.game == game
+        })
+        .collect()
+}
+
+fn recent_match_data_uuids(data: &[&RawRecentMatchData]) -> Vec<Uuid> {
+    data.iter().map(|x| { x.match_uuid.clone() }).collect()
+}
+
+fn recent_match_data_uuid_pairs(data: &[&RawRecentMatchData]) -> Vec<MatchPlayerPair> {
+    data.iter().map(|x| {
+        MatchPlayerPair{
+            match_uuid: x.match_uuid.clone(),
+            player_uuid: x.user_uuid.clone(),
+        }
+    }).collect()
+}
+
 impl api::ApiApplication {
 
     pub async fn get_recent_base_matches(&self, uuids: &[Uuid], user_id: i64) -> Result<Vec<RawRecentMatchData>, SquadOvError> {
         Ok(
-            sqlx::query_as!(
-                RawRecentMatchData,
+            sqlx::query!(
                 r#"
                 SELECT DISTINCT
                     v.video_uuid AS "video_uuid!",
@@ -89,7 +112,8 @@ impl api::ApiApplication {
                     ou.username AS "username!",
                     ou.id AS "user_id!",
                     ufm.reason AS "favorite_reason?",
-                    uwv.video_uuid IS NOT NULL AS "is_watchlist!"
+                    uwv.video_uuid IS NOT NULL AS "is_watchlist!",
+                    m.game AS "game!"
                 FROM squadov.users AS u
                 LEFT JOIN squadov.squad_role_assignments AS sra
                     ON sra.user_id = u.id
@@ -115,6 +139,21 @@ impl api::ApiApplication {
             )
                 .fetch_all(&*self.pool)
                 .await?
+                .into_iter()
+                .map(|x| {
+                    Ok(RawRecentMatchData {
+                        video_uuid: x.video_uuid,
+                        match_uuid: x.match_uuid,
+                        user_uuid: x.user_uuid,
+                        tm: x.tm,
+                        username: x.username,
+                        user_id: x.user_id,
+                        favorite_reason: x.favorite_reason,
+                        is_watchlist: x.is_watchlist,
+                        game: SquadOvGames::try_from(x.game)?
+                    })
+                })
+                .collect::<Result<Vec<RawRecentMatchData>, SquadOvError>>()?
         )
     }
 
@@ -240,39 +279,77 @@ impl api::ApiApplication {
     pub async fn get_recent_matches_from_uuids(&self, raw_base_matches: &[RawRecentMatchData]) -> Result<Vec<RecentMatch>, SquadOvError> {
         // First grab all the relevant VOD manifests using all the unique VOD UUID's.
         let mut vod_manifests = self.get_vod(&raw_base_matches.iter().map(|x| { x.video_uuid.clone() }).collect::<Vec<Uuid>>()).await?;
-
-        // Now we need to grab the match summary for each of the matches. Note that this will span a multitude of games
-        // so we need to bulk grab as much as possible to reduce the # of trips to the DB.
-        let match_uuids = raw_base_matches.iter().map(|x| { x.match_uuid.clone() }).collect::<Vec<Uuid>>();
-        let match_player_pairs = raw_base_matches.iter().map(|x| {
-            MatchPlayerPair{
-                match_uuid: x.match_uuid.clone(),
-                player_uuid: x.user_uuid.clone(),
-            }
-        }).collect::<Vec<MatchPlayerPair>>();
         
-        let aimlab_tasks = self.list_aimlab_matches_for_uuids(&match_uuids).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, AimlabTask>>();
-        let lol_matches = db::list_lol_match_summaries_for_uuids(&*self.pool, &match_uuids).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, LolPlayerMatchSummary>>();
-        let hearthstone_matches = self.filter_hearthstone_match_uuids(&match_uuids).await?.into_iter().collect::<HashSet<Uuid>>();
+        let aimlab_tasks = {
+            let recent = filter_recent_match_data_by_game(raw_base_matches, SquadOvGames::AimLab);
+
+            if !recent.is_empty() {
+                self.list_aimlab_matches_for_uuids(&recent_match_data_uuids(&recent)).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, AimlabTask>>()
+            } else {
+                HashMap::new()
+            }
+        };
+        let lol_matches = {
+            let recent = filter_recent_match_data_by_game(raw_base_matches, SquadOvGames::LeagueOfLegends);
+            if !recent.is_empty() {
+                db::list_lol_match_summaries_for_uuids(&*self.pool, &recent_match_data_uuids(&recent)).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, LolPlayerMatchSummary>>()
+            } else {
+                HashMap::new()
+            }
+        };
         // TFT, Valorant, and WoW is different because the match summary is player dependent.
-        let mut wow_encounters = self.list_wow_encounter_for_uuids(&match_player_pairs).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWEncounter>>();
-        let mut wow_challenges = self.list_wow_challenges_for_uuids(&match_player_pairs).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWChallenge>>();
-        let mut wow_arenas = self.list_wow_arenas_for_uuids(&match_player_pairs).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWArena>>();
-        let tft_match_uuids: HashSet<Uuid> = db::filter_tft_match_uuids(&*self.pool, &match_uuids).await?.into_iter().collect();
-        let mut tft_matches = db::list_tft_match_summaries_for_uuids(&*self.pool, &match_player_pairs)
-            .await?
-            .into_iter()
-            .map(|x| {
-                ((x.match_uuid.clone(), x.user_uuid.clone()), x)
-            })
-            .collect::<HashMap<(Uuid, Uuid), TftPlayerMatchSummary>>();
-        let mut valorant_matches = db::list_valorant_match_summaries_for_uuids(&*self.pool, &match_player_pairs)
-            .await?
-            .into_iter()
-            .map(|x| {
-                ((x.match_uuid.clone(), x.user_uuid.clone()), x)
-            })
-            .collect::<HashMap<(Uuid, Uuid), ValorantPlayerMatchSummary>>();
+        let mut wow_encounters = {
+            let recent = filter_recent_match_data_by_game(raw_base_matches, SquadOvGames::WorldOfWarcraft);
+            if !recent.is_empty() {
+                self.list_wow_encounter_for_uuids(&recent_match_data_uuid_pairs(&recent)).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWEncounter>>()
+            } else {
+                HashMap::new()
+            }
+        };
+        let mut wow_challenges = {
+            let recent = filter_recent_match_data_by_game(raw_base_matches, SquadOvGames::WorldOfWarcraft);
+            if !recent.is_empty() {
+                self.list_wow_challenges_for_uuids(&recent_match_data_uuid_pairs(&recent)).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWChallenge>>()
+            } else {
+                HashMap::new()
+            }
+        };
+        let mut wow_arenas = {
+            let recent = filter_recent_match_data_by_game(raw_base_matches, SquadOvGames::WorldOfWarcraft);
+            if !recent.is_empty() {
+                self.list_wow_arenas_for_uuids(&recent_match_data_uuid_pairs(&recent)).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWArena>>()
+            } else {
+                HashMap::new()
+            }
+        };
+        let mut tft_matches = {
+            let recent = filter_recent_match_data_by_game(raw_base_matches, SquadOvGames::TeamfightTactics);
+            if !recent.is_empty() {
+                db::list_tft_match_summaries_for_uuids(&*self.pool, &recent_match_data_uuid_pairs(&recent))
+                    .await?
+                    .into_iter()
+                    .map(|x| {
+                        ((x.match_uuid.clone(), x.user_uuid.clone()), x)
+                    })
+                    .collect::<HashMap<(Uuid, Uuid), TftPlayerMatchSummary>>()
+            } else {
+                HashMap::new()
+            }
+        };
+        let mut valorant_matches = {
+            let recent = filter_recent_match_data_by_game(raw_base_matches, SquadOvGames::Valorant);
+            if !recent.is_empty() {
+                db::list_valorant_match_summaries_for_uuids(&*self.pool, &recent_match_data_uuid_pairs(&recent))
+                    .await?
+                    .into_iter()
+                    .map(|x| {
+                        ((x.match_uuid.clone(), x.user_uuid.clone()), x)
+                    })
+                    .collect::<HashMap<(Uuid, Uuid), ValorantPlayerMatchSummary>>()
+            } else {
+                HashMap::new()
+            }
+        };
 
         Ok(
             raw_base_matches.into_iter().map(|x| {
@@ -291,24 +368,7 @@ impl api::ApiApplication {
                     base: BaseRecentMatch{
                         match_uuid: x.match_uuid.clone(),
                         tm: x.tm,
-                        game: if aimlab_task.is_some() {
-                            SquadOvGames::AimLab
-                        } else if lol_match.is_some() {
-                            SquadOvGames::LeagueOfLegends
-                        // We require an additional check for Tft match UUIDs because there's a possibility that the 
-                        // user didn't actually finish the match yet in which case the match UUID exists but the match
-                        // details don't.
-                        } else if tft_match.is_some() || tft_match_uuids.contains(&x.match_uuid) {
-                            SquadOvGames::TeamfightTactics
-                        } else if valorant_match.is_some() {
-                            SquadOvGames::Valorant
-                        } else if wow_encounter.is_some() || wow_challenge.is_some() || wow_arena.is_some() {
-                            SquadOvGames::WorldOfWarcraft
-                        } else if hearthstone_matches.contains(&x.match_uuid) {
-                            SquadOvGames::Hearthstone
-                        } else {
-                            SquadOvGames::Unknown
-                        },
+                        game: x.game,
                         vod: vod_manifests.remove(&x.video_uuid).ok_or(SquadOvError::InternalError(String::from("Failed to find expected VOD manifest.")))?,
                         username: x.username.clone(),
                         user_id: x.user_id,

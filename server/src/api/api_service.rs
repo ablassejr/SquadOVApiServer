@@ -537,28 +537,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/{video_uuid}")
                                 .service(
-                                    web::resource("")
-                                        .wrap(access::ApiAccess::new(
-                                            Box::new(access::VodAccessChecker{
-                                                must_be_vod_owner: true,
-                                                obtainer: access::VodPathObtainer{
-                                                    video_uuid_key: "video_uuid"
-                                                },
-                                            }),
-                                        ).verb_override(
-                                            "GET",
-                                            Box::new(access::VodAccessChecker{
-                                                must_be_vod_owner: false,
-                                                obtainer: access::VodPathObtainer{
-                                                    video_uuid_key: "video_uuid"
-                                                },
-                                            }),
-                                        ))
-                                        .route(web::delete().to(v1::delete_vod_handler))
-                                        .route(web::get().to(v1::get_vod_handler))
-                                        .route(web::post().to(v1::associate_vod_handler))
-                                )
-                                .service(
                                     web::scope("/list")
                                         .wrap(access::ApiAccess::new(
                                             Box::new(access::VodAccessChecker{
@@ -598,6 +576,29 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                             }),
                                         ))
                                         .route(web::post().to(v1::create_clip_for_vod_handler))
+                                )
+                                .service(
+                                    web::scope("")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::VodAccessChecker{
+                                                must_be_vod_owner: true,
+                                                obtainer: access::VodPathObtainer{
+                                                    video_uuid_key: "video_uuid"
+                                                },
+                                            }),
+                                        ).verb_override(
+                                            "GET",
+                                            Box::new(access::VodAccessChecker{
+                                                must_be_vod_owner: false,
+                                                obtainer: access::VodPathObtainer{
+                                                    video_uuid_key: "video_uuid"
+                                                },
+                                            }),
+                                        ))
+                                        .route("", web::delete().to(v1::delete_vod_handler))
+                                        .route("", web::get().to(v1::get_vod_handler))
+                                        .route("", web::post().to(v1::associate_vod_handler))
+                                        .route("/assoc", web::get().to(v1::get_vod_association_handler))
                                 )
                         )
                 )

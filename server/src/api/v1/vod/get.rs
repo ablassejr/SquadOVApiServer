@@ -118,6 +118,11 @@ pub async fn get_vod_handler(data : web::Path<VodFindFromVideoUuid>, app : web::
     Ok(HttpResponse::Ok().json(data))
 }
 
+pub async fn get_vod_association_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
+    let mut assocs = app.find_vod_associations(&[data.video_uuid.clone()]).await?;
+    Ok(HttpResponse::Ok().json(assocs.remove(&data.video_uuid).ok_or(SquadOvError::NotFound)?))
+}
+
 pub async fn get_vod_track_segment_handler(data : web::Path<squadov_common::VodSegmentId>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
     let redirect_uri = app.vod.get_segment_redirect_uri(&data).await?;
     // You may be tempted to make this into a TemporaryRedirect and point
