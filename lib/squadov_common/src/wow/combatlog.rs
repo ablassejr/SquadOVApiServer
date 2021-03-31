@@ -272,7 +272,9 @@ fn parse_wow_covenant_from_str(s: &str) -> Result<Option<WowCovenantInfo>, Squad
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[serde(tag="type")]
 pub enum WoWCombatLogEventType {
-    UnitDied,
+    UnitDied{
+        unconcious: bool,
+    },
     DamageDone{
         damage: WoWDamageType,
         amount: i64,
@@ -576,7 +578,9 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
             }
         },
         _ => match payload.parts[0].as_str() {
-            "UNIT_DIED" => Ok((None, WoWCombatLogEventType::UnitDied)),
+            "UNIT_DIED" => Ok((None, WoWCombatLogEventType::UnitDied{
+                unconcious: payload.parts[9] == "1",
+            })),
             "SWING_DAMAGE_LANDED" => Ok({
                 let mut idx = 9;
                 let advanced = if state.advanced_log {
@@ -1684,7 +1688,11 @@ async fn bulk_insert_wow_events(tx: &mut Transaction<'_, Postgres>, events: Vec<
             WoWCombatLogEventType::SpellSummon(..) => summon_events.push(x),
             WoWCombatLogEventType::Resurrect(..) => resurrect_events.push(x),
             WoWCombatLogEventType::EncounterStart{..} | WoWCombatLogEventType::EncounterEnd{..} => subencounter_events.push(x),
-            WoWCombatLogEventType::UnitDied{..} => death_events.push(x),
+            WoWCombatLogEventType::UnitDied{unconcious} => {
+                if !unconcious {
+                    death_events.push(x)
+                }
+            },
             WoWCombatLogEventType::AuraBreak{..} => aura_break_events.push(x),
             WoWCombatLogEventType::SpellCast{..} => spell_cast_events.push(x),
             _ => log::warn!("Handling an event that can't be parsed into a table? {:?}", x),
