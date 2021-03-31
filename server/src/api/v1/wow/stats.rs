@@ -98,7 +98,7 @@ impl api::ApiApplication {
             INNER JOIN squadov.wow_match_view_events AS wve
                 ON wve.view_id = wmv.alt_id
             INNER JOIN squadov.wow_match_view_character_presence AS wcp
-                ON wcp.character_id = wve.dest_char
+                ON wcp.character_id = wve.source_char
             INNER JOIN squadov.wow_match_view_healing_events AS whe
                 ON whe.event_id = wve.event_id
             WHERE wmv.match_uuid = $1
