@@ -25,7 +25,8 @@ impl api::ApiApplication {
             r#"
             SELECT 
                 wve.tm - $2::INTEGER * INTERVAL '1 second' AS "start!",
-                wve.tm AS "end!"
+                wve.tm AS "end!",
+                wve.dest_char AS "dest_char?"
             FROM squadov.wow_match_view_death_events AS wde
             INNER JOIN squadov.wow_match_view_events AS wve
                     ON wve.event_id = wde.event_id
@@ -37,6 +38,11 @@ impl api::ApiApplication {
             .fetch_one(&*self.pool)
             .await?;
 
+        if death_window.dest_char.is_none() {
+            return Err(SquadOvError::BadRequest);
+        }
+
+        let dest_char = death_window.dest_char.unwrap();
         Ok(WowDeathRecap{
             hp_events: sqlx::query_as!(
                 WowDeathRecapEvent,
@@ -65,6 +71,7 @@ impl api::ApiApplication {
                         ON wmv.alt_id = wve.view_id
                     WHERE wmv.id = $1
                         AND wve.tm BETWEEN $2 AND $3
+                        AND wve.dest_char = $4
                     UNION
                     SELECT
                         wve.tm,
@@ -82,12 +89,14 @@ impl api::ApiApplication {
                         ON wmv.alt_id = wve.view_id
                     WHERE wmv.id = $1
                         AND wve.tm BETWEEN $2 AND $3
+                        AND wve.dest_char = $4
                 ) AS data
                 ORDER BY data.log_line DESC
                 "#,
                 view_uuid,
                 death_window.start,
                 death_window.end,
+                dest_char,
             )
                 .fetch_all(&*self.pool)
                 .await?
