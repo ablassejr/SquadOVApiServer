@@ -1688,11 +1688,7 @@ async fn bulk_insert_wow_events(tx: &mut Transaction<'_, Postgres>, events: Vec<
             WoWCombatLogEventType::SpellSummon(..) => summon_events.push(x),
             WoWCombatLogEventType::Resurrect(..) => resurrect_events.push(x),
             WoWCombatLogEventType::EncounterStart{..} | WoWCombatLogEventType::EncounterEnd{..} => subencounter_events.push(x),
-            WoWCombatLogEventType::UnitDied{unconcious} => {
-                if !unconcious {
-                    death_events.push(x)
-                }
-            },
+            WoWCombatLogEventType::UnitDied{..} => death_events.push(x),
             WoWCombatLogEventType::AuraBreak{..} => aura_break_events.push(x),
             WoWCombatLogEventType::SpellCast{..} => spell_cast_events.push(x),
             _ => log::warn!("Handling an event that can't be parsed into a table? {:?}", x),
@@ -1725,6 +1721,7 @@ pub async fn store_wow_combat_log_events(tx: &mut Transaction<'_, Postgres>, eve
                 WoWCombatLogEventType::ChallengeModeStart{..} | 
                 WoWCombatLogEventType::ChallengeModeEnd{..} | 
                 WoWCombatLogEventType::Unknown => false,
+            WoWCombatLogEventType::UnitDied{unconcious} => !unconcious,
             _ => true,
         }
     }).collect();

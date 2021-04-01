@@ -133,6 +133,7 @@ pub struct WoWArena {
     pub build: String
 }
 
+#[derive(Clone)]
 pub struct GenericWoWMatchView {
     pub alt_id: i64,
     pub user_id: i64,

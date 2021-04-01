@@ -1,17 +1,21 @@
 use async_std::sync::{RwLock, Arc};
-use squadov_common::{RawWoWCombatLogPayload, SquadOvError, WoWCombatLogEvent};
+use squadov_common::{RawWoWCombatLogPayload, SquadOvError, WoWCombatLogEvent, GenericWoWMatchView};
 use rdkafka::consumer::stream_consumer::StreamConsumer;
 use rdkafka::consumer::{Consumer};
 use rdkafka::config::ClientConfig;
 use rdkafka::Message;
 use uuid::Uuid;
 use crate::api;
+use lru::LruCache;
 
 const WOW_COMBAT_LOG_BUFFER_CAPACITY: usize = 1000;
+const WOW_VIEW_LRU_CACHE_SIZE: usize = 32;
+
 #[derive(Clone)]
 struct WoWKafkaOpaque {
     app: Arc<api::ApiApplication>,
     events: Arc<RwLock<Vec<WoWCombatLogEvent>>>,
+    view_cache: Arc<RwLock<LruCache<Uuid, GenericWoWMatchView>>>
 }
 
 pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cfg: &ClientConfig) -> tokio::task::JoinHandle<()> {
@@ -24,6 +28,7 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
         let wow_opaque = WoWKafkaOpaque{
             app,
             events: Arc::new(RwLock::new(Vec::with_capacity(WOW_COMBAT_LOG_BUFFER_CAPACITY))),
+            view_cache: Arc::new(RwLock::new(LruCache::new(WOW_VIEW_LRU_CACHE_SIZE))),
         };
 
         squadov_common::generic_kafka_message_loop(wow_consumer, wow_opaque, |m, opaque| async move {
@@ -41,7 +46,21 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
             let key = std::str::from_utf8(key.unwrap())?;
             let match_view_uuid = Uuid::parse_str(&key)?;
             
-            let match_view = squadov_common::get_generic_wow_match_view_from_id(&*opaque.app.pool, &match_view_uuid).await?;
+            let match_view = {
+                if let Some(view) = {
+                    let mut view_cache = opaque.view_cache.write().await;
+                    view_cache.get(&match_view_uuid).cloned()
+                } {
+                    view
+                } else {
+                    let view = squadov_common::get_generic_wow_match_view_from_id(&*opaque.app.pool, &match_view_uuid).await?;
+
+                    let mut view_cache = opaque.view_cache.write().await;
+                    view_cache.put(match_view_uuid.clone(), view.clone());
+
+                    view
+                }
+            };
 
             // Note that the client does a simple split on the commas which is insufficient for advanced parsing
             // so we need to reparse so that at least the upper level parts corresponds to each logical section of
