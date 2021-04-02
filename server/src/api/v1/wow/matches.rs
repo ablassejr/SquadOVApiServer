@@ -110,30 +110,33 @@ impl api::ApiApplication {
             sqlx::query_as!(
                 WoWEncounter,
                 r#"
-                SELECT DISTINCT ON (wmv.match_uuid)
-                    wmv.match_uuid AS "match_uuid!",
-                    wmv.start_tm AS "tm!",
-                    wmv.end_tm AS "finish_time", 
-                    wmv.build_version AS "build!",
-                    u.uuid AS "user_uuid!",
-                    wa.combatants_key,
-                    wav.encounter_id,
-                    wav.encounter_name,
-                    wav.difficulty,
-                    wav.num_players,
-                    wav.instance_id,
-                    COALESCE(wav.success, FALSE) AS "success!"
-                FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
-                INNER JOIN squadov.wow_match_view AS wmv
-                    ON wmv.match_uuid = inp.match_uuid
-                        AND wmv.user_id = inp.user_id
-                INNER JOIN squadov.new_wow_encounters AS wa
-                    ON wa.match_uuid = wmv.match_uuid
-                INNER JOIN squadov.wow_encounter_view AS wav
-                    ON wav.view_id = wmv.id
-                INNER JOIN squadov.users AS u
-                    ON u.id = wmv.user_id
-                ORDER BY wmv.match_uuid, wmv.start_tm DESC
+                SELECT * FROM (
+                    SELECT DISTINCT ON (wmv.match_uuid)
+                        wmv.match_uuid AS "match_uuid!",
+                        wmv.start_tm AS "tm!",
+                        wmv.end_tm AS "finish_time", 
+                        wmv.build_version AS "build!",
+                        u.uuid AS "user_uuid!",
+                        wa.combatants_key,
+                        wav.encounter_id,
+                        wav.encounter_name,
+                        wav.difficulty,
+                        wav.num_players,
+                        wav.instance_id,
+                        COALESCE(wav.success, FALSE) AS "success!"
+                    FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
+                    INNER JOIN squadov.wow_match_view AS wmv
+                        ON wmv.match_uuid = inp.match_uuid
+                            AND wmv.user_id = inp.user_id
+                    INNER JOIN squadov.new_wow_encounters AS wa
+                        ON wa.match_uuid = wmv.match_uuid
+                    INNER JOIN squadov.wow_encounter_view AS wav
+                        ON wav.view_id = wmv.id
+                    INNER JOIN squadov.users AS u
+                        ON u.id = wmv.user_id
+                    ORDER BY wmv.match_uuid
+                ) AS t
+                ORDER BY finish_time DESC
                 "#,
                 &match_uuids,
                 &user_ids,
@@ -180,29 +183,32 @@ impl api::ApiApplication {
             sqlx::query_as!(
                 WoWChallenge,
                 r#"
-                SELECT DISTINCT ON (wmv.match_uuid)
-                    wmv.match_uuid AS "match_uuid!",
-                    wmv.start_tm AS "tm!",
-                    wmv.end_tm AS "finish_time", 
-                    wmv.build_version AS "build!",
-                    u.uuid AS "user_uuid!",
-                    wa.combatants_key,
-                    wav.challenge_name,
-                    wav.instance_id,
-                    wav.keystone_level,
-                    COALESCE(wav.time_ms, 0) AS "time_ms!",
-                    COALESCE(wav.success, FALSE) AS "success!"
-                FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
-                INNER JOIN squadov.wow_match_view AS wmv
-                    ON wmv.match_uuid = inp.match_uuid
-                        AND wmv.user_id = inp.user_id
-                INNER JOIN squadov.new_wow_challenges AS wa
-                    ON wa.match_uuid = wmv.match_uuid
-                INNER JOIN squadov.wow_challenge_view AS wav
-                    ON wav.view_id = wmv.id
-                INNER JOIN squadov.users AS u
-                    ON u.id = wmv.user_id
-                ORDER BY wmv.match_uuid, wmv.start_tm DESC
+                SELECT * FROM (
+                    SELECT DISTINCT ON (wmv.match_uuid)
+                        wmv.match_uuid AS "match_uuid!",
+                        wmv.start_tm AS "tm!",
+                        wmv.end_tm AS "finish_time", 
+                        wmv.build_version AS "build!",
+                        u.uuid AS "user_uuid!",
+                        wa.combatants_key,
+                        wav.challenge_name,
+                        wav.instance_id,
+                        wav.keystone_level,
+                        COALESCE(wav.time_ms, 0) AS "time_ms!",
+                        COALESCE(wav.success, FALSE) AS "success!"
+                    FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
+                    INNER JOIN squadov.wow_match_view AS wmv
+                        ON wmv.match_uuid = inp.match_uuid
+                            AND wmv.user_id = inp.user_id
+                    INNER JOIN squadov.new_wow_challenges AS wa
+                        ON wa.match_uuid = wmv.match_uuid
+                    INNER JOIN squadov.wow_challenge_view AS wav
+                        ON wav.view_id = wmv.id
+                    INNER JOIN squadov.users AS u
+                        ON u.id = wmv.user_id
+                    ORDER BY wmv.match_uuid
+                ) AS t
+                ORDER BY finish_time DESC
                 "#,
                 &match_uuids,
                 &user_ids,
@@ -249,41 +255,44 @@ impl api::ApiApplication {
             sqlx::query_as!(
                 WoWArena,
                 r#"
-                SELECT DISTINCT ON (wmv.match_uuid)
-                    wmv.match_uuid AS "match_uuid!",
-                    wmv.start_tm AS "tm!",
-                    wmv.end_tm AS "finish_time", 
-                    wmv.build_version AS "build!",
-                    wa.combatants_key,
-                    wav.instance_id,
-                    wav.arena_type,
-                    wav.winning_team_id,
-                    wav.match_duration_seconds,
-                    wav.new_ratings,
-                    u.uuid AS "user_uuid",
-                    (
-                        CASE WHEN wvc.event_id IS NOT NULL THEN wvc.team = wav.winning_team_id
-                             ELSE FALSE
-                        END
-                    ) AS "success!"
-                FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
-                INNER JOIN squadov.wow_match_view AS wmv
-                    ON wmv.match_uuid = inp.match_uuid
-                        AND wmv.user_id = inp.user_id
-                INNER JOIN squadov.new_wow_arenas AS wa
-                    ON wa.match_uuid = wmv.match_uuid
-                INNER JOIN squadov.wow_arena_view AS wav
-                    ON wav.view_id = wmv.id
-                INNER JOIN squadov.wow_match_view_character_presence AS wcp
-                    ON wcp.view_id = wmv.id
-                LEFT JOIN squadov.wow_match_view_combatants AS wvc
-                    ON wvc.character_id = wcp.character_id
-                INNER JOIN squadov.wow_user_character_cache AS wucc
-                    ON wucc.unit_guid = wcp.unit_guid
-                        AND wucc.user_id = inp.user_id
-                INNER JOIN squadov.users AS u
-                    ON u.id = wmv.user_id
-                ORDER BY wmv.match_uuid, wmv.start_tm DESC
+                SELECT * FROM (
+                    SELECT DISTINCT ON (wmv.match_uuid)
+                        wmv.match_uuid AS "match_uuid!",
+                        wmv.start_tm AS "tm!",
+                        wmv.end_tm AS "finish_time", 
+                        wmv.build_version AS "build!",
+                        wa.combatants_key,
+                        wav.instance_id,
+                        wav.arena_type,
+                        wav.winning_team_id,
+                        wav.match_duration_seconds,
+                        wav.new_ratings,
+                        u.uuid AS "user_uuid",
+                        (
+                            CASE WHEN wvc.event_id IS NOT NULL THEN wvc.team = wav.winning_team_id
+                                ELSE FALSE
+                            END
+                        ) AS "success!"
+                    FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
+                    INNER JOIN squadov.wow_match_view AS wmv
+                        ON wmv.match_uuid = inp.match_uuid
+                            AND wmv.user_id = inp.user_id
+                    INNER JOIN squadov.new_wow_arenas AS wa
+                        ON wa.match_uuid = wmv.match_uuid
+                    INNER JOIN squadov.wow_arena_view AS wav
+                        ON wav.view_id = wmv.id
+                    INNER JOIN squadov.wow_match_view_character_presence AS wcp
+                        ON wcp.view_id = wmv.id
+                    LEFT JOIN squadov.wow_match_view_combatants AS wvc
+                        ON wvc.character_id = wcp.character_id
+                    INNER JOIN squadov.wow_user_character_cache AS wucc
+                        ON wucc.unit_guid = wcp.unit_guid
+                            AND wucc.user_id = inp.user_id
+                    INNER JOIN squadov.users AS u
+                        ON u.id = wmv.user_id
+                    ORDER BY wmv.match_uuid
+                ) AS t
+                ORDER BY finish_time DESC
                 "#,
                 &match_uuids,
                 &user_ids,
