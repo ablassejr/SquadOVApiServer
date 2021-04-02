@@ -986,75 +986,6 @@
       ]
     }
   },
-  "265af20152d0faa074904796a7bae04886c6cc07e05897e62aa607f3f8f1e34a": {
-    "query": "\n                SELECT DISTINCT\n                    v.video_uuid AS \"video_uuid!\",\n                    v.match_uuid AS \"match_uuid!\",\n                    v.user_uuid AS \"user_uuid!\",\n                    v.end_time AS \"tm!\",\n                    ou.username AS \"username!\",\n                    ou.id AS \"user_id!\",\n                    ufm.reason AS \"favorite_reason?\",\n                    uwv.video_uuid IS NOT NULL AS \"is_watchlist!\",\n                    m.game AS \"game!\"\n                FROM squadov.users AS u\n                LEFT JOIN squadov.squad_role_assignments AS sra\n                    ON sra.user_id = u.id\n                LEFT JOIN squadov.squad_role_assignments AS ora\n                    ON ora.squad_id = sra.squad_id\n                INNER JOIN squadov.users AS ou\n                    ON ou.id = ora.user_id\n                        OR ou.id = u.id\n                INNER JOIN squadov.vods AS v\n                    ON v.user_uuid = ou.uuid\n                INNER JOIN squadov.matches AS m\n                    ON v.match_uuid = m.uuid\n                LEFT JOIN squadov.user_favorite_matches AS ufm\n                    ON ufm.match_uuid = m.uuid\n                        AND ufm.user_id = $2\n                LEFT JOIN squadov.user_watchlist_vods AS uwv\n                    ON uwv.video_uuid = v.video_uuid\n                        AND uwv.user_id = $2\n                WHERE v.match_uuid = ANY($1)\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "video_uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "match_uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 2,
-          "name": "user_uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 3,
-          "name": "tm!",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "username!",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 5,
-          "name": "user_id!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 6,
-          "name": "favorite_reason?",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 7,
-          "name": "is_watchlist!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 8,
-          "name": "game!",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        true,
-        true,
-        true,
-        false,
-        false,
-        false,
-        null,
-        true
-      ]
-    }
-  },
   "26ac46dc8763ee16c467c73e571717e2928568582e0d45ba1caded1b43afb6bc": {
     "query": "\n            SELECT hm.match_uuid\n            FROM squadov.hearthstone_matches AS hm\n            INNER JOIN squadov.hearthstone_match_view AS hmv\n                ON hmv.match_uuid = hm.match_uuid\n            INNER JOIN squadov.hearthstone_match_players AS hmp\n                ON hmp.view_uuid = hmv.view_uuid\n            INNER JOIN squadov.hearthstone_match_metadata AS hmm\n                ON hmm.view_uuid = hmv.view_uuid\n            WHERE hmp.user_id = $1\n                AND hmm.game_type = any($4)\n            ORDER BY hm.id DESC\n            LIMIT $2 OFFSET $3\n            ",
     "describe": {
@@ -2524,6 +2455,75 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "6b14130b896bd55dd376f7d6fb89d3f229c66e086ff5832429266ef62048190b": {
+    "query": "\n                SELECT DISTINCT\n                    v.video_uuid AS \"video_uuid!\",\n                    v.match_uuid AS \"match_uuid!\",\n                    v.user_uuid AS \"user_uuid!\",\n                    v.end_time AS \"tm!\",\n                    ou.username AS \"username!\",\n                    ou.id AS \"user_id!\",\n                    ufm.reason AS \"favorite_reason?\",\n                    uwv.video_uuid IS NOT NULL AS \"is_watchlist!\",\n                    m.game AS \"game!\"\n                FROM squadov.users AS u\n                LEFT JOIN squadov.squad_role_assignments AS sra\n                    ON sra.user_id = u.id\n                LEFT JOIN squadov.squad_role_assignments AS ora\n                    ON ora.squad_id = sra.squad_id\n                INNER JOIN squadov.users AS ou\n                    ON ou.id = ora.user_id\n                        OR ou.id = u.id\n                INNER JOIN squadov.vods AS v\n                    ON v.user_uuid = ou.uuid\n                INNER JOIN squadov.matches AS m\n                    ON v.match_uuid = m.uuid\n                LEFT JOIN squadov.user_favorite_matches AS ufm\n                    ON ufm.match_uuid = m.uuid\n                        AND ufm.user_id = $2\n                LEFT JOIN squadov.user_watchlist_vods AS uwv\n                    ON uwv.video_uuid = v.video_uuid\n                        AND uwv.user_id = $2\n                WHERE v.match_uuid = ANY($1)\n                ORDER BY v.end_time DESC\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "match_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "user_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 3,
+          "name": "tm!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "username!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "user_id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "favorite_reason?",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 7,
+          "name": "is_watchlist!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "game!",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        null,
+        true
       ]
     }
   },
