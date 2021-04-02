@@ -309,8 +309,8 @@ def extract_conduits_to(data, interface, output):
     with open(os.path.join(data, 'soulbindconduititem.csv')) as rawData:
         reader = csv.DictReader(rawData)
         for row in reader:
-            allData[row['ID']] = {
-                'id': int(row['ID']),
+            allData[row['ConduitID']] = {
+                'id': int(row['ConduitID']),
                 'itemId': int(row['ItemID'])
             }
     
