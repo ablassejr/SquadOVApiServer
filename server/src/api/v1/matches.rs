@@ -133,6 +133,7 @@ impl api::ApiApplication {
                     ON uwv.video_uuid = v.video_uuid
                         AND uwv.user_id = $2
                 WHERE v.match_uuid = ANY($1)
+                ORDER BY v.end_time DESC
                 "#,
                 uuids,
                 user_id,
