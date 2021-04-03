@@ -6,6 +6,7 @@ pub mod v1;
 pub mod graphql;
 pub mod admin;
 pub mod oembed;
+pub mod meta;
 
 use serde::{Deserialize};
 use sqlx::postgres::{PgPool};

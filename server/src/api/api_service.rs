@@ -3,6 +3,7 @@ use actix_web::dev::{HttpServiceFactory};
 use super::auth;
 use super::v1;
 use super::oembed;
+use super::meta;
 use super::access;
 use super::graphql;
 use super::admin;
@@ -17,6 +18,7 @@ async fn health_check() -> Result<HttpResponse, SquadOvError> {
 pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
     let mut scope = web::scope("")
         .route("/oembed", web::get().to(oembed::oembed_handler))
+        .route("/meta", web::get().to(meta::meta_handler))
         .route("/healthz", web::get().to(health_check))
         .service(
             web::scope("/admin")
