@@ -6,6 +6,7 @@ mod api;
 use structopt::StructOpt;
 use std::fs;
 use squadov_common::SquadOvError;
+use uuid::Uuid;
 
 #[derive(StructOpt, Debug)]
 struct Options {
@@ -17,6 +18,8 @@ struct Options {
     pg: String,
     #[structopt(short, long)]
     threads: i32,
+    #[structopt(short, long)]
+    vod: Option<Uuid>,
 }
 
 #[tokio::main]
@@ -27,10 +30,10 @@ pub async fn main() -> Result<(), SquadOvError> {
     env_logger::init();
 
     let opts = Options::from_args();
-    let raw_cfg = fs::read_to_string(opts.config).unwrap();
+    let raw_cfg = fs::read_to_string(opts.config.clone()).unwrap();
     let mut config : api::ApiConfig = toml::from_str(&raw_cfg).unwrap();
     config.vod.fastify_threads = opts.threads;
-    config.database.url = opts.pg;
+    config.database.url = opts.pg.clone();
     config.database.connections = opts.db;
     config.database.heavy_connections = opts.db;
     config.rabbitmq.enable_rso = false;
@@ -43,8 +46,12 @@ pub async fn main() -> Result<(), SquadOvError> {
     // Only use the provided config to connect to things.
     let _ = tokio::task::spawn(async move {
         let app = api::ApiApplication::new(&config).await;
-        loop {
-            async_std::task::sleep(std::time::Duration::from_secs(10)).await;
+        if let Some(vod) = opts.vod {
+            app.vod_itf.process_vod(&vod, None).await.unwrap();
+        } else {
+            loop {
+                async_std::task::sleep(std::time::Duration::from_secs(10)).await;
+            }
         }
     }).await;
     Ok(())
