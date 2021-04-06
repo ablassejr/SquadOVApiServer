@@ -118,6 +118,19 @@ pub async fn get_vod_handler(data : web::Path<VodFindFromVideoUuid>, app : web::
     Ok(HttpResponse::Ok().json(data))
 }
 
+pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
+    let mut assocs = app.find_vod_associations(&[data.video_uuid.clone()]).await?;
+    let vod = assocs.remove(&data.video_uuid).ok_or(SquadOvError::NotFound)?;
+
+    let extension = squadov_common::container_format_to_extension(&vod.raw_container_format);
+    let path = app.vod.get_segment_upload_uri(&squadov_common::VodSegmentId{
+        video_uuid: data.video_uuid.clone(),
+        quality: String::from("source"),
+        segment_name: format!("video.{}", &extension),
+    }).await?;
+    Ok(HttpResponse::Ok().json(&path))
+}
+
 pub async fn get_vod_association_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
     let mut assocs = app.find_vod_associations(&[data.video_uuid.clone()]).await?;
     Ok(HttpResponse::Ok().json(assocs.remove(&data.video_uuid).ok_or(SquadOvError::NotFound)?))
