@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.7.16",
+        "description": "Minor update with local recording to prep for Valorant release!",
+        "timestamp": 1617741833000,
+        "data": "data/update-v0.7.16.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.7.15",
         "description": "QOL update with bug fixes and the like!",
         "timestamp": 1617324501000,
