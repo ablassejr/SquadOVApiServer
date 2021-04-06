@@ -192,6 +192,7 @@ impl api::ApiApplication {
                 AND COALESCE(v.end_time <= $8, TRUE)
                 AND (NOT $9::BOOLEAN OR ufm.match_uuid IS NOT NULL)
                 AND (NOT $10::BOOLEAN OR uwv.video_uuid IS NOT NULL)
+                AND v.is_local = FALSE
             ORDER BY v.end_time DESC
             LIMIT $2 OFFSET $3
             "#,

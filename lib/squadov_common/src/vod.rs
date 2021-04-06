@@ -40,7 +40,9 @@ pub struct VodAssociation {
     #[serde(rename = "rawContainerFormat")]
     pub raw_container_format: String,
     #[serde(rename = "isClip")]
-    pub is_clip: bool
+    pub is_clip: bool,
+    #[serde(rename = "isLocal")]
+    pub is_local: bool
 }
 
 #[derive(Serialize,Deserialize,Clone)]

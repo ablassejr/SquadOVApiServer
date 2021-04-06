@@ -78,6 +78,7 @@ impl api::ApiApplication {
             WHERE v.match_uuid = $1 
                 AND (u.id = $2 OR (ora.user_id = $2 AND $3))
                 AND v.is_clip = FALSE
+                AND (v.is_local = FALSE OR u.id = $2)
             ",
             match_uuid,
             user_id,

@@ -37,14 +37,16 @@ impl api::ApiApplication {
                 SET match_uuid = $1,
                     user_uuid = $2,
                     start_time = $3,
-                    end_time = $4
-                WHERE video_uuid = $5
+                    end_time = $4,
+                    is_local = $5
+                WHERE video_uuid = $6
                 ",
                 assoc.match_uuid,
                 assoc.user_uuid,
                 assoc.start_time,
                 assoc.end_time,
-                assoc.video_uuid
+                assoc.is_local,
+                assoc.video_uuid,
             )
         ).await?;
         Ok(())
@@ -143,13 +145,18 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
 
     let mut tx = app.pool.begin().await?;
     app.associate_vod(&mut tx, &data.association).await?;
-    app.bulk_add_video_metadata(&mut tx, &data.association.video_uuid, &[data.metadata]).await?;
+
+    if !data.association.is_local {
+        app.bulk_add_video_metadata(&mut tx, &data.association.video_uuid, &[data.metadata]).await?;
+    }
     tx.commit().await?;
 
     // Note that we don't want to spawn a task directly here to "fastify" the VOD
     // because it does take a significant amount of memory/disk space to do so.
     // So we toss it to the local job queue so we can better limit the amount of resources we end up using.
-    app.vod_itf.request_vod_processing(&data.association.video_uuid, data.session_uri.clone(), true).await?;
+    if !data.association.is_local {
+        app.vod_itf.request_vod_processing(&data.association.video_uuid, data.session_uri.clone(), true).await?;
+    }
     return Ok(HttpResponse::Ok().finish());
 }
 
