@@ -41,7 +41,7 @@ pub struct VodAssociation {
     pub raw_container_format: String,
     #[serde(rename = "isClip")]
     pub is_clip: bool,
-    #[serde(rename = "isLocal")]
+    #[serde(rename = "isLocal", default)]
     pub is_local: bool
 }
 
