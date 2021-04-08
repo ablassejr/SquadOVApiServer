@@ -216,6 +216,14 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                 )
                                                 .service(
                                                     web::scope("/generic/{puuid}")
+                                                        .wrap(access::ApiAccess::new(
+                                                            Box::new(access::RiotValorantAccountAccessChecker{
+                                                                obtainer: access::RiotValorantAccountPathObtainer{
+                                                                    user_id_key: "user_id",
+                                                                    puuid_key: "puuid",
+                                                                },
+                                                            }),
+                                                        ))
                                                         .route("", web::post().to(v1::refresh_riot_account_from_puuid_handler))
                                                         .route("", web::delete().to(v1::delete_riot_account_handler))
                                                 )
