@@ -8,6 +8,7 @@ use squadov_common::{
     access::AccessTokenRequest,
     VodSegmentId,
 };
+use crate::api::v1::RecentMatchHandle;
 use actix_web::{web, HttpResponse};
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
@@ -83,7 +84,10 @@ impl api::ApiApplication {
             metadata.meta_title = clip.title.clone();
             metadata.meta_username = clip.clipper.clone();
         } else if let Some(match_uuid) = &access.match_uuid {
-            let base_matches = self.get_recent_base_matches(&[match_uuid.clone()], user.id).await?;
+            let base_matches = self.get_recent_base_matches(&[RecentMatchHandle{
+                match_uuid: match_uuid.clone(),
+                user_uuid: user.uuid.clone(),
+            }], user.id).await?;
             let recent_matches = self.get_recent_matches_from_uuids(&base_matches).await?;
             let m = recent_matches.first().ok_or(SquadOvError::NotFound)?;
 

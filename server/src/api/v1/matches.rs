@@ -98,9 +98,17 @@ fn recent_match_data_uuid_pairs(data: &[&RawRecentMatchData]) -> Vec<MatchPlayer
     }).collect()
 }
 
+pub struct RecentMatchHandle {
+    pub match_uuid: Uuid,
+    pub user_uuid: Uuid,
+}
+
 impl api::ApiApplication {
 
-    pub async fn get_recent_base_matches(&self, uuids: &[Uuid], user_id: i64) -> Result<Vec<RawRecentMatchData>, SquadOvError> {
+    pub async fn get_recent_base_matches(&self, handles: &[RecentMatchHandle], user_id: i64) -> Result<Vec<RawRecentMatchData>, SquadOvError> {
+        let match_uuids: Vec<Uuid> = handles.iter().map(|x| { x.match_uuid.clone() }).collect();
+        let user_uuids: Vec<Uuid> = handles.iter().map(|x| { x.user_uuid.clone() }).collect();
+
         Ok(
             sqlx::query!(
                 r#"
@@ -114,31 +122,24 @@ impl api::ApiApplication {
                     ufm.reason AS "favorite_reason?",
                     uwv.video_uuid IS NOT NULL AS "is_watchlist!",
                     m.game AS "game!"
-                FROM squadov.users AS u
-                CROSS JOIN LATERAL (
-                    SELECT DISTINCT ou.id, ou.uuid, ou.username
-                    FROM squadov.squad_role_assignments AS sra
-                    LEFT JOIN squadov.squad_role_assignments AS ora
-                        ON ora.squad_id = sra.squad_id
-                    INNER JOIN squadov.users AS ou
-                        ON ou.id = ora.user_id
-                            OR ou.id = u.id
-                    WHERE sra.user_id = u.id
-                ) AS ou
+                FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)
+                INNER JOIN squadov.users AS ou
+                    ON ou.uuid = inp.user_uuid
+                INNER JOIN squadov.matches AS m
+                    ON inp.match_uuid = m.uuid
                 INNER JOIN squadov.vods AS v
                     ON v.user_uuid = ou.uuid
-                INNER JOIN squadov.matches AS m
-                    ON v.match_uuid = m.uuid
+                        AND v.match_uuid = m.uuid
                 LEFT JOIN squadov.user_favorite_matches AS ufm
                     ON ufm.match_uuid = m.uuid
-                        AND ufm.user_id = $2
+                        AND ufm.user_id = $3
                 LEFT JOIN squadov.user_watchlist_vods AS uwv
                     ON uwv.video_uuid = v.video_uuid
-                        AND uwv.user_id = $2
-                WHERE v.match_uuid = ANY($1)
+                        AND uwv.user_id = $3
                 ORDER BY v.end_time DESC
                 "#,
-                uuids,
+                &match_uuids,
+                &user_uuids,
                 user_id,
             )
                 .fetch_all(&*self.pool)
@@ -162,9 +163,9 @@ impl api::ApiApplication {
     }
 
     async fn get_recent_base_matches_for_user(&self, user_id: i64, start: i64, end: i64, filter: &RecentMatchQuery) -> Result<Vec<RawRecentMatchData>, SquadOvError> {
-        let uuids: Vec<Uuid> = sqlx::query!(
+        let handles: Vec<RecentMatchHandle> = sqlx::query!(
             r#"
-            SELECT DISTINCT v.match_uuid AS "match_uuid!", v.end_time
+            SELECT DISTINCT v.match_uuid AS "match_uuid!", ou.uuid, v.end_time
             FROM squadov.users AS u
             CROSS JOIN LATERAL (
                 SELECT DISTINCT ou.id, ou.uuid
@@ -222,9 +223,12 @@ impl api::ApiApplication {
             .fetch_all(&*self.pool)
             .await?
             .into_iter()
-            .map(|x| { x.match_uuid })
+            .map(|x| { RecentMatchHandle {
+                match_uuid: x.match_uuid,
+                user_uuid: x.uuid,
+             }})
             .collect();
-        Ok(self.get_recent_base_matches(&uuids, user_id).await?)
+        Ok(self.get_recent_base_matches(&handles, user_id).await?)
     }
 
     async fn is_match_favorite_by_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<Option<String>, SquadOvError> {
