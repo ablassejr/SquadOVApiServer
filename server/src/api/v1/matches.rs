@@ -115,13 +115,16 @@ impl api::ApiApplication {
                     uwv.video_uuid IS NOT NULL AS "is_watchlist!",
                     m.game AS "game!"
                 FROM squadov.users AS u
-                LEFT JOIN squadov.squad_role_assignments AS sra
-                    ON sra.user_id = u.id
-                LEFT JOIN squadov.squad_role_assignments AS ora
-                    ON ora.squad_id = sra.squad_id
-                INNER JOIN squadov.users AS ou
-                    ON ou.id = ora.user_id
-                        OR ou.id = u.id
+                CROSS JOIN LATERAL (
+                    SELECT DISTINCT ou.id, ou.uuid, ou.username
+                    FROM squadov.squad_role_assignments AS sra
+                    LEFT JOIN squadov.squad_role_assignments AS ora
+                        ON ora.squad_id = sra.squad_id
+                    INNER JOIN squadov.users AS ou
+                        ON ou.id = ora.user_id
+                            OR ou.id = u.id
+                    WHERE sra.user_id = u.id
+                ) AS ou
                 INNER JOIN squadov.vods AS v
                     ON v.user_uuid = ou.uuid
                 INNER JOIN squadov.matches AS m
@@ -163,13 +166,17 @@ impl api::ApiApplication {
             r#"
             SELECT DISTINCT v.match_uuid AS "match_uuid!", v.end_time
             FROM squadov.users AS u
-            LEFT JOIN squadov.squad_role_assignments AS sra
-                ON sra.user_id = u.id
-            LEFT JOIN squadov.squad_role_assignments AS ora
-                ON ora.squad_id = sra.squad_id
-            INNER JOIN squadov.users AS ou
-                ON ou.id = ora.user_id
-                    OR ou.id = u.id
+            CROSS JOIN LATERAL (
+                SELECT DISTINCT ou.id, ou.uuid
+                FROM squadov.squad_role_assignments AS sra
+                LEFT JOIN squadov.squad_role_assignments AS ora
+                    ON ora.squad_id = sra.squad_id
+                INNER JOIN squadov.users AS ou
+                    ON ou.id = ora.user_id
+                        OR ou.id = u.id
+                WHERE sra.user_id = u.id
+                    AND (CARDINALITY($5::BIGINT[]) = 0 OR sra.squad_id = ANY($5))
+            ) AS ou
             INNER JOIN squadov.vods AS v
                 ON v.user_uuid = ou.uuid
             INNER JOIN squadov.matches AS m
@@ -186,7 +193,6 @@ impl api::ApiApplication {
                 AND v.start_time IS NOT NULL
                 AND v.end_time IS NOT NULL
                 AND (CARDINALITY($4::INTEGER[]) = 0 OR m.game = ANY($4))
-                AND (CARDINALITY($5::BIGINT[]) = 0 OR sra.squad_id = ANY($5))
                 AND (CARDINALITY($6::BIGINT[]) = 0 OR ou.id = ANY($6))
                 AND COALESCE(v.end_time >= $7, TRUE)
                 AND COALESCE(v.end_time <= $8, TRUE)
