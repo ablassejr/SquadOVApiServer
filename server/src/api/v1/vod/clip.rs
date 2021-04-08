@@ -166,7 +166,7 @@ impl api::ApiApplication {
     async fn list_user_accessible_clips(&self, user_id: i64, start: i64, end: i64, match_uuid: Option<Uuid>, filter: &RecentMatchQuery) -> Result<Vec<VodClip>, SquadOvError> {
         let clips = sqlx::query!(
             "
-            SELECT DISTINCT vc.clip_uuid
+            SELECT DISTINCT vc.clip_uuid, vc.tm
             FROM squadov.vod_clips AS vc
             INNER JOIN squadov.vods AS v
                 ON v.video_uuid = vc.clip_uuid
@@ -194,6 +194,7 @@ impl api::ApiApplication {
                 AND COALESCE(v.end_time <= $9, TRUE)
                 AND (NOT $10::BOOLEAN OR ufv.video_uuid IS NOT NULL)
                 AND (NOT $11::BOOLEAN OR uwv.video_uuid IS NOT NULL)
+            ORDER BY vc.tm DESC
             LIMIT $2 OFFSET $3
             ",
             user_id,
