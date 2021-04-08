@@ -55,20 +55,41 @@ pub async fn list_valorant_match_summaries_for_uuids(ex: &PgPool, uuids: &[Match
             FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)
             INNER JOIN squadov.valorant_matches AS vm
                 ON vm.match_uuid = inp.match_uuid
+            INNER JOIN squadov.users AS u
+                ON u.uuid = inp.user_uuid
+            INNER JOIN squadov.riot_account_links AS ral
+                ON ral.user_id = u.id
             INNER JOIN squadov.valorant_match_players AS vmp
                 ON vmp.match_uuid = vm.match_uuid
+                    AND vmp.puuid = ral.puuid
             INNER JOIN squadov.valorant_match_teams AS vmt
                 ON vmt.team_id = vmp.team_id
                     AND vmt.match_uuid = vm.match_uuid
-            INNER JOIN squadov.view_valorant_player_match_stats AS vvpms
-                ON vvpms.puuid = vmp.puuid AND vvpms.match_uuid = vm.match_uuid
+            CROSS JOIN LATERAL (
+                SELECT
+                    vmp2.match_uuid,
+                    vmp2.puuid,
+                    vmp2.competitive_tier,
+                    vmp2.kills,
+                    vmp2.deaths,
+                    vmp2.assists,
+                    vmp2.rounds_played,
+                    vmp2.total_combat_score,
+                    COALESCE(SUM(vmd2.damage), 0) AS "total_damage",
+                    COALESCE(SUM(vmd2.headshots), 0) AS "headshots",
+                    COALESCE(SUM(vmd2.bodyshots), 0) AS "bodyshots",
+                    COALESCE(SUM(vmd2.legshots), 0) AS "legshots",
+                    vmt2.won
+                FROM squadov.valorant_match_players AS vmp2
+                INNER JOIN squadov.valorant_match_teams AS vmt2
+                    ON vmt2.match_uuid = vmp2.match_uuid AND vmt2.team_id = vmp2.team_id
+                LEFT JOIN squadov.valorant_match_damage AS vmd2
+                    ON vmd2.instigator_puuid = vmp.puuid AND vmd2.match_uuid = vmp2.match_uuid
+                WHERE vmp2.match_uuid = vmp.match_uuid AND vmp2.puuid = vmp.puuid
+                GROUP BY vmp2.match_uuid, vmp2.puuid, vmt2.won
+            ) AS vvpms
             INNER JOIN squadov.valorant_match_uuid_link AS vmul
                 ON vmul.match_uuid = vm.match_uuid
-            INNER JOIN squadov.riot_account_links AS ral
-                ON ral.puuid = vmp.puuid
-            INNER JOIN squadov.users AS u
-                ON u.id = ral.user_id
-                    AND u.uuid = inp.user_uuid
             ORDER BY vm.server_start_time_utc DESC
             "#,
             &match_uuids,
