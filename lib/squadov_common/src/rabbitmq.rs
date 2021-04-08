@@ -315,7 +315,10 @@ impl RabbitMqInterface {
                             queue_lock.clear();
                             ret
                         };
-                        log::info!("RabbitMQ Publishing {} messages", queue_clone.len());
+
+                        if !queue_clone.is_empty() {
+                            log::info!("RabbitMQ Publishing {} messages", queue_clone.len());
+                        }
 
                         while !queue_clone.is_empty() {
                             let next_msg = queue_clone.pop_front();
