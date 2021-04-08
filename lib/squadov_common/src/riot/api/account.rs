@@ -62,7 +62,9 @@ impl super::RiotApiHandler {
             .send()
             .await?;
 
-        if resp.status() != StatusCode::OK {
+        if resp.status() == StatusCode::TOO_MANY_REQUESTS {
+            return Err(SquadOvError::RateLimit);
+        } else if resp.status() != StatusCode::OK {
             return Err(SquadOvError::InternalError(format!("Failed to get Riot account using RSO {} - {}", resp.status().as_u16(), resp.text().await?)));
         }
 

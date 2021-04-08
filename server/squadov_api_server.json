@@ -361,6 +361,75 @@
       ]
     }
   },
+  "0eb18588f66ca77af9cf196d31e81cf40077d7ab3bbaf555434c1d2483414b4e": {
+    "query": "\n                SELECT DISTINCT\n                    v.video_uuid AS \"video_uuid!\",\n                    v.match_uuid AS \"match_uuid!\",\n                    v.user_uuid AS \"user_uuid!\",\n                    v.end_time AS \"tm!\",\n                    ou.username AS \"username!\",\n                    ou.id AS \"user_id!\",\n                    ufm.reason AS \"favorite_reason?\",\n                    uwv.video_uuid IS NOT NULL AS \"is_watchlist!\",\n                    m.game AS \"game!\"\n                FROM squadov.users AS u\n                CROSS JOIN LATERAL (\n                    SELECT DISTINCT ou.id, ou.uuid, ou.username\n                    FROM squadov.squad_role_assignments AS sra\n                    LEFT JOIN squadov.squad_role_assignments AS ora\n                        ON ora.squad_id = sra.squad_id\n                    INNER JOIN squadov.users AS ou\n                        ON ou.id = ora.user_id\n                            OR ou.id = u.id\n                    WHERE sra.user_id = u.id\n                ) AS ou\n                INNER JOIN squadov.vods AS v\n                    ON v.user_uuid = ou.uuid\n                INNER JOIN squadov.matches AS m\n                    ON v.match_uuid = m.uuid\n                LEFT JOIN squadov.user_favorite_matches AS ufm\n                    ON ufm.match_uuid = m.uuid\n                        AND ufm.user_id = $2\n                LEFT JOIN squadov.user_watchlist_vods AS uwv\n                    ON uwv.video_uuid = v.video_uuid\n                        AND uwv.user_id = $2\n                WHERE v.match_uuid = ANY($1)\n                ORDER BY v.end_time DESC\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "match_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "user_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 3,
+          "name": "tm!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "username!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "user_id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "favorite_reason?",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 7,
+          "name": "is_watchlist!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "game!",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        null,
+        true
+      ]
+    }
+  },
   "0ec7e256f346660a19f1620ceb5774b81f088ace7fa2cdf1e0b6bc47690cbe1c": {
     "query": "\n                SELECT *\n                FROM squadov.aimlab_tasks\n                WHERE match_uuid = ANY($1)\n                ",
     "describe": {
@@ -961,6 +1030,11 @@
           "ordinal": 6,
           "name": "is_clip",
           "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "is_local",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
@@ -974,6 +1048,7 @@
         false,
         true,
         true,
+        false,
         false,
         false
       ]
@@ -1271,6 +1346,11 @@
           "ordinal": 6,
           "name": "is_clip",
           "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "is_local",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
@@ -1285,6 +1365,7 @@
         false,
         true,
         true,
+        false,
         false,
         false
       ]
@@ -2321,6 +2402,42 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "3bdc679bdeefc6fe56410534d1a800864f2fb4cd48bce56c771553219b608cb5": {
+    "query": "\n            SELECT DISTINCT vc.clip_uuid, vc.tm\n            FROM squadov.vod_clips AS vc\n            INNER JOIN squadov.vods AS v\n                ON v.video_uuid = vc.clip_uuid\n            INNER JOIN squadov.matches AS m\n                ON m.uuid = v.match_uuid\n            LEFT JOIN squadov.squad_role_assignments AS sra\n                ON sra.user_id = vc.clip_user_id\n            LEFT JOIN squadov.squad_role_assignments AS ora\n                ON ora.squad_id = sra.squad_id\n            INNER JOIN squadov.users AS ou\n                ON ou.id = ora.user_id\n                    OR ou.uuid = v.user_uuid\n            LEFT JOIN squadov.user_favorite_vods AS ufv\n                ON ufv.video_uuid = v.video_uuid\n                    AND ufv.user_id = $1\n            LEFT JOIN squadov.user_watchlist_vods AS uwv\n                ON uwv.video_uuid = v.video_uuid\n                    AND uwv.user_id = $1\n            WHERE (vc.clip_user_id = $1 OR ora.user_id = $1)\n                AND ($4::UUID IS NULL OR m.uuid = $4)\n                AND (CARDINALITY($5::INTEGER[]) = 0 OR m.game = ANY($5))\n                AND (CARDINALITY($6::BIGINT[]) = 0 OR sra.squad_id = ANY($6))\n                AND (CARDINALITY($7::BIGINT[]) = 0 OR ora.user_id = ANY($7))\n                AND COALESCE(v.end_time >= $8, TRUE)\n                AND COALESCE(v.end_time <= $9, TRUE)\n                AND (NOT $10::BOOLEAN OR ufv.video_uuid IS NOT NULL)\n                AND (NOT $11::BOOLEAN OR uwv.video_uuid IS NOT NULL)\n            ORDER BY vc.tm DESC\n            LIMIT $2 OFFSET $3\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "clip_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "tm",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8",
+          "Uuid",
+          "Int4Array",
+          "Int8Array",
+          "Int8Array",
+          "Timestamptz",
+          "Timestamptz",
+          "Bool",
+          "Bool"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
     }
   },
   "3bedd86bf5d4d4d4f9f74223548e976bfc5ac3d034c19e50484ceef0dabf0583": {
@@ -4533,6 +4650,41 @@
       "nullable": []
     }
   },
+  "71bc12cc79828fdaecf9b13fb86f51ba36a8ad7ed5b1d8abfff74add6a4eb0e2": {
+    "query": "\n            SELECT DISTINCT v.match_uuid AS \"match_uuid!\", v.end_time\n            FROM squadov.users AS u\n            CROSS JOIN LATERAL (\n                SELECT DISTINCT ou.id, ou.uuid\n                FROM squadov.squad_role_assignments AS sra\n                LEFT JOIN squadov.squad_role_assignments AS ora\n                    ON ora.squad_id = sra.squad_id\n                INNER JOIN squadov.users AS ou\n                    ON ou.id = ora.user_id\n                        OR ou.id = u.id\n                WHERE sra.user_id = u.id\n                    AND (CARDINALITY($5::BIGINT[]) = 0 OR sra.squad_id = ANY($5))\n            ) AS ou\n            INNER JOIN squadov.vods AS v\n                ON v.user_uuid = ou.uuid\n            INNER JOIN squadov.matches AS m\n                ON v.match_uuid = m.uuid\n            LEFT JOIN squadov.user_favorite_matches AS ufm\n                ON ufm.match_uuid = m.uuid\n                    AND ufm.user_id = $1\n            LEFT JOIN squadov.user_watchlist_vods AS uwv\n                ON uwv.video_uuid = v.video_uuid\n                    AND uwv.user_id = $1\n            WHERE u.id = $1\n                AND v.match_uuid IS NOT NULL\n                AND v.user_uuid IS NOT NULL\n                AND v.start_time IS NOT NULL\n                AND v.end_time IS NOT NULL\n                AND (CARDINALITY($4::INTEGER[]) = 0 OR m.game = ANY($4))\n                AND (CARDINALITY($6::BIGINT[]) = 0 OR ou.id = ANY($6))\n                AND COALESCE(v.end_time >= $7, TRUE)\n                AND COALESCE(v.end_time <= $8, TRUE)\n                AND (NOT $9::BOOLEAN OR ufm.match_uuid IS NOT NULL)\n                AND (NOT $10::BOOLEAN OR uwv.video_uuid IS NOT NULL)\n                AND v.is_local = FALSE\n            ORDER BY v.end_time DESC\n            LIMIT $2 OFFSET $3\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "end_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int4Array",
+          "Int8Array",
+          "Int8Array",
+          "Timestamptz",
+          "Timestamptz",
+          "Bool",
+          "Bool"
+        ]
+      },
+      "nullable": [
+        true,
+        true
+      ]
+    }
+  },
   "7208f56ad9f4e0bd881d374d0e36d35f4874f093dc8a06ec6a83bf8abe9cc6a6": {
     "query": "\n            SELECT\n                vpmm.start_time,\n                vpmm.end_time\n            FROM squadov.valorant_player_match_metadata AS vpmm\n            WHERE vpmm.match_uuid = $1\n                AND vpmm.puuid = $2\n            ",
     "describe": {
@@ -5592,64 +5744,6 @@
       ]
     }
   },
-  "978c67b35a70d33d92a8ff42ce97daa6b26b8dec8bdeed43ff2f7bebab2c6daf": {
-    "query": "\n            SELECT DISTINCT v.*\n            FROM squadov.vods AS v\n            INNER JOIN squadov.users AS u\n                ON u.uuid = v.user_uuid\n            LEFT JOIN squadov.squad_role_assignments AS sra\n                ON sra.user_id = u.id\n            LEFT JOIN squadov.squad_role_assignments AS ora\n                ON ora.squad_id = sra.squad_id\n            WHERE v.match_uuid = $1 \n                AND (u.id = $2 OR (ora.user_id = $2 AND $3))\n                AND v.is_clip = FALSE\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "user_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 2,
-          "name": "video_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 3,
-          "name": "start_time",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "end_time",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 5,
-          "name": "raw_container_format",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 6,
-          "name": "is_clip",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Int8",
-          "Bool"
-        ]
-      },
-      "nullable": [
-        true,
-        true,
-        false,
-        true,
-        true,
-        false,
-        false
-      ]
-    }
-  },
   "988b7f29e275a40b7ee9b0ccb1face5efe4c8e73f93deee5e1ce7ee7d1730b4c": {
     "query": "\n        SELECT EXISTS (\n            SELECT 1\n            FROM squadov.riot_account_links AS ral\n            WHERE ral.user_id = $1\n                AND ral.puuid = $2\n        ) AS \"exists!\"\n        ",
     "describe": {
@@ -6323,22 +6417,6 @@
       "nullable": [
         false
       ]
-    }
-  },
-  "aa278c97d95ceb727d5b983034d30708c62887ce9cd465d54c68d2f0c326fcc9": {
-    "query": "\n                UPDATE squadov.vods\n                SET match_uuid = $1,\n                    user_uuid = $2,\n                    start_time = $3,\n                    end_time = $4\n                WHERE video_uuid = $5\n                ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Uuid",
-          "Timestamptz",
-          "Timestamptz",
-          "Uuid"
-        ]
-      },
-      "nullable": []
     }
   },
   "ab31b9de96ddfd358b4c8f58fa6ad2318f1b63a9c7ba1895d4b52758328796e7": {
@@ -8160,41 +8238,6 @@
       "nullable": [
         false,
         false
-      ]
-    }
-  },
-  "e61527ef75cc48bfaf910f193d08107484356899902ca74e6b5fd75ae5c1b85c": {
-    "query": "\n            SELECT DISTINCT v.match_uuid AS \"match_uuid!\", v.end_time\n            FROM squadov.users AS u\n            LEFT JOIN squadov.squad_role_assignments AS sra\n                ON sra.user_id = u.id\n            LEFT JOIN squadov.squad_role_assignments AS ora\n                ON ora.squad_id = sra.squad_id\n            INNER JOIN squadov.users AS ou\n                ON ou.id = ora.user_id\n                    OR ou.id = u.id\n            INNER JOIN squadov.vods AS v\n                ON v.user_uuid = ou.uuid\n            INNER JOIN squadov.matches AS m\n                ON v.match_uuid = m.uuid\n            LEFT JOIN squadov.user_favorite_matches AS ufm\n                ON ufm.match_uuid = m.uuid\n                    AND ufm.user_id = $1\n            LEFT JOIN squadov.user_watchlist_vods AS uwv\n                ON uwv.video_uuid = v.video_uuid\n                    AND uwv.user_id = $1\n            WHERE u.id = $1\n                AND v.match_uuid IS NOT NULL\n                AND v.user_uuid IS NOT NULL\n                AND v.start_time IS NOT NULL\n                AND v.end_time IS NOT NULL\n                AND (CARDINALITY($4::INTEGER[]) = 0 OR m.game = ANY($4))\n                AND (CARDINALITY($5::BIGINT[]) = 0 OR sra.squad_id = ANY($5))\n                AND (CARDINALITY($6::BIGINT[]) = 0 OR ou.id = ANY($6))\n                AND COALESCE(v.end_time >= $7, TRUE)\n                AND COALESCE(v.end_time <= $8, TRUE)\n                AND (NOT $9::BOOLEAN OR ufm.match_uuid IS NOT NULL)\n                AND (NOT $10::BOOLEAN OR uwv.video_uuid IS NOT NULL)\n            ORDER BY v.end_time DESC\n            LIMIT $2 OFFSET $3\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "end_time",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int4Array",
-          "Int8Array",
-          "Int8Array",
-          "Timestamptz",
-          "Timestamptz",
-          "Bool",
-          "Bool"
-        ]
-      },
-      "nullable": [
-        true,
-        true
       ]
     }
   },
