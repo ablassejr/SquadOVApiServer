@@ -56,7 +56,10 @@ struct GCPJwtClaims {
 
 impl GCPHttpAuthClient {
     async fn exchange_jwt_for_access_token(&self, jwt: &str) -> Result<OAuthAccessToken, SquadOvError> {
-        let client = reqwest::Client::new();
+        let client = reqwest::ClientBuilder::new()
+            .timeout(std::time::Duration::from_secs(120))
+            .connect_timeout(std::time::Duration::from_secs(60))
+            .build()?;
         Ok(
             client.post("https://oauth2.googleapis.com/token")
                 .json(&GCPTokenRequest{
@@ -212,6 +215,8 @@ impl GCPClient {
                         let result = block_on(http.refresh_access_token());
                         if result.is_err() {
                             log::warn!("Failed to refresh GCP access token: {:?}", result.err());
+                        } else {
+                            log::info!("...Successful token refresh.");
                         }
                     }
                 }
