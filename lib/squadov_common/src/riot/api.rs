@@ -22,6 +22,7 @@ use chrono::{DateTime, Utc};
 pub struct ApiKeyLimit {
     pub requests: usize,
     pub seconds: u64,
+    pub enabled: bool
 }
 
 #[derive(Deserialize,Debug,Clone)]
@@ -108,6 +109,10 @@ impl RiotApiHandler {
     // the rate limit due to the fact that we can use more than the rate limit amount within
     // a given time period (especially if the time period is low).
     async fn tick_burst_threshold(&self) {
+        if !self.api_key.burst_limit.enabled {
+            return;
+        }
+
         let permit = self.burst_threshold.acquire().await;
         permit.forget();
 
@@ -120,6 +125,10 @@ impl RiotApiHandler {
     }
 
     async fn tick_bulk_threshold(&self) {
+        if !self.api_key.bulk_limit.enabled {
+            return;
+        }
+
         let permit = self.bulk_threshold.acquire().await;
         permit.forget();
 
@@ -191,6 +200,7 @@ impl RiotApiApplicationInterface {
 #[async_trait]
 impl RabbitMqListener for RiotApiApplicationInterface {
     async fn handle(&self, data: &[u8]) -> Result<(), SquadOvError> {
+        log::info!("Handle Riot RabbitMQ Task: {}", std::str::from_utf8(data).unwrap_or("failure"));
         let task: RiotApiTask = serde_json::from_slice(data)?;
         match task {
             RiotApiTask::AccountMe{access_token, refresh_token, expiration, user_id} => self.obtain_riot_account_from_access_token(&access_token, &refresh_token, &expiration, user_id).await?,

@@ -52,10 +52,12 @@ key = "${RSO_API_KEY}"
 [riot.rso_api_key.burst_limit]
 requests = 10
 seconds = 10
+enabled = false
 
 [riot.rso_api_key.bulk_limit]
 requests = 500
 seconds = 600
+enabled = false
 
 [riot.valorant_api_key]
 key = "${VALORANT_API_KEY}"
@@ -63,10 +65,12 @@ key = "${VALORANT_API_KEY}"
 [riot.valorant_api_key.burst_limit]
 requests = 500
 seconds = 10
+enabled = true
 
 [riot.valorant_api_key.bulk_limit]
 requests = 30000
 seconds = 600
+enabled = true
 
 [riot.lol_api_key]
 key = "${LOL_API_KEY}"
@@ -74,10 +78,12 @@ key = "${LOL_API_KEY}"
 [riot.lol_api_key.burst_limit]
 requests = 500
 seconds = 10
+enabled = true
 
 [riot.lol_api_key.bulk_limit]
 requests = 30000
 seconds = 600
+enabled = true
 
 [riot.tft_api_key]
 key = "${TFT_API_KEY}"
@@ -85,10 +91,12 @@ key = "${TFT_API_KEY}"
 [riot.tft_api_key.burst_limit]
 requests = 500
 seconds = 10
+enabled = true
 
 [riot.tft_api_key.bulk_limit]
 requests = 30000
 seconds = 600
+enabled = true
 
 [rabbitmq]
 amqp_url = "${RABBITMQ_AMQP_URL}"

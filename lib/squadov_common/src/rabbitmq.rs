@@ -52,7 +52,7 @@ pub struct RabbitMqConnectionBundle {
     db: Arc<PgPool>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RabbitMqPacket {
     queue: String,
     data: Vec<u8>,
@@ -309,8 +309,16 @@ impl RabbitMqInterface {
                 tokio::task::spawn(async move {
                     let mut publish_idx: usize = 0;
                     loop {
-                        {
-                            let next_msg = publish_queue.write().await.pop_front();
+                        let mut queue_clone = {
+                            let mut queue_lock = publish_queue.write().await;
+                            let ret = queue_lock.clone();
+                            queue_lock.clear();
+                            ret
+                        };
+                        log::info!("RabbitMQ Publishing {} messages", queue_clone.len());
+
+                        while !queue_clone.is_empty() {
+                            let next_msg = queue_clone.pop_front();
                             if next_msg.is_some() {
                                 let next_msg = next_msg.unwrap();
                                 match publisher.publish(next_msg, publish_idx).await {
