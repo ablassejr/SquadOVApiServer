@@ -50,7 +50,10 @@ impl super::RiotApiHandler {
     }
 
     pub async fn get_account_me(&self, access_token: &str) -> Result<RiotAccount, SquadOvError> {
-        let client = reqwest::ClientBuilder::new().build()?;
+        let client = reqwest::ClientBuilder::new()
+            .timeout(std::time::Duration::from_secs(120))
+            .connect_timeout(std::time::Duration::from_secs(60))
+            .build()?;
         let endpoint = Self::build_api_endpoint("americas", "riot/account/v1/accounts/me");
         self.tick_thresholds().await;
 

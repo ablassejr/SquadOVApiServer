@@ -155,6 +155,8 @@ impl RiotApiHandler {
 
         Ok(reqwest::ClientBuilder::new()
             .default_headers(headers)
+            .timeout(std::time::Duration::from_secs(120))
+            .connect_timeout(std::time::Duration::from_secs(60))
             .build()?)
     }
 
