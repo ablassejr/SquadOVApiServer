@@ -49,8 +49,8 @@ pub struct ValorantMatchPlayerDto {
     #[serde(rename="teamId")]
     pub team_id: String,
     #[serde(rename="characterId")]
-    pub character_id: String,
-    pub stats: ValorantMatchPlayerStatsDto,
+    pub character_id: Option<String>,
+    pub stats: Option<ValorantMatchPlayerStatsDto>,
     #[serde(rename="competitiveTier", default)]
     pub competitive_tier: i32,
 }

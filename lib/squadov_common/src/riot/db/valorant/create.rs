@@ -97,31 +97,41 @@ async fn store_valorant_match_player_dto(ex: &mut Transaction<'_, Postgres>, mat
         VALUES
     "));
 
+    let mut added = 0;
     for m in info {
-        sql.push(format!("(
-            '{match_uuid}',
-            '{team_id}',
-            '{puuid}',
-            '{character_id}',
-            {competitive_tier},
-            {total_combat_score},
-            {rounds_played},
-            {kills},
-            {deaths},
-            {assists}
-        )",
-            match_uuid=match_uuid,
-            team_id=&m.team_id,
-            puuid=&m.puuid,
-            character_id=&m.character_id,
-            competitive_tier=m.competitive_tier,
-            total_combat_score=m.stats.score,
-            rounds_played=m.stats.rounds_played,
-            kills=m.stats.kills,
-            deaths=m.stats.deaths,
-            assists=m.stats.assists
-        ));
-        sql.push(String::from(","));
+        if let Some(character_id) = &m.character_id {
+            if let Some(stats) = &m.stats {
+                sql.push(format!("(
+                    '{match_uuid}',
+                    '{team_id}',
+                    '{puuid}',
+                    '{character_id}',
+                    {competitive_tier},
+                    {total_combat_score},
+                    {rounds_played},
+                    {kills},
+                    {deaths},
+                    {assists}
+                )",
+                    match_uuid=match_uuid,
+                    team_id=&m.team_id,
+                    puuid=&m.puuid,
+                    character_id=&character_id,
+                    competitive_tier=m.competitive_tier,
+                    total_combat_score=stats.score,
+                    rounds_played=stats.rounds_played,
+                    kills=stats.kills,
+                    deaths=stats.deaths,
+                    assists=stats.assists
+                ));
+                sql.push(String::from(","));
+                added += 1;
+            }
+        }
+    }
+
+    if added == 0 {
+        return Ok(());
     }
 
     sql.truncate(sql.len() - 1);

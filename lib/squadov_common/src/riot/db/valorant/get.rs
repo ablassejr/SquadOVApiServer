@@ -74,15 +74,15 @@ async fn get_valorant_match_players_dto(ex: &PgPool, match_uuid: &Uuid) -> Resul
                 ValorantMatchPlayerDto {
                     puuid: x.puuid,
                     team_id: x.team_id,
-                    character_id: x.character_id,
+                    character_id: Some(x.character_id),
                     competitive_tier: x.competitive_tier,
-                    stats: ValorantMatchPlayerStatsDto {
+                    stats: Some(ValorantMatchPlayerStatsDto {
                         score: x.total_combat_score,
                         rounds_played: x.rounds_played,
                         kills: x.kills,
                         deaths: x.deaths,
                         assists: x.assists,
-                    },
+                    }),
                 }
             })
             .collect()
