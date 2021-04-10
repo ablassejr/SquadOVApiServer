@@ -165,6 +165,17 @@ impl RiotApiHandler {
             StatusCode::OK => Ok(resp),
             StatusCode::TOO_MANY_REQUESTS => Err(SquadOvError::RateLimit),
             StatusCode::NOT_FOUND => Err(SquadOvError::NotFound),
+            StatusCode::INTERNAL_SERVER_ERROR | StatusCode::BAD_GATEWAY | StatusCode::SERVICE_UNAVAILABLE | StatusCode::GATEWAY_TIMEOUT => {
+                let url = String::from(resp.url().as_str());
+                log::warn!("Failed to query Riot API with a 500-error...retrying: {}", format!(
+                    "{context} {status} - {text} [{endpoint}]",
+                    context=context,
+                    status=resp.status().as_u16(),
+                    text=resp.text().await?,
+                    endpoint=url,
+                ));
+                Err(SquadOvError::Defer(1000))
+            },
             _ => {
                 let url = String::from(resp.url().as_str());
                 Err(SquadOvError::InternalError(format!(

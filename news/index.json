@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.7.20",
+        "description": "Some fixes that cropped up for Valorant and local recording.",
+        "timestamp": 1618076762000,
+        "data": "data/hotfix-v0.7.20.md",
+        "type": "hotfix"
+    },
+    {
         "title": "SquadOV v0.7.19",
         "description": "Welcome /r/valorant!",
         "timestamp": 1617906139000,
