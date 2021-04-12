@@ -2,6 +2,28 @@ resource "google_storage_bucket" "vod-storage-bucket" {
     name            = var.vod_storage_bucket
     location        = "US-CENTRAL1"
     storage_class   = "STANDARD"
+
+    lifecycle_rule {
+        condition {
+            age = 14
+        }
+
+        action {
+            type = "SetStorageClass"
+            storage_class = "NEARLINE"
+        }
+    }
+
+    lifecycle_rule {
+        condition {
+            age = 30
+        }
+
+        action {
+            type = "SetStorageClass"
+            storage_class = "COLDLINE"
+        }
+    }
 }
 
 resource "google_storage_bucket" "blob-storage-bucket" {
