@@ -266,6 +266,7 @@ async fn get_valorant_match_round_results(ex: &PgPool, match_uuid: &Uuid) -> Res
             team_round_winner
         FROM squadov.valorant_match_rounds
         WHERE match_uuid = $1
+        ORDER BY round_num ASC
         ",
         match_uuid
     )
