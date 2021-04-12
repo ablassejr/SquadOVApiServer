@@ -217,11 +217,12 @@ impl VodProcessingInterface {
         log::info!("Generate Input Temp File");
         let input_filename = NamedTempFile::new()?.into_temp_path();
         log::info!("Download VOD - {}", vod_uuid);
-        self.vod.download_vod_to_path(&VodSegmentId{
+        let source_segment_id = VodSegmentId{
             video_uuid: vod_uuid.clone(),
             quality: String::from("source"),
             segment_name: format!("video.{}", &raw_extension),
-        }, &input_filename).await?;
+        };
+        self.vod.download_vod_to_path(&source_segment_id, &input_filename).await?;
 
         let fastify_filename = NamedTempFile::new()?.into_temp_path();
         let preview_filename = NamedTempFile::new()?.into_temp_path();
@@ -254,6 +255,11 @@ impl VodProcessingInterface {
         db::mark_vod_with_preview(&mut tx, vod_uuid).await?;
         log::info!("Process VOD TX (Commit) - {}", vod_uuid);
         tx.commit().await?;
+        log::info!("Delete Source VOD - {}", vod_uuid);
+        match self.vod.delete_vod(&source_segment_id).await {
+            Ok(()) => (),
+            Err(err) => log::warn!("Failed to delete source VOD: {}", err),
+        };
 
         log::info!("Finish Fastifying {:?}", vod_uuid);
         Ok(())
