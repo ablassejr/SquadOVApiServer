@@ -4,7 +4,7 @@ resource "google_sql_database_instance" "main-db" {
     region = "us-central1"
 
     settings {
-        tier = "db-custom-8-30720"
+        tier = "db-custom-4-20480"
         availability_type = "ZONAL"
 
         backup_configuration {
@@ -24,6 +24,11 @@ resource "google_sql_database_instance" "main-db" {
             day = 7
             hour = 3
             update_track = "stable"
+        }
+
+        database_flags {
+            name  = "maintenance_work_mem"
+            value = "1048576"
         }
     }
 }
