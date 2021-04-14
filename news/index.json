@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.7.22",
+        "description": "Some improvements for local recording and push-to-talk.",
+        "timestamp": 1618443565000,
+        "data": "data/update-v0.7.22.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.7.20",
         "description": "Some fixes that cropped up for Valorant and local recording.",
         "timestamp": 1618076762000,
