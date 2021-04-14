@@ -136,6 +136,8 @@ impl api::ApiApplication {
                 LEFT JOIN squadov.user_watchlist_vods AS uwv
                     ON uwv.video_uuid = v.video_uuid
                         AND uwv.user_id = $3
+                WHERE v.is_clip = FALSE
+                    AND v.is_local = FALSE
                 ORDER BY v.end_time DESC
                 "#,
                 &match_uuids,
@@ -200,6 +202,7 @@ impl api::ApiApplication {
                 AND (NOT $9::BOOLEAN OR ufm.match_uuid IS NOT NULL)
                 AND (NOT $10::BOOLEAN OR uwv.video_uuid IS NOT NULL)
                 AND v.is_local = FALSE
+                    AND v.is_clip = FALSE
             ORDER BY v.end_time DESC
             LIMIT $2 OFFSET $3
             "#,
