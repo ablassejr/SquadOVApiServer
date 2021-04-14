@@ -236,18 +236,28 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("", web::post().to(v1::create_lol_match_handler))
                         .service(
                             web::scope("/match/{match_uuid}")
-                                .wrap(access::ApiAccess::new(
-                                    Box::new(access::LolMatchAccessChecker{
-                                        obtainer: access::LolMatchUuidPathObtainer{
-                                            match_uuid_key: "match_uuid",
-                                        },
-                                    }),
-                                ))
-                                .route("", web::post().to(v1::finish_lol_match_handler))
-                                .route("", web::get().to(v1::get_lol_match_handler))
+                                .route("/finish", web::post().to(v1::finish_lol_match_handler))
                                 .service(
                                     web::scope("/user/{user_id}")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::UserSpecificAccessChecker{
+                                                obtainer: access::UserIdPathSetObtainer{
+                                                    key: "user_id"
+                                                },
+                                            }),
+                                        ))
                                         .route("/vods", web::get().to(v1::get_lol_match_user_accessible_vod_handler))
+                                )
+                                .service(
+                                    web::scope("")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::LolMatchAccessChecker{
+                                                obtainer: access::LolMatchUuidPathObtainer{
+                                                    match_uuid_key: "match_uuid",
+                                                },
+                                            }),
+                                        ))
+                                        .route("", web::get().to(v1::get_lol_match_handler))
                                 )
                         )
                         .service(
@@ -282,18 +292,28 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("", web::post().to(v1::create_tft_match_handler))
                         .service(
                             web::scope("/match/{match_uuid}")
-                                .wrap(access::ApiAccess::new(
-                                    Box::new(access::TftMatchAccessChecker{
-                                        obtainer: access::TftMatchUuidPathObtainer{
-                                            match_uuid_key: "match_uuid",
-                                        },
-                                    }),
-                                ))
-                                .route("", web::post().to(v1::finish_tft_match_handler))
-                                .route("", web::get().to(v1::get_tft_match_handler))
+                                .route("/finish", web::post().to(v1::finish_tft_match_handler))
                                 .service(
                                     web::scope("/user/{user_id}")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::UserSpecificAccessChecker{
+                                                obtainer: access::UserIdPathSetObtainer{
+                                                    key: "user_id"
+                                                },
+                                            }),
+                                        ))
                                         .route("/vods", web::get().to(v1::get_tft_match_user_accessible_vod_handler))
+                                )
+                                .service(
+                                    web::scope("")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::TftMatchAccessChecker{
+                                                obtainer: access::TftMatchUuidPathObtainer{
+                                                    match_uuid_key: "match_uuid",
+                                                },
+                                            }),
+                                        ))
+                                        .route("", web::get().to(v1::get_tft_match_handler))
                                 )
                         )
                         .service(
