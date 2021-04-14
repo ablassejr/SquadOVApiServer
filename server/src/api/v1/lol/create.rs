@@ -63,6 +63,8 @@ pub async fn finish_lol_match_handler(app : web::Data<Arc<api::ApiApplication>>,
 }
 
 pub async fn request_lol_match_backfill_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<LolBackfillInput>, path: web::Path<LolBackfillPath>) -> Result<HttpResponse, SquadOvError> {
-    app.lol_itf.request_backfill_user_lol_matches(&data.summoner_name, &data.platform, path.user_id).await?;
+    let summoner = db::get_user_riot_summoner_from_name(&*app.pool, path.user_id, &data.summoner_name).await?.ok_or(SquadOvError::NotFound)?;
+    let name = summoner.summoner_name.clone().ok_or(SquadOvError::BadRequest)?;
+    app.lol_itf.request_backfill_user_lol_matches(&name, &data.platform, path.user_id).await?;
     Ok(HttpResponse::Ok().finish())
 }

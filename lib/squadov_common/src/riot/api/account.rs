@@ -1,7 +1,7 @@
 use crate::{
     SquadOvError,
     rabbitmq::{RABBITMQ_DEFAULT_PRIORITY},
-    riot::RiotAccount
+    riot::{RiotAccount, RiotSummonerDto, RiotSummoner, RiotUserInfo},
 };
 use super::RiotApiTask;
 use reqwest::{StatusCode};
@@ -70,6 +70,58 @@ impl super::RiotApiHandler {
 
         Ok(resp.json::<RiotAccount>().await?)
     }
+
+    pub async fn get_summoner_me(&self, access_token: &str, region: &str) -> Result<RiotSummoner, SquadOvError> {
+        let client = reqwest::ClientBuilder::new()
+            .timeout(std::time::Duration::from_secs(120))
+            .connect_timeout(std::time::Duration::from_secs(60))
+            .build()?;
+        let endpoint = Self::build_api_endpoint(region, "lol/summoner/v4/summoners/me");
+        self.tick_thresholds().await;
+
+        let resp = client.get(&endpoint)
+            .bearer_auth(access_token)
+            .send()
+            .await?;
+
+        if resp.status() == StatusCode::TOO_MANY_REQUESTS {
+            return Err(SquadOvError::RateLimit);
+        } else if resp.status() != StatusCode::OK {
+            return Err(SquadOvError::InternalError(format!("Failed to get Riot summoner using RSO {} - {}", resp.status().as_u16(), resp.text().await?)));
+        }
+
+        let dto = resp.json::<RiotSummonerDto>().await?;
+        Ok(
+            RiotSummoner{
+                puuid: dto.puuid,
+                account_id: Some(dto.account_id),
+                summoner_id: Some(dto.id),
+                summoner_name: Some(dto.name),
+                last_backfill_lol_time: None,
+                last_backfill_tft_time: None,
+            }
+        )
+    }
+
+    pub async fn get_user_info(&self, access_token: &str) -> Result<RiotUserInfo, SquadOvError> {
+        let client = reqwest::ClientBuilder::new()
+            .timeout(std::time::Duration::from_secs(120))
+            .connect_timeout(std::time::Duration::from_secs(60))
+            .build()?;
+        let endpoint = String::from("https://auth.riotgames.com/userinfo");
+        let resp = client.get(&endpoint)
+            .bearer_auth(access_token)
+            .send()
+            .await?;
+
+        if resp.status() == StatusCode::TOO_MANY_REQUESTS {
+            return Err(SquadOvError::RateLimit);
+        } else if resp.status() != StatusCode::OK {
+            return Err(SquadOvError::InternalError(format!("Failed to get Riot account userinfo {} - {}", resp.status().as_u16(), resp.text().await?)));
+        }
+
+        Ok(resp.json::<RiotUserInfo>().await?)
+    }
 }
 
 impl super::RiotApiApplicationInterface {
@@ -97,19 +149,21 @@ impl super::RiotApiApplicationInterface {
             (access_token.to_string(), refresh_token.to_string(), expiration.clone())
         };
 
+        let user_info = self.api.get_user_info(&access_token).await?;
         let account = self.api.get_account_me(&access_token).await?;
-        log::info!("\t...Storing account: {:?}#{:?} for {}", &account.game_name, &account.tag_line, user_id);
+        let summoner = self.api.get_summoner_me(&access_token, &user_info.cpid).await?;
+
         let mut tx = self.db.begin().await?;
+
+        log::info!("\t...Storing account: {:?}#{:?} for {}", &account.game_name, &account.tag_line, user_id);
         db::store_riot_account(&mut tx, &account).await?;
+        
+        log::info!("\t...Storing summoner: {:?} for {}", &summoner.summoner_name, user_id);
+        db::store_riot_summoner(&mut tx, &summoner).await?;
+
         db::link_riot_account_to_user(&mut tx, &account.puuid, user_id).await?;
         db::store_rso_for_riot_account(&mut tx, &account.puuid, user_id, &access_token, &refresh_token, &expiration).await?;
         tx.commit().await?;
-
-        // Also fire off a request for LoL summoner information. Note however that this needs to be done on the correct queue
-        // as the RSO queue and the LoL queue use different keys. We can, however, do a publish correctly from whatever queue that
-        // we want!
-        self.request_lol_summoner_from_puuid(&account.puuid).await?;
-
         Ok(())
     }
     

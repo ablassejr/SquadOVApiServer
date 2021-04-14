@@ -58,6 +58,8 @@ pub async fn finish_tft_match_handler(app : web::Data<Arc<api::ApiApplication>>,
 }
 
 pub async fn request_tft_match_backfill_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<TftBackfillInput>, path: web::Path<TftBackfillPath>) -> Result<HttpResponse, SquadOvError> {
-    app.tft_itf.request_backfill_user_tft_matches(&data.summoner_name, &data.region, path.user_id).await?;
+    let summoner = db::get_user_riot_summoner_from_name(&*app.pool, path.user_id, &data.summoner_name).await?.ok_or(SquadOvError::NotFound)?;
+    let name = summoner.summoner_name.clone().ok_or(SquadOvError::BadRequest)?;
+    app.tft_itf.request_backfill_user_tft_matches(&name, &data.region, path.user_id).await?;
     Ok(HttpResponse::Ok().finish())
 }

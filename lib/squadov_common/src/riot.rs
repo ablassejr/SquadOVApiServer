@@ -38,3 +38,9 @@ pub struct RiotSummonerDto {
     pub id: String,
     pub puuid: String
 }
+
+#[derive(Deserialize)]
+pub struct RiotUserInfo {
+    pub sub: String,
+    pub cpid: String,
+}

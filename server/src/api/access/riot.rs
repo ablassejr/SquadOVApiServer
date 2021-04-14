@@ -1,6 +1,10 @@
 mod valorant;
+mod lol;
+mod tft;
 
 pub use valorant::*;
+pub use lol::*;
+pub use tft::*;
 
 use actix_web::{HttpRequest};
 use squadov_common::SquadOvError;

@@ -154,8 +154,4 @@ impl super::RiotApiApplicationInterface {
         }
         Ok(())
     }
-
-    pub async fn request_lol_summoner_from_puuid(&self, _puuid: &str) -> Result<(), SquadOvError> {
-        Ok(())
-    }
 }

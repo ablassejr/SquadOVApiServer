@@ -1,6 +1,10 @@
 mod valorant;
+mod lol;
+mod tft;
 
 pub use valorant::*;
+pub use lol::*;
+pub use tft::*;
 
 use actix_web::{web, HttpResponse};
 use crate::api;
@@ -48,6 +52,38 @@ pub struct RiotSummonerVerifyData {
     puuid: String,
 }
 
+impl api::ApiApplication {
+    pub async fn resync_riot_account_rso(&self, puuid: &str, user_id: i64) -> Result<(), SquadOvError> {
+        let rso = sqlx::query!(
+            r#"
+            SELECT
+                rso_access_token AS "access_token!",
+                rso_refresh_token AS "refresh_token!",
+                rso_expiration AS "expiration!"
+            FROM squadov.riot_account_links
+            WHERE puuid = $1
+                AND user_id = $2
+                AND rso_access_token IS NOT NULL
+                AND rso_refresh_token IS NOT NULL
+                AND rso_expiration IS NOT NULL
+            "#,
+            puuid,
+            user_id,
+        )
+            .fetch_one(&*self.pool)
+            .await?;
+
+        self.rso_itf.request_riot_account_from_access_token(
+            &rso.access_token,
+            &rso.refresh_token,
+            rso.expiration,
+            user_id,
+        ).await?;
+        Ok(())
+    }
+
+}
+
 pub async fn get_riot_valorant_account_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<RiotPuuidPathInput>) -> Result<HttpResponse, SquadOvError> {
     let account = db::get_user_riot_account(&*app.pool, path.user_id, &path.puuid).await?;
     Ok(HttpResponse::Ok().json(&account))
@@ -73,7 +109,7 @@ pub async fn verify_lol_summoner_ownership_handler(app : web::Data<Arc<api::ApiA
         db::associate_raw_puuid_with_puuid(&*app.pool, &summoner.puuid, &data.puuid).await?;
     } else if let Some(summoner) = db::get_user_riot_summoner_from_raw_puuid(&*app.pool, path.user_id, &data.puuid).await? {
         // In this case we have the account associated - the user updated their gamename/tagline so fire off a request to resync.
-        app.lol_itf.request_lol_summoner_from_puuid(&summoner.puuid).await?;
+        app.resync_riot_account_rso(&summoner.puuid, path.user_id).await?;
     } else {
         // No account!
         return Err(SquadOvError::NotFound);
@@ -96,8 +132,7 @@ pub async fn list_riot_tft_accounts_handler(app : web::Data<Arc<api::ApiApplicat
 }
 
 pub async fn refresh_riot_account_from_puuid_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<RiotPuuidPathInput>) -> Result<HttpResponse, SquadOvError> {
-    app.valorant_itf.request_riot_account_from_puuid(&path.puuid).await?;
-    app.lol_itf.request_lol_summoner_from_puuid(&path.puuid).await?;
+    app.resync_riot_account_rso(&path.puuid, path.user_id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
