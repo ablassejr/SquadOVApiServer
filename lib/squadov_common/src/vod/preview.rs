@@ -7,11 +7,8 @@ pub async fn generate_vod_preview(input_fname: &str, output_fname: &std::path::P
     let ffmpeg_path = std::env::var("FFMPEG_BINARY_PATH")?;
     let ffmpeg_output = if cfg!(unix) {
         Command::new(&ffmpeg_path)
-            // Single threaded so that we can split our CPU bandwidth among multiple videos.
-            // I didn't find this to affect encoding performance much since we're just doing
-            // straight copies.
             .arg("-threads")
-            .arg("1")
+            .arg("4")
             // Need to auto accept overwriting existing files to prevent blocking.
             .arg("-y")
             // TODO: smarter choosing of the clip timing
@@ -29,6 +26,8 @@ pub async fn generate_vod_preview(input_fname: &str, output_fname: &std::path::P
             .arg("h264")
             .arg("-crf")
             .arg("28")
+            .arg("-preset")
+            .arg("fast")
             .arg("-an")
             .arg("-movflags")
             .arg("+faststart")
