@@ -3,13 +3,17 @@ use crate::{
     riot::games::{
         LolPlayerMatchSummary,
         LolMiniParticipantStats,
-    }
+    },
+    matches::MatchPlayerPair,
 };
 use sqlx::PgPool;
 use uuid::Uuid;
 use std::collections::HashMap;
 
-pub async fn list_lol_match_summaries_for_uuids(ex: &PgPool, uuids: &[Uuid]) -> Result<Vec<LolPlayerMatchSummary>, SquadOvError> {
+pub async fn list_lol_match_summaries_for_uuids(ex: &PgPool, uuids: &[MatchPlayerPair]) -> Result<Vec<LolPlayerMatchSummary>, SquadOvError> {
+    let match_uuids = uuids.iter().map(|x| { x.match_uuid.clone() }).collect::<Vec<Uuid>>();
+    let player_uuids = uuids.iter().map(|x| { x.player_uuid.clone() }).collect::<Vec<Uuid>>();
+
     let mut match_summaries: Vec<LolPlayerMatchSummary> = sqlx::query!(
         r#"
         SELECT
@@ -23,8 +27,11 @@ pub async fn list_lol_match_summaries_for_uuids(ex: &PgPool, uuids: &[Uuid]) -> 
             lmi.game_mode,
             lmi.game_version,
             lmpi.participant_id AS "current_participant_id!",
-            (vod.video_uuid IS NOT NULL) AS "has_vod!"
-        FROM squadov.lol_match_info AS lmi
+            (vod.video_uuid IS NOT NULL) AS "has_vod!",
+            u.uuid AS "user_uuid!"
+        FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)
+        INNER JOIN squadov.lol_match_info AS lmi
+            ON lmi.match_uuid = inp.match_uuid
         INNER JOIN squadov.lol_match_participant_identities AS lmpi
             ON lmpi.match_uuid = lmi.match_uuid
         INNER JOIN squadov.riot_accounts AS ra
@@ -33,13 +40,14 @@ pub async fn list_lol_match_summaries_for_uuids(ex: &PgPool, uuids: &[Uuid]) -> 
             ON ral.puuid = ra.puuid
         INNER JOIN squadov.users AS u
             ON u.id = ral.user_id
+                AND u.uuid = inp.user_uuid
         LEFT JOIN squadov.vods AS vod
             ON vod.match_uuid = lmi.match_uuid
                 AND vod.user_uuid = u.uuid
-        WHERE lmi.match_uuid = ANY($1)
         ORDER BY lmi.game_creation DESC
         "#,
-        uuids,
+        &match_uuids,
+        &player_uuids,
     )
         .fetch_all(ex)
         .await?
@@ -47,6 +55,7 @@ pub async fn list_lol_match_summaries_for_uuids(ex: &PgPool, uuids: &[Uuid]) -> 
         .map(|x| {
             LolPlayerMatchSummary {
                 match_uuid: x.match_uuid,
+                user_uuid: x.user_uuid,
                 game_creation: x.game_creation,
                 game_duration: x.game_duration,
                 game_type: x.game_type,
@@ -61,8 +70,6 @@ pub async fn list_lol_match_summaries_for_uuids(ex: &PgPool, uuids: &[Uuid]) -> 
             }
         })
         .collect();
-
-    let match_uuids: Vec<Uuid> = match_summaries.iter().map(|x| { x.match_uuid.clone() }).collect();
 
     let mut participant_map: HashMap<Uuid, Vec<LolMiniParticipantStats>> = HashMap::new();
     sqlx::query!(
@@ -116,14 +123,14 @@ pub async fn list_lol_match_summaries_for_uuids(ex: &PgPool, uuids: &[Uuid]) -> 
         });
 
     for m in &mut match_summaries {
-        m.participants.extend(participant_map.remove(&m.match_uuid).unwrap_or(vec![]));
+        m.participants.extend(participant_map.get(&m.match_uuid).cloned().unwrap_or(vec![]));
     }
 
     Ok(match_summaries)
 }
 
-pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start: i64, end: i64) -> Result<Vec<LolPlayerMatchSummary>, SquadOvError> {
-    let uuids: Vec<Uuid> = sqlx::query!(
+pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_uuid: &Uuid, start: i64, end: i64) -> Result<Vec<LolPlayerMatchSummary>, SquadOvError> {
+    let uuids: Vec<MatchPlayerPair> = sqlx::query!(
         r#"
         SELECT lmi.match_uuid
         FROM squadov.lol_match_info AS lmi
@@ -142,7 +149,12 @@ pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start:
         .fetch_all(&*ex)
         .await?
         .into_iter()
-        .map(|x| { x.match_uuid })
+        .map(|x| {
+            MatchPlayerPair{
+                match_uuid: x.match_uuid,
+                player_uuid: user_uuid.clone(),
+            }
+        })
         .collect();
     list_lol_match_summaries_for_uuids(&*ex, &uuids).await
 }

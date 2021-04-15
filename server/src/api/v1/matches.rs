@@ -304,10 +304,10 @@ impl api::ApiApplication {
                 HashMap::new()
             }
         };
-        let lol_matches = {
+        let mut lol_matches = {
             let recent = filter_recent_match_data_by_game(raw_base_matches, SquadOvGames::LeagueOfLegends);
             if !recent.is_empty() {
-                db::list_lol_match_summaries_for_uuids(&*self.pool, &recent_match_data_uuids(&recent)).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, LolPlayerMatchSummary>>()
+                db::list_lol_match_summaries_for_uuids(&*self.pool, &recent_match_data_uuid_pairs(&recent)).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), LolPlayerMatchSummary>>()
             } else {
                 HashMap::new()
             }
@@ -372,7 +372,7 @@ impl api::ApiApplication {
                 // data from the hash maps. TFT and Valorant summary data is player specific hence why it can be removed.
                 let key_pair = (x.match_uuid.clone(), x.user_uuid.clone());
                 let aimlab_task = aimlab_tasks.get(&x.match_uuid);
-                let lol_match = lol_matches.get(&x.match_uuid);
+                let lol_match = lol_matches.remove(&key_pair);
                 let tft_match = tft_matches.remove(&key_pair);
                 let valorant_match = valorant_matches.remove(&key_pair);
                 let wow_encounter = wow_encounters.remove(&key_pair);
@@ -391,7 +391,7 @@ impl api::ApiApplication {
                         is_watchlist: x.is_watchlist,
                     },
                     aimlab_task: aimlab_task.cloned(),
-                    lol_match: lol_match.cloned(),
+                    lol_match,
                     tft_match,
                     valorant_match,
                     wow_challenge,

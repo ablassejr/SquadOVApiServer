@@ -335,6 +335,7 @@ pub struct LolMiniParticipantStats {
 #[serde(rename_all = "camelCase")]
 pub struct LolPlayerMatchSummary {
     pub match_uuid: Uuid,
+    pub user_uuid: Uuid,
     pub game_creation: DateTime<Utc>,
     pub game_duration: i64,
     pub game_type: String,

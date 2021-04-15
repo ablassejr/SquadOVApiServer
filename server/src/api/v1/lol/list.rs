@@ -9,14 +9,17 @@ use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct LolUserMatchListInput {
-    puuid: String
+    puuid: String,
+    user_id: i64,
 }
 
 pub async fn list_lol_matches_for_user_handler(data : web::Path<LolUserMatchListInput>, query: web::Query<api::PaginationParameters>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let user = app.users.get_stored_user_from_id(data.user_id, &*app.pool).await?.ok_or(SquadOvError::NotFound)?;
     let query = query.into_inner();
     let matches = db::list_lol_match_summaries_for_puuid(
         &*app.pool,
         &data.puuid,
+        &user.uuid,
         query.start,
         query.end,
     ).await?;
