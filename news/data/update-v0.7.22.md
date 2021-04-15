@@ -7,7 +7,6 @@ Behind the scenes, this patch is also prepping us for our release for League of 
 * Push-to-Talk.
 
 ## Improvements
-* We transitioned to a new system of building and updating SquadOV. This should hopefully fix the infinite-update problem some people were having.
 * Added a link to your favorite matches/VODs under the "Library" dropdown.
 * Display the reason you favorited a match next to the favorite star.
 * Upload/Download progress no longer requires you to stay on the match page for its entire duration.

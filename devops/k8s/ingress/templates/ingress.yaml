@@ -59,12 +59,6 @@ spec:
             - backend:
                 serviceName: internal-admin-service
                 servicePort: 3000
-        - host: "update.squadov.gg"
-          http:
-            paths:
-            - backend:
-                serviceName: internal-nucleus-service
-                servicePort: 3030
     tls:
         - hosts:
             - "support.squadov.gg"
@@ -74,5 +68,4 @@ spec:
             - "api.squadov.gg"
             - "blog.squadov.gg"
             - "eagle.squadov.gg"
-            - "update.squadov.gg"
           secretName: squadov-cert-prod
