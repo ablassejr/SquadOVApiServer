@@ -38,6 +38,11 @@ resource "google_sql_database" "squadov-database" {
     instance = google_sql_database_instance.main-db.name
 }
 
+resource "google_sql_database" "squadov-update-database" {
+    name     = "updates"
+    instance = google_sql_database_instance.main-db.name
+}
+
 resource "google_sql_user" "default-user" {
     name     = var.postgres_user
     password = var.postgres_password

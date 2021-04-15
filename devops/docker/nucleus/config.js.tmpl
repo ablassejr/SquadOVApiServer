@@ -1,0 +1,293 @@
+const path = require('path');
+
+module.exports = {
+  /**
+   * The port to run Nucleus Server on, if the port is in use the server will not start
+   */
+  port: 3030,
+
+  /**
+   * The fully qualified domain + path that Nucleus is being hosted at
+   */
+  baseURL: 'https://update.squadov.gg',
+
+  /**
+   * The data store to use when persisting plugins and versions.  Current possible values
+   * are "sequelize", ensure you also supply valid connection details for your
+   * chosen strategy below.
+   *
+   * PR's welcome to add another data store.
+   */
+  dbStrategy: 'sequelize',
+
+  /**
+   * Sequelize connection information, please note all options are required
+   *
+   * database: The name of the database to connect to
+   * dialect: The type of SQL database this is, check sequelize docs for more info
+   * username: Username to use when connecting
+   * password; Password to use when connecting
+   * host: Hostname of database
+   * port: Port to use when connecting
+   * storage: Path to sqlite file, only used for sqlite dialect
+   */
+  sequelize: {
+    dialect: 'postgres',
+    database: 'updates',
+    username: '${POSTGRES_USER}',
+    password: '${POSTGRES_PASSWORD}',
+    host: "127.0.0.1",
+    port: 5432
+  },
+
+  /**
+   * The file store to use when persisting update files and metadata.  Current possible
+   * values are "s3" and "local" ensure you also supply valid connection details if
+   * required for your chosen strategy below.
+   *
+   * PR's welcome to add another file store.
+   */
+  fileStrategy: 'local',
+
+  /**
+   * Local file configuration
+   *
+   * root: Path on disk to the root of the static file store
+   * staticUrl: The HTTP url to use to access the static file store remotely
+   */
+  local: null,
+
+  /**
+   * There is actually no authentication config for s3, all config must be done through the standard AWS
+   * environment variables or through EC2 IAM roles.
+   *
+   * See http://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/setting-credentials-node.html
+   *
+   * Bucket / Region / CloudFront config goes here though
+   */
+  s3: {
+    bucketName: 'squadov-release', // The name for your S3 Bucket
+    cloudfront: null
+  },
+
+  /**
+   * The authentication strategy to use when logging users in.  Current possible values are "local",
+   * "openid" and "github".  Make you also supply the required authentication details
+   */
+  authStrategy: 'local',
+
+  /**
+   * Local authentication details
+   *
+   * The `adminIdentifiers` array should be a list of usernames
+   *
+   * DISCLAIMER: This strategy should ONLY be used for local development and NEVER
+   * used in production.  Unicorns cry every time this setting is used in production.
+   * Don't make the unicorns cry.
+   *
+   * displayName: The user friendly name of this user
+   * username: A unique identifier to use when this user signs in, please note uniqueness is
+   *           not enforced
+   * password: Well, uhhh, their password
+   * photo: A URL for their profile, entirely optional, just makes things look nicer ;)
+   */
+  localAuth: [{
+    displayName: 'SquadOV Updates',
+    username: 'squadovupdates',
+    password: '${NUCLEUS_PASSWORD}',
+    photo: 'https://pbs.twimg.com/profile_images/1219364727/charlie-support_400x400.png'
+  }],
+
+  /**
+   * OpenID authentication details
+   *
+   * The `adminIdentifiers` array should be a list of email
+   * addresses for users to consider admins
+   *
+   * realm: The domain that the server is hosted on
+   * stateless: Stateless mode for openID
+   * profile: Whether to fetch profile information, should normally be true
+   * providerURL: Your openID provider URL
+   * domain: Domain to restrict email addresses to
+   */
+  openid: null,
+
+  /**
+   * GitHub authentication details
+   *
+   * The `adminIdentifiers` array should be a list of GitHub usernames
+   * to consider admins
+   *
+   * clientID: GitHub API client ID
+   * clientSecret: GitHub API clientSecret
+   * realm: The domain the server is hosted on
+   */
+  github: null,
+
+  /**
+   * See the documentation for your authentication strategy for what this array does
+   */
+  adminIdentifiers: ['squadovupdates'],
+
+  /**
+   * Session options, in development just leave this as default.
+   *
+   * IN PRODUCTION PLEASE USE REDIS!
+   *
+   * type: Can be either "redis" or null
+   *
+   * redis:
+   *   host: The host URL for the redis instance
+   *   port: The port for the redis instance
+   */
+  sessionConfig: {
+    type: null,
+    secret: '${NUCLEUS_SESSION_SECRET}',
+
+    redis: {
+      host: '',
+      port: ''
+    }
+  },
+
+  organization: 'SquadOV',
+
+  /**
+   * GPG key to use when signing APT and YUM releases
+   *
+   * Requires to be unlocked (no password) and have both the private and
+   * public key.
+   */
+  gpgSigningKey: `
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+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
+9vDWKDN3jXDgh0iaTk2ZEniXdA==
+=aqwM
+-----END PGP PUBLIC KEY BLOCK-----
+
+-----BEGIN PGP PRIVATE KEY BLOCK-----
+
+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
+=JKCN
+-----END PGP PRIVATE KEY BLOCK-----
+  `,
+
+  /**
+   * The default percentage rollout for new releases.  The first release for
+   * any channel will always be 100% but all future releases will have a
+   * default rollout value of this setting
+   */
+  defaultRollout: 0
+};

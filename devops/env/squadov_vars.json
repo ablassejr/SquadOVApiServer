@@ -41,6 +41,10 @@
 	"POSTMARK_API_KEY": "ENC[AES256_GCM,data:CNOayosoehBxApWLwtxucO7Gct10XDx+k8AzlSviP6Yl/W48,iv:k8jWO36RJIwkpORgy7ki4NoH5rLeM+Hm39v4JwGXBQA=,tag:NA0E/KoYgulfQ9CoH1y3yg==,type:str]",
 	"INVITE_HMAC_KEY": "ENC[AES256_GCM,data:+uzAx+jbASfy+KwKMvYpF4IRkr7Ouan2t7K1+DGj2k4Lzcgiei8LwRzxFPY/ex6SEDgMI8IOHJKwKzGPezJe6w==,iv:oJqUjrc1jWVWAYAq9h365frLF5pxxF2yODRsZpZ61JQ=,tag:NzXZHxgVFChK4dkEtNgivA==,type:str]",
 	"SQUADOV_API_URL": "ENC[AES256_GCM,data:dWL6XJKJ8svHgQ1aQ6lTNc8Xmd3ySw==,iv:7zzeysWw3xKAapO0moVuZgKFAZ5gaUtWoZ6+HQY/TeY=,tag:cGeUMIC7DFoaUPT26eUrQA==,type:str]",
+	"NUCLEUS_PASSWORD": "ENC[AES256_GCM,data:LuEbEQSmoK1rx0rV5eQyZKm1MvA=,iv:O4rI4HxgogdGPBf5O0yurMfdnbyo7Y/Znw3ebQQilS0=,tag:FfN+RdUB/ywuC7x+xoJBgQ==,type:str]",
+	"NUCLEUS_SESSION_SECRET": "ENC[AES256_GCM,data:ONb1XXuQzkl0uG6rTGTmcNbtNLs=,iv:DO2QMTyoAVeiFu+tcIhXpCQtQOmGHI27p1JZDLuObxU=,tag:sIRDS87Cq/b8kouk4J9vUg==,type:str]",
+	"AWS_ACCESS_KEY_ID": "ENC[AES256_GCM,data:2JDfgEWXy2u/V+UoT4VSQ06E/48=,iv:iduAmQZM6rmPbJajRYdrBZFiQRO3ZsNu38FHmsA3J/I=,tag:uE5qh8EWSJt9nNPbSg/WeQ==,type:str]",
+	"AWS_SECRET_ACCESS_KEY": "ENC[AES256_GCM,data:HvFfzlUWfOu2drJ0nxnnQoF/eRIxHLpi5/lFVJVElw3dpEfxJcFhhQ==,iv:S+duHcLwhCicfdtThHabujI4tO7+TbAKuN7c0aX5YJo=,tag:dUFtY4cX0r4Of21ywWlQyQ==,type:str]",
 	"sops": {
 		"kms": null,
 		"gcp_kms": [
@@ -52,8 +56,8 @@
 		],
 		"azure_kv": null,
 		"hc_vault": null,
-		"lastmodified": "2021-03-31T17:37:43Z",
-		"mac": "ENC[AES256_GCM,data:6maXigEjhStqUx4c8fovtJ3cfuCp5LzXyUM6ji9seLey3f9DPX8+IjkVeqF51jEL0vKxIyz32b5E49gmGn/HHojS/0B3kdFNOKOfsTygPUw2mP9kbK9akSRi6Fdr4qMR3QbRjkyYdtewoQIPXP6nQoyV0TQ/1xwF5qITu7+rujk=,iv:zVURHZgIJpk5FcU0xaGORuj+PEBZjU7c8OdmPkYqbDQ=,tag:Djo3m6CHnzaB0soGuflVtw==,type:str]",
+		"lastmodified": "2021-04-15T01:02:09Z",
+		"mac": "ENC[AES256_GCM,data:DlPG5m19JuZEDhWt73uKAJjCjWrtvKC61njh3O8Xg1lgpwkWvDysG3Bb0mbERGSsdZQgoftbLjQoP7yhVvinbTaRhdIkGOlWgJJCHS4QMsfzbouXZhCW15yzTkNnVaCBpoxSAu5Gj/o2bDOIJs++G8UucE8XgcOTqXSpgsXRFK4=,iv:exq/iKBEZ/OWiJhSKMWabePeT1JYuCM6xSrnrbZo1uU=,tag:92IQDFwHllnlBLwYDD7r0g==,type:str]",
 		"pgp": null,
 		"unencrypted_suffix": "_unencrypted",
 		"version": "3.6.1"
