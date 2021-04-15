@@ -19,6 +19,8 @@ spec:
             containers:
                 - name: nucleus
                   image: registry.gitlab.com/squadov/squadovapiserver/squadov/nucleus:{{ .Values.commitHash }}
+                  ports:
+                    - containerPort: 3030
                   resources:
                     requests:
                         cpu: "10m"

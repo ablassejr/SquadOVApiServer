@@ -47,7 +47,7 @@ module.exports = {
    *
    * PR's welcome to add another file store.
    */
-  fileStrategy: 'local',
+  fileStrategy: 's3',
 
   /**
    * Local file configuration
@@ -55,7 +55,10 @@ module.exports = {
    * root: Path on disk to the root of the static file store
    * staticUrl: The HTTP url to use to access the static file store remotely
    */
-  local: null,
+  local: {
+      root: '',
+      staticUrl: ''
+  },
 
   /**
    * There is actually no authentication config for s3, all config must be done through the standard AWS
