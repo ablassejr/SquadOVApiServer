@@ -42,5 +42,5 @@ pub struct RiotSummonerDto {
 #[derive(Deserialize)]
 pub struct RiotUserInfo {
     pub sub: String,
-    pub cpid: String,
+    pub cpid: Option<String>,
 }

@@ -71,7 +71,7 @@ impl super::RiotApiHandler {
         Ok(resp.json::<RiotAccount>().await?)
     }
 
-    pub async fn get_summoner_me(&self, access_token: &str, region: &str) -> Result<RiotSummoner, SquadOvError> {
+    pub async fn get_summoner_me(&self, access_token: &str, region: &str) -> Result<Option<RiotSummoner>, SquadOvError> {
         let client = reqwest::ClientBuilder::new()
             .timeout(std::time::Duration::from_secs(120))
             .connect_timeout(std::time::Duration::from_secs(60))
@@ -86,12 +86,14 @@ impl super::RiotApiHandler {
 
         if resp.status() == StatusCode::TOO_MANY_REQUESTS {
             return Err(SquadOvError::RateLimit);
+        } else if resp.status() == StatusCode::NOT_FOUND {
+            return Ok(None);
         } else if resp.status() != StatusCode::OK {
             return Err(SquadOvError::InternalError(format!("Failed to get Riot summoner using RSO {} - {}", resp.status().as_u16(), resp.text().await?)));
         }
 
         let dto = resp.json::<RiotSummonerDto>().await?;
-        Ok(
+        Ok(Some(
             RiotSummoner{
                 puuid: dto.puuid,
                 account_id: Some(dto.account_id),
@@ -100,7 +102,7 @@ impl super::RiotApiHandler {
                 last_backfill_lol_time: None,
                 last_backfill_tft_time: None,
             }
-        )
+        ))
     }
 
     pub async fn get_user_info(&self, access_token: &str) -> Result<RiotUserInfo, SquadOvError> {
@@ -151,15 +153,21 @@ impl super::RiotApiApplicationInterface {
 
         let user_info = self.api.get_user_info(&access_token).await?;
         let account = self.api.get_account_me(&access_token).await?;
-        let summoner = self.api.get_summoner_me(&access_token, &user_info.cpid).await?;
+        let summoner = if let Some(cpid) = &user_info.cpid {
+            self.api.get_summoner_me(&access_token, cpid).await?
+        } else {
+            None
+        };
 
         let mut tx = self.db.begin().await?;
 
         log::info!("\t...Storing account: {:?}#{:?} for {}", &account.game_name, &account.tag_line, user_id);
         db::store_riot_account(&mut tx, &account).await?;
         
-        log::info!("\t...Storing summoner: {:?} for {}", &summoner.summoner_name, user_id);
-        db::store_riot_summoner(&mut tx, &summoner).await?;
+        if let Some(s) = summoner {
+            log::info!("\t...Storing summoner: {:?} for {}", &s.summoner_name, user_id);
+            db::store_riot_summoner(&mut tx, &s).await?;
+        }
 
         db::link_riot_account_to_user(&mut tx, &account.puuid, user_id).await?;
         db::store_rso_for_riot_account(&mut tx, &account.puuid, user_id, &access_token, &refresh_token, &expiration).await?;
