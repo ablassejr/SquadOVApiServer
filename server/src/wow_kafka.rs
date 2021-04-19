@@ -102,15 +102,14 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
             if handle_events {
                 let mut tx = opaque.app.heavy_pool.begin().await?;
                 let events = {
-                    let events = opaque.events.read().await;
-                    events.clone()
+                    let mut events = opaque.events.write().await;
+                    let ret = events.clone();
+                    events.clear();
+                    ret
                 };
                 log::info!("Handling {} WoW Combat Log Events", events.len());
                 squadov_common::store_wow_combat_log_events(&mut tx, events).await?;
                 tx.commit().await?;
-
-                let mut events = opaque.events.write().await;
-                events.clear();
             }
 
             Ok(handle_events)

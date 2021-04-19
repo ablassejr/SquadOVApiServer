@@ -17,6 +17,7 @@ use squadov_common::{
     HalResponse,
     BlobManagementClient,
     KafkaCredentialKeyPair,
+    WowCombatLogRmqInterface,
     riot::{
         api::{RiotApiHandler, RiotApiApplicationInterface, RiotConfig},
     },
@@ -178,6 +179,7 @@ pub struct ApiApplication {
     pub tft_itf: Arc<RiotApiApplicationInterface>,
     pub email: Arc<EmailClient>,
     pub vod_itf: Arc<VodProcessingInterface>,
+    pub wow_itf: Arc<WowCombatLogRmqInterface>,
 }
 
 impl ApiApplication {
@@ -224,6 +226,7 @@ impl ApiApplication {
         let valorant_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, valorant_api.clone(), rabbitmq.clone(), pool.clone()));
         let lol_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, lol_api.clone(), rabbitmq.clone(), pool.clone()));
         let tft_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, tft_api.clone(), rabbitmq.clone(), pool.clone()));
+        let wow_itf = Arc::new(WowCombatLogRmqInterface::new(&config.rabbitmq, rabbitmq.clone(), heavy_pool.clone()));
 
         if !disable_rabbitmq {
             if config.rabbitmq.enable_rso {
@@ -275,6 +278,7 @@ impl ApiApplication {
             tft_itf,
             email: Arc::new(EmailClient::new(&config.email)),
             vod_itf,
+            wow_itf,
         }
     }
 }

@@ -2,11 +2,13 @@ mod matches;
 mod characters;
 mod match_info;
 mod stats;
+mod combatlog;
 
 pub use matches::*;
 pub use characters::*;
 pub use match_info::*;
 pub use stats::*;
+pub use combatlog::*;
 
 use serde::Deserialize;
 use uuid::Uuid;

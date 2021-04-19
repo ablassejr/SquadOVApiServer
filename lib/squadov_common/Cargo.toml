@@ -50,6 +50,8 @@ unicode-segmentation = "1.7.1"
 env_logger = "0.7.1"
 lapin = "2.0.0-alpha.1"
 tempfile = "3.1.0"
+lru = "0.6.5"
+flate2 = "1.0"
 
 [build-dependencies]
 prost-build = "0.6.1"

@@ -1,16 +1,17 @@
 db = "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1/squadov"
-connections = 8
+threads = 8
 
 [rabbitmq]
 amqp_url = "${RABBITMQ_AMQP_URL}"
 prefetch_count = 2
-enable_rso = true
+enable_rso = false
 rso_queue = "riot_rso"
-enable_valorant = true
+enable_valorant = false
 valorant_queue = "valorant_api"
-enable_lol = true
+enable_lol = false
 lol_queue = "lol_api"
-enable_tft = true
+enable_tft = false
 tft_queue = "tft_api"
-enable_vod = true
+enable_vod = false
 vod_queue = "squadov_vods"
+wow_combatlog_queue = "wow_combatlog"
