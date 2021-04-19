@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-    name: wow-kafka-workers
+    name: wow-kafka-workers-v2
     labels:
         task: wowkafka
 spec:
@@ -21,9 +21,9 @@ spec:
                   image: registry.gitlab.com/squadov/squadovapiserver/squadov/wow_kafka_worker:{{ .Values.commitHash }}
                   env:
                     - name: DB_CONNS
-                      value: "128"
+                      value: "16"
                     - name: KAFKA_THREADS
-                      value: "128"
+                      value: "16"
                     - name: "SQUADOV_VOD_ROOT"
                       value: "gs://squadov-vod-bucket"
                     - name: "SQUADOV_BLOB_BUCKET"
@@ -42,9 +42,9 @@ spec:
                             key: password
                   resources:
                     requests:
-                        cpu: "2000m"
+                        cpu: "1000m"
                     limits:
-                        cpu: "4500m"
+                        cpu: "2000m"
                 - name: cloudsql-proxy
                   image: gcr.io/cloudsql-docker/gce-proxy:1.16
                   ports:
@@ -61,9 +61,9 @@ spec:
                         readOnly: true
                   resources:
                     requests:
-                        cpu: "1000m"
+                        cpu: "500m"
                     limits:
-                        cpu: "3000m"
+                        cpu: "2000m"
             volumes:
                 - name: gke-service-account
                   secret:

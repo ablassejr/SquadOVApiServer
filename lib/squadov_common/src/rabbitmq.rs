@@ -18,7 +18,7 @@ use rand::Rng;
 use sqlx::PgPool;
 
 pub const RABBITMQ_DEFAULT_PRIORITY: u8 = 0;
-pub const RABBITMQ_HIGH_PRIORITY: u8 = 10;
+pub const RABBITMQ_HIGH_PRIORITY: u8 = 5;
 const RABBITMQ_MAX_DELAY_MS: i64 = 3600000; // 1 hour
 const SQUADOV_RETRY_COUNT_HEADER: &'static str = "x-squadov-retry-count";
 const SQUADOV_MESSAGE_MAX_AGE_HEADER: &'static str = "x-squadov-max-age";
@@ -86,38 +86,49 @@ impl RabbitMqConnectionBundle {
             ConnectionProperties::default()
         ).await?;
 
+        let mut default_table = FieldTable::default();
+        default_table.insert(ShortString::from("x-max-priority"), AMQPValue::LongUInt(10));
+
+        let queue_opts = QueueDeclareOptions{
+            passive: false,
+            durable: true,
+            exclusive: false,
+            auto_delete: false,
+            nowait: false,
+        };
+
         let mut channels: Vec<Channel> = Vec::new();
         for _i in 0..num_channels {
             let ch = connection.create_channel().await?;
 
             ch.queue_declare(
                 &config.rso_queue,
-                QueueDeclareOptions::default(),
-                FieldTable::default(),
+                queue_opts.clone(),
+                default_table.clone(),
             ).await?;
 
             ch.queue_declare(
                 &config.valorant_queue,
-                QueueDeclareOptions::default(),
-                FieldTable::default(),
+                queue_opts.clone(),
+                default_table.clone(),
             ).await?;
 
             ch.queue_declare(
                 &config.lol_queue,
-                QueueDeclareOptions::default(),
-                FieldTable::default(),
+                queue_opts.clone(),
+                default_table.clone(),
             ).await?;
 
             ch.queue_declare(
                 &config.tft_queue,
-                QueueDeclareOptions::default(),
-                FieldTable::default(),
+                queue_opts.clone(),
+                default_table.clone(),
             ).await?;
 
             ch.queue_declare(
                 &config.vod_queue,
-                QueueDeclareOptions::default(),
-                FieldTable::default(),
+                queue_opts.clone(),
+                default_table.clone(),
             ).await?;
 
             channels.push(ch);
