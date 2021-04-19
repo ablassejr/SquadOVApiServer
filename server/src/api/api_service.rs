@@ -591,14 +591,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                 .route("/drps", web::get().to(v1::get_wow_match_damage_received_per_second_handler))
                                         )
                                 )
-                                .service(
-                                    web::scope("/view/{view_uuid}")
-                                        .route("", web::post().to(v1::bulk_upload_combatlog_handler))
-                                            .data(web::Payload::configure(|cfg| {
-                                                // Note that we should be submitting GZIP here so this shouldn't get super super large.
-                                                cfg.limit(5 * 1024 * 1024)
-                                            }))
-                                )
                         )
                 )
                 .service(

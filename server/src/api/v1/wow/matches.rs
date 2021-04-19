@@ -762,25 +762,6 @@ impl api::ApiApplication {
         
         Ok(())
     }
-
-    pub async fn check_wow_match_view_user_association(&self, view_uuid: &Uuid, user_id: i64) -> Result<bool, SquadOvError> {
-        Ok(
-            sqlx::query!(
-                r#"
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM squadov.wow_match_view
-                    WHERE user_id = $1 AND id = $2
-                ) as "exists!"
-                "#,
-                user_id,
-                view_uuid
-            )
-                .fetch_one(&*self.pool)
-                .await?
-                .exists
-        )
-    }
 }
 
 pub async fn create_wow_encounter_match_handler(app : web::Data<Arc<api::ApiApplication>>, input_match: web::Json<GenericMatchCreationRequest<WoWEncounterStart>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {

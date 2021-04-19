@@ -4,14 +4,12 @@ members = [
     "lib/squadov_common",
     "tools/hearthstone_power_parser",
     "tools/wow_db_migrater",
-    "msa/rabbitmq_delay_handler",
-    "msa/wow_combatlog_handler"
+    "msa/rabbitmq_delay_handler"
 ]
 default-members = [
     "server",
     "lib/squadov_common",
     "tools/hearthstone_power_parser",
-    "msa/rabbitmq_delay_handler",
-    "msa/wow_combatlog_handler"
+    "msa/rabbitmq_delay_handler"
 ]
 exclude = ["deps/cargo/sqlx"]

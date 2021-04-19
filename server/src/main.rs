@@ -84,6 +84,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         } else {
             let config2 = config.clone();
+
+            for _i in 0..config.kafka.wow_combat_log_threads {
+                wow_kafka::create_wow_consumer_thread(app.clone(), &config.kafka.wow_combat_log_topic, &kafka_config);
+            }
+
             let user_status_tracker = squadov_common::squad::status::UserActivityStatusTracker::new().start();
             
             // The API service is primarily used for dealing with API calls.actix_web

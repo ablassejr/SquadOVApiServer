@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::Deserialize;
 use chrono::{DateTime, Utc};
 use sqlx::{Transaction, Postgres, Row};
 use uuid::Uuid;
@@ -7,6 +7,7 @@ use std::cmp::PartialEq;
 use std::str::FromStr;
 use crate::SquadOvError;
 use unicode_segmentation::UnicodeSegmentation;
+use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Deserialize)]
@@ -24,7 +25,7 @@ pub struct FullWoWCombatLogState {
     pub blob: crate::BlobResumableIdentifier,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct RawWoWCombatLogPayload {
     pub timestamp: DateTime<Utc>,
     pub parts: Vec<String>,
