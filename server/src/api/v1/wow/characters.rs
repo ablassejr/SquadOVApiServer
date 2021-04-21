@@ -253,7 +253,7 @@ impl api::ApiApplication {
         Ok(
             sqlx::query!(
                 "
-                SELECT
+                SELECT DISTINCT
                     wcc.covenant_id,
                     wcc.soulbind_id,
                     wcc.soulbind_traits,
@@ -287,27 +287,29 @@ impl api::ApiApplication {
     }
 
     async fn get_wow_full_character(&self, view_uuid: &Uuid, guid: &str) -> Result<WowFullCharacter, SquadOvError> {
-        let item_ratings_data = sqlx::query!(
+        let items: Vec<WowItem> = sqlx::query_as!(
+            WowItem,
             r#"
             SELECT
-                COALESCE(ARRAY_AGG(wci.item_id ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS "items!",
-                COALESCE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS "ilvl!"
+                MAX(wci.item_id) AS "item_id!",
+                MAX(wci.ilvl) AS "ilvl!"
             FROM squadov.wow_match_view_character_presence AS wcp
             LEFT JOIN squadov.wow_match_view_combatant_items AS wci
                 ON wci.character_id = wcp.character_id
             WHERE wcp.view_id = $1
                 AND wcp.unit_guid = $2
-            GROUP BY wcp.unit_guid
+            GROUP BY wcp.unit_guid, wci.idx
+            ORDER BY wci.idx ASC
             "#,
             view_uuid,
             guid,
         )
-            .fetch_one(&*self.pool)
+            .fetch_all(&*self.pool)
             .await?;
 
         let talents = sqlx::query!(
             r#"
-            SELECT wct.talent_id, wct.is_pvp
+            SELECT DISTINCT wct.talent_id, wct.is_pvp
             FROM squadov.wow_match_view_character_presence AS wcp
             INNER JOIN squadov.wow_match_view_combatant_talents AS wct
                 ON wct.character_id = wcp.character_id
@@ -321,12 +323,7 @@ impl api::ApiApplication {
             .await?;
         
         Ok(WowFullCharacter {
-            items: item_ratings_data.items.iter().zip(item_ratings_data.ilvl.iter()).map(|(item_id, ilvl)| {
-                WowItem{
-                    item_id: *item_id,
-                    ilvl: *ilvl,
-                }
-            }).collect(),
+            items,
             covenant: self.get_wow_character_covenant(view_uuid, guid).await?,
             talents: talents.iter().filter(|x| { !x.is_pvp }).map(|x| { x.talent_id }).collect(),
             pvp_talents: talents.iter().filter(|x| { x.is_pvp }).map(|x| { x.talent_id }).collect(),

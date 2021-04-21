@@ -15,7 +15,7 @@ if __name__ == '__main__':
     for d in data:
         cmd = [
             'rabbitmqadmin',
-            '--host=albatross.rmq.cloudamqp.com',
+            '--host=blossom-green-kiwi.rmq2.cloudamqp.com',
             '--port=443',
             '--username={}'.format(args.username),
             '--password={}'.format(args.password),
