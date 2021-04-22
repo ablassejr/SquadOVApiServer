@@ -2761,6 +2761,51 @@
       ]
     }
   },
+  "7613b49079d74bcc0a6a3f16e9fbffa020360120fbbefd51f8925c8e47943ecd": {
+    "query": "\n                SELECT DISTINCT\n                    wcc.covenant_id,\n                    wcc.soulbind_id,\n                    wcc.soulbind_traits,\n                    wcc.conduit_item_ids,\n                    wcc.conduit_item_ilvls\n                FROM squadov.wow_match_view_character_presence AS wcp\n                INNER JOIN squadov.wow_match_view_combatant_covenants AS wcc\n                    ON wcc.character_id = wcp.character_id\n                WHERE wcp.view_id = $1\n                    AND wcp.unit_guid = $2\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "covenant_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "soulbind_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "soulbind_traits",
+          "type_info": "Int4Array"
+        },
+        {
+          "ordinal": 3,
+          "name": "conduit_item_ids",
+          "type_info": "Int8Array"
+        },
+        {
+          "ordinal": 4,
+          "name": "conduit_item_ilvls",
+          "type_info": "Int4Array"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "7b66b2c6300c2b5a1361c3499f0cb7ee7c16aa824cc82a8c740872c21089c32a": {
     "query": "\n                    SELECT DISTINCT\n                        wcp.unit_guid AS \"guid\",\n                        COALESCE(wcp.unit_name, '') AS \"name!\",\n                        COALESCE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS \"items!\",\n                        wvc.spec_id,\n                        wvc.team,\n                        wvc.rating\n                    FROM squadov.wow_match_view AS wmv\n                    INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                        ON wcp.view_id = wmv.id\n                            AND wcp.has_combatant_info\n                    INNER JOIN squadov.wow_match_view_combatants AS wvc\n                        ON wvc.character_id = wcp.character_id\n                    LEFT JOIN squadov.wow_match_view_combatant_items AS wci\n                        ON wci.event_id = wvc.event_id\n                    WHERE wmv.match_uuid = $1\n                        AND wmv.user_id = $2\n                    GROUP BY wcp.unit_guid, wcp.unit_name, wvc.spec_id, wvc.team, wvc.event_id, wvc.rating\n                    ",
     "describe": {
@@ -3029,6 +3074,33 @@
         true,
         true,
         true
+      ]
+    }
+  },
+  "86ba2434ffc4e6bb62fd42d66e5bd60af8d968fa881fcf10688b05e9d249c13e": {
+    "query": "\n            SELECT\n                MAX(wci.item_id) AS \"item_id!\",\n                MAX(wci.ilvl) AS \"ilvl!\"\n            FROM squadov.wow_match_view_character_presence AS wcp\n            LEFT JOIN squadov.wow_match_view_combatant_items AS wci\n                ON wci.character_id = wcp.character_id\n            WHERE wcp.view_id = $1\n                AND wcp.unit_guid = $2\n            GROUP BY wcp.unit_guid, wci.idx\n            ORDER BY wci.idx ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "item_id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "ilvl!",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": [
+        null,
+        null
       ]
     }
   },
@@ -3372,6 +3444,33 @@
         false,
         false,
         false,
+        false,
+        false
+      ]
+    }
+  },
+  "9c745ec23350330d4bf9301227a89dd8c85ff727550c3f28860631dd790bf310": {
+    "query": "\n            SELECT DISTINCT wct.talent_id, wct.is_pvp\n            FROM squadov.wow_match_view_character_presence AS wcp\n            INNER JOIN squadov.wow_match_view_combatant_talents AS wct\n                ON wct.character_id = wcp.character_id\n            WHERE wcp.view_id = $1\n                AND wcp.unit_guid = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "talent_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "is_pvp",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": [
         false,
         false
       ]
@@ -4093,51 +4192,6 @@
         false,
         false,
         false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "c2e3a465589752a50ad1e4934b284f67f9ca184a3168c64c09ca97705710ede8": {
-    "query": "\n                SELECT\n                    wcc.covenant_id,\n                    wcc.soulbind_id,\n                    wcc.soulbind_traits,\n                    wcc.conduit_item_ids,\n                    wcc.conduit_item_ilvls\n                FROM squadov.wow_match_view_character_presence AS wcp\n                INNER JOIN squadov.wow_match_view_combatant_covenants AS wcc\n                    ON wcc.character_id = wcp.character_id\n                WHERE wcp.view_id = $1\n                    AND wcp.unit_guid = $2\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "covenant_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "soulbind_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "soulbind_traits",
-          "type_info": "Int4Array"
-        },
-        {
-          "ordinal": 3,
-          "name": "conduit_item_ids",
-          "type_info": "Int8Array"
-        },
-        {
-          "ordinal": 4,
-          "name": "conduit_item_ilvls",
-          "type_info": "Int4Array"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Text"
-        ]
-      },
-      "nullable": [
         false,
         false,
         false,
@@ -5179,33 +5233,6 @@
       ]
     }
   },
-  "f21c4172698e68f78d2010295a8218ab9ad5b223260f1a82186ad4dd84cab06c": {
-    "query": "\n            SELECT wct.talent_id, wct.is_pvp\n            FROM squadov.wow_match_view_character_presence AS wcp\n            INNER JOIN squadov.wow_match_view_combatant_talents AS wct\n                ON wct.character_id = wcp.character_id\n            WHERE wcp.view_id = $1\n                AND wcp.unit_guid = $2\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "talent_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "is_pvp",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false
-      ]
-    }
-  },
   "f382fb88ffd3e4c638653d4a1ec9bbf9d909ee1496075266caa65fd3ece7bc8c": {
     "query": "\n            SELECT\n                sq.id AS \"id!\",\n                sq.squad_name AS \"squad_name!\",\n                sq.squad_group AS \"squad_group!\",\n                sq.creation_time AS \"creation_time!\",\n                sq.member_count AS \"member_count!\",\n                sq.pending_invite_count AS \"pending_invite_count!\",\n                sra.squad_role AS \"squad_role: SquadRole\",\n                us.username AS \"username\",\n                us.id AS \"user_id\"\n            FROM squadov.squad_overview AS sq\n            INNER JOIN squadov.squad_role_assignments AS sra\n                ON sra.squad_id = sq.id\n            INNER JOIN squadov.users AS us\n                ON us.id = sra.user_id\n            WHERE sra.user_id = $1 AND sra.squad_id = $2\n            ORDER BY sq.squad_name\n            ",
     "describe": {
@@ -5302,33 +5329,6 @@
       },
       "nullable": [
         false
-      ]
-    }
-  },
-  "fab3163de831779c9d24f171c5580cb2fcd4381e4a8b227e491ddfe39dea4ca2": {
-    "query": "\n            SELECT\n                COALESCE(ARRAY_AGG(wci.item_id ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS \"items!\",\n                COALESCE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS \"ilvl!\"\n            FROM squadov.wow_match_view_character_presence AS wcp\n            LEFT JOIN squadov.wow_match_view_combatant_items AS wci\n                ON wci.character_id = wcp.character_id\n            WHERE wcp.view_id = $1\n                AND wcp.unit_guid = $2\n            GROUP BY wcp.unit_guid\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "items!",
-          "type_info": "Int8Array"
-        },
-        {
-          "ordinal": 1,
-          "name": "ilvl!",
-          "type_info": "Int4Array"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Text"
-        ]
-      },
-      "nullable": [
-        null,
-        null
       ]
     }
   },

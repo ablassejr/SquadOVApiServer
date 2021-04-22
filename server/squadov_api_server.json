@@ -257,6 +257,27 @@
       ]
     }
   },
+  "0aa6504114475b54049e82d160f8f302cdc48bce58f08be363ea938af6debcad": {
+    "query": "\n                SELECT EXISTS (\n                    SELECT 1\n                    FROM squadov.wow_match_view\n                    WHERE user_id = $1 AND id = $2\n                ) as \"exists!\"\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "exists!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "0bd26186a44f54beee9c3c73318a49c25e1cc59fdccd0e24c8192b16d745ec30": {
     "query": "\n            WITH series(tm) AS (\n                SELECT *\n                FROM generate_series(\n                    DATE_TRUNC('month', $1::TIMESTAMPTZ),\n                    DATE_TRUNC('month', $2::TIMESTAMPTZ),\n                    INTERVAL '1 month'\n                )\n            )\n            SELECT\n                s.tm AS \"tm!\",\n                COALESCE(das.users, 0) AS \"session!\",\n                COALESCE(dae.users, 0) AS \"endpoint!\",\n                COALESCE(dav.users, 0) AS \"vod!\"\n            FROM series AS s\n            LEFT JOIN squadov.view_monthly_active_user_sessions AS das\n                ON das.tm = s.tm\n            LEFT JOIN squadov.view_monthly_active_user_endpoint AS dae\n                ON dae.tm = s.tm\n            LEFT JOIN squadov.view_monthly_active_vod_users AS dav\n                ON dav.tm = s.tm\n            ORDER BY s.tm ASC\n            ",
     "describe": {
@@ -2104,86 +2125,6 @@
       },
       "nullable": [
         false
-      ]
-    }
-  },
-  "3708a378844c2b265cb35d07c6315c0b127981ca1d76de664e1dcd3dceb8a90c": {
-    "query": "\n        SELECT\n            lmi.match_uuid,\n            lmi.game_creation,\n            lmi.game_duration,\n            lmi.game_type,\n            lmi.queue_id,\n            lmi.season_id,\n            lmi.map_id,\n            lmi.game_mode,\n            lmi.game_version,\n            lmpi.participant_id AS \"current_participant_id!\",\n            (vod.video_uuid IS NOT NULL) AS \"has_vod!\"\n        FROM squadov.lol_match_info AS lmi\n        INNER JOIN squadov.lol_match_participant_identities AS lmpi\n            ON lmpi.match_uuid = lmi.match_uuid\n        INNER JOIN squadov.riot_accounts AS ra\n            ON ra.summoner_id = lmpi.summoner_id\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.puuid = ra.puuid\n        INNER JOIN squadov.users AS u\n            ON u.id = ral.user_id\n        LEFT JOIN squadov.vods AS vod\n            ON vod.match_uuid = lmi.match_uuid\n                AND vod.user_uuid = u.uuid\n        WHERE lmi.match_uuid = ANY($1)\n        ORDER BY lmi.game_creation DESC\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "game_creation",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 2,
-          "name": "game_duration",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "game_type",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "queue_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "season_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "map_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "game_mode",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 8,
-          "name": "game_version",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 9,
-          "name": "current_participant_id!",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 10,
-          "name": "has_vod!",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        null
       ]
     }
   },
@@ -4661,6 +4602,51 @@
       ]
     }
   },
+  "7613b49079d74bcc0a6a3f16e9fbffa020360120fbbefd51f8925c8e47943ecd": {
+    "query": "\n                SELECT DISTINCT\n                    wcc.covenant_id,\n                    wcc.soulbind_id,\n                    wcc.soulbind_traits,\n                    wcc.conduit_item_ids,\n                    wcc.conduit_item_ilvls\n                FROM squadov.wow_match_view_character_presence AS wcp\n                INNER JOIN squadov.wow_match_view_combatant_covenants AS wcc\n                    ON wcc.character_id = wcp.character_id\n                WHERE wcp.view_id = $1\n                    AND wcp.unit_guid = $2\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "covenant_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "soulbind_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "soulbind_traits",
+          "type_info": "Int4Array"
+        },
+        {
+          "ordinal": 3,
+          "name": "conduit_item_ids",
+          "type_info": "Int8Array"
+        },
+        {
+          "ordinal": 4,
+          "name": "conduit_item_ilvls",
+          "type_info": "Int4Array"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "79bbe74adeb52bd21131efd638ca94cd292186cfa35b3b9389587c24025dd3e4": {
     "query": "\n        SELECT ra.puuid, ra.account_id, ra.summoner_id, ra.summoner_name, ra.last_backfill_lol_time, ra.last_backfill_tft_time\n        FROM squadov.riot_accounts AS ra\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.puuid = ra.puuid\n        WHERE ral.user_id = $1\n            AND ra.summoner_name = $2\n        ",
     "describe": {
@@ -5007,87 +4993,6 @@
       ]
     }
   },
-  "83219795d580bdada964fc4a91ce0599b9839bdf64a4427acf7f3f0ce1078327": {
-    "query": "\n        SELECT\n            lmi.match_uuid,\n            lmi.game_creation,\n            lmi.game_duration,\n            lmi.game_type,\n            lmi.queue_id,\n            lmi.season_id,\n            lmi.map_id,\n            lmi.game_mode,\n            lmi.game_version,\n            lmpi.participant_id AS \"current_participant_id!\",\n            (vod.video_uuid IS NOT NULL) AS \"has_vod!\"\n        FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)\n        INNER JOIN squadov.lol_match_info AS lmi\n            ON lmi.match_uuid = inp.match_uuid\n        INNER JOIN squadov.lol_match_participant_identities AS lmpi\n            ON lmpi.match_uuid = lmi.match_uuid\n        INNER JOIN squadov.riot_accounts AS ra\n            ON ra.summoner_id = lmpi.summoner_id\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.puuid = ra.puuid\n        INNER JOIN squadov.users AS u\n            ON u.id = ral.user_id\n                AND u.uuid = inp.user_uuid\n        LEFT JOIN squadov.vods AS vod\n            ON vod.match_uuid = lmi.match_uuid\n                AND vod.user_uuid = u.uuid\n        ORDER BY lmi.game_creation DESC\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "game_creation",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 2,
-          "name": "game_duration",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "game_type",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "queue_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "season_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "map_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "game_mode",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 8,
-          "name": "game_version",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 9,
-          "name": "current_participant_id!",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 10,
-          "name": "has_vod!",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "UuidArray"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        null
-      ]
-    }
-  },
   "83c7f31e0fcf569a652ce53c16eb72548e41bd4e7a845a4c5c1b29f8957f8c1f": {
     "query": "\n        UPDATE squadov.tft_matches\n        SET game_start_time = LEAST($2, game_start_time)\n        WHERE match_uuid = $1\n        ",
     "describe": {
@@ -5131,6 +5036,33 @@
         true,
         true,
         true
+      ]
+    }
+  },
+  "86ba2434ffc4e6bb62fd42d66e5bd60af8d968fa881fcf10688b05e9d249c13e": {
+    "query": "\n            SELECT\n                MAX(wci.item_id) AS \"item_id!\",\n                MAX(wci.ilvl) AS \"ilvl!\"\n            FROM squadov.wow_match_view_character_presence AS wcp\n            LEFT JOIN squadov.wow_match_view_combatant_items AS wci\n                ON wci.character_id = wcp.character_id\n            WHERE wcp.view_id = $1\n                AND wcp.unit_guid = $2\n            GROUP BY wcp.unit_guid, wci.idx\n            ORDER BY wci.idx ASC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "item_id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "ilvl!",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": [
+        null,
+        null
       ]
     }
   },
@@ -5705,6 +5637,33 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "9c745ec23350330d4bf9301227a89dd8c85ff727550c3f28860631dd790bf310": {
+    "query": "\n            SELECT DISTINCT wct.talent_id, wct.is_pvp\n            FROM squadov.wow_match_view_character_presence AS wcp\n            INNER JOIN squadov.wow_match_view_combatant_talents AS wct\n                ON wct.character_id = wcp.character_id\n            WHERE wcp.view_id = $1\n                AND wcp.unit_guid = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "talent_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "is_pvp",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false
       ]
     }
   },
