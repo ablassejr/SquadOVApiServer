@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 pub struct ShareTokenMetadata {
     path: Path<Url>,
+    full_path: String,
     method: String,
 }
 
@@ -23,6 +24,7 @@ impl super::AccessChecker<ShareTokenMetadata> for ShareTokenAccessRestricter {
     fn generate_aux_metadata(&self, req: &HttpRequest) -> Result<ShareTokenMetadata, SquadOvError> {
         Ok(ShareTokenMetadata{
             path: req.match_info().clone(),
+            full_path: String::from(req.path()),
             method: String::from(req.method().as_str()),
         })
     }
@@ -34,6 +36,11 @@ impl super::AccessChecker<ShareTokenMetadata> for ShareTokenAccessRestricter {
     async fn post_check(&self, _app: Arc<ApiApplication>, session: &SquadOVSession, data: ShareTokenMetadata) -> Result<bool, SquadOvError> {
         // If the session doesn't have a share token then this checker isn't relevant.
         if session.share_token.is_none() {
+            return Ok(true);
+        }
+
+        // Override permissions for certain URLs.
+        if data.full_path.contains("wow/characters/armory") {
             return Ok(true);
         }
 
