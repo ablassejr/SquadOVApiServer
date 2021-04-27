@@ -27,13 +27,13 @@ resource "google_container_node_pool" "primary_wow_worker_nodes" {
         }
         disk_size_gb = 20
         disk_type = "pd-ssd"
-        machine_type = "e2-custom-8-16384"
+        machine_type = "e2-custom-2-2048"
         image_type = "COS"
     }
 
     autoscaling {
         min_node_count = 1
-        max_node_count = 1
+        max_node_count = 2
     }
 }
 
@@ -81,13 +81,13 @@ resource "google_container_node_pool" "static_nodes" {
         }
         disk_size_gb = 20
         disk_type = "pd-ssd"
-        machine_type = "e2-custom-2-4096"
+        machine_type = "n1-custom-1-1024"
         image_type = "COS"
     }
 
     autoscaling {
         min_node_count = 1
-        max_node_count = 1
+        max_node_count = 2
     }
 }
 

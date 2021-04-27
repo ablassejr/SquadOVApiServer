@@ -61,7 +61,7 @@ spec:
                         readOnly: true
                   resources:
                     requests:
-                        cpu: "500m"
+                        cpu: "100m"
                     limits:
                         cpu: "2000m"
             volumes:
