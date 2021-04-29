@@ -473,6 +473,10 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                 // Need to handle ABSORBED separately since its format is different from other spells.
                 "ABSORBED" => Ok((None, WoWCombatLogEventType::Unknown)),
                 _ => {
+                    if payload.parts.len() < 12 {
+                        return Ok((None, WoWCombatLogEventType::Unknown));
+                    }
+
                     let mut idx = 9;
                     let spell_info = WoWSpellInfo{
                         id: payload.parts[idx].parse()?,

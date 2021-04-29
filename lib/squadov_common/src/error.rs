@@ -225,3 +225,9 @@ impl From<hex::FromHexError> for SquadOvError {
         return Self::InternalError(format!("Hex Decode {}", err))
     }
 }
+
+impl<T : std::fmt::Debug> From<nom::Err<nom::error::Error<T>>> for SquadOvError {
+    fn from(err: nom::Err<nom::error::Error<T>>) -> Self {
+        return Self::InternalError(format!("Nom {:?}", err))
+    }
+}

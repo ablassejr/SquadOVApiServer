@@ -1,3 +1,9 @@
+#[macro_use]
+extern crate lazy_static;
+
+#[macro_use]
+extern crate nom;
+
 pub mod error;
 pub mod parse;
 pub mod hal;
@@ -24,6 +30,7 @@ pub mod aimlab;
 pub mod access;
 pub mod encrypt;
 pub mod http;
+pub mod csgo;
 
 pub use error::*;
 pub use parse::*;
@@ -44,9 +51,12 @@ pub use games::*;
 pub use email::*;
 pub use aimlab::*;
 
-#[macro_use]
-extern crate lazy_static;
-
 pub mod proto {
-    include!(concat!(env!("OUT_DIR"), "/squadov.hearthstone.game_state.rs"));
+    pub mod hearthstone {
+        include!(concat!(env!("OUT_DIR"), "/squadov.hearthstone.game_state.rs"));
+    }
+
+    pub mod csgo {
+        include!(concat!(env!("OUT_DIR"), "/protobuf.csgo.rs"));
+    }
 }

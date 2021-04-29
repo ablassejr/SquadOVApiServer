@@ -20,7 +20,7 @@ use std::convert::TryFrom;
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use serde::Serialize;
-use squadov_common::proto::{
+use squadov_common::proto::hearthstone::{
     HearthstoneSerializedGameSnapshot,
     HearthstoneSerializedEntity,
     HearthstoneSerializedGameSnapshotAuxData,
@@ -536,7 +536,7 @@ pub async fn get_hearthstone_match_logs_handler(path : web::Path<super::Hearthst
     // Namely the most expensive part is fully the thousands of entities in each snapshot.
     let logs = app.get_hearthstone_match_logs_for_user(&path.match_uuid, path.user_id).await?;
 
-    let mut buf = web::BytesMut::new();
+    let mut buf: Vec<u8> = vec![];
     logs.encode(&mut buf)?;
 
     Ok(HttpResponse::Ok().body(buf))

@@ -9,6 +9,8 @@ spec:
     selector:
         matchLabels:
             task: wowkafka
+    strategy:
+        type: Recreate
     template:
         metadata:
             labels:
