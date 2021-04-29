@@ -27,7 +27,7 @@ resource "google_container_node_pool" "primary_wow_worker_nodes" {
         }
         disk_size_gb = 20
         disk_type = "pd-ssd"
-        machine_type = "e2-custom-2-2048"
+        machine_type = "e2-custom-2-3072"
         image_type = "COS"
     }
 
