@@ -219,9 +219,23 @@ impl RabbitMqListener for RiotApiApplicationInterface {
             RiotApiTask::AccountMe{access_token, refresh_token, expiration, user_id} => self.obtain_riot_account_from_access_token(&access_token, &refresh_token, &expiration, user_id).await?,
             RiotApiTask::Account{puuid} => self.obtain_riot_account_from_puuid(&puuid).await?,
             RiotApiTask::ValorantBackfill{puuid} => self.backfill_user_valorant_matches(&puuid).await?,
-            RiotApiTask::ValorantMatch{match_id, shard} => self.obtain_valorant_match_info(&match_id, &shard).await?,
+            RiotApiTask::ValorantMatch{match_id, shard} => match self.obtain_valorant_match_info(&match_id, &shard).await {
+                Ok(_) => (),
+                Err(err) => match err {
+                    // Remap not found to defer because Rito's api might not be that fast to give us the info right as the game finishes.
+                    SquadOvError::NotFound => return Err(SquadOvError::Defer(60 * 1000)),
+                    _ => return Err(err)
+                }
+            },
             RiotApiTask::LolBackfill{account_id, platform} => self.backfill_user_lol_matches(&account_id, &platform).await?,
-            RiotApiTask::LolMatch{platform, game_id} => self.obtain_lol_match_info(&platform, game_id).await?,
+            RiotApiTask::LolMatch{platform, game_id} => match self.obtain_lol_match_info(&platform, game_id).await {
+                Ok(_) => (),
+                Err(err) => match err {
+                    // Remap not found to defer because Rito's api might not be that fast to give us the info right as the game finishes.
+                    SquadOvError::NotFound => return Err(SquadOvError::Defer(60 * 1000)),
+                    _ => return Err(err)
+                }
+            },
             RiotApiTask::TftBackfill{puuid, region} => self.backfill_user_tft_matches(&puuid, &region).await?,
             RiotApiTask::TftMatch{platform, region, game_id} => match self.obtain_tft_match_info(&platform, &region, game_id).await {
                 Ok(_) => (),
