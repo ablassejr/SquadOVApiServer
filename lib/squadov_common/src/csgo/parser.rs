@@ -20,10 +20,13 @@ use crate::proto::csgo::{
     CsvcMsgGameEvent,
     CsvcMsgCreateStringTable,
     CsvcMsgUpdateStringTable,
+    CsvcMsgSendTable,
+    CsvcMsgPacketEntities,
     csvc_msg_game_event_list,
 };
 use prost::Message;
 use crate::bit_reader::BitReader;
+use std::sync::{RwLock, Arc};
 
 const DEMO_HEADER_ID: &str = "HL2DEMO";
 const DEMO_PROTOCOL: i32 = 4;
@@ -38,7 +41,7 @@ struct CsgoDemoRawFile<'a> {
     reader: BitReader<'a>,
     // Intermediary state tracking
     event_list: Option<CsvcMsgGameEventList>,
-    data_table: Option<CsgoDemoDataTable>,
+    data_table: Option<Arc<RwLock<CsgoDemoDataTable>>>,
 }
 
 impl<'a> CsgoDemoRawFile<'a> {
@@ -134,9 +137,15 @@ impl<'a> CsgoDemoRawFile<'a> {
                         demo.handle_string_table_update(string_table_msg)?;
                     },
                     // Handling the svc_PacketEntities message is crucial for tracking the state of players and other entities (weapons, nades, etc.).
-                    SvcMessages::SvcPacketEntities => (),
+                    SvcMessages::SvcPacketEntities => {
+                        let msg = CsvcMsgPacketEntities::decode(raw_buffer)?;
+                        demo.handle_entity_update(msg)?;
+                    },
                     SvcMessages::SvcSendTable => {
-                        log::debug!("SEND TABLE???");
+                        let msg = CsvcMsgSendTable::decode(raw_buffer)?;
+                        if let Some(dt) = &self.data_table {
+                            dt.write()?.receive_table(msg)?;
+                        }
                     },
                     _ => (),
                 }
@@ -150,7 +159,7 @@ impl<'a> CsgoDemoRawFile<'a> {
         // The data table is the table that contains all the classes known by the server.
         // Entities will be created using classes stored in the data table!!!
         let raw_buffer = self.get_raw_payload_data(DEMO_RECORD_BUFFER_SIZE, "CS:GO Demo Data Table")?;
-        self.data_table = Some(CsgoDemoDataTable::parse(raw_buffer)?);
+        self.data_table = Some(Arc::new(RwLock::new(CsgoDemoDataTable::parse(raw_buffer)?)));
         Ok(())
     }
 
@@ -180,7 +189,12 @@ impl<'a> CsgoDemoRawFile<'a> {
                 },
                 CsgoDemoCmdMessage::SignOn | CsgoDemoCmdMessage::Packet => self.read_demo_packet(cmd_header.tick, demo)?,
                 CsgoDemoCmdMessage::ConsoleCmd => self.read_demo_console_cmd()?,
-                CsgoDemoCmdMessage::DataTables => self.read_demo_data_table()?,
+                CsgoDemoCmdMessage::DataTables => {
+                    self.read_demo_data_table()?;
+                    if let Some(dt) = self.data_table.as_ref() {
+                        demo.on_data_table(dt.clone())?;
+                    }
+                },
                 CsgoDemoCmdMessage::StringTables => self.read_demo_string_table()?,
                 CsgoDemoCmdMessage::UserCmd => self.read_demo_user_cmd()?,
                 _ => {

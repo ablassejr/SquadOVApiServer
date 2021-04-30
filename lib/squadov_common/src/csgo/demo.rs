@@ -12,11 +12,15 @@ use crate::proto::csgo::{
     CsvcMsgGameEvent,
     CsvcMsgCreateStringTable,
     CsvcMsgUpdateStringTable,
+    CsvcMsgPacketEntities,
     csvc_msg_game_event_list,
 };
 use crate::SquadOvError;
 use crate::parse::bit_reader::BitReader;
+use super::data_table::CsgoDemoDataTable;
+use super::entity::CsgoEntityScene;
 use std::collections::{HashMap, VecDeque};
+use std::sync::{RwLock, Arc};
 
 const SUBSTRING_BITS: usize = 5;
 const MAX_USERDATA_BITS: usize = 14;
@@ -315,9 +319,11 @@ pub struct CsgoDemo {
     pub header: CsgoDemoHeader,
     pub game_start_tick: Option<i32>,
     pub rounds: Vec<CsgoDemoRound>,
-    // These variables are only needed when parsing the demo file.
+    // These variables are only needed when parsing the demo file for handling
+    // more intermediary states.
     string_tables: Vec<CsgoDemoStringTable>,
     player_info: HashMap<i32, CsgoDemoPlayerInfo>,
+    entities: CsgoEntityScene,
 }
 
 impl Default for CsgoDemo {
@@ -328,6 +334,7 @@ impl Default for CsgoDemo {
             rounds: vec![],
             string_tables: vec![],
             player_info: HashMap::new(),
+            entities: CsgoEntityScene::default(),
         }
     }
 }
@@ -497,6 +504,16 @@ impl CsgoDemo {
             log::warn!("Table ID does not exist...skipping.");
         }
 
+        Ok(())
+    }
+
+    pub fn on_data_table(&mut self, table: Arc<RwLock<CsgoDemoDataTable>>) -> Result<(), SquadOvError> {
+        self.entities.connect_data_table(table);
+        Ok(())
+    }
+
+    pub fn handle_entity_update(&mut self, data: CsvcMsgPacketEntities) -> Result<(), SquadOvError> {
+        self.entities.handle_entity_update(data)?;
         Ok(())
     }
 }

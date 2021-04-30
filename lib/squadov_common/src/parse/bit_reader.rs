@@ -100,4 +100,22 @@ impl<'a> BitReader<'a> {
 
         Ok(res)
     }
+
+    pub fn read_var_u32(&mut self) -> Result<u32, SquadOvError> {
+        // The initial section has 6 bits. In order of MSB -> LSB:
+        // - 1 bit to indicator whether to read an extra 8 bits of data
+        //   and use those as the MSBs.
+        // - 1 bit to indicator whether to read an extra 4 bits of data
+        //   and use those as the MSBs.
+        // - 4 bits to always use as the 4 LSBs.
+        // If BOTH indicators are set, then we read an extra 28 bits of data instead!
+        // Why? Don't question it.
+        let ret = self.read_multibit::<u32>(6)?;
+        Ok((ret & 15) | (match ret & (16 | 32) {
+            16 => self.read_multibit::<u32>(4)?,
+            32 => self.read_multibit::<u32>(8)?,
+            48 => self.read_multibit::<u32>(28)?,
+            _ => 0
+        } << 4))
+    }
 }
