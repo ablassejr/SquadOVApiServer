@@ -231,3 +231,15 @@ impl<T : std::fmt::Debug> From<nom::Err<nom::error::Error<T>>> for SquadOvError 
         return Self::InternalError(format!("Nom {:?}", err))
     }
 }
+
+impl From<prost::DecodeError> for SquadOvError {
+    fn from(err: prost::DecodeError) -> Self {
+        return Self::InternalError(format!("Prost Decode {:?}", err))
+    }
+}
+
+impl From<std::string::FromUtf8Error> for SquadOvError {
+    fn from(err: std::string::FromUtf8Error) -> Self {
+        return Self::InternalError(format!("From utf8 {:?}", err))
+    }
+}

@@ -31,6 +31,7 @@ pub mod access;
 pub mod encrypt;
 pub mod http;
 pub mod csgo;
+pub mod math;
 
 pub use error::*;
 pub use parse::*;

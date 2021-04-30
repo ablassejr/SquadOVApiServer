@@ -1,3 +1,5 @@
+pub mod bit_reader;
+
 use chrono::{DateTime, Utc, TimeZone};
 use serde::{Deserializer};
 use serde::de::{self, Visitor, Unexpected};

@@ -51,6 +51,8 @@ env_logger = "0.7.1"
 lapin = "2.0.0-alpha.1"
 tempfile = "3.1.0"
 nom = "6"
+funty = "=1.1.0"
+bitvec = "0.19.4"
 
 [build-dependencies]
 prost-build = "0.7.0"
