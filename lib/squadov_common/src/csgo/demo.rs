@@ -19,6 +19,12 @@ use crate::SquadOvError;
 use crate::parse::bit_reader::BitReader;
 use super::data_table::CsgoDemoDataTable;
 use super::entity::CsgoEntityScene;
+use super::math::{
+    CsgoVector,
+    CsgoQAngle,
+    parse_csgo_vector,
+    parse_csgo_qangle,
+};
 use std::collections::{HashMap, VecDeque};
 use std::sync::{RwLock, Arc};
 
@@ -137,46 +143,6 @@ named!(pub parse_csgo_demo_cmd_header<CsgoDemoCmdHeader>,
             cmd: cmd,
             tick: tick,
             player_slot: player_slot,
-        })
-    ))
-);
-
-#[derive(Debug)]
-pub struct CsgoVector {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-}
-
-named!(parse_csgo_vector<CsgoVector>,
-    complete!(do_parse!(
-        x: le_f32 >>
-        y: le_f32 >>
-        z: le_f32 >>
-        (CsgoVector{
-            x: x,
-            y: y,
-            z: z,
-        })
-    ))
-);
-
-#[derive(Debug)]
-pub struct CsgoQAngle {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-}
-
-named!(parse_csgo_qangle<CsgoQAngle>,
-    complete!(do_parse!(
-        x: le_f32 >>
-        y: le_f32 >>
-        z: le_f32 >>
-        (CsgoQAngle{
-            x: x,
-            y: y,
-            z: z,
         })
     ))
 );

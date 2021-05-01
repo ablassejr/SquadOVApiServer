@@ -25,12 +25,16 @@ const NUM_NETWORKED_EHANDLE_SERIAL_NUMBER_BITS: usize = 10;
 pub struct CsgoEntity {
     id: i32,
     class: u32,
-    serial: u32
+    serial: u32,
+    props: HashMap<String, CsgoProp>,
 }
 
 impl CsgoEntity {
     fn add_update_prop(&mut self, prop: CsgoProp) {
-
+        if let Some(pb_prop) = prop.entry().prop.get() {
+            let prop_name = pb_prop.var_name().to_string();
+            self.props.insert(prop_name, prop);
+        }
     }
 }
 
@@ -91,9 +95,10 @@ impl CsgoEntityScene {
                 id: entity_id,
                 class: class_id,
                 serial: serial_num,
+                props: HashMap::new(),
             };
 
-            log::debug!("Createing entity: {}", entity_id);
+            log::debug!("Creating entity: {}", entity_id);
             self.entities.insert(entity_id, entity);
         }
         Ok(())
@@ -117,7 +122,7 @@ impl CsgoEntityScene {
             let server_class = data_table.get_server_class_from_id(entity.class as i32).ok_or(SquadOvError::NotFound)?;
             for idx in field_indices {
                 let prop_entry = server_class.get_prop(idx as usize).ok_or(SquadOvError::NotFound)?;
-                entity.add_update_prop(CsgoProp::parse(reader, prop_entry, server_class, idx)?);
+                entity.add_update_prop(CsgoProp::parse(reader, prop_entry)?);
             }
 
             Ok(())
@@ -147,7 +152,7 @@ impl CsgoEntityScene {
             let is_entity = total_headers >= 0;
             if is_entity {
                 update_flags = FHDR_ZERO;
-                new_entity = header_base + 1 + reader.read_var_u32()? as i32;
+                new_entity = header_base + 1 + reader.read_var_ubits()? as i32;
                 header_base = new_entity;
 
                 // Check whether or not we left the PVS.
@@ -182,7 +187,6 @@ impl CsgoEntityScene {
 
             match update_type {
                 CsgoEntityUpdateType::EnterPvs => {
-                    log::info!("enter pvs: {}", new_entity);
                     // Create a new entity of the appropriate class.
                     let class_id = reader.read_multibit::<u32>(server_class_bits)?;
                     let serial_num = reader.read_multibit::<u32>(NUM_NETWORKED_EHANDLE_SERIAL_NUMBER_BITS)?;
@@ -202,7 +206,6 @@ impl CsgoEntityScene {
                     }
                 },
                 CsgoEntityUpdateType::DeltaEnt => {
-                    log::info!("delta ent: {}", new_entity);
                     self.update_entity_from_data(new_entity, &mut reader)?
                 },
             }

@@ -103,8 +103,8 @@ impl<'a> CsgoDemoRawFile<'a> {
 
         let target_ptr = self.reader.loc_bytes() + payload_len as usize;
         while self.reader.loc_bytes() < target_ptr {
-            let cmd = self.reader.read_var_i32()?;
-            let size = self.reader.read_var_i32()? as usize;
+            let cmd = self.reader.read_var_u32()?;
+            let size = self.reader.read_var_u32()? as usize;
             
             if self.reader.loc_bytes() + size > target_ptr {
                 return Err(SquadOvError::InternalError(format!("CS:GO Demo Payload failed to parse for cmd [{}] with size [{}]", cmd, size)));
@@ -113,9 +113,9 @@ impl<'a> CsgoDemoRawFile<'a> {
             // This needs to happen here to increment the pointer.
             let raw_buffer = self.reader.read_aligned_bytes(size as usize)?;
 
-            if let Some(_ncmd) = NetMessages::from_i32(cmd) {
+            if let Some(_ncmd) = NetMessages::from_i32(cmd as i32) {
                 // Not much of importance happens within NetMessages I think.
-            } else if let Some(scmd) = SvcMessages::from_i32(cmd) {
+            } else if let Some(scmd) = SvcMessages::from_i32(cmd as i32) {
                 match scmd {
                     SvcMessages::SvcGameEventList => {
                         self.event_list = Some(CsvcMsgGameEventList::decode(raw_buffer)?);

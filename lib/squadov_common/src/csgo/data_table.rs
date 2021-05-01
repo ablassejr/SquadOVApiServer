@@ -4,33 +4,25 @@ use crate::proto::csgo::{
     csvc_msg_send_table,
 };
 use crate::parse::bit_reader::BitReader;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashSet, HashMap, BTreeSet};
+use super::prop_types::{
+    CsgoPropType,
+    SPROP_EXCLUDE,
+    SPROP_INSIDEARRAY,
+    SPROP_COLLAPSIBLE,
+    SPROP_CHANGES_OFTEN,
+};
 use prost::Message;
 use std::sync::Arc;
 
-const SPROP_EXCLUDE: i32 = 1 << 6;
-const SPROP_INSIDEARRAY: i32 = 1 << 8;
-const SPROP_COLLAPSIBLE: i32 = 1 << 11;
-
-#[repr(i32)]
-enum CsgoPropType {
-    //DptInt = 0,
-    //DptFloat = 1,
-    //DptVector = 2,
-    //DptVectorXy = 3,
-    //DptString = 4,
-    DptArray = 5,
-    DptDataTable = 6,
-    //DptIn64 = 7,
-}
-
-struct CsgoDtPropHandle {
+#[derive(Clone)]
+pub struct CsgoDtPropHandle {
     table: Arc<CsvcMsgSendTable>,
     idx: usize,
 }
 
 impl CsgoDtPropHandle {
-    fn get(&self) -> Option<&csvc_msg_send_table::SendpropT> {
+    pub fn get(&self) -> Option<&csvc_msg_send_table::SendpropT> {
         self.table.props.get(self.idx)
     }
 }
@@ -41,18 +33,18 @@ impl std::fmt::Debug for CsgoDtPropHandle {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CsgoServerClassFlatPropEntry {
-    prop: CsgoDtPropHandle,
-    array_element_prop: Option<CsgoDtPropHandle>,
+    pub prop: CsgoDtPropHandle,
+    pub array_element_prop: Option<CsgoDtPropHandle>,
 }
 
 #[derive(Debug)]
 pub struct CsgoServerClass {
-    class_id: i32,
-    name: String,
-    dt_name: String,
-    props: Vec<CsgoServerClassFlatPropEntry>,
+    pub class_id: i32,
+    pub name: String,
+    pub dt_name: String,
+    pub props: Vec<CsgoServerClassFlatPropEntry>,
 }
 
 impl CsgoServerClass {
@@ -93,18 +85,17 @@ impl CsgoDemoDataTable {
 
     fn gather_exclude_entries(&self, table: Arc<CsvcMsgSendTable>, excluded: &mut CsgoExcludedProps) {
         for prop in &table.props {
+            let sub_dt_name = prop.dt_name().to_string();
             if prop.flags() & SPROP_EXCLUDE > 0 {
-                let sub_dt_name = prop.dt_name().to_string();
                 excluded.insert((
                     sub_dt_name.clone(),
                     prop.var_name().to_string(),
                 ));
+            }
 
-                if prop.r#type() == CsgoPropType::DptDataTable as i32 {
-                    let sub_table = self.tables.get(&sub_dt_name);
-                    if let Some(st) = sub_table {
-                        self.gather_exclude_entries(st.clone(), excluded);
-                    }
+            if prop.r#type() == CsgoPropType::DptDataTable as i32 {
+                if let Some(st) = self.tables.get(&sub_dt_name) {
+                    self.gather_exclude_entries(st.clone(), excluded);
                 }
             }
         }
@@ -162,31 +153,75 @@ impl CsgoDemoDataTable {
         class.props.append(&mut tmp_props);
     }
 
-    fn flatten_data_table(&self, entry: &mut CsgoServerClass) {
+    fn flatten_data_table(&self, entry: &mut CsgoServerClass) -> Result<(), SquadOvError> {
         // Modifies the class to store a handle to all the DT props.
         // While Valve's C++ can store a pointer, Rust prevents us from doing
         // that so store a handle object that can effectively function as a pointer.
         let data_table = self.tables.get(&entry.dt_name);
         if let Some(dt) = data_table {
             let mut excluded: CsgoExcludedProps = HashSet::new();
+
             self.gather_exclude_entries(dt.clone(), &mut excluded);
             self.gather_props(dt.clone(), entry, &excluded);
 
-            // Sort props by priority.
-            entry.props.sort_by(|a, b| {
-                let a_prio = if let Some(aprop) = a.prop.get() {
-                    aprop.priority()
-                } else {
-                    0
-                };
-                let b_prio = if let Some(bprop) = b.prop.get() {
-                    bprop.priority()
-                } else {
-                    0
-                };
-                a_prio.cmp(&b_prio)
-            });
+            // Sort props by priority. There's an additional requirement that
+            // props with the SPROP_CHANGES_OFTEN flag are functionally equivalent
+            // to priority = 64. Note that Valve does a really weird sorting algorithm here.
+            // What they do is 1) collect all the unique priority values (N) and then
+            // 2) perform N passes through the props. In each pass, Valve keeps track of
+            // the next un-sorted index and will swap the next valid prop into that slot.
+            // THIS IS NOT A STABLE SORT. Thus we have to match Valve's algorithm here instead
+            // of just condensing it into a regular sort algorithm.
+            let mut unique_priorities: BTreeSet<i32> = BTreeSet::new();
+            unique_priorities.insert(64);
+            for p in &entry.props {
+                if let Some(prop) = p.prop.get() {
+                    unique_priorities.insert(prop.priority());
+                }
+            }
+
+            // 'start' is the current index of the sorted props vector.
+            let mut start: usize = 0;
+            for priority in unique_priorities {
+                // 'current_prop' is the current index in the props vector that we're testing to see
+                // if it should be put into 'start' instead.
+                loop {
+                    let mut current_prop = start;
+                    while current_prop < entry.props.len() {
+                        // The first get indexes the array and since we check the index in the while loop
+                        // the unwrap should be safe here.
+                        let prop_priority: i32;
+                        let prop_flags: i32;
+
+                        if let Some(prop) = entry.props.get(current_prop).unwrap().prop.get() {
+                            prop_priority = prop.priority();
+                            prop_flags = prop.flags();
+                        } else {
+                            log::warn!("Detected invalid prop pointer?");
+                            return Err(SquadOvError::BadRequest);
+                        }
+
+                        if prop_priority == priority || (priority == 64 && (prop_flags & SPROP_CHANGES_OFTEN > 0)) {
+                            if start != current_prop {
+                                let old_start = entry.props[start].clone();
+                                entry.props[start] = entry.props[current_prop].clone();
+                                entry.props[current_prop] = old_start;
+                            }
+                            start += 1;
+                            break;
+                        }
+
+                        current_prop += 1;
+                    }
+
+                    if current_prop == entry.props.len() {
+                        break
+                    }
+                }
+            }
         }
+
+        Ok(())
     }
 
     pub fn parse(data: &[u8]) -> Result<Self, SquadOvError> {
@@ -200,8 +235,8 @@ impl CsgoDemoDataTable {
 
         loop {
             // The 'type' doesn't seem to be necessary?
-            let _ = reader.read_var_i32()?;
-            let buffer_size = reader.read_var_i32()? as usize;
+            let _ = reader.read_var_u32()?;
+            let buffer_size = reader.read_var_u32()? as usize;
             let buffer = reader.read_aligned_bytes(buffer_size)?;
             let msg = CsvcMsgSendTable::decode(buffer)?;
 
@@ -212,10 +247,10 @@ impl CsgoDemoDataTable {
             dt.receive_table(msg)?;
         }
 
-        let num_server_classes = reader.read_multibit::<u16>(16)? as i32;
+        let num_server_classes = reader.read_signed_multibit(16)? as i32;
         for _i in 0..num_server_classes {
             let mut entry = CsgoServerClass{
-                class_id: reader.read_multibit::<u16>(16)? as i32,
+                class_id: reader.read_signed_multibit(16)? as i32,
                 name: reader.read_null_terminated_str()?,
                 dt_name: reader.read_null_terminated_str()?,
                 props: vec![],
@@ -228,7 +263,7 @@ impl CsgoDemoDataTable {
 
             // Nothing really jumps out to me as to why we can't flatten the data table stuff early here
             // since all the data tables have been added already.
-            dt.flatten_data_table(&mut entry);
+            dt.flatten_data_table(&mut entry)?;
             dt.classes.insert(entry.class_id, entry);
         }
 
