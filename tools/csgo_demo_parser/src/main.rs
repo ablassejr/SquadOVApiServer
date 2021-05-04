@@ -15,5 +15,7 @@ fn main() {
     println!("FILE: {}", opts.file);
 
     let demo = CsgoDemoParser::from_path(std::path::Path::new(&opts.file)).unwrap();
-    println!("Demo: {:?}", demo);
+    println!("Demo Header: {:?}", demo.header);
+    println!("Demo Start Tick: {:?}", demo.game_start_tick);
+    println!("Demo Rounds: {:?}", demo.rounds);
 }

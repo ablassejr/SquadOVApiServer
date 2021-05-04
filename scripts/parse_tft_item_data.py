@@ -25,5 +25,5 @@ if __name__ == '__main__':
             json.dump(d, f)
 
         iIcon = os.path.join(args.assets, '{0:02}.png'.format(itemId))
-        oIcon = os.path.join(args.assets, oFolder, 'icon.png')
+        oIcon = os.path.join(oFolder, 'icon.png')
         shutil.copy(iIcon, oIcon)

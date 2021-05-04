@@ -29,12 +29,12 @@ const DT_MAX_STRING_BITS: usize = 9;
 #[derive(Debug)]
 pub struct CsgoPropValue {
     prop_type: CsgoPropType,
-    v_i32: Option<i32>,
-    v_float: Option<f32>,
-    v_str: Option<String>,
-    v_i64: Option<i64>,
-    v_vec: Option<CsgoVector>,
-    v_arr: Vec<CsgoProp>,
+    pub v_i32: Option<i32>,
+    pub v_float: Option<f32>,
+    pub v_str: Option<String>,
+    pub v_i64: Option<i64>,
+    pub v_vec: Option<CsgoVector>,
+    pub v_arr: Vec<CsgoProp>,
 }
 
 impl CsgoPropValue {
@@ -175,12 +175,12 @@ impl CsgoPropValue {
         let mut ret: Vec<CsgoProp> = vec![];
         ret.reserve(num_elements);
         
-        let element_prop = CsgoServerClassFlatPropEntry{
-            prop: prop.array_element_prop.clone().ok_or(SquadOvError::BadRequest)?,
-            array_element_prop: None,
-        };
-
-        for _i in 0..num_elements {
+        for i in 0..num_elements {    
+            let element_prop = CsgoServerClassFlatPropEntry{
+                prop: prop.array_element_prop.clone().ok_or(SquadOvError::BadRequest)?,
+                array_element_prop: None,
+                prefix: format!("{}.{:03}", &prop.prefix, i),
+            };
             ret.push(CsgoProp::parse(reader, &element_prop)?);
         }
 
@@ -235,7 +235,7 @@ impl CsgoPropValue {
 #[derive(Debug)]
 pub struct CsgoProp {
     entry: CsgoServerClassFlatPropEntry,
-    value: CsgoPropValue,
+    pub value: CsgoPropValue,
 }
 
 impl CsgoProp {

@@ -29,5 +29,5 @@ if __name__ == '__main__':
         if not os.path.exists(iIcon):
             iIcon = os.path.join(args.assets, unitName.replace(' ', '').replace("'", '').lower() + '.png')
 
-        oIcon = os.path.join(args.assets, oFolder, 'icon.png')
+        oIcon = os.path.join(oFolder, 'icon.png')
         shutil.copy(iIcon, oIcon)

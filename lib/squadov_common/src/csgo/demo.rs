@@ -14,6 +14,7 @@ use crate::proto::csgo::{
     CsvcMsgUpdateStringTable,
     CsvcMsgPacketEntities,
     csvc_msg_game_event_list,
+    csvc_msg_game_event,
 };
 use crate::SquadOvError;
 use crate::parse::bit_reader::BitReader;
@@ -25,11 +26,17 @@ use super::math::{
     parse_csgo_vector,
     parse_csgo_qangle,
 };
+use super::weapon::{CsgoWeapon, csgo_string_to_weapon};
 use std::collections::{HashMap, VecDeque};
 use std::sync::{RwLock, Arc};
+use num_enum::TryFromPrimitive;
+use std::convert::TryFrom;
 
 const SUBSTRING_BITS: usize = 5;
 const MAX_USERDATA_BITS: usize = 14;
+
+const CSGO_PLAYER_MAX_WEAPONS: i32 = 64;
+const CSGO_WEAPON_ID_MASK: i32 = 0x7FF;
 
 #[derive(Debug)]
 pub struct CsgoDemoHeader {
@@ -212,8 +219,213 @@ named!(parse_csgo_demo_packet_message<CsgoDemoPacketMessage>,
 );
 
 #[derive(Debug)]
-pub struct CsgoDemoRound {
+pub enum CsgoDemoBombStatus {
+    Planted,
+    Defused,
+    Exploded
+}
 
+#[derive(Debug)]
+pub enum CsgoDemoBombSite {
+    SiteA,
+    SiteB,
+    SiteUnknown,
+}
+
+#[derive(Debug)]
+pub enum CsgoTeam {
+    TeamCT,
+    TeamT,
+    TeamSpectate,
+}
+
+#[derive(Debug, TryFromPrimitive)]
+#[repr(i32)]
+pub enum CsgoRoundWin {
+    TargetBombed = 1,
+    BombDefused = 7,
+    CTWin,
+    TWin,
+    TSurrender = 17,
+    CTSurrender,
+}
+
+#[derive(Debug)]
+pub struct CsgoDemoBombState {
+    // Bomb 'event' can either be a defusal or an explosion since those two events
+    // should be mutually exclusive.
+    bomb_state: CsgoDemoBombStatus,
+    bomb_event_tick: Option<i32>,
+    bomb_event_userid: Option<i32>,
+    bomb_plant_tick: Option<i32>,
+    bomb_plant_userid: Option<i32>,
+    bomb_plant_site: Option<CsgoDemoBombSite>,
+}
+
+impl Default for CsgoDemoBombState {
+    fn default() -> Self {
+        Self {
+            bomb_state: CsgoDemoBombStatus::Planted,
+            bomb_event_tick: None,
+            bomb_event_userid: None,
+            bomb_plant_tick: None,
+            bomb_plant_userid: None,
+            bomb_plant_site: None,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct CsgoDemoKill {
+    tick: i32,
+    victim: i32,
+    // Keeping this an option just in case the player killed themselves...
+    killer: Option<i32>,
+    assister: Option<i32>,
+    flash_assist: bool,
+    headshot: bool,
+    smoke: bool,
+    blind: bool,
+    wallbang: bool,
+    noscope: bool,
+    weapon: CsgoWeapon,
+}
+
+#[derive(Debug, TryFromPrimitive)]
+#[repr(i32)]
+pub enum CsgoDemoHitGroup {
+    Generic = 0,
+    Head,
+    Chest,
+    Stomach,
+    LeftArm,
+    RightArm,
+    LeftLeg,
+    RightLeg,
+    Gear
+}
+
+#[derive(Debug)]
+pub struct CsgoDemoDamage {
+    tick: i32,
+    attacker: Option<i32>,
+    receiver: i32,
+    remaining_health: i32,
+    remaining_armor: i32,
+    damage_health: i32,
+    damage_armor: i32,
+    weapon: CsgoWeapon,
+    hitgroup: CsgoDemoHitGroup,
+}
+
+#[derive(Debug)]
+pub struct CsgoDemoRoundPlayerInfo {
+    kills: i32,
+    deaths: i32,
+    assists: i32,
+    equipment_value: i32,
+    headshot_kills: i32,
+    objective: i32,
+    cash_earned: i32,
+    utility_damage: i32,
+    enemies_flashed: i32,
+    damage: i32,
+    money_saved: i32,
+    kill_reward: i32,
+    weapons: Vec<CsgoWeapon>,
+    armor: i32,
+    has_defuse: bool,
+    has_helmet: bool,
+}
+
+impl Default for CsgoDemoRoundPlayerInfo {
+    fn default() -> Self {
+        Self {
+            kills: 0,
+            deaths: 0,
+            assists: 0,
+            equipment_value: 0,
+            headshot_kills: 0,
+            objective: 0,
+            cash_earned: 0,
+            utility_damage: 0,
+            enemies_flashed: 0,
+            damage: 0,
+            money_saved: 0,
+            kill_reward: 0,
+            weapons: vec![],
+            armor: 0,
+            has_defuse: false,
+            has_helmet: false,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct CsgoDemoRound {
+    round_num: usize,
+    // Time bookmarks.
+    round_start_tick: i32,
+    // All these other times are filled in later (after round start).
+    // I also don't want to shoe-horn us into only supporting the bomb defusal game mode
+    // so freeze end (i.e buy time end) could just not be a thing in those modes.
+    freeze_end_tick: Option<i32>,
+    round_end_tick: Option<i32>,
+    bomb_state: Option<CsgoDemoBombState>,
+    // This is the team winner.
+    round_winner: Option<CsgoTeam>,
+    round_win_reason: Option<CsgoRoundWin>,
+    // The user who was the "MVP" of this round.
+    round_mvp: Option<i32>,
+    // Kills and damage events that happened during this round.
+    kills: Vec<CsgoDemoKill>,
+    damage: Vec<CsgoDemoDamage>,
+    // Players in this round and their econ/weapons.
+    players: HashMap<i32, CsgoDemoRoundPlayerInfo>,
+}
+
+impl Default for CsgoDemoRound {
+    fn default() -> Self {
+        Self {
+            round_num: 0,
+            round_start_tick: 0,
+            freeze_end_tick: None,
+            round_end_tick: None,
+            bomb_state: None,
+            round_winner: None,
+            round_win_reason: None,
+            round_mvp: None,
+            kills: vec![],
+            damage: vec![],
+            players: HashMap::new(),
+        }
+    }
+}
+
+impl CsgoDemoRound {
+    
+    fn plant_bomb(&mut self, tick: i32, site: CsgoDemoBombSite, player: i32) {
+        let mut new_state = CsgoDemoBombState::default();
+        new_state.bomb_plant_tick = Some(tick);
+        new_state.bomb_plant_userid = Some(player);
+        new_state.bomb_plant_site = Some(site);
+        self.bomb_state = Some(new_state);
+    }
+
+    fn defuse_bomb(&mut self, tick: i32, player: i32) {
+        if let Some(state) = self.bomb_state.as_mut() {
+            state.bomb_event_tick = Some(tick);
+            state.bomb_event_userid = Some(player);
+            state.bomb_state = CsgoDemoBombStatus::Defused;
+        }
+    }
+
+    fn explode_bomb(&mut self, tick: i32) {
+        if let Some(state) = self.bomb_state.as_mut() {
+            state.bomb_event_tick = Some(tick);
+            state.bomb_state = CsgoDemoBombStatus::Exploded;
+        }
+    }
 }
 
 #[derive(Debug,Clone)]
@@ -289,7 +501,8 @@ pub struct CsgoDemo {
     // more intermediary states.
     string_tables: Vec<CsgoDemoStringTable>,
     player_info: HashMap<i32, CsgoDemoPlayerInfo>,
-    entities: CsgoEntityScene,
+    model_precache: HashMap<i32, String>,
+    pub entities: CsgoEntityScene,
 }
 
 impl Default for CsgoDemo {
@@ -300,65 +513,356 @@ impl Default for CsgoDemo {
             rounds: vec![],
             string_tables: vec![],
             player_info: HashMap::new(),
+            model_precache: HashMap::new(),
             entities: CsgoEntityScene::default(),
         }
     }
 }
 
+type CsgoParsedGameEventMessage = HashMap<String, csvc_msg_game_event::KeyT>;
+
+fn parse_csgo_game_event_message(event: CsvcMsgGameEvent, desc: &csvc_msg_game_event_list::DescriptorT) -> Result<CsgoParsedGameEventMessage, SquadOvError> {
+    let mut msg = HashMap::new();
+
+    for (idx, key) in event.keys.into_iter().enumerate() {
+        if let Some(descriptor_key) = desc.keys.get(idx) {
+            let name = descriptor_key.name();
+            msg.insert(name.to_string(), key);
+        }
+    }
+
+    Ok(msg)
+}
+
 impl CsgoDemo {
     pub fn handle_game_event(&mut self, tick: i32, event: CsvcMsgGameEvent, desc: &csvc_msg_game_event_list::DescriptorT) -> Result<(), SquadOvError> {
         let event_name = desc.name();
+        let current_round_idx = if self.rounds.is_empty() { 0 } else { self.rounds.len() - 1 };
         match event_name {
             "round_announce_match_start" => {
                 log::debug!("csgo game start at: {} [{}]", tick, event_name);
                 self.game_start_tick = Some(tick);
             },
             "player_death" => {
-                if self.game_start_tick.is_some() {
-                    // Need to do a game_start_tick check to ensure that
-                    // we only record kills/deaths that occur post warm-up.
-                    log::debug!("csgo player death at: {}", tick);
+                log::debug!("csgo player death at: {}", tick);
+                if let Some(round) = self.rounds.get_mut(current_round_idx) {
+                    // Determine who died and who killed them (and how they died).
+                    // We want to keep these events associated with rounds.
+                    let mut msg = parse_csgo_game_event_message(event, desc)?;
+                    let kill = CsgoDemoKill{
+                        tick,
+                        victim: msg.remove("userid").ok_or(SquadOvError::NotFound)?.val_short(),
+                        killer: msg.remove("attacker").map(|x| { x.val_short() }),
+                        assister: msg.remove("assister").map(|x| { x.val_short() }),
+                        flash_assist: msg.remove("assistedflash").map(|x| { x.val_bool() }).unwrap_or(false),
+                        headshot: msg.remove("headshot").map(|x| { x.val_bool() }).unwrap_or(false),
+                        smoke: msg.remove("thrusmoke").map(|x| { x.val_bool() }).unwrap_or(false),
+                        blind: msg.remove("attackerblind").map(|x| { x.val_bool() }).unwrap_or(false),
+                        wallbang: msg.remove("penetrated").map(|x| { x.val_short() }).unwrap_or(0) > 0,
+                        noscope: msg.remove("noscope").map(|x| { x.val_bool() }).unwrap_or(false),
+                        weapon: csgo_string_to_weapon(&msg.remove("weapon").map(|x| { String::from(x.val_string()) }).unwrap_or(String::new())),
+                    };
+                    round.kills.push(kill);
                 }
             },
             "player_hurt" => {
                 log::debug!("csgo player hurt at: {}", tick);
-            },
-            "player_spawn" => {
-                log::debug!("csgo player spawn: {}", tick);
+                if let Some(round) = self.rounds.get_mut(current_round_idx) {
+                    let mut msg = parse_csgo_game_event_message(event, desc)?;
+                    let damage = CsgoDemoDamage{
+                        tick,
+                        attacker: msg.remove("attacker").map(|x| { x.val_short() }),
+                        receiver: msg.remove("userid").ok_or(SquadOvError::NotFound)?.val_short(),
+                        remaining_health: msg.remove("health").map(|x| { x.val_byte() }).unwrap_or(0),
+                        remaining_armor: msg.remove("armor").map(|x| { x.val_byte() }).unwrap_or(0),
+                        damage_health: msg.remove("dmg_health").map(|x| { x.val_short() }).unwrap_or(0),
+                        damage_armor: msg.remove("dmg_armor").map(|x| { x.val_byte() }).unwrap_or(0),
+                        weapon: csgo_string_to_weapon(&msg.remove("weapon").map(|x| { String::from(x.val_string()) }).unwrap_or(String::new())),
+                        hitgroup: CsgoDemoHitGroup::try_from(msg.remove("hitgroup").map(|x| { x.val_byte() }).unwrap_or(0))?,
+                    };
+                    round.damage.push(damage);
+                }
             },
             "round_start" => {
                 log::debug!("csgo round start at: {}", tick);
+                // Create a new empty round - we assume that we've tracked
+                // all the rounds properly so that the number of rounds in the
+                // rounds vector is accurate.
+                let mut new_round = CsgoDemoRound::default();
+                new_round.round_num = self.rounds.len();
+                new_round.round_start_tick = tick;
+
+                // Populate player info.
+                for (uid, _player) in &self.player_info {
+                    new_round.players.insert(*uid, CsgoDemoRoundPlayerInfo::default());
+                }
+
+                self.rounds.push(new_round);
             },
             "round_end" => {
                 log::debug!("csgo round end at: {}", tick);
+                if let Some(round) = self.rounds.get_mut(current_round_idx) {
+                    round.round_end_tick = Some(tick);
+
+                    // There's additional information that we can grab from
+                    // the event regarding how the round was won and who won it.
+                    let mut msg = parse_csgo_game_event_message(event, desc)?;
+                    let msg_team_id = msg.remove("winner").ok_or(SquadOvError::NotFound)?.val_byte();
+                    round.round_winner = if msg_team_id == self.entities.parse_state.ct_id {
+                        Some(CsgoTeam::TeamCT)
+                    } else if msg_team_id == self.entities.parse_state.terrorist_id {
+                        Some(CsgoTeam::TeamT)
+                    } else {
+                        None
+                    };
+                    round.round_win_reason = CsgoRoundWin::try_from(msg.remove("reason").ok_or(SquadOvError::NotFound)?.val_byte()).ok();
+
+                    // Pull round end match stats from the player's entity.
+                    for (uid, player) in &self.player_info {
+                        if let Some(player_entity) = self.entities.get_entity(player.entity_id) {
+                            if let Some(player_round_info) = round.players.get_mut(uid) {
+                                {
+                                    let key = format!("m_iMatchStats_Deaths.{:03}", current_round_idx);
+                                    if let Some(prop) = player_entity.get_prop(&key) {
+                                        player_round_info.deaths = prop.value.v_i32.unwrap_or(0);
+                                    }
+                                }
+
+                                {
+                                    let key = format!("m_iMatchStats_Assists.{:03}", current_round_idx);
+                                    if let Some(prop) = player_entity.get_prop(&key) {
+                                        player_round_info.assists = prop.value.v_i32.unwrap_or(0);
+                                    }
+                                }
+
+                                {
+                                    let key = format!("m_iMatchStats_HeadShotKills.{:03}", current_round_idx);
+                                    if let Some(prop) = player_entity.get_prop(&key) {
+                                        player_round_info.headshot_kills = prop.value.v_i32.unwrap_or(0);
+                                    }
+                                }
+
+                                {
+                                    let key = format!("m_iMatchStats_Objective.{:03}", current_round_idx);
+                                    if let Some(prop) = player_entity.get_prop(&key) {
+                                        player_round_info.objective = prop.value.v_i32.unwrap_or(0);
+                                    }
+                                }
+
+                                {
+                                    let key = format!("m_iMatchStats_CashEarned.{:03}", current_round_idx);
+                                    if let Some(prop) = player_entity.get_prop(&key) {
+                                        player_round_info.cash_earned = prop.value.v_i32.unwrap_or(0);
+                                    }
+                                }
+
+                                {
+                                    let key = format!("m_iMatchStats_UtilityDamage.{:03}", current_round_idx);
+                                    if let Some(prop) = player_entity.get_prop(&key) {
+                                        player_round_info.utility_damage = prop.value.v_i32.unwrap_or(0);
+                                    }
+                                }
+
+                                {
+                                    let key = format!("m_iMatchStats_EnemiesFlashed.{:03}", current_round_idx);
+                                    if let Some(prop) = player_entity.get_prop(&key) {
+                                        player_round_info.enemies_flashed = prop.value.v_i32.unwrap_or(0);
+                                    }
+                                }
+
+                                {
+                                    let key = format!("m_iMatchStats_Kills.{:03}", current_round_idx);
+                                    if let Some(prop) = player_entity.get_prop(&key) {
+                                        player_round_info.kills = prop.value.v_i32.unwrap_or(0);
+                                    }
+                                }
+
+                                {
+                                    let key = format!("m_iMatchStats_Damage.{:03}", current_round_idx);
+                                    if let Some(prop) = player_entity.get_prop(&key) {
+                                        player_round_info.damage = prop.value.v_i32.unwrap_or(0);
+                                    }
+                                }
+
+                                {
+                                    let key = format!("m_iMatchStats_EquipmentValue.{:03}", current_round_idx);
+                                    if let Some(prop) = player_entity.get_prop(&key) {
+                                        player_round_info.equipment_value = prop.value.v_i32.unwrap_or(0);
+                                    }
+                                }
+
+                                {
+                                    let key = format!("m_iMatchStats_MoneySaved.{:03}", current_round_idx);
+                                    if let Some(prop) = player_entity.get_prop(&key) {
+                                        player_round_info.money_saved = prop.value.v_i32.unwrap_or(0);
+                                    }
+                                }
+
+                                {
+                                    let key = format!("m_iMatchStats_KillReward.{:03}", current_round_idx);
+                                    if let Some(prop) = player_entity.get_prop(&key) {
+                                        player_round_info.kill_reward = prop.value.v_i32.unwrap_or(0);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             },
             "bomb_planted" => {
                 log::debug!("csgo bomb planted: {}", tick);
+                if let Some(round) = self.rounds.get_mut(current_round_idx) {
+                    // Also want to know who planted the bomb and where.
+                    let mut msg = parse_csgo_game_event_message(event, desc)?;
+
+                    let bomb_site_id = msg.remove("site").ok_or(SquadOvError::NotFound)?.val_short();
+                    let bomb_site = if let Some(site_a_id) = self.entities.parse_state.site_a_trigger {
+                        if site_a_id == bomb_site_id {
+                            CsgoDemoBombSite::SiteA
+                        } else {
+                            CsgoDemoBombSite::SiteB
+                        }
+                    } else if let Some(site_b_id) = self.entities.parse_state.site_b_trigger {
+                        if site_b_id == bomb_site_id {
+                            CsgoDemoBombSite::SiteB
+                        } else {
+                            CsgoDemoBombSite::SiteA
+                        }
+                    } else {
+                        CsgoDemoBombSite::SiteUnknown
+                    };
+
+                    round.plant_bomb(
+                        tick,
+                        bomb_site,
+                        msg.remove("userid").ok_or(SquadOvError::NotFound)?.val_short(),
+                    );
+                }
             },
             "bomb_defused" => {
                 log::debug!("csgo bomb defused: {}", tick);
+                if let Some(round) = self.rounds.get_mut(current_round_idx) {
+                    // Also want to know who the bomb event is associated with (i.e. who defused).
+                    // No need to grab the bomb location since it should be the same as where it was planted.
+                    let mut msg = parse_csgo_game_event_message(event, desc)?;
+                    round.defuse_bomb(tick, msg.remove("userid").ok_or(SquadOvError::NotFound)?.val_short());
+                }
             },
             "bomb_exploded" => {
                 log::debug!("csgo bomb exploded: {}", tick);
+                if let Some(round) = self.rounds.get_mut(current_round_idx) {
+                    round.explode_bomb(tick);
+                }
             },
             "round_freeze_end" => {
                 log::debug!("csgo round freeze end: {}", tick);
+                if let Some(round) = self.rounds.get_mut(current_round_idx) {
+                    round.freeze_end_tick = Some(tick);
+                    
+                    // Also, at the end of the freeze round, scrape the player entity for information on what the
+                    // user's weapons are.
+                    for (uid, player) in &self.player_info {
+                        if let Some(player_entity) = self.entities.get_entity(player.entity_id) {
+                            let mut player_round_weapons: Vec<CsgoWeapon> = vec![];
+
+                            for i in 0..CSGO_PLAYER_MAX_WEAPONS {
+                                let weapon_key = format!("m_hMyWeapons.{:03}", i);
+                                if let Some(weapon) = player_entity.get_prop(&weapon_key) {
+                                    let weapon_entity_id = weapon.value.v_i32.unwrap_or(0) & CSGO_WEAPON_ID_MASK;
+                                    // Grab the weapon entity itself and figure out what weapon it is based off its class.
+                                    if let Some(weapon_entity) = self.entities.get_entity(weapon_entity_id) {
+                                        if let Some(weapon_class) = self.entities.get_class_name(weapon_entity.class as i32)? {
+                                            let weapon = weapon_entity.to_weapon(&weapon_class);
+
+                                            player_round_weapons.push({
+                                                let model_idx = weapon_entity.get_prop("m_nModelIndex").map(|x| { x.value.v_i32.unwrap_or(0) }).unwrap_or(0);
+                                                let model_name = self.model_precache.get(&model_idx).map(|x| { x.as_str() }).unwrap_or("");
+                                                // There's certain special cases where multiple weapons use the same class name.
+                                                // In that case we further refine the actual weapon using the weapon model.
+                                                // TODO: Maybe just use the model instead?
+                                                match weapon {
+                                                    CsgoWeapon::P2000 => if model_name.contains("pist_hkp2000") {
+                                                        CsgoWeapon::P2000
+                                                    } else if model_name.contains("pist_223") {
+                                                        CsgoWeapon::Usps
+                                                    } else {
+                                                        log::info!("Unknown weapon model: {}, {} [p2000]", model_name, &weapon_class);
+                                                        weapon
+                                                    },
+                                                    CsgoWeapon::M4a4 => if model_name.contains("rif_m4a1") {
+                                                        CsgoWeapon::M4a4
+                                                    } else if model_name.contains("rif_m4a1_s") {
+                                                        CsgoWeapon::M4a1s
+                                                    } else {
+                                                        log::info!("Unknown weapon model: {}, {} [m4a4]", model_name, &weapon_class);
+                                                        weapon
+                                                    },
+                                                    CsgoWeapon::P250 => if model_name.contains("pist_cz_75") {
+                                                        CsgoWeapon::Cz75
+                                                    } else if model_name.contains("pist_p250") {
+                                                        CsgoWeapon::P250
+                                                    } else {
+                                                        log::info!("Unknown weapon model: {}, {} [p250]", model_name, &weapon_class);
+                                                        weapon
+                                                    },
+                                                    CsgoWeapon::Deagle => if model_name.contains("pist_deagle") {
+                                                        CsgoWeapon::Deagle
+                                                    } else if model_name.contains("pist_revolver") {
+                                                        CsgoWeapon::R8
+                                                    } else {
+                                                        log::info!("Unknown weapon model: {}, {} [deagle]", model_name, &weapon_class);
+                                                        weapon
+                                                    },
+                                                    CsgoWeapon::Mp7 => if model_name.contains("smg_mp7") {
+                                                        CsgoWeapon::Mp7
+                                                    } else if model_name.contains("smg_mp5sd") {
+                                                        CsgoWeapon::Mp5
+                                                    } else {
+                                                        log::info!("Unknown weapon model: {}, {} [mp7]", model_name, &weapon_class);
+                                                        weapon
+                                                    },
+                                                    _ => weapon
+                                                }
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+
+                            if let Some(player_round_info) = round.players.get_mut(uid) {
+                                player_round_info.weapons = player_round_weapons;
+
+                                if let Some(armor_prop) = player_entity.get_prop("m_ArmorValue") {
+                                    player_round_info.armor = armor_prop.value.v_i32.unwrap_or(0);
+                                }
+
+                                if let Some(defuse_prop) = player_entity.get_prop("m_bHasDefuser") {
+                                    player_round_info.has_defuse = defuse_prop.value.v_i32.unwrap_or(0) != 0;
+                                }
+
+                                if let Some(helmet_prop) = player_entity.get_prop("m_bHasHelmet") {
+                                    player_round_info.has_helmet = helmet_prop.value.v_i32.unwrap_or(0) != 0;
+                                }
+                            }
+                        }
+                    }
+                }
             },
             "round_mvp" => {
                 log::debug!("csgo round mvp: {}", tick);
+                if let Some(round) = self.rounds.get_mut(current_round_idx) {
+                    // Need to determine who exactly got the MVP. This **should** happen before the 
+                    // next "round_start" event.
+                    let mut msg = parse_csgo_game_event_message(event, desc)?;
+                    round.round_mvp = Some(msg.remove("userid").ok_or(SquadOvError::NotFound)?.val_short());
+                }
             },
-            _ => log::debug!("unhandled: {} at {}", event_name, tick),
+            _ => (),
         };
         Ok(())
     }
 
     fn generic_handle_string_table_change(&mut self, table: &CsgoDemoStringTable, num_entries: i32, data: &[u8]) -> Result<(), SquadOvError> {
-        let is_user_info = table.name == "userinfo";
-        // There may be more relevant string tables but for now we only care about userinfo ones.
-        if !is_user_info {
-            return Ok(());
-        }
-
         let mut reader = BitReader::new(data);
         let encode_using_dictionaries = reader.read_bit()?;
         if encode_using_dictionaries {
@@ -410,21 +914,26 @@ impl CsgoDemo {
             // Now obtain user data.
             let mut user_data: Option<Vec<u8>> = None;
             if reader.read_bit()? {
-                let bytes_to_read = if table.user_data_fixed_size {
-                    table.user_data_size as usize
+                let bits_to_read = if table.user_data_fixed_size {
+                    table.user_data_size_bits as usize
                 } else {
-                    reader.read_multibit::<usize>(MAX_USERDATA_BITS)?
+                    reader.read_multibit::<usize>(MAX_USERDATA_BITS)? * 8
                 };
 
-                user_data = Some(reader.read_raw(bytes_to_read * 8)?);
+                user_data = Some(reader.read_raw(bits_to_read)?);
             }
 
-            if is_user_info {
-                if let Some(raw_user_data) = user_data {
+            if table.name == "modelprecache" {
+                self.model_precache.insert(last_entry, entry.clone());
+            } else if let Some(raw_user_data) = user_data {
+                if table.name == "userinfo" {
                     let mut player_info = parse_csgo_demo_player_info(&raw_user_data)?.1;
                     player_info.entity_id = last_entry;
                     log::debug!("Player Info: {:?}", player_info);
-                    self.player_info.insert(player_info.entity_id, player_info);
+
+                    // Use user_id instead of entity_id because all the events and what not
+                    // will refer to the player's userid and not entity id.
+                    self.player_info.insert(player_info.user_id, player_info);
                 }
             }
 

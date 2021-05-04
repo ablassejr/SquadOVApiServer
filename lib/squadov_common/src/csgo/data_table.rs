@@ -37,6 +37,23 @@ impl std::fmt::Debug for CsgoDtPropHandle {
 pub struct CsgoServerClassFlatPropEntry {
     pub prop: CsgoDtPropHandle,
     pub array_element_prop: Option<CsgoDtPropHandle>,
+    pub prefix: String,
+}
+
+impl CsgoServerClassFlatPropEntry {
+    pub fn full_name(&self) -> String {
+        let base_name = if let Some(p) = self.prop.get() {
+            String::from(p.var_name())
+        } else {
+            String::new()
+        };
+
+        if self.prefix.is_empty() {
+            base_name
+        } else {
+            format!("{}.{}", &self.prefix, base_name)
+        }
+    }    
 }
 
 #[derive(Debug)]
@@ -45,6 +62,7 @@ pub struct CsgoServerClass {
     pub name: String,
     pub dt_name: String,
     pub props: Vec<CsgoServerClassFlatPropEntry>,
+    pub baseclasses: CsgoBaseClasses,
 }
 
 impl CsgoServerClass {
@@ -58,13 +76,14 @@ pub struct CsgoDemoDataTable {
     // Indexed by table name
     tables: HashMap<String, Arc<CsvcMsgSendTable>>,
     // Indexed by class ID.
-    classes: HashMap<i32, CsgoServerClass>,
+    pub classes: HashMap<i32, CsgoServerClass>,
     // Used later when parsing entities
     server_class_bits: usize, 
 }
 
 // Indexed by: (DT Name, Variable name)
 type CsgoExcludedProps = HashSet<(String, String)>;
+type CsgoBaseClasses = HashSet<String>;
 
 impl CsgoDemoDataTable {
     pub fn receive_table(&mut self, table: CsvcMsgSendTable) -> Result<(), SquadOvError> {
@@ -81,6 +100,26 @@ impl CsgoDemoDataTable {
 
     pub fn get_server_class_bits(&self) -> usize {
         return self.server_class_bits
+    }
+
+    fn gather_baseclass(&self, table: Arc<CsvcMsgSendTable>, baseclasses: &mut CsgoBaseClasses) {
+        for prop in &table.props {
+            let sub_dt_name = prop.dt_name().to_string();
+            if prop.var_name() == "baseclass" {
+                for (_id, class) in &self.classes {
+                    if class.dt_name == sub_dt_name {
+                        baseclasses.insert(class.name.clone());
+                        break;
+                    }   
+                }
+            }
+
+            if prop.r#type() == CsgoPropType::DptDataTable as i32 {
+                if let Some(st) = self.tables.get(&sub_dt_name) {
+                    self.gather_baseclass(st.clone(), baseclasses);
+                }
+            }
+        }
     }
 
     fn gather_exclude_entries(&self, table: Arc<CsvcMsgSendTable>, excluded: &mut CsgoExcludedProps) {
@@ -101,7 +140,7 @@ impl CsgoDemoDataTable {
         }
     }
 
-    fn gather_props_iterate_props(&self, table: Arc<CsvcMsgSendTable>, class: &mut CsgoServerClass, excluded: &CsgoExcludedProps, output_props: &mut Vec<CsgoServerClassFlatPropEntry>) {
+    fn gather_props_iterate_props(&self, table: Arc<CsvcMsgSendTable>, class: &mut CsgoServerClass, excluded: &CsgoExcludedProps, output_props: &mut Vec<CsgoServerClassFlatPropEntry>, prefix: &str) {
         for (idx, prop) in table.props.iter().enumerate() {
             if prop.flags() & SPROP_INSIDEARRAY > 0 ||
                 prop.flags() & SPROP_EXCLUDE > 0 ||
@@ -115,9 +154,14 @@ impl CsgoDemoDataTable {
                 let sub_table = self.tables.get(&sub_dt_name);
                 if let Some(st) = sub_table {
                     if prop.flags() & SPROP_COLLAPSIBLE > 0 {
-                        self.gather_props_iterate_props(st.clone(), class, excluded, output_props);
+                        self.gather_props_iterate_props(st.clone(), class, excluded, output_props, prefix);
                     } else {
-                        self.gather_props(st.clone(), class, excluded);
+                        let new_prefix = if prefix.is_empty() {
+                            prop.var_name().to_string()
+                        } else {
+                            format!("{}.{}", prefix, prop.var_name())
+                        };
+                        self.gather_props(st.clone(), class, excluded, &new_prefix);
                     }
                 }
             } else if prop_type == CsgoPropType::DptArray as i32 {
@@ -131,6 +175,7 @@ impl CsgoDemoDataTable {
                             table: table.clone(),
                             idx: idx - 1,
                         }),
+                        prefix: prefix.to_string(),
                     }
                 );
             } else {
@@ -141,15 +186,16 @@ impl CsgoDemoDataTable {
                             idx,
                         },
                         array_element_prop: None,
+                        prefix: prefix.to_string(),
                     }
                 );
             }
         }
     }
 
-    fn gather_props(&self, table: Arc<CsvcMsgSendTable>, class: &mut CsgoServerClass, excluded: &CsgoExcludedProps) {
+    fn gather_props(&self, table: Arc<CsvcMsgSendTable>, class: &mut CsgoServerClass, excluded: &CsgoExcludedProps, prefix: &str) {
         let mut tmp_props: Vec<CsgoServerClassFlatPropEntry> = vec![];
-        self.gather_props_iterate_props(table.clone(), class, excluded, &mut tmp_props);
+        self.gather_props_iterate_props(table.clone(), class, excluded, &mut tmp_props, prefix);
         class.props.append(&mut tmp_props);
     }
 
@@ -162,7 +208,7 @@ impl CsgoDemoDataTable {
             let mut excluded: CsgoExcludedProps = HashSet::new();
 
             self.gather_exclude_entries(dt.clone(), &mut excluded);
-            self.gather_props(dt.clone(), entry, &excluded);
+            self.gather_props(dt.clone(), entry, &excluded, "");
 
             // Sort props by priority. There's an additional requirement that
             // props with the SPROP_CHANGES_OFTEN flag are functionally equivalent
@@ -174,6 +220,7 @@ impl CsgoDemoDataTable {
             // of just condensing it into a regular sort algorithm.
             let mut unique_priorities: BTreeSet<i32> = BTreeSet::new();
             unique_priorities.insert(64);
+
             for p in &entry.props {
                 if let Some(prop) = p.prop.get() {
                     unique_priorities.insert(prop.priority());
@@ -254,6 +301,7 @@ impl CsgoDemoDataTable {
                 name: reader.read_null_terminated_str()?,
                 dt_name: reader.read_null_terminated_str()?,
                 props: vec![],
+                baseclasses: HashSet::new(),
             };
 
             if entry.class_id >= num_server_classes {
@@ -265,6 +313,40 @@ impl CsgoDemoDataTable {
             // since all the data tables have been added already.
             dt.flatten_data_table(&mut entry)?;
             dt.classes.insert(entry.class_id, entry);
+        }
+
+        // Second pass to determine baseclasses.
+        let all_class_keys: Vec<i32> = dt.classes.keys().map(|x| { *x }).collect();
+        for key in all_class_keys {
+            let dt_name = if let Some(class) = dt.classes.get(&key) {
+                class.dt_name.clone()
+            } else {
+                continue;
+            };
+
+            let table = dt.tables.get(&dt_name);
+            if table.is_none() {
+                continue;
+            }
+
+            let mut baseclasses: CsgoBaseClasses = HashSet::new();
+            dt.gather_baseclass(table.unwrap().clone(), &mut baseclasses);
+
+            if let Some(class) = dt.classes.get_mut(&key) {
+                class.baseclasses = baseclasses;
+
+                if class.baseclasses.contains("CWeaponCSBase") {
+                    log::info!("CSGO CLASS: {}", class.name);
+                    log::info!("--- BASE ---");
+                    for p in &class.baseclasses {
+                        log::info!("\t{}", p);
+                    }
+                    log::info!("--- PROPS ---");
+                    for p in &class.props {
+                        log::info!("\t{} [type: {}]", p.full_name(), p.prop.get().unwrap().r#type());
+                    }
+                }
+            }
         }
 
         dt.server_class_bits = crate::math::integer_log2(num_server_classes) as usize + 1;

@@ -7,7 +7,19 @@ use super::demo::{
     parse_csgo_demo_cmd_header,
     parse_csgo_demo_cmd_info,
 };
-use super::data_table::CsgoDemoDataTable;
+use super::entity::{
+    CsgoEntity,
+    CsgoEntityCallback,
+    CsgoDemoEntityParseState,
+};
+use super::data_table::{
+    CsgoDemoDataTable,
+    CsgoServerClass,
+};
+use super::math::{
+    CsgoVector,
+    CsgoBoundingBox,
+};
 use std::path::Path;
 use std::io::Read;
 use nom::number::complete::{
@@ -206,6 +218,95 @@ impl<'a> CsgoDemoRawFile<'a> {
     }
 }
 
+struct CsgoCCSTeamHandler {
+}
+
+impl CsgoEntityCallback for CsgoCCSTeamHandler {
+    fn notify(&self, entity: &CsgoEntity, _class: &CsgoServerClass, parse_state: &mut CsgoDemoEntityParseState) -> Result<(), SquadOvError> {
+        let team_name = if let Some(prop_team_name) = entity.get_prop("m_szTeamname") {
+            if let Some(team_name) = prop_team_name.value.v_str.as_ref() {
+                team_name.as_str()
+            } else {
+                ""
+            }
+        } else {
+            ""
+        };
+
+        let team_num = if let Some(prop_team_num) = entity.get_prop("") {
+            prop_team_num.value.v_i32.unwrap_or(-1)
+        } else {
+            -1
+        };
+
+        if team_num != -1 {
+            if team_name == "TERRORIST" {
+                parse_state.terrorist_id = team_num;
+            } else if team_name == "CT" {
+                parse_state.ct_id = team_num;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+struct CsgoCCSPlayerResourceHandler {
+}
+
+impl CsgoEntityCallback for CsgoCCSPlayerResourceHandler {
+    fn notify(&self, entity: &CsgoEntity, _class: &CsgoServerClass, parse_state: &mut CsgoDemoEntityParseState) -> Result<(), SquadOvError> {
+        if let Some(prop_bombsite_a) = entity.get_prop("m_bombsiteCenterA") {
+            if let Some(bombsite_a) = prop_bombsite_a.value.v_vec.as_ref() {
+                parse_state.site_a_center = bombsite_a.clone();
+            }
+        }
+        
+        if let Some(prop_bombsite_b) = entity.get_prop("m_bombsiteCenterB") {
+            if let Some(bombsite_b) = prop_bombsite_b.value.v_vec.as_ref() {
+                parse_state.site_b_center = bombsite_b.clone();
+            }
+        }
+
+        parse_state.update_bombsites();
+        Ok(())
+    }
+}
+
+struct CsgoCBaseTriggerHandler {
+}
+
+impl CsgoEntityCallback for CsgoCBaseTriggerHandler {
+    fn notify(&self, entity: &CsgoEntity, _class: &CsgoServerClass, parse_state: &mut CsgoDemoEntityParseState) -> Result<(), SquadOvError> {
+        let min_vec = if let Some(prop) = entity.get_prop("m_vecMins") {
+            if let Some(value) = prop.value.v_vec.as_ref() {
+                value.clone()
+            } else {
+                CsgoVector::default()
+            }
+        } else {
+            CsgoVector::default()
+        };
+
+        let max_vec = if let Some(prop) = entity.get_prop("m_vecMaxs") {
+            if let Some(value) = prop.value.v_vec.as_ref() {
+                value.clone()
+            } else {
+                CsgoVector::default()
+            }
+        } else {
+            CsgoVector::default()
+        };
+
+        parse_state.triggers.insert(entity.id, CsgoBoundingBox{
+            min: min_vec,
+            max: max_vec,
+        });
+
+        parse_state.update_bombsites();
+        Ok(())
+    }
+}
 
 pub struct CsgoDemoParser {}
 
@@ -216,7 +317,15 @@ impl CsgoDemoParser {
         let mut raw_buffer: Vec<u8> = vec![];
         file.read_to_end(&mut raw_buffer)?;
 
-        let mut demo: CsgoDemo = CsgoDemo::default();
+        let mut demo = CsgoDemo::default();
+
+        // Link multiple callbacks for when we receive entities from the demo files.
+        // First thing, detect CCSTeam entities so that we know the appropriate team IDs.
+        {
+            demo.entities.add_entity_callback("CCSTeam", Box::new(CsgoCCSTeamHandler{}));
+            demo.entities.add_entity_callback("CCSPlayerResource", Box::new(CsgoCCSPlayerResourceHandler{}));
+            demo.entities.add_entity_callback("CBaseTrigger", Box::new(CsgoCBaseTriggerHandler{}));
+        }
 
         let mut demo_file = CsgoDemoRawFile::new(&raw_buffer);
         demo_file.read_header(&mut demo)?;
@@ -230,6 +339,7 @@ impl CsgoDemoParser {
         }
 
         demo_file.read_body(&mut demo)?;
+
         Ok(demo)
     }
 
