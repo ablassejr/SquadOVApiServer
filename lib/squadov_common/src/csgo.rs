@@ -6,3 +6,4 @@ pub mod prop;
 pub mod prop_types;
 pub mod math;
 pub mod weapon;
+pub mod gsi;

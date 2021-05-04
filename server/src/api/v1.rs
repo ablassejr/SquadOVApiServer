@@ -13,6 +13,7 @@ mod tft;
 mod oauth;
 mod features;
 mod analytics;
+mod csgo;
 
 pub use user::*;
 pub use matches::*;
@@ -29,6 +30,7 @@ pub use tft::*;
 pub use oauth::*;
 pub use features::*;
 pub use analytics::*;
+pub use csgo::*;
 
 use serde::Serialize;
 

@@ -594,6 +594,38 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         )
                 )
                 .service(
+                    web::scope("/csgo")
+                        .service(
+                            web::scope("/user/{user_id}")
+                                .wrap(access::ApiAccess::new(
+                                    Box::new(access::UserSpecificAccessChecker{
+                                        obtainer: access::UserIdPathSetObtainer{
+                                            key: "user_id"
+                                        },
+                                    }),
+                                ).verb_override(
+                                    "GET",
+                                    Box::new(access::SameSquadAccessChecker{
+                                        obtainer: access::UserIdPathSetObtainer{
+                                            key: "user_id"
+                                        },
+                                    })
+                                ))
+                                .service(
+                                    web::scope("/view")
+                                        .route("", web::post().to(v1::create_csgo_view_for_user_handler))
+                                        .service(
+                                            web::scope("/{view_uuid}")
+                                                .route("", web::post().to(v1::finish_csgo_view_for_user_handler))
+                                                    .data(web::Payload::configure(|cfg| {
+                                                        // Note that we should be submitting GZIP here so this shouldn't get super super large.
+                                                        cfg.limit(5 * 1024 * 1024)
+                                                    }))
+                                        )
+                                )
+                        )
+                )
+                .service(
                     web::scope("/vod")
                         .route("", web::post().to(v1::create_vod_destination_handler))
                         .route("/bulkDelete", web::post().to(v1::bulk_delete_vods_handler))
