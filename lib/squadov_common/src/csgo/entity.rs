@@ -108,7 +108,7 @@ pub struct CsgoEntityScene {
     data_table: Option<Arc<RwLock<CsgoDemoDataTable>>>,
     entities: HashMap<i32, CsgoEntity>,
     // Entity update handler(s).
-    callbacks: HashMap<String, Vec<Box<dyn CsgoEntityCallback>>>,
+    callbacks: HashMap<String, Vec<Box<dyn CsgoEntityCallback + Send + Sync>>>,
     pub parse_state: CsgoDemoEntityParseState,
 }
 
@@ -163,7 +163,7 @@ impl CsgoEntityScene {
         self.data_table = Some(table);
     }
 
-    pub fn add_entity_callback(&mut self, class: &str, cb: Box<dyn CsgoEntityCallback>) {
+    pub fn add_entity_callback(&mut self, class: &str, cb: Box<dyn CsgoEntityCallback + Send + Sync>) {
         if !self.callbacks.contains_key(class) {
             self.callbacks.insert(class.to_string(), vec![]);
         }

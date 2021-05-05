@@ -2,7 +2,9 @@ use actix_web::{web, HttpResponse};
 use crate::api;
 use squadov_common::{
     SquadOvError,
+    SquadOvGames,
     csgo::gsi::CsgoGsiMatchState,
+    csgo::db,
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -35,12 +37,49 @@ pub struct CsgoViewData {
     stop_time: DateTime<Utc>,
     match_state: CsgoGsiMatchState,
     demo: Option<String>,
+    demo_timestamp: Option<DateTime<Utc>>,
 }
 
 pub async fn create_csgo_view_for_user_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<CsgoCreateViewPath>, data: web::Json<CsgoCreateViewData>) -> Result<HttpResponse, SquadOvError> {
-    Err(SquadOvError::NotFound)
+    let mut tx = app.pool.begin().await?;
+    let view = db::create_csgo_view_for_user(&mut tx, path.user_id, &data.server, &data.start_time, &data.map, &data.mode).await?;
+    tx.commit().await?;
+    Ok(HttpResponse::Ok().json(&view))
 }
 
 pub async fn finish_csgo_view_for_user_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<CsgoViewPath>, data: web::Json<CsgoViewData>) -> Result<HttpResponse, SquadOvError> {
-    Err(SquadOvError::NotFound)
+    let view = db::find_csgo_view(&*app.pool, &path.view_uuid).await?;
+
+    for _i in 0i32..2 {
+        let mut tx = app.pool.begin().await?;
+        let match_uuid = match db::find_existing_csgo_match(&*app.pool, &view.game_server, &view.start_time, &data.stop_time).await? {
+            Some(uuid) => uuid,
+            None => {
+                let new_match = app.create_new_match(&mut tx, SquadOvGames::Csgo).await?;
+                match db::create_csgo_match(&mut tx, &new_match.uuid, &view.game_server, &view.start_time, &data.stop_time).await {
+                    Ok(_) => (),
+                    Err(err) => match err {
+                        SquadOvError::Duplicate => {
+                            log::warn!("Caught duplicate CSGO match...retrying!");
+                            continue;
+                        },
+                        _ => return Err(err)
+                    }
+                };
+                new_match.uuid
+            }
+        };
+        db::finish_csgo_view(&mut tx, &path.view_uuid, &match_uuid, &data.stop_time, &data.match_state).await?;
+
+        if let Some(demo) = &data.demo {
+            if let Some(demo_timestamp) = &data.demo_timestamp {
+                app.csgo_itf.request_parse_csgo_demo_from_url(&path.view_uuid, demo, demo_timestamp).await?;
+            }
+        }
+        
+        tx.commit().await?;
+        return Ok(HttpResponse::Ok().json(match_uuid));
+    }
+
+    Err(SquadOvError::InternalError(String::from("Reached CSGO finish view retry threshold.")))
 }

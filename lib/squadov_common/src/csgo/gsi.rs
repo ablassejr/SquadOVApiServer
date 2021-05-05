@@ -5,73 +5,73 @@ use std::collections::HashMap;
 #[derive(Deserialize,Debug)]
 #[serde(rename_all="camelCase")]
 pub struct CsgoGsiWeaponState {
-    name: String,
-    r#type: String,
-    paintkit: String,
+    pub name: String,
+    pub r#type: String,
+    pub paintkit: String,
 }
 
 #[derive(Deserialize,Debug)]
 #[serde(rename_all="camelCase")]
 pub struct CsgoGsiPlayerRoundState {
-    steam_id: String,
-    team: String,
-    weapons: HashMap<i32, CsgoGsiWeaponState>,
-    money: i32,
-    equipment_value: i32,
-    armor: i32,
-    helmet: bool,
+    pub steam_id: String,
+    pub team: String,
+    pub weapons: HashMap<i32, CsgoGsiWeaponState>,
+    pub money: i32,
+    pub equipment_value: i32,
+    pub armor: i32,
+    pub helmet: bool,
 }
 
 #[derive(Deserialize,Debug)]
 #[serde(rename_all="camelCase")]
 pub struct CsgoGsiKillState {
-    timestamp: DateTime<Utc>,
-    killer: Option<String>,
-    victim: Option<String>,
-    assisters: Vec<String>,
-    weapon: Option<String>,
-    headshot: Option<bool>,
-    flashed: Option<bool>,
-    smoked: Option<bool>,
+    pub timestamp: DateTime<Utc>,
+    pub killer: Option<String>,
+    pub victim: Option<String>,
+    pub assisters: Vec<String>,
+    pub weapon: Option<String>,
+    pub headshot: Option<bool>,
+    pub flashed: Option<bool>,
+    pub smoked: Option<bool>,
 }
 
 #[derive(Deserialize,Debug)]
 #[serde(rename_all="camelCase")]
 pub struct CsgoGsiPlayerState {
-    round_num: i32,
-    winning_team: Option<String>,
-    round_win_method: Option<String>,
-    players: HashMap<String, CsgoGsiPlayerRoundState>,
-    kills: Vec<CsgoGsiKillState>,
-    buy_time: Option<DateTime<Utc>>,
-    play_time: Option<DateTime<Utc>>,
-    bomb_plant_time: Option<DateTime<Utc>>,
-    bomb_next_time: Option<DateTime<Utc>>,
-    round_end_time: Option<DateTime<Utc>>,
+    pub kills: i32,
+    pub deaths: i32,
+    pub assists: i32,
+    pub mvps: i32,
+    pub score: i32,
+    pub name: String,
+    pub steam_id: String,
 }
 
 #[derive(Deserialize,Debug)]
 #[serde(rename_all="camelCase")]
 pub struct CsgoGsiRoundState {
-    kills: i32,
-    deaths: i32,
-    assists: i32,
-    mvps: i32,
-    score: i32,
-    name: String,
-    steam_id: String,
+    pub round_num: i32,
+    pub winning_team: Option<String>,
+    pub round_win_method: Option<String>,
+    pub players: HashMap<String, CsgoGsiPlayerRoundState>,
+    pub kills: Vec<CsgoGsiKillState>,
+    pub buy_time: Option<DateTime<Utc>>,
+    pub play_time: Option<DateTime<Utc>>,
+    pub bomb_plant_time: Option<DateTime<Utc>>,
+    pub bomb_next_time: Option<DateTime<Utc>>,
+    pub round_end_time: Option<DateTime<Utc>>,
 }
 
 #[derive(Deserialize,Debug)]
 #[serde(rename_all="camelCase")]
 pub struct CsgoGsiMatchState {
-    map: String,
-    mode: String,
-    winner: Option<String>,
-    connected_server: Option<String>,
-    warmup_start: Option<DateTime<Utc>>,
-    start: Option<DateTime<Utc>>,
-    end: Option<DateTime<Utc>>,
-    rounds: HashMap<i32, CsgoGsiRoundState>,
-    players: HashMap<String, CsgoGsiPlayerState>,
+    pub map: String,
+    pub mode: String,
+    pub winner: Option<String>,
+    pub connected_server: Option<String>,
+    pub warmup_start: Option<DateTime<Utc>>,
+    pub start: Option<DateTime<Utc>>,
+    pub end: Option<DateTime<Utc>>,
+    pub rounds: HashMap<i32, CsgoGsiRoundState>,
+    pub players: HashMap<String, CsgoGsiPlayerState>,
 }

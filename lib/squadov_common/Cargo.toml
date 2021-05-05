@@ -53,6 +53,7 @@ tempfile = "3.1.0"
 nom = "6"
 funty = "=1.1.0"
 bitvec = "0.19.4"
+bzip2 = "0.4"
 
 [build-dependencies]
 prost-build = "0.7.0"

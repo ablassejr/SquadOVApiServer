@@ -39,6 +39,8 @@ pub struct RabbitMqConfig {
     pub tft_queue: String,
     pub enable_vod: bool,
     pub vod_queue: String,
+    pub enable_csgo: bool,
+    pub csgo_queue: String,
 }
 
 #[async_trait]

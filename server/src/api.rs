@@ -30,7 +30,8 @@ use squadov_common::{
         VodManager,
         GCSVodManager,
         FilesystemVodManager,
-    }
+    },
+    csgo::rabbitmq::CsgoRabbitmqInterface
 };
 use url::Url;
 use std::vec::Vec;
@@ -178,6 +179,7 @@ pub struct ApiApplication {
     pub tft_itf: Arc<RiotApiApplicationInterface>,
     pub email: Arc<EmailClient>,
     pub vod_itf: Arc<VodProcessingInterface>,
+    pub csgo_itf: Arc<CsgoRabbitmqInterface>,
 }
 
 impl ApiApplication {
@@ -224,6 +226,7 @@ impl ApiApplication {
         let valorant_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, valorant_api.clone(), rabbitmq.clone(), pool.clone()));
         let lol_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, lol_api.clone(), rabbitmq.clone(), pool.clone()));
         let tft_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, tft_api.clone(), rabbitmq.clone(), pool.clone()));
+        let csgo_itf = Arc::new(CsgoRabbitmqInterface::new(&config.rabbitmq, rabbitmq.clone(), pool.clone()));
 
         if !disable_rabbitmq {
             if config.rabbitmq.enable_rso {
@@ -240,6 +243,10 @@ impl ApiApplication {
 
             if config.rabbitmq.enable_tft {
                 RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.tft_queue.clone(), tft_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
+            }
+
+            if config.rabbitmq.enable_csgo {
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.csgo_queue.clone(), csgo_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
             }
         }
 
@@ -275,6 +282,7 @@ impl ApiApplication {
             tft_itf,
             email: Arc::new(EmailClient::new(&config.email)),
             vod_itf,
+            csgo_itf,
         }
     }
 }

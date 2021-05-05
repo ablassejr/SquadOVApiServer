@@ -178,7 +178,8 @@ where
                     .fetch_one(ex)
                     .await?
                     .exists,
-            SquadOvGames::Unknown => false 
+            SquadOvGames::Csgo => false,
+            SquadOvGames::Unknown => false,
         }   
     )
 }

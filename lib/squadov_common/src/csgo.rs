@@ -7,3 +7,6 @@ pub mod prop_types;
 pub mod math;
 pub mod weapon;
 pub mod gsi;
+pub mod db;
+pub mod schema;
+pub mod rabbitmq;

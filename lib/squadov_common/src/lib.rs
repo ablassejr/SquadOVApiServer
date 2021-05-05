@@ -32,6 +32,7 @@ pub mod encrypt;
 pub mod http;
 pub mod csgo;
 pub mod math;
+pub mod steam;
 
 pub use error::*;
 pub use parse::*;

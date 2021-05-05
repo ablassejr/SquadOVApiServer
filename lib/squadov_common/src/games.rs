@@ -10,5 +10,6 @@ pub enum SquadOvGames {
     TeamfightTactics,
     Valorant,
     WorldOfWarcraft,
+    Csgo,
     Unknown,
 }

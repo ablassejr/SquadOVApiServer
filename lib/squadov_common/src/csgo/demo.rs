@@ -31,6 +31,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::{RwLock, Arc};
 use num_enum::TryFromPrimitive;
 use std::convert::TryFrom;
+use serde_repr::{Serialize_repr};
 
 const SUBSTRING_BITS: usize = 5;
 const MAX_USERDATA_BITS: usize = 14;
@@ -218,28 +219,31 @@ named!(parse_csgo_demo_packet_message<CsgoDemoPacketMessage>,
     ))
 );
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Serialize_repr)]
+#[repr(i32)]
 pub enum CsgoDemoBombStatus {
     Planted,
     Defused,
     Exploded
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Serialize_repr)]
+#[repr(i32)]
 pub enum CsgoDemoBombSite {
     SiteA,
     SiteB,
     SiteUnknown,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Serialize_repr)]
+#[repr(i32)]
 pub enum CsgoTeam {
     TeamCT,
     TeamT,
     TeamSpectate,
 }
 
-#[derive(Debug, TryFromPrimitive)]
+#[derive(Debug, Clone, Copy, TryFromPrimitive, Serialize_repr)]
 #[repr(i32)]
 pub enum CsgoRoundWin {
     TargetBombed = 1,
@@ -254,12 +258,12 @@ pub enum CsgoRoundWin {
 pub struct CsgoDemoBombState {
     // Bomb 'event' can either be a defusal or an explosion since those two events
     // should be mutually exclusive.
-    bomb_state: CsgoDemoBombStatus,
-    bomb_event_tick: Option<i32>,
-    bomb_event_userid: Option<i32>,
-    bomb_plant_tick: Option<i32>,
-    bomb_plant_userid: Option<i32>,
-    bomb_plant_site: Option<CsgoDemoBombSite>,
+    pub bomb_state: CsgoDemoBombStatus,
+    pub bomb_event_tick: Option<i32>,
+    pub bomb_event_userid: Option<i32>,
+    pub bomb_plant_tick: Option<i32>,
+    pub bomb_plant_userid: Option<i32>,
+    pub bomb_plant_site: Option<CsgoDemoBombSite>,
 }
 
 impl Default for CsgoDemoBombState {
@@ -277,21 +281,21 @@ impl Default for CsgoDemoBombState {
 
 #[derive(Debug)]
 pub struct CsgoDemoKill {
-    tick: i32,
-    victim: i32,
+    pub tick: i32,
+    pub victim: i32,
     // Keeping this an option just in case the player killed themselves...
-    killer: Option<i32>,
-    assister: Option<i32>,
-    flash_assist: bool,
-    headshot: bool,
-    smoke: bool,
-    blind: bool,
-    wallbang: bool,
-    noscope: bool,
-    weapon: CsgoWeapon,
+    pub killer: Option<i32>,
+    pub assister: Option<i32>,
+    pub flash_assist: bool,
+    pub headshot: bool,
+    pub smoke: bool,
+    pub blind: bool,
+    pub wallbang: bool,
+    pub noscope: bool,
+    pub weapon: CsgoWeapon,
 }
 
-#[derive(Debug, TryFromPrimitive)]
+#[derive(Debug, Clone, Copy, TryFromPrimitive, Serialize_repr)]
 #[repr(i32)]
 pub enum CsgoDemoHitGroup {
     Generic = 0,
@@ -307,35 +311,37 @@ pub enum CsgoDemoHitGroup {
 
 #[derive(Debug)]
 pub struct CsgoDemoDamage {
-    tick: i32,
-    attacker: Option<i32>,
-    receiver: i32,
-    remaining_health: i32,
-    remaining_armor: i32,
-    damage_health: i32,
-    damage_armor: i32,
-    weapon: CsgoWeapon,
-    hitgroup: CsgoDemoHitGroup,
+    pub tick: i32,
+    pub attacker: Option<i32>,
+    pub receiver: i32,
+    pub remaining_health: i32,
+    pub remaining_armor: i32,
+    pub damage_health: i32,
+    pub damage_armor: i32,
+    pub weapon: CsgoWeapon,
+    pub hitgroup: CsgoDemoHitGroup,
 }
 
 #[derive(Debug)]
 pub struct CsgoDemoRoundPlayerInfo {
-    kills: i32,
-    deaths: i32,
-    assists: i32,
-    equipment_value: i32,
-    headshot_kills: i32,
-    objective: i32,
-    cash_earned: i32,
-    utility_damage: i32,
-    enemies_flashed: i32,
-    damage: i32,
-    money_saved: i32,
-    kill_reward: i32,
-    weapons: Vec<CsgoWeapon>,
-    armor: i32,
-    has_defuse: bool,
-    has_helmet: bool,
+    pub kills: i32,
+    pub deaths: i32,
+    pub assists: i32,
+    pub equipment_value: i32,
+    pub headshot_kills: i32,
+    pub objective: i32,
+    pub cash_earned: i32,
+    pub utility_damage: i32,
+    pub enemies_flashed: i32,
+    pub damage: i32,
+    pub money_saved: i32,
+    pub kill_reward: i32,
+    pub weapons: Vec<CsgoWeapon>,
+    pub armor: i32,
+    pub has_defuse: bool,
+    pub has_helmet: bool,
+    pub money: i32,
+    pub team: CsgoTeam,
 }
 
 impl Default for CsgoDemoRoundPlayerInfo {
@@ -357,31 +363,33 @@ impl Default for CsgoDemoRoundPlayerInfo {
             armor: 0,
             has_defuse: false,
             has_helmet: false,
+            money: 0,
+            team: CsgoTeam::TeamSpectate,
         }
     }
 }
 
 #[derive(Debug)]
 pub struct CsgoDemoRound {
-    round_num: usize,
+    pub round_num: usize,
     // Time bookmarks.
-    round_start_tick: i32,
+    pub round_start_tick: i32,
     // All these other times are filled in later (after round start).
     // I also don't want to shoe-horn us into only supporting the bomb defusal game mode
     // so freeze end (i.e buy time end) could just not be a thing in those modes.
-    freeze_end_tick: Option<i32>,
-    round_end_tick: Option<i32>,
-    bomb_state: Option<CsgoDemoBombState>,
+    pub freeze_end_tick: Option<i32>,
+    pub round_end_tick: Option<i32>,
+    pub bomb_state: Option<CsgoDemoBombState>,
     // This is the team winner.
-    round_winner: Option<CsgoTeam>,
-    round_win_reason: Option<CsgoRoundWin>,
+    pub round_winner: Option<CsgoTeam>,
+    pub round_win_reason: Option<CsgoRoundWin>,
     // The user who was the "MVP" of this round.
-    round_mvp: Option<i32>,
+    pub round_mvp: Option<i32>,
     // Kills and damage events that happened during this round.
-    kills: Vec<CsgoDemoKill>,
-    damage: Vec<CsgoDemoDamage>,
+    pub kills: Vec<CsgoDemoKill>,
+    pub damage: Vec<CsgoDemoDamage>,
     // Players in this round and their econ/weapons.
-    players: HashMap<i32, CsgoDemoRoundPlayerInfo>,
+    pub players: HashMap<i32, CsgoDemoRoundPlayerInfo>,
 }
 
 impl Default for CsgoDemoRound {
@@ -441,8 +449,8 @@ pub struct CsgoDemoStringTable {
 pub struct CsgoDemoPlayerInfo {
     version: u64,
     // This is the same SteamID that we can find via GSI.
-    xuid: u64,
-    name: String,
+    pub xuid: u64,
+    pub name: String,
     user_id: i32,
     guid: String,
     friends_id: u32,
@@ -500,7 +508,7 @@ pub struct CsgoDemo {
     // These variables are only needed when parsing the demo file for handling
     // more intermediary states.
     string_tables: Vec<CsgoDemoStringTable>,
-    player_info: HashMap<i32, CsgoDemoPlayerInfo>,
+    pub player_info: HashMap<i32, CsgoDemoPlayerInfo>,
     model_precache: HashMap<i32, String>,
     pub entities: CsgoEntityScene,
 }
@@ -842,6 +850,21 @@ impl CsgoDemo {
 
                                 if let Some(helmet_prop) = player_entity.get_prop("m_bHasHelmet") {
                                     player_round_info.has_helmet = helmet_prop.value.v_i32.unwrap_or(0) != 0;
+                                }
+
+                                if let Some(team_prop) = player_entity.get_prop("m_iTeamNum") {
+                                    let team_id = team_prop.value.v_i32.unwrap_or(-1);
+                                    player_round_info.team = if team_id == self.entities.parse_state.ct_id {
+                                        CsgoTeam::TeamCT
+                                    } else if team_id == self.entities.parse_state.terrorist_id {
+                                        CsgoTeam::TeamT
+                                    } else {
+                                        CsgoTeam::TeamSpectate
+                                    };
+                                }
+
+                                if let Some(account_prop) = player_entity.get_prop("m_iAccount") {
+                                    player_round_info.money = account_prop.value.v_i32.unwrap_or(0);
                                 }
                             }
                         }

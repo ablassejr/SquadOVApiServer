@@ -313,7 +313,7 @@ pub struct CsgoDemoParser {}
 // Largely based off Valve's CSGO demo parser:
 // https://github.com/ValveSoftware/csgo-demoinfo
 impl CsgoDemoParser {
-    fn from_file(file: &mut std::fs::File) -> Result<CsgoDemo, SquadOvError> {
+    pub fn from_file(file: &mut std::fs::File) -> Result<CsgoDemo, SquadOvError> {
         let mut raw_buffer: Vec<u8> = vec![];
         file.read_to_end(&mut raw_buffer)?;
 

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX ON csgo_event_container(view_uuid, event_source);

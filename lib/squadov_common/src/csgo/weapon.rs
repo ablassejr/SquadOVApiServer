@@ -1,4 +1,6 @@
-#[derive(Debug, Clone)]
+use serde_repr::Serialize_repr;
+
+#[derive(Debug, Clone, Copy, Serialize_repr)]
 #[repr(i32)]
 pub enum CsgoWeapon {
     Unknown,
@@ -59,6 +61,8 @@ pub fn csgo_string_to_weapon(class: &str) -> CsgoWeapon {
         csgo_string_to_weapon(test_class.strip_prefix("cweapon").unwrap())
     } else if test_class.contains("knife") {
         CsgoWeapon::Knife
+    } else if test_class.starts_with("weapon_") {
+        csgo_string_to_weapon(test_class.strip_prefix("weapon_").unwrap())
     } else {
         match test_class.as_str() {
             // Grenades
