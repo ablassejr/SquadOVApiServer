@@ -313,10 +313,7 @@ pub struct CsgoDemoParser {}
 // Largely based off Valve's CSGO demo parser:
 // https://github.com/ValveSoftware/csgo-demoinfo
 impl CsgoDemoParser {
-    pub fn from_file(file: &mut std::fs::File) -> Result<CsgoDemo, SquadOvError> {
-        let mut raw_buffer: Vec<u8> = vec![];
-        file.read_to_end(&mut raw_buffer)?;
-
+    pub fn from_bytes(raw_buffer: &[u8]) -> Result<CsgoDemo, SquadOvError> {
         let mut demo = CsgoDemo::default();
 
         // Link multiple callbacks for when we receive entities from the demo files.
@@ -327,7 +324,7 @@ impl CsgoDemoParser {
             demo.entities.add_entity_callback("CBaseTrigger", Box::new(CsgoCBaseTriggerHandler{}));
         }
 
-        let mut demo_file = CsgoDemoRawFile::new(&raw_buffer);
+        let mut demo_file = CsgoDemoRawFile::new(raw_buffer);
         demo_file.read_header(&mut demo)?;
         // Verify that we actually read a valid CS:GO demo.
         if demo.header.demo_filestamp != DEMO_HEADER_ID {
@@ -341,6 +338,12 @@ impl CsgoDemoParser {
         demo_file.read_body(&mut demo)?;
 
         Ok(demo)
+    }
+
+    pub fn from_file(file: &mut std::fs::File) -> Result<CsgoDemo, SquadOvError> {
+        let mut raw_buffer: Vec<u8> = vec![];
+        file.read_to_end(&mut raw_buffer)?;
+        Ok(CsgoDemoParser::from_bytes(&raw_buffer)?)
     }
 
     pub fn from_path(path: &Path) -> Result<CsgoDemo, SquadOvError> {

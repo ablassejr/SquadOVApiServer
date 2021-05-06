@@ -5,6 +5,7 @@ use squadov_common::{
     SquadOvGames,
     csgo::gsi::CsgoGsiMatchState,
     csgo::db,
+    steam
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -35,7 +36,8 @@ pub struct CsgoViewPath {
 #[serde(rename_all="camelCase")]
 pub struct CsgoViewData {
     stop_time: DateTime<Utc>,
-    match_state: CsgoGsiMatchState,
+    data: CsgoGsiMatchState,
+    local_steam_id: i64,
     demo: Option<String>,
     demo_timestamp: Option<DateTime<Utc>>,
 }
@@ -69,7 +71,8 @@ pub async fn finish_csgo_view_for_user_handler(app : web::Data<Arc<api::ApiAppli
                 new_match.uuid
             }
         };
-        db::finish_csgo_view(&mut tx, &path.view_uuid, &match_uuid, &data.stop_time, &data.match_state).await?;
+        db::finish_csgo_view(&mut tx, &path.view_uuid, &match_uuid, &data.stop_time, &data.data).await?;
+        steam::link_steam_id_to_user(&mut tx, data.local_steam_id, path.user_id).await?;
 
         if let Some(demo) = &data.demo {
             if let Some(demo_timestamp) = &data.demo_timestamp {

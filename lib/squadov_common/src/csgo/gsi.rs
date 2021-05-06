@@ -15,7 +15,7 @@ pub struct CsgoGsiWeaponState {
 pub struct CsgoGsiPlayerRoundState {
     pub steam_id: String,
     pub team: String,
-    pub weapons: HashMap<i32, CsgoGsiWeaponState>,
+    pub weapons: Vec<CsgoGsiWeaponState>,
     pub money: i32,
     pub equipment_value: i32,
     pub armor: i32,
@@ -72,6 +72,6 @@ pub struct CsgoGsiMatchState {
     pub warmup_start: Option<DateTime<Utc>>,
     pub start: Option<DateTime<Utc>>,
     pub end: Option<DateTime<Utc>>,
-    pub rounds: HashMap<i32, CsgoGsiRoundState>,
+    pub rounds: Vec<CsgoGsiRoundState>,
     pub players: HashMap<String, CsgoGsiPlayerState>,
 }

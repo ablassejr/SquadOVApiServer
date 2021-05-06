@@ -330,11 +330,11 @@ impl CsgoCommonEventContainer {
 
         {
             let mut round_map: HashMap<i32, CsgoCommonRound> = HashMap::new();
-            for (round_num, round) in &gsi.rounds {
+            for round in &gsi.rounds {
                 let round_win_reason: CsgoRoundWin = CsgoRoundWin::TWin;
                 let mut new_round = CsgoCommonRound{
                     container_id: 0,
-                    round_num: *round_num,
+                    round_num: round.round_num,
                     tm_round_start: round.buy_time.clone(),
                     tm_round_play: round.play_time.clone(),
                     tm_round_end: round.round_end_time.clone(),
@@ -367,7 +367,7 @@ impl CsgoCommonEventContainer {
                     if let Some(userid) = steam_id_to_user_id.get(&steamid) {
                         let pround = CsgoCommonRoundPlayerStats{
                             container_id: 0,
-                            round_num: *round_num,
+                            round_num: round.round_num,
                             user_id: *userid,
                             kills: 0,
                             deaths: 0,
@@ -383,7 +383,7 @@ impl CsgoCommonEventContainer {
                             has_defuse: None,
                             has_helmet: Some(p.helmet),
                             team: csgo_gsi_team_to_common(&p.team),
-                            weapons: p.weapons.values().map(|x| {
+                            weapons: p.weapons.iter().map(|x| {
                                 csgo_string_to_weapon(&x.name)
                             }).collect(),
                         };
@@ -394,7 +394,7 @@ impl CsgoCommonEventContainer {
                 for k in &round.kills {
                     let mut base_kill = CsgoCommonRoundKill{
                         container_id: 0,
-                        round_num: *round_num,
+                        round_num: round.round_num,
                         tm: k.timestamp.clone(),
                         victim: None,
                         killer: None,
@@ -436,7 +436,7 @@ impl CsgoCommonEventContainer {
                 }
 
                 new_round.player_stats = round_player_stats.into_iter().map(|(_id, v)| { v }).collect();
-                round_map.insert(*round_num, new_round);
+                round_map.insert(round.round_num, new_round);
             }
             ret.rounds = round_map.into_iter().map(|(_id, v)| { v }).collect();
         }

@@ -312,14 +312,6 @@ impl CsgoDemoDataTable {
             // Nothing really jumps out to me as to why we can't flatten the data table stuff early here
             // since all the data tables have been added already.
             dt.flatten_data_table(&mut entry)?;
-
-            if entry.name == "CCSPlayer" {
-                log::info!("CSGO CLASS: {}", entry.name);
-                log::info!("--- PROPS ---");
-                for p in &entry.props {
-                    log::info!("\t{} [type: {}]", p.full_name(), p.prop.get().unwrap().r#type());
-                }
-            }
             dt.classes.insert(entry.class_id, entry);
         }
 

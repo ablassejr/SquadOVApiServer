@@ -133,6 +133,12 @@ impl RabbitMqConnectionBundle {
                 default_table.clone(),
             ).await?;
 
+            ch.queue_declare(
+                &config.csgo_queue,
+                queue_opts.clone(),
+                default_table.clone(),
+            ).await?;
+
             channels.push(ch);
         }
 

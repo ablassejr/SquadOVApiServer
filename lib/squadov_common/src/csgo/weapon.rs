@@ -1,6 +1,7 @@
 use serde_repr::Serialize_repr;
+use num_enum::TryFromPrimitive;
 
-#[derive(Debug, Clone, Copy, Serialize_repr)]
+#[derive(Debug, Clone, Copy, Serialize_repr, TryFromPrimitive)]
 #[repr(i32)]
 pub enum CsgoWeapon {
     Unknown,

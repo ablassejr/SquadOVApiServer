@@ -10,7 +10,7 @@ use crate::{
 };
 use sqlx::postgres::{PgPool};
 use serde::{Serialize, Deserialize};
-use std::io::{Read, Write};
+use std::io::{Read};
 use uuid::Uuid;
 use bzip2::read::BzDecoder;
 use chrono::{DateTime, Utc};
@@ -49,28 +49,27 @@ impl CsgoRabbitmqInterface {
         Ok(())
     }
 
-    pub async fn parse_csgo_demo_from_local_file(&self, view_uuid: &Uuid, timestamp: &DateTime<Utc>, mut file: std::fs::File) -> Result<(), SquadOvError> {
+    pub async fn parse_csgo_demo_from_bytes(&self, view_uuid: &Uuid, timestamp: &DateTime<Utc>, bytes: &[u8]) -> Result<(), SquadOvError> {
         log::info!("Parsing CSGO demo for View: {}", view_uuid);
-        let demo = CsgoDemoParser::from_file(&mut file)?;
+        let demo = CsgoDemoParser::from_bytes(bytes)?;
+        log::info!("...Finished parsing CSGO demo.");
         let mut tx = self.db.begin().await?;
         db::store_csgo_demo_events_for_view(&mut tx, view_uuid, &demo, timestamp).await?;
+        log::info!("...Store CSGO demo in database.");
         tx.commit().await?;
         Ok(())
     }
 
-    pub async fn parse_csgo_demo_from_compressed_local_file(&self, view_uuid: &Uuid, timestamp: &DateTime<Utc>, file: std::fs::File, og_url: &str) -> Result<(), SquadOvError> {
+    pub async fn parse_csgo_demo_from_compressed_local_file(&self, view_uuid: &Uuid, timestamp: &DateTime<Utc>, bytes: &[u8], og_url: &str) -> Result<(), SquadOvError> {
         // Assume that the extension of the demo URL contains the way it was compressed.
         if og_url.ends_with(".dem") {
-            self.parse_csgo_demo_from_local_file(view_uuid, timestamp, file).await?;
+            self.parse_csgo_demo_from_bytes(view_uuid, timestamp, bytes).await?;
         } else if og_url.ends_with(".bz2") {
-            let mut uncompressed_file = tempfile::tempfile()?;
-            {
-                let mut decoder = BzDecoder::new(file);
-                let mut buffer: Vec<u8> = vec![];
-                decoder.read_to_end(&mut buffer)?;
-                uncompressed_file.write_all(&buffer)?;
-            }
-            self.parse_csgo_demo_from_local_file(view_uuid, timestamp, uncompressed_file).await?;
+            log::info!("Uncompress BZ2 CSGO demo...");
+            let mut decoder = BzDecoder::new(bytes);
+            let mut buffer: Vec<u8> = vec![];
+            decoder.read_to_end(&mut buffer)?;
+            self.parse_csgo_demo_from_bytes(view_uuid, timestamp, &buffer).await?;
         } else {
             log::warn!("Failed to recognize CSGO demo compression time: {}", og_url);
             return Err(SquadOvError::BadRequest);
@@ -80,10 +79,8 @@ impl CsgoRabbitmqInterface {
 
     pub async fn parse_csgo_demo_from_url(&self, view_uuid: &Uuid, timestamp: &DateTime<Utc>, demo_url: &str) -> Result<(), SquadOvError> {
         let resp = reqwest::get(demo_url).await?;
-        let mut compressed_file = tempfile::tempfile()?;
         let body = resp.bytes().await?;
-        compressed_file.write_all(&body)?;
-        self.parse_csgo_demo_from_compressed_local_file(view_uuid, timestamp, compressed_file, demo_url).await?;
+        self.parse_csgo_demo_from_compressed_local_file(view_uuid, timestamp, &body, demo_url).await?;
         Ok(())
     }
 }

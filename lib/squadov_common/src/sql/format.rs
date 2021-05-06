@@ -8,6 +8,14 @@ pub fn sql_format_bool(v: bool) -> &'static str {
     }
 }
 
+pub fn sql_format_option_bool(v: Option<bool>) -> &'static str {
+    if let Some(b) = v {
+        sql_format_bool(b)
+    } else {
+        "NULL"
+    }
+}
+
 pub fn sql_format_string(v: &str) -> String {
     format!("'{}'", v.replace("'", "''"))
 }
