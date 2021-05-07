@@ -6,10 +6,33 @@ use crate::csgo::{
     summary::CsgoPlayerMatchSummary,
 };
 use crate::matches::MatchPlayerPair;
-use sqlx::{Transaction, Executor, Postgres};
+use sqlx::{PgPool, Transaction, Executor, Postgres};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 use std::collections::HashSet;
+
+pub async fn list_csgo_match_summaries_for_user(ex: &PgPool, user_id: i64, start: i64, end: i64) -> Result<Vec<CsgoPlayerMatchSummary>, SquadOvError> {
+    let uuids: Vec<MatchPlayerPair> = sqlx::query_as!(
+        MatchPlayerPair,
+        r#"
+            SELECT cmv.match_uuid AS "match_uuid!", u.uuid AS "player_uuid!"
+            FROM squadov.csgo_match_views AS cmv
+            INNER JOIN squadov.users AS u
+                ON u.id = cmv.user_id
+            WHERE cmv.user_id = $1
+            ORDER BY cmv.start_time DESC
+            LIMIT $2 OFFSET $3
+        "#,
+        user_id,
+        end - start,
+        start
+    )
+        .fetch_all(&*ex)
+        .await?;
+
+    list_csgo_match_summaries_for_uuids(ex, &uuids).await
+}
+
 
 pub async fn list_csgo_match_summaries_for_uuids<'a, T>(ex: T, uuids: &[MatchPlayerPair]) -> Result<Vec<CsgoPlayerMatchSummary>, SquadOvError>
 where
@@ -38,7 +61,7 @@ where
                 (COUNT(crd.*) FILTER(WHERE crd.hitgroup = 1))::INTEGER AS "headshots!",
                 (COUNT(crd.*) FILTER(WHERE crd.hitgroup >= 2 OR crd.hitgroup <= 5))::INTEGER AS "bodyshots!",
                 (COUNT(crd.*) FILTER(WHERE crd.hitgroup > 5))::INTEGER AS "legshots!",
-                COALESCE(((SUM(crd.damage_health) + SUM(crd.damage_armor))::DOUBLE PRECISION / (winner.last_round+1)::DOUBLE PRECISION), 0.0) AS "damage_per_round!",
+                COALESCE(((SUM(crd.damage_health))::DOUBLE PRECISION / (winner.last_round+1)::DOUBLE PRECISION), 0.0) AS "damage_per_round!",
                 (rounds.win)::INTEGER AS "friendly_rounds!",
                 (rounds.lost)::INTEGER AS "enemy_rounds!"
             FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)
@@ -103,6 +126,7 @@ where
                 cec.event_source,
                 rounds.win,
                 rounds.lost
+            ORDER BY cmv.start_time DESC
             "#,
             &match_uuids,
             &player_uuids,
