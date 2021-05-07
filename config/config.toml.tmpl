@@ -113,6 +113,8 @@ enable_vod = true
 vod_queue = "squadov_vods"
 enable_csgo = true
 csgo_queue = "csgo_rmq"
+enable_steam = true
+steam_queue = "steam_api"
 
 [email]
 postmark_api_key = "${POSTMARK_API_KEY}"
@@ -124,3 +126,8 @@ app_url = "https://app.${DEPLOYMENT_DOMAIN}"
 landing_url = "https://${DEPLOYMENT_DOMAIN}"
 invite_key = "${INVITE_HMAC_KEY}"
 share_key = "${SHARE_ENCRYPTION_KEY}"
+
+[steam]
+api_key = "${STEAM_API_KEY}"
+requests = 100000
+seconds = 86400

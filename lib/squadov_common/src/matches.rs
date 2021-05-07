@@ -15,6 +15,7 @@ use crate::{
         WoWChallenge,
         WoWArena,
     },
+    csgo::summary::CsgoPlayerMatchSummary,
 };
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -69,6 +70,7 @@ pub struct RecentMatch {
     pub wow_challenge: Option<WoWChallenge>,
     pub wow_encounter: Option<WoWEncounter>,
     pub wow_arena: Option<WoWArena>,
+    pub csgo_match: Option<CsgoPlayerMatchSummary>,
 }
 
 pub async fn is_user_in_match<'a, T>(ex: T, user_id: i64, match_uuid: &Uuid, game: SquadOvGames) -> Result<bool, SquadOvError>

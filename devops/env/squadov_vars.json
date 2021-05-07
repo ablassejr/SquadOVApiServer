@@ -45,6 +45,7 @@
 	"NUCLEUS_SESSION_SECRET": "ENC[AES256_GCM,data:ONb1XXuQzkl0uG6rTGTmcNbtNLs=,iv:DO2QMTyoAVeiFu+tcIhXpCQtQOmGHI27p1JZDLuObxU=,tag:sIRDS87Cq/b8kouk4J9vUg==,type:str]",
 	"AWS_ACCESS_KEY_ID": "ENC[AES256_GCM,data:2JDfgEWXy2u/V+UoT4VSQ06E/48=,iv:iduAmQZM6rmPbJajRYdrBZFiQRO3ZsNu38FHmsA3J/I=,tag:uE5qh8EWSJt9nNPbSg/WeQ==,type:str]",
 	"AWS_SECRET_ACCESS_KEY": "ENC[AES256_GCM,data:HvFfzlUWfOu2drJ0nxnnQoF/eRIxHLpi5/lFVJVElw3dpEfxJcFhhQ==,iv:S+duHcLwhCicfdtThHabujI4tO7+TbAKuN7c0aX5YJo=,tag:dUFtY4cX0r4Of21ywWlQyQ==,type:str]",
+	"STEAM_API_KEY": "ENC[AES256_GCM,data:Mr/REdXPUJIfeH7ww9qnMNSMYIrBf3ybd0ZkqwGb67Y=,iv:YEuQOFVaNViiwFVfb6iv7FKc9OWHiB5JidN3J2osuz4=,tag:ZZay+ibfrjrZXKItPhj2Zg==,type:str]",
 	"sops": {
 		"kms": null,
 		"gcp_kms": [
@@ -56,8 +57,8 @@
 		],
 		"azure_kv": null,
 		"hc_vault": null,
-		"lastmodified": "2021-04-19T23:43:54Z",
-		"mac": "ENC[AES256_GCM,data:GZeDqmJqSlntvY9NQMi2lKyA50Cda6m6IB3e7xQK50j21sZK2PF0TK1Gtkdj11Reb1BNMyFCjEIuN/XBCAWJR/mShBT2bs8EXbnvST6/CODKfD9zLoHZK50aRz0umGtONguhYafNgC+9Vy/xxAjzTBytVWzUJXEPx2uquQKigFY=,iv:jFqvS4pBdcRSuvL/feXnGAX3BbCSNZRbQiU7RMBCsZE=,tag:Eo55P1WtHqBtKyH6xBN77A==,type:str]",
+		"lastmodified": "2021-05-06T16:50:26Z",
+		"mac": "ENC[AES256_GCM,data:TVKGuS2883RamnskaRbUUi9+fgbyBh/rKxlrd/m4qwxe5lWsVIQBVczHrTEMNrFzH36SqIWASPDmpRip2DcBVHS7PBcBRA0O9D+Kq+lSOqC44w1j2PWJJBrWLFGFvQQ+xRgO5fkE0CURphzFe2aC9NhnMq2eZo5E09vepEcrH5I=,iv:cmyxauTYDNEecsqnJ/PAWIcq9APMyBOsG9ZaHD/lTc0=,tag:Ze0r3ayfvn0+zVRlPIwVzg==,type:str]",
 		"pgp": null,
 		"unencrypted_suffix": "_unencrypted",
 		"version": "3.6.1"

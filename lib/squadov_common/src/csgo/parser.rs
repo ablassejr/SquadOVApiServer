@@ -233,7 +233,7 @@ impl CsgoEntityCallback for CsgoCCSTeamHandler {
             ""
         };
 
-        let team_num = if let Some(prop_team_num) = entity.get_prop("") {
+        let team_num = if let Some(prop_team_num) = entity.get_prop("m_iTeamNum") {
             prop_team_num.value.v_i32.unwrap_or(-1)
         } else {
             -1
@@ -278,7 +278,7 @@ struct CsgoCBaseTriggerHandler {
 
 impl CsgoEntityCallback for CsgoCBaseTriggerHandler {
     fn notify(&self, entity: &CsgoEntity, _class: &CsgoServerClass, parse_state: &mut CsgoDemoEntityParseState) -> Result<(), SquadOvError> {
-        let min_vec = if let Some(prop) = entity.get_prop("m_vecMins") {
+        let min_vec = if let Some(prop) = entity.get_prop("m_Collision.m_vecMins") {
             if let Some(value) = prop.value.v_vec.as_ref() {
                 value.clone()
             } else {
@@ -288,7 +288,7 @@ impl CsgoEntityCallback for CsgoCBaseTriggerHandler {
             CsgoVector::default()
         };
 
-        let max_vec = if let Some(prop) = entity.get_prop("m_vecMaxs") {
+        let max_vec = if let Some(prop) = entity.get_prop("m_Collision.m_vecMaxs") {
             if let Some(value) = prop.value.v_vec.as_ref() {
                 value.clone()
             } else {
@@ -336,7 +336,6 @@ impl CsgoDemoParser {
         }
 
         demo_file.read_body(&mut demo)?;
-
         Ok(demo)
     }
 

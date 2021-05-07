@@ -41,6 +41,8 @@ pub struct RabbitMqConfig {
     pub vod_queue: String,
     pub enable_csgo: bool,
     pub csgo_queue: String,
+    pub enable_steam: bool,
+    pub steam_queue: String,
 }
 
 #[async_trait]
@@ -135,6 +137,12 @@ impl RabbitMqConnectionBundle {
 
             ch.queue_declare(
                 &config.csgo_queue,
+                queue_opts.clone(),
+                default_table.clone(),
+            ).await?;
+
+            ch.queue_declare(
+                &config.steam_queue,
                 queue_opts.clone(),
                 default_table.clone(),
             ).await?;

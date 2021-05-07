@@ -169,6 +169,7 @@ impl CsgoCommonEventContainer {
                 steam_account: SteamAccount{
                     steam_id: player.xuid as i64,
                     name: player.name.clone(),
+                    profile_image_url: None,
                 },
                 kills: 0,
                 deaths: 0,
@@ -314,6 +315,7 @@ impl CsgoCommonEventContainer {
                     steam_account: SteamAccount{
                         steam_id: steamid,
                         name: gsi_player.name.clone(),
+                        profile_image_url: None,
                     },
                     kills: gsi_player.kills,
                     deaths: gsi_player.deaths,

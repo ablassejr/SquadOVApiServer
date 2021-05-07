@@ -7,6 +7,7 @@ use crate::{
         db,
         parser::CsgoDemoParser,
     },
+    steam::rabbitmq::SteamApiRabbitmqInterface,
 };
 use sqlx::postgres::{PgPool};
 use serde::{Serialize, Deserialize};
@@ -29,11 +30,13 @@ pub struct CsgoRabbitmqInterface {
     mqconfig: RabbitMqConfig,
     rmq: Arc<RabbitMqInterface>,
     db: Arc<PgPool>,
+    steam_itf: Arc<SteamApiRabbitmqInterface>,
 }
 
 impl CsgoRabbitmqInterface {
-    pub fn new (mqconfig: &RabbitMqConfig, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>) -> Self {
+    pub fn new (steam_itf: Arc<SteamApiRabbitmqInterface>, mqconfig: &RabbitMqConfig, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>) -> Self {
         Self {
+            steam_itf,
             mqconfig: mqconfig.clone(),
             rmq,
             db,
@@ -53,9 +56,12 @@ impl CsgoRabbitmqInterface {
         log::info!("Parsing CSGO demo for View: {}", view_uuid);
         let demo = CsgoDemoParser::from_bytes(bytes)?;
         log::info!("...Finished parsing CSGO demo.");
+        let steam_ids: Vec<i64> = demo.player_info.values().map(|x| { x.xuid as i64 }).filter(|x| { *x > 0 }).collect();
+        self.steam_itf.request_sync_steam_accounts(&steam_ids).await?;
+        log::info!("...Sent request to sync Steam accounts.");
         let mut tx = self.db.begin().await?;
         db::store_csgo_demo_events_for_view(&mut tx, view_uuid, &demo, timestamp).await?;
-        log::info!("...Store CSGO demo in database.");
+        log::info!("...Finished CSGO demo in database.");
         tx.commit().await?;
         Ok(())
     }

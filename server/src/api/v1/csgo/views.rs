@@ -73,6 +73,7 @@ pub async fn finish_csgo_view_for_user_handler(app : web::Data<Arc<api::ApiAppli
         };
         db::finish_csgo_view(&mut tx, &path.view_uuid, &match_uuid, &data.stop_time, &data.data).await?;
         steam::link_steam_id_to_user(&mut tx, data.local_steam_id, path.user_id).await?;
+        app.steam_itf.request_sync_steam_accounts(&[data.local_steam_id]).await?;
 
         if let Some(demo) = &data.demo {
             if let Some(demo_timestamp) = &data.demo_timestamp {

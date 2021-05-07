@@ -10,7 +10,7 @@ use squadov_common::{
     SquadOvGames,
     matches::{RecentMatch, BaseRecentMatch, MatchPlayerPair},
     aimlab::AimlabTask,
-    riot::db,
+    riot::db as riot_db,
     riot::games::{
         LolPlayerMatchSummary,
         TftPlayerMatchSummary,
@@ -28,6 +28,12 @@ use squadov_common::{
         squadov_decrypt,
     },
     stats::StatPermission,
+    csgo::{
+        db as csgo_db,
+        summary::{
+            CsgoPlayerMatchSummary,
+        },
+    },
 };
 use std::sync::Arc;
 use chrono::{DateTime, Utc, TimeZone};
@@ -62,7 +68,6 @@ pub struct RawRecentMatchData {
     is_watchlist: bool,
     game: SquadOvGames,
 }
-
 
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
@@ -307,7 +312,7 @@ impl api::ApiApplication {
         let mut lol_matches = {
             let recent = filter_recent_match_data_by_game(raw_base_matches, SquadOvGames::LeagueOfLegends);
             if !recent.is_empty() {
-                db::list_lol_match_summaries_for_uuids(&*self.pool, &recent_match_data_uuid_pairs(&recent)).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), LolPlayerMatchSummary>>()
+                riot_db::list_lol_match_summaries_for_uuids(&*self.pool, &recent_match_data_uuid_pairs(&recent)).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), LolPlayerMatchSummary>>()
             } else {
                 HashMap::new()
             }
@@ -340,7 +345,7 @@ impl api::ApiApplication {
         let mut tft_matches = {
             let recent = filter_recent_match_data_by_game(raw_base_matches, SquadOvGames::TeamfightTactics);
             if !recent.is_empty() {
-                db::list_tft_match_summaries_for_uuids(&*self.pool, &recent_match_data_uuid_pairs(&recent))
+                riot_db::list_tft_match_summaries_for_uuids(&*self.pool, &recent_match_data_uuid_pairs(&recent))
                     .await?
                     .into_iter()
                     .map(|x| {
@@ -354,13 +359,27 @@ impl api::ApiApplication {
         let mut valorant_matches = {
             let recent = filter_recent_match_data_by_game(raw_base_matches, SquadOvGames::Valorant);
             if !recent.is_empty() {
-                db::list_valorant_match_summaries_for_uuids(&*self.pool, &recent_match_data_uuid_pairs(&recent))
+                riot_db::list_valorant_match_summaries_for_uuids(&*self.pool, &recent_match_data_uuid_pairs(&recent))
                     .await?
                     .into_iter()
                     .map(|x| {
                         ((x.match_uuid.clone(), x.user_uuid.clone()), x)
                     })
                     .collect::<HashMap<(Uuid, Uuid), ValorantPlayerMatchSummary>>()
+            } else {
+                HashMap::new()
+            }
+        };
+        let mut csgo_matches = {
+            let recent = filter_recent_match_data_by_game(raw_base_matches, SquadOvGames::Csgo);
+            if !recent.is_empty() {
+                csgo_db::list_csgo_match_summaries_for_uuids(&*self.pool, &recent_match_data_uuid_pairs(&recent))
+                    .await?
+                    .into_iter()
+                    .map(|x| {
+                        ((x.match_uuid.clone(), x.user_uuid.clone()), x)
+                    })
+                    .collect::<HashMap<(Uuid, Uuid), CsgoPlayerMatchSummary>>()
             } else {
                 HashMap::new()
             }
@@ -378,6 +397,7 @@ impl api::ApiApplication {
                 let wow_encounter = wow_encounters.remove(&key_pair);
                 let wow_challenge = wow_challenges.remove(&key_pair);
                 let wow_arena = wow_arenas.remove(&key_pair);
+                let csgo_match = csgo_matches.remove(&key_pair);
         
                 Ok(RecentMatch {
                     base: BaseRecentMatch{
@@ -397,6 +417,7 @@ impl api::ApiApplication {
                     wow_challenge,
                     wow_encounter,
                     wow_arena,
+                    csgo_match,
                 })
             }).collect::<Result<Vec<RecentMatch>, SquadOvError>>()?
         )
@@ -461,7 +482,7 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
                 return Err(SquadOvError::Unauthorized);
             }
         } else if qp.0 == "puuid" {
-            if !db::is_riot_puuid_linked_to_user(&*app.pool, session.user.id, &qp.1).await? {
+            if !riot_db::is_riot_puuid_linked_to_user(&*app.pool, session.user.id, &qp.1).await? {
                 return Err(SquadOvError::Unauthorized);
             }
         }

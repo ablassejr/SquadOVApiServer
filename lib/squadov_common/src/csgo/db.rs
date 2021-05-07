@@ -3,10 +3,99 @@ use crate::csgo::{
     demo::CsgoDemo,
     gsi::CsgoGsiMatchState,
     schema::{CsgoView, CsgoCommonEventContainer, CsgoCommonPlayer, CsgoCommonRound},
+    summary::CsgoPlayerMatchSummary,
 };
+use crate::matches::MatchPlayerPair;
 use sqlx::{Transaction, Executor, Postgres};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
+use std::collections::HashSet;
+
+pub async fn list_csgo_match_summaries_for_uuids<'a, T>(ex: T, uuids: &[MatchPlayerPair]) -> Result<Vec<CsgoPlayerMatchSummary>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    let match_uuids = uuids.iter().map(|x| { x.match_uuid.clone() }).collect::<Vec<Uuid>>();
+    let player_uuids = uuids.iter().map(|x| { x.player_uuid.clone() }).collect::<Vec<Uuid>>();
+
+    Ok(
+        sqlx::query_as!(
+            CsgoPlayerMatchSummary,
+            r#"
+            SELECT
+                inp.match_uuid AS "match_uuid!",
+                inp.user_uuid AS "user_uuid!",
+                cmv.map AS "map!",
+                cmv.mode AS "mode!",
+                cmv.start_time AS "match_start_time!",
+                COALESCE(EXTRACT(EPOCH FROM cmv.stop_time - cmv.start_time), 0)::INTEGER AS "match_length_seconds!",
+                cecp.kills AS "kills!",
+                cecp.deaths AS "deaths!",
+                cecp.assists AS "assists!",
+                cecp.mvps AS "mvps!",
+                COALESCE(winner.win, FALSE) AS "winner!",
+                cec.event_source = 1 AS "has_demo!",
+                (COUNT(crd.*) FILTER(WHERE crd.hitgroup = 1))::INTEGER AS "headshots!",
+                (COUNT(crd.*) FILTER(WHERE crd.hitgroup >= 2 OR crd.hitgroup <= 5))::INTEGER AS "bodyshots!",
+                (COUNT(crd.*) FILTER(WHERE crd.hitgroup > 5))::INTEGER AS "legshots!",
+                COALESCE(((SUM(crd.damage_health) + SUM(crd.damage_armor))::DOUBLE PRECISION / (winner.last_round+1)::DOUBLE PRECISION), 0.0) AS "damage_per_round!"
+            FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)
+            INNER JOIN squadov.users AS u
+                ON u.uuid = inp.user_uuid
+            INNER JOIN squadov.csgo_match_views AS cmv
+                ON cmv.match_uuid = inp.match_uuid
+                    AND cmv.user_id = u.id
+            CROSS JOIN LATERAL (
+                SELECT cec.id, cec.event_source
+                FROM squadov.csgo_event_container AS cec
+                WHERE cec.view_uuid = cmv.view_uuid
+                ORDER BY cec.event_source DESC
+                LIMIT 1
+            ) AS cec
+            CROSS JOIN LATERAL (
+                SELECT sul.steam_id
+                FROM squadov.steam_user_links AS sul
+                WHERE sul.user_id = u.id
+                LIMIT 1
+            ) AS sul
+            INNER JOIN squadov.csgo_event_container_players AS cecp
+                ON cecp.container_id = cec.id AND cecp.steam_id = sul.steam_id
+            LEFT JOIN LATERAL (
+                SELECT ccr.winning_team = cps.team, ccr.round_num
+                FROM squadov.csgo_event_container_rounds AS ccr
+                INNER JOIN squadov.csgo_event_container_round_player_stats AS cps
+                    ON cps.container_id = ccr.container_id
+                        AND cps.round_num = ccr.round_num
+                        AND user_id = cecp.user_id
+                WHERE ccr.container_id = cec.id
+                ORDER BY ccr.round_num DESC
+                LIMIT 1
+            ) AS winner(win, last_round) ON TRUE
+            LEFT JOIN squadov.csgo_event_container_round_damage AS crd
+                ON crd.container_id = cec.id
+                    AND crd.attacker = cecp.user_id
+            GROUP BY
+                inp.match_uuid,
+                inp.user_uuid,
+                cmv.map,
+                cmv.mode,
+                cmv.start_time,
+                "match_length_seconds!",
+                cecp.kills,
+                cecp.deaths,
+                cecp.assists,
+                cecp.mvps,
+                winner.win,
+                winner.last_round,
+                cec.event_source
+            "#,
+            &match_uuids,
+            &player_uuids,
+        )
+            .fetch_all(ex)
+            .await?
+    )
+}
 
 pub async fn create_csgo_view_for_user(ex: &mut Transaction<'_, Postgres>, user_id: i64, server: &str, start_time: &DateTime<Utc>, map: &str, mode: &str) -> Result<Uuid, SquadOvError> {
     Ok(
@@ -158,10 +247,12 @@ pub async fn store_csgo_demo_events_for_view(ex: &mut Transaction<'_, Postgres>,
     Ok(())
 }
 
-async fn store_csgo_common_players_for_container(ex: &mut Transaction<'_, Postgres>, container_id: i64, players: &[CsgoCommonPlayer]) -> Result<(), SquadOvError> {
+async fn store_csgo_common_players_for_container(ex: &mut Transaction<'_, Postgres>, container_id: i64, players: &[CsgoCommonPlayer]) -> Result<HashSet<i32>, SquadOvError> {
     if players.is_empty() {
-        return Ok(());
+        return Ok(HashSet::new());
     }
+
+    let mut valid_players: HashSet<i32> = HashSet::new();
 
     // Need to run two SQL statements here. One to insert the
     // players into the Steam account cache. And another to store the player
@@ -189,9 +280,10 @@ async fn store_csgo_common_players_for_container(ex: &mut Transaction<'_, Postgr
         VALUES 
     "));
 
-    let mut added = 0;
+    let mut added: i32 = 0;
     for p in players {
-        if p.steam_account.steam_id != 0 {
+        if p.user_id != 0 && p.steam_account.steam_id != 0 {
+            valid_players.insert(p.user_id);
             container_sql.push(format!("
             (
                 {container_id},
@@ -220,9 +312,9 @@ async fn store_csgo_common_players_for_container(ex: &mut Transaction<'_, Postgr
                 steam_name=crate::sql::sql_format_string(&p.steam_account.name),
             ));
             steam_sql.push(String::from(","));
-        }
 
-        added += 1;
+            added += 1;
+        }
     }
 
     if added > 0 {
@@ -235,10 +327,10 @@ async fn store_csgo_common_players_for_container(ex: &mut Transaction<'_, Postgr
         sqlx::query(&steam_sql.join("")).execute(&mut *ex).await?;
         sqlx::query(&container_sql.join("")).execute(&mut *ex).await?;
     }
-    Ok(())
+    Ok(valid_players)
 }
 
-async fn store_csgo_common_rounds_for_container(ex: &mut Transaction<'_, Postgres>, container_id: i64, rounds: &[CsgoCommonRound]) -> Result<(), SquadOvError> {
+async fn store_csgo_common_rounds_for_container(ex: &mut Transaction<'_, Postgres>, container_id: i64, rounds: &[CsgoCommonRound], valid_players: &HashSet<i32>) -> Result<(), SquadOvError> {
     if rounds.is_empty() {
         return Ok(());
     }
@@ -363,7 +455,7 @@ async fn store_csgo_common_rounds_for_container(ex: &mut Transaction<'_, Postgre
         rounds_sql.push(String::from(","));
 
         for ps in &r.player_stats {
-            if ps.user_id == 0 {
+            if valid_players.contains(&ps.user_id) {
                 round_stats_sql.push(format!("(
                     {container_id},
                     {round_num},
@@ -408,13 +500,13 @@ async fn store_csgo_common_rounds_for_container(ex: &mut Transaction<'_, Postgre
         
         for k in &r.kills {
             if let Some(killer) = k.killer {
-                if killer == 0 {
+                if !valid_players.contains(&killer) {
                     continue;
                 }
             }
 
             if let Some(victim) = k.victim {
-                if victim == 0 {
+                if !valid_players.contains(&victim) {
                     continue;
                 }
             }
@@ -461,12 +553,12 @@ async fn store_csgo_common_rounds_for_container(ex: &mut Transaction<'_, Postgre
         }
 
         for d in &r.damage {
-            if d.receiver == 0 {
+            if !valid_players.contains(&d.receiver) {
                 continue;
             }
 
             if let Some(attacker) = d.attacker {
-                if attacker == 0 {
+                if !valid_players.contains(&attacker) {
                     continue;
                 }
             }
@@ -543,7 +635,7 @@ pub async fn store_csgo_common_events_for_view(ex: &mut Transaction<'_, Postgres
         .await?
         .id;
 
-    store_csgo_common_players_for_container(&mut *ex, event_container_id, &events.players).await?;
-    store_csgo_common_rounds_for_container(&mut *ex, event_container_id, &events.rounds).await?;
+    let valid_players = store_csgo_common_players_for_container(&mut *ex, event_container_id, &events.players).await?;
+    store_csgo_common_rounds_for_container(&mut *ex, event_container_id, &events.rounds, &valid_players).await?;
     Ok(())
 }

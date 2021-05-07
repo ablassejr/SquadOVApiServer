@@ -10,3 +10,4 @@ pub mod gsi;
 pub mod db;
 pub mod schema;
 pub mod rabbitmq;
+pub mod summary;

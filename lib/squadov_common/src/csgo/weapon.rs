@@ -74,7 +74,7 @@ pub fn csgo_string_to_weapon(class: &str) -> CsgoWeapon {
             "cdecoygrenade" | "decoy" | "decoygrenade" => CsgoWeapon::Decoy,
             "cflashbang" | "flashbang" => CsgoWeapon::Flashbang,
             // Other
-            "cc4" => CsgoWeapon::Bomb,
+            "cc4" | "planted_c4" => CsgoWeapon::Bomb,
             "taser" => CsgoWeapon::Taser,
             // Pistols
             "hkp2000" => CsgoWeapon::P2000,

@@ -625,7 +625,7 @@ impl CsgoDemo {
                     };
                     round.round_win_reason = CsgoRoundWin::try_from(msg.remove("reason").ok_or(SquadOvError::NotFound)?.val_byte()).ok();
 
-                    // Pull round end match stats from the player's entity.
+                    // Pull round end match stats from the player's entity if available.
                     for (uid, player) in &self.player_info {
                         if let Some(player_entity) = self.entities.get_entity(player.entity_id) {
                             if let Some(player_round_info) = round.players.get_mut(uid) {
@@ -951,7 +951,10 @@ impl CsgoDemo {
             } else if let Some(raw_user_data) = user_data {
                 if table.name == "userinfo" {
                     let mut player_info = parse_csgo_demo_player_info(&raw_user_data)?.1;
-                    player_info.entity_id = last_entry;
+                    // WHY THE FUCK IS THIS +1 VALVE. In their reference code, they set "last_entry"
+                    // to be the stored player info's entity ID. BUT! In the ShowPlayerInfo function, when they
+                    // go search for the entity using this stored value they add 1. HOLY SHIT.
+                    player_info.entity_id = last_entry + 1;
                     log::debug!("Player Info: {:?}", player_info);
 
                     // Use user_id instead of entity_id because all the events and what not

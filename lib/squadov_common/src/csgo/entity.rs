@@ -223,6 +223,7 @@ impl CsgoEntityScene {
 
             let data_table = self.data_table.as_ref().ok_or(SquadOvError::BadRequest)?.read()?;
             let server_class = data_table.get_server_class_from_id(entity.class as i32).ok_or(SquadOvError::NotFound)?;
+
             for idx in field_indices {
                 let prop_entry = server_class.get_prop(idx as usize).ok_or(SquadOvError::NotFound)?;
                 entity.add_update_prop(CsgoProp::parse(reader, prop_entry)?);
