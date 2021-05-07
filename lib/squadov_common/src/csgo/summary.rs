@@ -21,4 +21,6 @@ pub struct CsgoPlayerMatchSummary {
     pub bodyshots: i32,
     pub legshots: i32,
     pub damage_per_round: f64,
+    pub friendly_rounds: i32,
+    pub enemy_rounds: i32,
 }

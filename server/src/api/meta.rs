@@ -153,6 +153,16 @@ impl api::ApiApplication {
                         x.format("%Y%m%d %H:%M:%S").to_string()
                     }).unwrap_or(String::from("Unknown"))
                 );
+            } else if let Some(csgo_match) = &m.csgo_match {
+                metadata.meta_title = format!(
+                    "CS:GO - {map} - {mode} - {fscore}:{escore} - {win} [{tm}]",
+                    map=&csgo_match.map,
+                    mode=&csgo_match.mode,
+                    fscore=csgo_match.friendly_rounds,
+                    escore=csgo_match.enemy_rounds,
+                    win=if csgo_match.winner { String::from("Win") } else { String::from("Loss") },
+                    tm=csgo_match.match_start_time.format("%Y%m%d %H:%M:%S").to_string(),
+                );
             } else if m.base.game == SquadOvGames::Hearthstone {
                 metadata.meta_title = String::from("Hearthstone Match");
             } else {

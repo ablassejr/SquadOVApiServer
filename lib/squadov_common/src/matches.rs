@@ -180,7 +180,21 @@ where
                     .fetch_one(ex)
                     .await?
                     .exists,
-            SquadOvGames::Csgo => false,
+            SquadOvGames::Csgo =>
+                sqlx::query!(
+                    r#"
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM squadov.csgo_match_views AS cmv
+                        WHERE cmv.user_id = $1 AND cmv.match_uuid = $2
+                    ) as "exists!"
+                    "#,
+                    user_id,
+                    match_uuid,
+                )
+                    .fetch_one(ex)
+                    .await?
+                    .exists,
             SquadOvGames::Unknown => false,
         }   
     )

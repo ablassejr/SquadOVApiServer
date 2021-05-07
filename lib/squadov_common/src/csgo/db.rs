@@ -38,7 +38,9 @@ where
                 (COUNT(crd.*) FILTER(WHERE crd.hitgroup = 1))::INTEGER AS "headshots!",
                 (COUNT(crd.*) FILTER(WHERE crd.hitgroup >= 2 OR crd.hitgroup <= 5))::INTEGER AS "bodyshots!",
                 (COUNT(crd.*) FILTER(WHERE crd.hitgroup > 5))::INTEGER AS "legshots!",
-                COALESCE(((SUM(crd.damage_health) + SUM(crd.damage_armor))::DOUBLE PRECISION / (winner.last_round+1)::DOUBLE PRECISION), 0.0) AS "damage_per_round!"
+                COALESCE(((SUM(crd.damage_health) + SUM(crd.damage_armor))::DOUBLE PRECISION / (winner.last_round+1)::DOUBLE PRECISION), 0.0) AS "damage_per_round!",
+                (rounds.win)::INTEGER AS "friendly_rounds!",
+                (rounds.lost)::INTEGER AS "enemy_rounds!"
             FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)
             INNER JOIN squadov.users AS u
                 ON u.uuid = inp.user_uuid
@@ -71,6 +73,17 @@ where
                 ORDER BY ccr.round_num DESC
                 LIMIT 1
             ) AS winner(win, last_round) ON TRUE
+            CROSS JOIN LATERAL (
+                SELECT
+                    COUNT(crr.round_num) FILTER(WHERE crr.winning_team = cps.team),
+                    COUNT(crr.round_num) FILTER(WHERE crr.winning_team != cps.team)
+                FROM squadov.csgo_event_container_rounds AS crr
+                INNER JOIN squadov.csgo_event_container_round_player_stats AS cps
+                    ON cps.container_id = crr.container_id
+                        AND cps.round_num = crr.round_num
+                WHERE crr.container_id = cec.id
+                    AND cps.user_id = cecp.user_id
+            ) AS rounds(win, lost)
             LEFT JOIN squadov.csgo_event_container_round_damage AS crd
                 ON crd.container_id = cec.id
                     AND crd.attacker = cecp.user_id
@@ -87,7 +100,9 @@ where
                 cecp.mvps,
                 winner.win,
                 winner.last_round,
-                cec.event_source
+                cec.event_source,
+                rounds.win,
+                rounds.lost
             "#,
             &match_uuids,
             &player_uuids,
