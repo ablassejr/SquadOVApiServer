@@ -79,7 +79,7 @@ impl GCPHttpAuthClient {
 
         let claims = GCPJwtClaims{
             iss: self.credentials.client_email.clone(),
-            scope: String::from("https://www.googleapis.com/auth/devstorage.read_write"),
+            scope: String::from("https://www.googleapis.com/auth/devstorage.full_control https://www.googleapis.com/auth/cloud-platform"),
             aud: String::from("https://oauth2.googleapis.com/token"),
             exp: expire_unix_time,
             iat: current_unix_time
@@ -136,7 +136,6 @@ impl GCPHttpAuthClient {
         let mut headers = header::HeaderMap::new();
         let access_token = format!("{} {}", ref_token.token_type, ref_token.access_token);
         headers.insert(header::AUTHORIZATION, header::HeaderValue::from_str(&access_token)?);
-
         Ok(reqwest::ClientBuilder::new()
             .default_headers(headers)
             .timeout(std::time::Duration::from_secs(120))

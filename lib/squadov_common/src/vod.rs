@@ -42,7 +42,7 @@ pub struct VodAssociation {
     #[serde(rename = "isClip")]
     pub is_clip: bool,
     #[serde(rename = "isLocal", default)]
-    pub is_local: bool
+    pub is_local: bool,
 }
 
 #[derive(Serialize,Deserialize,Clone)]
@@ -234,11 +234,12 @@ impl VodProcessingInterface {
         preview::generate_vod_preview(fastify_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &preview_filename).await?;
 
         log::info!("Upload Fastify VOD - {}", vod_uuid);
-        self.vod.upload_vod_from_file(&VodSegmentId{
+        let fastify_segment = VodSegmentId{
             video_uuid: vod_uuid.clone(),
             quality: String::from("source"),
             segment_name: String::from("fastify.mp4"),
-        }, &fastify_filename).await?;
+        };
+        self.vod.upload_vod_from_file(&fastify_segment, &fastify_filename).await?;
 
         log::info!("Upload Preview VOD - {}", vod_uuid);
         self.vod.upload_vod_from_file(&VodSegmentId{
@@ -260,6 +261,12 @@ impl VodProcessingInterface {
             Ok(()) => (),
             Err(err) => log::warn!("Failed to delete source VOD: {}", err),
         };
+
+        log::info!("Check if VOD is Public - {}", vod_uuid);
+        if db::check_if_vod_public(&*self.db, vod_uuid).await? {
+            log::info!("Setting Fastify as Public - {}", vod_uuid);
+            self.vod.make_segment_public(&fastify_segment).await?;
+        }
 
         log::info!("Finish Fastifying {:?}", vod_uuid);
         Ok(())

@@ -157,4 +157,21 @@ impl VodManager for GCSVodManager {
         let client = self.get_gcp_client().gcs();
         Ok(client.delete_object(&self.bucket, &fname).await?)
     }
+
+    async fn get_public_segment_redirect_uri(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
+        let fname = self.get_fname_from_segment_id(segment);
+        Ok(
+            format!(
+                "https://storage.googleapis.com/{}/{}",
+                self.bucket,
+                fname
+            )
+        )
+    }
+
+    async fn make_segment_public(&self, segment: &VodSegmentId) -> Result<(), SquadOvError> {
+        let fname = self.get_fname_from_segment_id(segment);
+        let client = self.get_gcp_client().gcs();
+        Ok(client.set_object_public_acl(&self.bucket, &fname).await?)
+    }
 }

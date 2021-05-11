@@ -3,6 +3,36 @@ use crate::vod::VodAssociation;
 use sqlx::{Executor, Transaction, Postgres};
 use uuid::Uuid;
 
+pub async fn check_if_vod_public<'a, T>(ex: T, video_uuid: &Uuid) -> Result<bool, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM squadov.share_tokens AS st
+                WHERE st.clip_uuid = $1
+                UNION
+                SELECT 1
+                FROM squadov.share_tokens AS st
+                INNER JOIN squadov.users AS u
+                    ON u.id = st.user_id
+                INNER JOIN squadov.vods AS v
+                    ON v.match_uuid = st.match_uuid
+                        AND v.user_uuid = u.uuid
+                WHERE v.video_uuid = $1
+            ) AS "exists!"
+            "#,
+            video_uuid
+        )
+            .fetch_one(ex)
+            .await?
+            .exists
+    )
+}
+
 pub async fn get_vod_association<'a, T>(ex: T, uuid: &Uuid) -> Result<VodAssociation, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>

@@ -35,7 +35,16 @@ resource "google_storage_bucket" "blob-storage-bucket" {
 resource "google_project_iam_custom_role" "api-service-custom-role" {
     role_id     = "apiServiceAccountRole"
     title       = "API Service Account Role"
-    permissions = ["storage.objects.get", "storage.objects.delete", "storage.objects.list", "storage.objects.create", "storage.buckets.get"]
+    permissions = [
+        "storage.objects.get",
+        "storage.objects.delete",
+        "storage.objects.list",
+        "storage.objects.create",
+        "storage.buckets.get",
+        "storage.objects.setIamPolicy",
+        "storage.objects.getIamPolicy",
+        "storage.objects.update"
+    ]
 }
 
 resource "google_service_account" "api-service-account" {

@@ -71,4 +71,12 @@ impl VodManager for FilesystemVodManager {
 
         Ok(fs::remove_file(fname)?)
     }
+
+    async fn get_public_segment_redirect_uri(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
+        self.get_segment_redirect_uri(segment).await
+    }
+
+    async fn make_segment_public(&self, _segment: &VodSegmentId) -> Result<(), SquadOvError> {
+        Ok(())
+    }
 }

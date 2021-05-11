@@ -19,6 +19,42 @@ pub enum GCSUploadStatus {
 }
 
 impl super::GCSClient {
+    pub async fn set_object_public_acl(&self, bucket_id: &str, path: &str) -> Result<(), SquadOvError> {
+        let client = self.http.read()?.create_http_client()?;
+
+        #[derive(Serialize)]
+        struct ACLData {
+            entity: String,
+            role: String,
+        }
+
+        let data = ACLData{
+            entity: String::from("allUsers"),
+            role: String::from("READER"),
+        };
+
+        // TODO: Parse this response if we ever need it.
+        let url = format!(
+            "{}/b/{}/o/{}/acl",
+            super::STORAGE_BASE_URL,
+            bucket_id,
+            crate::url_encode(path),
+        );
+        let resp = client.post(&url)
+            .json(&data)
+            .send()
+            .await?;
+
+        if resp.status() != StatusCode::OK {
+            let status = resp.status().as_u16();
+            return Err(match status {
+                404 => SquadOvError::NotFound,
+                _ => SquadOvError::InternalError(format!("GCS Set Object ACL Error: {} - {} [{}]", status, resp.text().await?, &url))
+            });
+        }
+        Ok(())
+    }
+
     pub async fn get_object(&self, bucket_id: &str, path: &str) -> Result<(), SquadOvError> {
         let client = self.http.read()?.create_http_client()?;
 
@@ -42,7 +78,6 @@ impl super::GCSClient {
         }
         Ok(())
     }
-
     
     pub async fn download_object(&self, bucket_id: &str, path: &str) -> Result<Vec<u8>, SquadOvError> {
         let client = self.http.read()?.create_http_client()?;

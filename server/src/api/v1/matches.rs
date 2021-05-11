@@ -490,6 +490,9 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
 
     // If the user already shared this match, reuse that token so we don't fill up our databases with a bunch of useless tokens.
     let mut token = squadov_common::access::find_encrypted_access_token_for_match_user(&*app.pool, &path.match_uuid, session.user.id).await?;
+    let video_uuid = app.find_vod_from_match_user_id(path.match_uuid.clone(), session.user.id).await?.map(|x| {
+        x.video_uuid
+    });
 
     if token.is_none() {
         // Now that we've verified all these things we can go ahead and return to the user a fully fleshed out
@@ -499,9 +502,7 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
             full_path: data.full_path.clone(),
             user_uuid: session.user.uuid.clone(),
             match_uuid: Some(path.match_uuid.clone()),
-            video_uuid: app.find_vod_from_match_user_id(path.match_uuid.clone(), session.user.id).await?.map(|x| {
-                x.video_uuid
-            }),
+            video_uuid: video_uuid.clone(),
             clip_uuid: None,
             graphql_stats: data.graphql_stats.clone(),
         };
@@ -520,6 +521,12 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
         tx.commit().await?;
 
         token = Some(token_id);
+    }
+
+    // Make the VOD public - we need to keep track of its public setting in our database as well as configure the backend
+    // to enable it to be served publically.
+    if let Some(uuid) = video_uuid.as_ref() {
+        app.make_vod_public(&uuid).await?;
     }
 
     let token = token.ok_or(SquadOvError::InternalError(String::from("Failed to obtain/generate share token.")))?;

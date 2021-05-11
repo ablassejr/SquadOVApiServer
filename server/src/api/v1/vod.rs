@@ -90,6 +90,10 @@ pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApp
         token = Some(token_id);
     }
 
+    // Make the VOD public - we need to keep track of its public setting in our database as well as configure the backend
+    // to enable it to be served publically.
+    app.make_vod_public(&path.clip_uuid).await?;
+
     let token = token.ok_or(SquadOvError::InternalError(String::from("Failed to obtain/generate share token.")))?;
 
     // It could be neat to store some sort of access token ID in our database and allow users to track how
@@ -115,6 +119,39 @@ pub struct VodFavoriteData {
 }
 
 impl api::ApiApplication {
+    pub async fn make_vod_public(&self, video_uuid: &Uuid) -> Result<(), SquadOvError> {
+        // Get all the segments that exist for this VOD.
+        let quality_options = self.get_vod_quality_options(&[video_uuid.clone()]).await?;
+        let assocs = self.find_vod_associations(&[video_uuid.clone()]).await?;
+
+        if let Some(quality_arr) = quality_options.get(video_uuid) {
+            if let Some(vod) = assocs.get(video_uuid) {
+                let raw_extension = squadov_common::container_format_to_extension(&vod.raw_container_format);
+                for quality in quality_arr {
+                    // We only need to make one segment public since only one or the other will ever exist
+                    // at a given point in time.
+                    let base_segment = if quality.has_fastify {
+                        squadov_common::VodSegmentId{
+                            video_uuid: video_uuid.clone(),
+                            quality: quality.id.clone(),
+                            segment_name: String::from("fastify.mp4"),
+                        }
+                    } else {
+                        squadov_common::VodSegmentId{
+                            video_uuid: video_uuid.clone(),
+                            quality: quality.id.clone(),
+                            segment_name: format!("video.{}", &raw_extension),
+                        }
+                    };
+
+                    self.vod.make_segment_public(&base_segment).await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     async fn add_vod_favorite_for_user(&self, video_uuid: &Uuid, user_id: i64, reason: &str) -> Result<(), SquadOvError> {
         sqlx::query!(
             r#"

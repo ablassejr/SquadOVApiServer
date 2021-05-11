@@ -4,6 +4,7 @@ use squadov_common::{
     VodSegment,
     VodManifest,
     VodTrack,
+    vod::db
 };
 use crate::api;
 use actix_web::{web, HttpResponse};
@@ -137,7 +138,12 @@ pub async fn get_vod_association_handler(data : web::Path<VodFindFromVideoUuid>,
 }
 
 pub async fn get_vod_track_segment_handler(data : web::Path<squadov_common::VodSegmentId>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
-    let redirect_uri = app.vod.get_segment_redirect_uri(&data).await?;
+    // If the VOD is public (shared), then we can return the public URL instead of the signed private one.
+    let redirect_uri = if db::check_if_vod_public(&*app.pool, &data.video_uuid).await? {
+        app.vod.get_public_segment_redirect_uri(&data).await?
+    } else {
+        app.vod.get_segment_redirect_uri(&data).await?
+    };
     // You may be tempted to make this into a TemporaryRedirect and point
     // a media player (e.g. VideoJS) to load from this directly. Don't do that
     // unless you can figure out how to also pass the user's session ID along
