@@ -23,4 +23,5 @@ pub struct CsgoPlayerMatchSummary {
     pub damage_per_round: f64,
     pub friendly_rounds: i32,
     pub enemy_rounds: i32,
+    pub steam_id: i64,
 }

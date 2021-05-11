@@ -626,6 +626,11 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .service(
                                     web::scope("/match")
                                         .route("", web::get().to(v1::list_csgo_matches_for_user_handler))
+                                        .service(
+                                            web::scope("/{match_uuid}")
+                                                .route("", web::get().to(v1::get_csgo_match_handler))
+                                                .route("/vods", web::get().to(v1::get_csgo_match_accessible_vods_handler))
+                                        )
                                 )
                         )
                 )

@@ -1,15 +1,301 @@
-use crate::SquadOvError;
-use crate::csgo::{
-    demo::CsgoDemo,
-    gsi::CsgoGsiMatchState,
-    schema::{CsgoView, CsgoCommonEventContainer, CsgoCommonPlayer, CsgoCommonRound},
-    summary::CsgoPlayerMatchSummary,
+use crate::{
+    SquadOvError,
+    csgo::{
+        demo::{
+            CsgoDemo,
+            CsgoDemoBombStatus,
+            CsgoDemoBombSite,
+            CsgoTeam,
+            CsgoRoundWin,
+            CsgoDemoHitGroup,
+        },
+        gsi::CsgoGsiMatchState,
+        schema::{
+            CsgoView,
+            CsgoCommonEventContainer,
+            CsgoCommonPlayer,
+            CsgoCommonRound,
+            CsgoEventSource,
+            CsgoCommonRoundPlayerStats,
+            CsgoCommonRoundKill,
+            CsgoCommonRoundDamage,
+        },
+        summary::CsgoPlayerMatchSummary,
+        weapon::CsgoWeapon,
+    },
+    matches::MatchPlayerPair,
+    steam::SteamAccount,
 };
-use crate::matches::MatchPlayerPair;
 use sqlx::{PgPool, Transaction, Executor, Postgres};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
+
+pub async fn get_steam_ids_in_match_for_user_uuids(ex: &PgPool, match_uuid: &Uuid, user_uuids: &[Uuid]) -> Result<Vec<(Uuid, i64)>, SquadOvError> {
+    Ok(
+        sqlx::query!(
+            "
+            SELECT DISTINCT u.uuid, sul.steam_id
+            FROM squadov.csgo_match_views AS cmv
+            INNER JOIN squadov.users AS u
+                ON u.id = cmv.user_id
+            INNER JOIN squadov.steam_user_links AS sul
+                ON sul.user_id = u.id
+            INNER JOIN squadov.steam_users_cache AS suc
+                ON suc.steam_id = sul.steam_id
+            INNER JOIN squadov.csgo_event_container AS cec
+                ON cec.view_uuid = cmv.view_uuid
+            INNER JOIN squadov.csgo_event_container_players AS ccp
+                ON ccp.container_id = cec.id
+            WHERE cmv.match_uuid = $1
+                AND u.uuid = ANY($2)
+            ",
+            match_uuid,
+            user_uuids,
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                (x.uuid, x.steam_id)
+            })
+            .collect()
+    )
+}
+
+async fn get_csgo_round_data_for_container(ex: &PgPool, container_id: i64) -> Result<Vec<CsgoCommonRound>, SquadOvError> {
+    let rounds = sqlx::query!(
+        "
+        SELECT *
+        FROM squadov.csgo_event_container_rounds
+        WHERE container_id = $1
+        ",
+        container_id,
+    )
+        .fetch_all(&*ex)
+        .await?;
+
+    let mut round_kills: HashMap<i32, Vec<_>> = HashMap::new();
+    sqlx::query!(
+        "
+        SELECT *
+        FROM squadov.csgo_event_container_round_kills
+        WHERE container_id = $1
+        ORDER BY tm ASC
+        ",
+        container_id,
+    )
+        .fetch_all(&*ex)
+        .await?
+        .into_iter()
+        .for_each(|x| {
+            if let Some(v) = round_kills.get_mut(&x.round_num) {
+                v.push(x);
+            } else {
+                round_kills.insert(x.round_num, vec![x]);
+            }
+        });
+
+    let mut round_damage: HashMap<i32, Vec<_>> = HashMap::new();
+    sqlx::query!(
+        "
+        SELECT *
+        FROM squadov.csgo_event_container_round_damage
+        WHERE container_id = $1
+        ORDER BY tm ASC
+        ",
+        container_id,
+    )
+        .fetch_all(&*ex)
+        .await?
+        .into_iter()
+        .for_each(|x| {
+            if let Some(v) = round_damage.get_mut(&x.round_num) {
+                v.push(x);
+            } else {
+                round_damage.insert(x.round_num, vec![x]);
+            }
+        });
+
+    let mut round_player_stats: HashMap<i32, Vec<_>> = HashMap::new();
+    sqlx::query!(
+        "
+        SELECT *
+        FROM squadov.csgo_event_container_round_player_stats
+        WHERE container_id = $1
+        ",
+        container_id,
+    )
+        .fetch_all(&*ex)
+        .await?
+        .into_iter()
+        .for_each(|x| {
+            if let Some(v) = round_player_stats.get_mut(&x.round_num) {
+                v.push(x);
+            } else {
+                round_player_stats.insert(x.round_num, vec![x]);
+            }
+        });
+    
+    Ok(
+        rounds.into_iter().map(|x| {
+            CsgoCommonRound{
+                container_id,
+                round_num: x.round_num,
+                tm_round_start: x.tm_round_start,
+                tm_round_play: x.tm_round_play,
+                tm_round_end: x.tm_round_end,
+                bomb_state: x.bomb_state.map(|y| { CsgoDemoBombStatus::try_from(y).unwrap_or(CsgoDemoBombStatus::Unknown) }),
+                tm_bomb_plant: x.tm_bomb_plant,
+                bomb_plant_user: x.bomb_plant_user,
+                bomb_plant_site: x.bomb_plant_site.map(|y| { CsgoDemoBombSite::try_from(y).unwrap_or(CsgoDemoBombSite::SiteUnknown) }),
+                tm_bomb_event: x.tm_bomb_event,
+                bomb_event_user: x.bomb_event_user,
+                winning_team: x.winning_team.map(|y| { CsgoTeam::try_from(y).unwrap_or(CsgoTeam::TeamSpectate) }),
+                round_win_reason: x.round_win_reason.map(|y| { CsgoRoundWin::try_from(y).unwrap_or(CsgoRoundWin::Unknown) }),
+                round_mvp: x.round_mvp,
+                player_stats: if let Some(rd_ps) = round_player_stats.remove(&x.round_num) {
+                    rd_ps.into_iter().map(|x| {
+                        CsgoCommonRoundPlayerStats{
+                            container_id,
+                            round_num: x.round_num,
+                            user_id: x.user_id,
+                            kills: x.kills,
+                            deaths: x.deaths,
+                            assists: x.assists,
+                            mvp: x.mvp,
+                            equipment_value: x.equipment_value,
+                            money: x.money,
+                            headshot_kills: x.headshot_kills,
+                            utility_damage: x.utility_damage,
+                            enemies_flashed: x.enemies_flashed,
+                            damage: x.damage,
+                            armor: x.armor,
+                            has_defuse: x.has_defuse,
+                            has_helmet: x.has_helmet,
+                            team: CsgoTeam::try_from(x.team).unwrap_or(CsgoTeam::TeamSpectate),
+                            weapons: x.weapons.into_iter().map(|y| {
+                                CsgoWeapon::try_from(y).unwrap_or(CsgoWeapon::Unknown)
+                            }).collect()
+                        }
+                    }).collect()
+                } else {
+                    vec![]
+                },
+                kills: if let Some(rd_kills) = round_kills.remove(&x.round_num) {
+                    rd_kills.into_iter().map(|x| {
+                        CsgoCommonRoundKill{
+                            container_id,
+                            round_num: x.round_num,
+                            tm: x.tm,
+                            victim: x.victim,
+                            killer: x.killer,
+                            assister: x.assister,
+                            flash_assist: x.flash_assist,
+                            headshot: x.headshot,
+                            smoke: x.smoke,
+                            blind: x.blind,
+                            wallbang: x.wallbang,
+                            noscope: x.noscope,
+                            weapon: x.weapon.map(|y| { CsgoWeapon::try_from(y).unwrap_or(CsgoWeapon::Unknown) }),
+                        }
+                    }).collect()
+                } else {
+                    vec![]
+                },
+                damage: if let Some(rd_damage) = round_damage.remove(&x.round_num) {
+                    rd_damage.into_iter().map(|x| {
+                        CsgoCommonRoundDamage{
+                            container_id,
+                            round_num: x.round_num,
+                            tm: x.tm,
+                            receiver: x.receiver,
+                            attacker: x.attacker,
+                            remaining_health: x.remaining_health,
+                            remaining_armor: x.remaining_armor,
+                            damage_health: x.damage_health,
+                            damage_armor: x.damage_armor,
+                            weapon: CsgoWeapon::try_from(x.weapon).unwrap_or(CsgoWeapon::Unknown),
+                            hitgroup: CsgoDemoHitGroup::try_from(x.hitgroup).unwrap_or(CsgoDemoHitGroup::Generic),
+                        }
+                    }).collect()
+                } else {
+                    vec![]
+                },
+            }
+        }).collect()
+    )
+}
+
+async fn get_csgo_player_data_for_container(ex: &PgPool, container_id: i64) -> Result<Vec<CsgoCommonPlayer>, SquadOvError> {
+    Ok(
+        sqlx::query!(
+            "
+            SELECT
+                cgc.user_id,
+                cgc.kills,
+                cgc.deaths,
+                cgc.assists,
+                cgc.mvps,
+                suc.steam_id,
+                suc.steam_name,
+                suc.profile_image_url
+            FROM squadov.csgo_event_container_players AS cgc
+            INNER JOIN squadov.steam_users_cache AS suc
+                ON suc.steam_id = cgc.steam_id
+            WHERE cgc.container_id = $1
+            ",
+            container_id,
+        )
+            .fetch_all(&*ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                CsgoCommonPlayer{
+                    container_id,
+                    user_id: x.user_id,
+                    kills: x.kills,
+                    deaths: x.deaths,
+                    assists: x.assists,
+                    mvps: x.mvps,
+                    steam_account: SteamAccount{
+                        steam_id: x.steam_id,
+                        name: x.steam_name,
+                        profile_image_url: x.profile_image_url,
+                    },
+                }
+            })
+            .collect()
+    )
+}
+
+pub async fn get_csgo_event_container_from_view(ex: &PgPool, view_uuid: &Uuid) -> Result<CsgoCommonEventContainer, SquadOvError> {
+    // First figure out which container we want to use: namely either the GSI or the demo one.
+    // We always prefer the demo!
+    let container = sqlx::query!(
+        "
+        SELECT *
+        FROM squadov.csgo_event_container
+        WHERE view_uuid = $1
+        ORDER BY event_source DESC
+        LIMIT 1
+        ",
+        view_uuid
+    )
+        .fetch_one(&*ex)
+        .await?;
+    
+    Ok(
+        CsgoCommonEventContainer{
+            id: container.id,
+            view_uuid: container.view_uuid.clone(),
+            event_source: CsgoEventSource::try_from(container.event_source)?,
+            rounds: get_csgo_round_data_for_container(&*ex, container.id).await?,
+            players: get_csgo_player_data_for_container(&*ex, container.id).await?,
+        }
+    )
+}
 
 pub async fn list_csgo_match_summaries_for_user(ex: &PgPool, user_id: i64, start: i64, end: i64) -> Result<Vec<CsgoPlayerMatchSummary>, SquadOvError> {
     let uuids: Vec<MatchPlayerPair> = sqlx::query_as!(
@@ -63,7 +349,8 @@ where
                 (COUNT(crd.*) FILTER(WHERE crd.hitgroup > 5))::INTEGER AS "legshots!",
                 COALESCE(((SUM(crd.damage_health))::DOUBLE PRECISION / (winner.last_round+1)::DOUBLE PRECISION), 0.0) AS "damage_per_round!",
                 (rounds.win)::INTEGER AS "friendly_rounds!",
-                (rounds.lost)::INTEGER AS "enemy_rounds!"
+                (rounds.lost)::INTEGER AS "enemy_rounds!",
+                sul.steam_id AS "steam_id!"
             FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)
             INNER JOIN squadov.users AS u
                 ON u.uuid = inp.user_uuid
@@ -125,7 +412,8 @@ where
                 winner.last_round,
                 cec.event_source,
                 rounds.win,
-                rounds.lost
+                rounds.lost,
+                sul.steam_id
             ORDER BY cmv.start_time DESC
             "#,
             &match_uuids,
@@ -182,6 +470,27 @@ where
             WHERE view_uuid = $1
             ",
             view_uuid,
+        )
+            .fetch_one(ex)
+            .await?
+    )
+}
+
+pub async fn find_csgo_view_from_match_user<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64) -> Result<CsgoView, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            CsgoView,
+            "
+            SELECT *
+            FROM squadov.csgo_match_views
+            WHERE match_uuid = $1
+                AND user_id = $2
+            ",
+            match_uuid,
+            user_id,
         )
             .fetch_one(ex)
             .await?
@@ -415,7 +724,8 @@ async fn store_csgo_common_rounds_for_container(ex: &mut Transaction<'_, Postgre
             has_defuse,
             has_helmet,
             team,
-            weapons
+            weapons,
+            money
         )
         VALUES 
     "));
@@ -454,7 +764,8 @@ async fn store_csgo_common_rounds_for_container(ex: &mut Transaction<'_, Postgre
             damage_health,
             damage_armor,
             weapon,
-            hitgroup
+            hitgroup,
+            tm
         )
         VALUES 
     "));
@@ -512,7 +823,8 @@ async fn store_csgo_common_rounds_for_container(ex: &mut Transaction<'_, Postgre
                     {has_defuse},
                     {has_helmet},
                     {team},
-                    {weapons}
+                    {weapons},
+                    {money}
                 )",
                     container_id=container_id,
                     round_num=ps.round_num,
@@ -531,6 +843,7 @@ async fn store_csgo_common_rounds_for_container(ex: &mut Transaction<'_, Postgre
                     has_helmet=crate::sql_format_option_bool(ps.has_helmet),
                     team=ps.team as i32,
                     weapons=crate::sql_format_integer_array(&ps.weapons.iter().map(|x| { *x as i32 }).collect::<Vec<i32>>()),
+                    money=crate::sql_format_option_value(&ps.money),
                 ));
                 round_stats_sql.push(String::from(","));
                 added_round_stats += 1;
@@ -612,7 +925,8 @@ async fn store_csgo_common_rounds_for_container(ex: &mut Transaction<'_, Postgre
                 {damage_health},
                 {damage_armor},
                 {weapon},
-                {hitgroup}
+                {hitgroup},
+                {tm}
             )",
                 container_id=container_id,
                 round_num=d.round_num,
@@ -624,6 +938,7 @@ async fn store_csgo_common_rounds_for_container(ex: &mut Transaction<'_, Postgre
                 damage_armor=d.damage_armor,
                 weapon=d.weapon as i32,
                 hitgroup=d.hitgroup as i32,
+                tm=crate::sql_format_time(&d.tm),
             ));
             round_damage_sql.push(String::from(","));
             added_round_damage += 1;

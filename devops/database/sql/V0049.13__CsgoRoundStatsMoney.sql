@@ -1,0 +1,2 @@
+ALTER TABLE csgo_event_container_round_player_stats
+ADD COLUMN money INTEGER;

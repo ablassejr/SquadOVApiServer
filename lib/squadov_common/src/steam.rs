@@ -7,6 +7,7 @@ use serde::Serialize;
 use sqlx::{Transaction, Postgres};
 
 #[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct SteamAccount {
     pub steam_id: i64,
     pub name: String,

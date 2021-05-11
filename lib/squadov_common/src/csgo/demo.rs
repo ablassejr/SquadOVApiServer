@@ -219,15 +219,16 @@ named!(parse_csgo_demo_packet_message<CsgoDemoPacketMessage>,
     ))
 );
 
-#[derive(Debug, Clone, Copy, Serialize_repr)]
+#[derive(Debug, Clone, Copy, Serialize_repr, TryFromPrimitive)]
 #[repr(i32)]
 pub enum CsgoDemoBombStatus {
     Planted,
     Defused,
-    Exploded
+    Exploded,
+    Unknown
 }
 
-#[derive(Debug, Clone, Copy, Serialize_repr)]
+#[derive(Debug, Clone, Copy, Serialize_repr, TryFromPrimitive)]
 #[repr(i32)]
 pub enum CsgoDemoBombSite {
     SiteA,
@@ -235,7 +236,7 @@ pub enum CsgoDemoBombSite {
     SiteUnknown,
 }
 
-#[derive(Debug, Clone, Copy, Serialize_repr)]
+#[derive(Debug, Clone, Copy, Serialize_repr, TryFromPrimitive)]
 #[repr(i32)]
 pub enum CsgoTeam {
     TeamCT,
@@ -252,6 +253,7 @@ pub enum CsgoRoundWin {
     TWin,
     TSurrender = 17,
     CTSurrender,
+    Unknown,
 }
 
 #[derive(Debug)]
@@ -765,6 +767,11 @@ impl CsgoDemo {
             "round_freeze_end" => {
                 log::debug!("csgo round freeze end: {}", tick);
                 if let Some(round) = self.rounds.get_mut(current_round_idx) {
+                    // There's gonna be an extra round_freeze_end when the game ends so we want to ignore that one.
+                    if round.freeze_end_tick.is_some() {
+                        return Ok(());
+                    }
+
                     round.freeze_end_tick = Some(tick);
                     
                     // Also, at the end of the freeze round, scrape the player entity for information on what the

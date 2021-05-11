@@ -22,6 +22,8 @@ use chrono::{DateTime, Utc};
 use num_enum::TryFromPrimitive;
 use std::collections::HashMap;
 
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct CsgoView {
     pub view_uuid: Uuid,
     pub match_uuid: Option<Uuid>,
@@ -43,6 +45,7 @@ pub enum CsgoEventSource {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct CsgoCommonPlayer {
     pub container_id: i64,
     pub user_id: i32,
@@ -54,6 +57,7 @@ pub struct CsgoCommonPlayer {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct CsgoCommonRoundPlayerStats {
     pub container_id: i64,
     pub round_num: i32,
@@ -76,6 +80,7 @@ pub struct CsgoCommonRoundPlayerStats {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct CsgoCommonRoundKill {
     pub container_id: i64,
     pub round_num: i32,
@@ -93,6 +98,7 @@ pub struct CsgoCommonRoundKill {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct CsgoCommonRoundDamage {
     pub container_id: i64,
     pub round_num: i32,
@@ -108,6 +114,7 @@ pub struct CsgoCommonRoundDamage {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct CsgoCommonRound {
     pub container_id: i64,
     pub round_num: i32,
@@ -129,6 +136,7 @@ pub struct CsgoCommonRound {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct CsgoCommonEventContainer {
     pub id: i64,
     pub view_uuid: Uuid,
