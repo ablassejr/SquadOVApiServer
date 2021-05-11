@@ -9,6 +9,8 @@ use crate::riot::db;
 use serde::Deserialize;
 use chrono::{DateTime, Utc};
 
+const RIOT_MAX_AGE_SECONDS: i64 = 86400; // 1 day
+
 impl super::RiotApiHandler {
     pub async fn get_account_by_puuid(&self, puuid: &str) -> Result<RiotAccount, SquadOvError> {
         let client = self.create_http_client()?;
@@ -136,7 +138,7 @@ impl super::RiotApiApplicationInterface {
     }
     
     pub async fn request_riot_account_from_puuid(&self, puuid: &str) -> Result<(), SquadOvError> {
-        self.rmq.publish(&self.mqconfig.valorant_queue, serde_json::to_vec(&RiotApiTask::Account{puuid: String::from(puuid)})?, RABBITMQ_DEFAULT_PRIORITY, -1).await;
+        self.rmq.publish(&self.mqconfig.valorant_queue, serde_json::to_vec(&RiotApiTask::Account{puuid: String::from(puuid)})?, RABBITMQ_DEFAULT_PRIORITY, RIOT_MAX_AGE_SECONDS).await;
         Ok(())
     }
 
@@ -181,7 +183,7 @@ impl super::RiotApiApplicationInterface {
             refresh_token: refresh_token.to_string(),
             expiration,
             user_id,
-        })?, RABBITMQ_DEFAULT_PRIORITY, -1).await;
+        })?, RABBITMQ_DEFAULT_PRIORITY, RIOT_MAX_AGE_SECONDS).await;
         Ok(())
     }
 }

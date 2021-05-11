@@ -258,7 +258,6 @@ impl ApiApplication {
                 RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.steam_queue.clone(), steam_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
             }
 
-            
             if config.rabbitmq.enable_csgo {
                 RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.csgo_queue.clone(), csgo_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
             }

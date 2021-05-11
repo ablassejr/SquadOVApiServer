@@ -1,0 +1,26 @@
+db = "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1/squadov"
+connections = 1
+
+[rabbitmq]
+amqp_url = "${RABBITMQ_AMQP_URL}"
+prefetch_count = 1
+enable_rso = false
+rso_queue = "riot_rso"
+enable_valorant = false
+valorant_queue = "valorant_api"
+enable_lol = false
+lol_queue = "lol_api"
+enable_tft = false
+tft_queue = "tft_api"
+enable_vod = false
+vod_queue = "squadov_vods"
+wow_combatlog_queue = "wow_combatlog"
+enable_csgo = true
+csgo_queue = "csgo_rmq"
+enable_steam = false
+steam_queue = "steam_api"
+
+[steam]
+api_key = "${STEAM_API_KEY}"
+requests = 100000
+seconds = 86400

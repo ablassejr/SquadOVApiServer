@@ -12,6 +12,8 @@ use crate::{
 use super::RiotApiTask;
 use crate::riot::db;
 
+const RIOT_MAX_AGE_SECONDS: i64 = 86400; // 1 day
+
 impl super::RiotApiHandler {
     pub async fn get_valorant_matches_for_user(&self, puuid: &str, shard: &str) -> Result<ValorantMatchlistDto, SquadOvError> {
         let client = self.create_http_client()?;
@@ -61,7 +63,7 @@ impl super::RiotApiApplicationInterface {
     }
 
     pub async fn request_backfill_user_valorant_matches(&self, puuid: &str) -> Result<(), SquadOvError> {
-        self.rmq.publish(&self.mqconfig.valorant_queue, serde_json::to_vec(&RiotApiTask::ValorantBackfill{puuid: String::from(puuid)})?, RABBITMQ_DEFAULT_PRIORITY, -1).await;
+        self.rmq.publish(&self.mqconfig.valorant_queue, serde_json::to_vec(&RiotApiTask::ValorantBackfill{puuid: String::from(puuid)})?, RABBITMQ_DEFAULT_PRIORITY, RIOT_MAX_AGE_SECONDS).await;
         Ok(())
     }
 
@@ -113,7 +115,7 @@ impl super::RiotApiApplicationInterface {
         self.rmq.publish(&self.mqconfig.valorant_queue, serde_json::to_vec(&RiotApiTask::ValorantMatch{
             match_id: String::from(match_id),
             shard: String::from(shard),
-        })?, priority, -1).await;
+        })?, priority, RIOT_MAX_AGE_SECONDS).await;
         Ok(())
     }
 }

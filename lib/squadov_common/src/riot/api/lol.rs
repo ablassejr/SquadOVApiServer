@@ -14,6 +14,8 @@ use crate::{
 use super::RiotApiTask;
 use chrono::{Utc, Duration};
 
+const RIOT_MAX_AGE_SECONDS: i64 = 86400; // 1 day
+
 impl super::RiotApiHandler {
     pub async fn get_lol_matches_for_user(&self, account_id: &str, platform: &str, begin_index: i32, end_index: i32) -> Result<Vec<LolMatchReferenceDto>, SquadOvError> {
         let client = self.create_http_client()?;
@@ -68,7 +70,7 @@ impl super::RiotApiApplicationInterface {
         self.rmq.publish(&self.mqconfig.lol_queue, serde_json::to_vec(&RiotApiTask::LolMatch{
             platform: String::from(platform),
             game_id,
-        })?, priority, -1).await;
+        })?, priority, RIOT_MAX_AGE_SECONDS).await;
         Ok(())
     }
 
@@ -138,7 +140,7 @@ impl super::RiotApiApplicationInterface {
         self.rmq.publish(&self.mqconfig.lol_queue, serde_json::to_vec(&RiotApiTask::LolBackfill{
             account_id,
             platform: String::from(platform),
-        })?, RABBITMQ_DEFAULT_PRIORITY, -1).await;
+        })?, RABBITMQ_DEFAULT_PRIORITY, RIOT_MAX_AGE_SECONDS).await;
         Ok(())
     }
 

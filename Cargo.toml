@@ -5,13 +5,15 @@ members = [
     "tools/hearthstone_power_parser",
     "tools/csgo_demo_parser",
     "tools/wow_db_migrater",
-    "msa/rabbitmq_delay_handler"
+    "msa/rabbitmq_delay_handler",
+    "msa/csgo_demo_handler"
 ]
 default-members = [
     "server",
     "lib/squadov_common",
     "tools/hearthstone_power_parser",
     "tools/csgo_demo_parser",
-    "msa/rabbitmq_delay_handler"
+    "msa/rabbitmq_delay_handler",
+    "msa/csgo_demo_handler"
 ]
 exclude = ["deps/cargo/sqlx"]

@@ -19,7 +19,7 @@ use sqlx::PgPool;
 
 pub const RABBITMQ_DEFAULT_PRIORITY: u8 = 0;
 pub const RABBITMQ_HIGH_PRIORITY: u8 = 5;
-const RABBITMQ_MAX_DELAY_MS: i64 = 3600000; // 1 hour
+const RABBITMQ_MAX_DELAY_MS: i64 = 7200000; // 2 hour
 const SQUADOV_RETRY_COUNT_HEADER: &'static str = "x-squadov-retry-count";
 const SQUADOV_MESSAGE_MAX_AGE_HEADER: &'static str = "x-squadov-max-age";
 const DEFAULT_MAX_AGE_SECONDS: i64 = 3600; // 1 hour
@@ -182,11 +182,20 @@ impl RabbitMqConnectionBundle {
         } else {
             let total_delay_ms = {
                 let mut rng = rand::thread_rng();
-                std::cmp::min(
+                let ms = std::cmp::min(
                     2i64.pow(msg.retry_count) +  rng.gen_range(0..1000) + msg.base_delay_ms.unwrap(),
-                    RABBITMQ_MAX_DELAY_MS)
+                    RABBITMQ_MAX_DELAY_MS
+                );
+
+                // If we get to a negative delay because of integer overflow due to the pow we should just assume
+                // that we want to do the max delay.
+                if ms <= 0 {
+                    RABBITMQ_MAX_DELAY_MS
+                } else {
+                    ms
+                }
             };
-            log::info!("Delaying RabbitMQ message for {}ms.", total_delay_ms);
+            log::info!("Delaying RabbitMQ message for {}ms [Retry {}, Base {:?}].", total_delay_ms, msg.retry_count, msg.base_delay_ms);
             self.add_delayed_rabbitmq_message(msg, total_delay_ms).await?;
         }
 

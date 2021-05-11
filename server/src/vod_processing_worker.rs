@@ -42,6 +42,7 @@ pub async fn main() -> Result<(), SquadOvError> {
     config.rabbitmq.enable_valorant = false;
     config.rabbitmq.enable_vod = true;
     config.rabbitmq.enable_csgo = false;
+    config.rabbitmq.enable_steam = false;
     config.rabbitmq.prefetch_count = 1;
 
     // Only use the provided config to connect to things.

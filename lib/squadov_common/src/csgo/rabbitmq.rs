@@ -16,6 +16,8 @@ use uuid::Uuid;
 use bzip2::read::BzDecoder;
 use chrono::{DateTime, Utc};
 
+const DEMO_MAX_AGE_SECONDS: i64 = 86400; // 1 day
+
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum CsgoTask {
@@ -48,7 +50,7 @@ impl CsgoRabbitmqInterface {
             url: String::from(demo_url),
             view_uuid: view_uuid.clone(),
             timestamp: timestamp.clone(),
-        })?, RABBITMQ_DEFAULT_PRIORITY, -1).await;
+        })?, RABBITMQ_DEFAULT_PRIORITY, DEMO_MAX_AGE_SECONDS).await;
         Ok(())
     }
 

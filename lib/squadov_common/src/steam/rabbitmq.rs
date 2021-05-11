@@ -11,6 +11,8 @@ use crate::{
 use sqlx::postgres::{PgPool};
 use serde::{Serialize, Deserialize};
 
+const STEAM_MAX_AGE_SECONDS: i64 = 86400; // 1 day
+
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum SteamTask {
@@ -39,7 +41,7 @@ impl SteamApiRabbitmqInterface {
     pub async fn request_sync_steam_accounts(&self, ids: &[i64]) -> Result<(), SquadOvError> {
         self.rmq.publish(&self.mqconfig.steam_queue, serde_json::to_vec(&SteamTask::ProfileSync{
             steam_ids: ids.to_vec(),
-        })?, RABBITMQ_DEFAULT_PRIORITY, -1).await;
+        })?, RABBITMQ_DEFAULT_PRIORITY, STEAM_MAX_AGE_SECONDS).await;
         Ok(())
     }
 }

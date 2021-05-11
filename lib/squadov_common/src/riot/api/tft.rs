@@ -40,6 +40,7 @@ impl super::RiotApiHandler {
 }
 
 const TFT_BACKFILL_AMOUNT: i32 = 100;
+const RIOT_MAX_AGE_SECONDS: i64 = 86400; // 1 day
 
 impl super::RiotApiApplicationInterface {
     pub async fn request_obtain_tft_match_info(&self, platform: &str, region: &str, game_id: i64, priority: bool) -> Result<(), SquadOvError> {
@@ -53,7 +54,7 @@ impl super::RiotApiApplicationInterface {
             platform: String::from(platform),
             region: String::from(region),
             game_id,
-        })?, priority, -1).await;
+        })?, priority, RIOT_MAX_AGE_SECONDS).await;
         Ok(())
     }
 
@@ -112,7 +113,7 @@ impl super::RiotApiApplicationInterface {
         self.rmq.publish(&self.mqconfig.tft_queue, serde_json::to_vec(&RiotApiTask::TftBackfill{
             puuid: summoner.puuid.clone(),
             region: String::from(region),
-        })?, RABBITMQ_DEFAULT_PRIORITY, -1).await;
+        })?, RABBITMQ_DEFAULT_PRIORITY, RIOT_MAX_AGE_SECONDS).await;
         Ok(())
     }
 

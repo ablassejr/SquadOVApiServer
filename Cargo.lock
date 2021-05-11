@@ -1172,6 +1172,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "csgo_demo_handler"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "chrono",
+ "env_logger 0.7.1",
+ "log",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "squadov_common",
+ "structopt",
+ "tokio",
+ "toml",
+]
+
+[[package]]
 name = "csgo_demo_parser"
 version = "0.1.0"
 dependencies = [
