@@ -70,6 +70,7 @@ async fn get_csgo_round_data_for_container(ex: &PgPool, container_id: i64) -> Re
         SELECT *
         FROM squadov.csgo_event_container_rounds
         WHERE container_id = $1
+        ORDER BY round_num ASC
         ",
         container_id,
     )

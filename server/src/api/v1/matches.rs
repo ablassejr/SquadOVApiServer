@@ -172,7 +172,7 @@ impl api::ApiApplication {
     async fn get_recent_base_matches_for_user(&self, user_id: i64, start: i64, end: i64, filter: &RecentMatchQuery) -> Result<Vec<RawRecentMatchData>, SquadOvError> {
         let handles: Vec<RecentMatchHandle> = sqlx::query!(
             r#"
-            SELECT DISTINCT v.match_uuid AS "match_uuid!", ou.uuid, v.end_time
+            SELECT DISTINCT v.match_uuid AS "match_uuid!", ou.uuid AS "uuid!", v.end_time
             FROM squadov.users AS u
             CROSS JOIN LATERAL (
                 SELECT DISTINCT ou.id, ou.uuid
@@ -184,6 +184,8 @@ impl api::ApiApplication {
                         OR ou.id = u.id
                 WHERE sra.user_id = u.id
                     AND (CARDINALITY($5::BIGINT[]) = 0 OR sra.squad_id = ANY($5))
+                UNION
+                SELECT u.id, u.uuid
             ) AS ou
             INNER JOIN squadov.vods AS v
                 ON v.user_uuid = ou.uuid
