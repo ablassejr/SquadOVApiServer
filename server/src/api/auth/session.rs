@@ -211,7 +211,10 @@ impl crate::api::ApiApplication {
         if expired || force {
             let new_token = match self.clients.fusionauth.refresh_jwt(&session.refresh_token).await {
                 Ok(t) => t,
-                Err(err) => return logged_error!(squadov_common::SquadOvError::InternalError(format!("Refresh JWT {}", err)))
+                Err(err) => {
+                    log::warn!("Failed to Refresh client JWT: {}", err);
+                    return Err(squadov_common::SquadOvError::Unauthorized);
+                },
             };
 
             let old_id = session.session_id;
@@ -223,11 +226,7 @@ impl crate::api::ApiApplication {
             squadov_common::analytics::mark_active_user_session(&mut tx, session.user.id).await?;
             tx.commit().await?;
 
-            match self.session.refresh_session(&old_id, &session, &self.pool).await {
-                Ok(_) => (),
-                Err(err) => return logged_error!(squadov_common::SquadOvError::InternalError(format!("Refresh Session {}", err)))
-            };
-
+            self.session.refresh_session(&old_id, &session, &self.pool).await?;
             session.old_session_id = Some(old_id);
         }
 

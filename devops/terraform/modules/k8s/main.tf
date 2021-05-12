@@ -108,7 +108,7 @@ resource "google_container_node_pool" "infra_nodes" {
         }
         disk_size_gb = 20
         disk_type = "pd-ssd"
-        machine_type = "e2-custom-4-4096"
+        machine_type = "e2-custom-4-5120"
         image_type = "COS"
     }
 

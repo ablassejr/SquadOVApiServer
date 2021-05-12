@@ -36,6 +36,7 @@ impl super::FusionAuthClient {
     pub async fn validate_jwt(&self, access_token: &str) -> Result<(), FusionAuthValidateJwtError> {
         let res = self.client.get(self.build_url("/api/jwt/validate").as_str())
             .header("Authorization", format!("JWT {}", access_token).as_str())
+            .timeout(std::time::Duration::from_secs(20))
             .send()
             .await;
         match res {
@@ -59,6 +60,7 @@ impl super::FusionAuthClient {
             .json(&FusionAuthRefreshJwtRequest{
                 refresh_token,
             })
+            .timeout(std::time::Duration::from_secs(20))
             .send()
             .await;
         
