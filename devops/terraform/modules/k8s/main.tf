@@ -135,7 +135,7 @@ resource "google_container_node_pool" "demo_worker_nodes" {
         }
         disk_size_gb = 20
         disk_type = "pd-ssd"
-        machine_type = "e2-custom-2-2048"
+        machine_type = "n1-custom-1-1024"
         image_type = "COS"
     }
 
