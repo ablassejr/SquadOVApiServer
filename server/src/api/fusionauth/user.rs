@@ -1,7 +1,8 @@
 use serde::{Serialize,Deserialize};
 use derive_more::{Display};
+use squadov_common::encode::url_encode;
 
-#[derive(Serialize,Deserialize)]
+#[derive(Debug, Serialize,Deserialize)]
 pub struct FusionAuthRegistration {
     #[serde(rename = "applicationId")]
     pub application_id: String,
@@ -10,7 +11,7 @@ pub struct FusionAuthRegistration {
     pub insert_instant: i64,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct FusionAuthUser {
     pub email: String,
     pub registrations: Vec<FusionAuthRegistration>,
@@ -72,7 +73,7 @@ impl super::FusionAuthClient {
     }
 
     pub async fn find_user_generic(&self, key: &str, value: &str) -> Result<FusionAuthUser, FusionAuthUserError> {
-        match self.client.get(self.build_url(format!("/api/user?{}={}", key, value).as_str()).as_str())
+        match self.client.get(self.build_url(format!("/api/user?{}={}", key, url_encode(value)).as_str()).as_str())
             .send()
             .await {
             Ok(resp) => {

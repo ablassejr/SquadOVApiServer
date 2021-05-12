@@ -121,6 +121,7 @@ pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<Arc<api:
         },
         Err(err) => return logged_error!(squadov_common::SquadOvError::InternalError(format!("Get User {}", err))),
     };
+
     session.user = stored_user;
 
     // Store this session in our database and ensure the user is made aware of which session they should

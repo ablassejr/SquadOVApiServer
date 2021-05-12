@@ -12,7 +12,7 @@ pub struct FusionAuthLoginInput {
     password: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct FusionAuthLoginResult {
     pub user: super::FusionAuthUser,
     pub token: String,

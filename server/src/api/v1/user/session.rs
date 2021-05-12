@@ -43,7 +43,10 @@ pub async fn refresh_user_session_handler(app : web::Data<Arc<api::ApiApplicatio
     let session = app.refresh_session_if_necessary(session.unwrap(), true).await?;
 
     // This block of code isn't crucial to the task of refreshing the session so we can ignore errors here.
-    let _ = handle_session_user_backfill_tasks(app.clone(), &session).await;
+    match handle_session_user_backfill_tasks(app.clone(), &session).await {
+        Ok(_) => (),
+        Err(err) => log::warn!("Failed to handle session user backfill tasks: {}", err),
+    };
 
     // Extract expiration from the access token JWT.
     let token = jsonwebtoken::dangerous_insecure_decode::<SessionJwtClaims>(&session.access_token)?;
