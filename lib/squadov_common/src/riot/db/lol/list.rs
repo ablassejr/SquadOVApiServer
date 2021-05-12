@@ -44,6 +44,7 @@ pub async fn list_lol_match_summaries_for_uuids(ex: &PgPool, uuids: &[MatchPlaye
         LEFT JOIN squadov.vods AS vod
             ON vod.match_uuid = lmi.match_uuid
                 AND vod.user_uuid = u.uuid
+                AND vod.is_clip = FALSE
         ORDER BY lmi.game_creation DESC
         "#,
         &match_uuids,
