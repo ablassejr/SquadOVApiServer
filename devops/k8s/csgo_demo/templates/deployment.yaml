@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: csgo-demo
+    labels:
+        task: csgo-demo
+spec:
+    replicas: 2
+    selector:
+        matchLabels:
+            task: csgo-demo
+    template:
+        metadata:
+            labels:
+                task: csgo-demo
+        spec:
+            nodeSelector:
+                task: demo
+            containers:
+                - name: parser
+                  image: "registry.gitlab.com/squadov/squadovapiserver/squadov/csgo_demo_handler:{{ .Values.commitHash }}"
+                  resources:
+                    requests:
+                        cpu: "200m"
+                    limits:
+                        cpu: "1000m"
+                - name: cloudsql-proxy
+                  image: gcr.io/cloudsql-docker/gce-proxy:1.16
+                  ports:
+                    - containerPort: 5432
+                  command: ["/cloud_sql_proxy",
+                             "-instances=squadov:us-central1:squadov-postgres=tcp:5432",
+                             "-credential_file=/secrets/gke/gcloud-service-account.json"]
+                  securityContext:
+                      runAsUser: 2  # non-root user
+                      allowPrivilegeEscalation: false
+                  volumeMounts:
+                      - name: gke-service-account
+                        mountPath: /secrets/gke
+                        readOnly: true
+                  resources:
+                    requests:
+                        cpu: "10m"
+                    limits:
+                        cpu: "100m"
+            volumes:
+                - name: gke-service-account
+                  secret:
+                    secretName: gke-service-account
+            imagePullSecrets:
+                - name: regcred
