@@ -27,10 +27,17 @@ pub struct CsgoUserMatchInput {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct CsgoMatchResponse {
     summary: CsgoPlayerMatchSummary,
     view: CsgoView,
     container: CsgoCommonEventContainer,
+    // This is primarily relevant in the case where a demo exists.
+    // The exact UTC time of things happening is going to be not quite the same
+    // as the time given by the user thus we need to tell the user the proper
+    // offset to allow them to be able to accurately go to the correct time
+    // in the VOD for any given event.
+    clock_offset_ms: i64,
 }
 
 #[derive(Serialize)]
@@ -45,6 +52,7 @@ pub async fn get_csgo_match_handler(app : web::Data<Arc<api::ApiApplication>>, p
     let view = db::find_csgo_view_from_match_user(&*app.pool, &path.match_uuid, path.user_id).await?;
     let container = db::get_csgo_event_container_from_view(&*app.pool, &view.view_uuid).await?;
     Ok(HttpResponse::Ok().json(CsgoMatchResponse{
+        clock_offset_ms: db::compute_csgo_timing_offset(&*app.pool, &view.view_uuid).await?,
         summary: db::list_csgo_match_summaries_for_uuids(&*app.pool, &[MatchPlayerPair{
             match_uuid: path.match_uuid.clone(),
             player_uuid: user.uuid.clone(),

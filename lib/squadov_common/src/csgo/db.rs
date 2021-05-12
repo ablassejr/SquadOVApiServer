@@ -32,6 +32,85 @@ use uuid::Uuid;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 
+pub async fn compute_csgo_timing_offset(ex: &PgPool, view_uuid: &Uuid) -> Result<i64, SquadOvError> {
+    // To compute the offset, we compute the difference between the tm_round_start, tm_round_play, and tm_round_end
+    // events for the same round between the GSI and the Demo event container.
+    let demo_rounds = sqlx::query!(
+        "
+        SELECT cer.round_num, cer.tm_round_start, cer.tm_round_play, cer.tm_round_end
+        FROM squadov.csgo_event_container_rounds AS cer
+        INNER JOIN squadov.csgo_event_container AS cec
+            ON cec.id = cer.container_id
+        WHERE cec.view_uuid = $1
+            AND cec.event_source = 1
+        ",
+        view_uuid
+    )
+        .fetch_all(&*ex)
+        .await?
+        .into_iter()
+        .map(|x| {
+            (x.round_num, x)
+        })
+        .collect::<HashMap<i32, _>>();
+
+    if demo_rounds.is_empty() {
+        return Ok(0);
+    }
+
+    let gsi_rounds = sqlx::query!(
+        "
+        SELECT cer.round_num, cer.tm_round_start, cer.tm_round_play, cer.tm_round_end
+        FROM squadov.csgo_event_container_rounds AS cer
+        INNER JOIN squadov.csgo_event_container AS cec
+            ON cec.id = cer.container_id
+        WHERE cec.view_uuid = $1
+            AND cec.event_source = 0
+        ",
+        view_uuid
+    )
+        .fetch_all(&*ex)
+        .await?
+        .into_iter()
+        .map(|x| {
+            (x.round_num, x)
+        })
+        .collect::<HashMap<i32, _>>();
+
+    let mut differences: Vec<i64> = vec![];
+    for (round_num, demo_tm) in &demo_rounds {
+        if let Some(gsi_tm) = gsi_rounds.get(round_num) {
+
+            if demo_tm.tm_round_start.is_some() && gsi_tm.tm_round_start.is_some() {
+                differences.push((gsi_tm.tm_round_start.unwrap() - demo_tm.tm_round_start.unwrap()).num_milliseconds());
+            }
+
+            if demo_tm.tm_round_play.is_some() && gsi_tm.tm_round_play.is_some() {
+                differences.push((gsi_tm.tm_round_play.unwrap() - demo_tm.tm_round_play.unwrap()).num_milliseconds());
+            }
+
+            if demo_tm.tm_round_end.is_some() && gsi_tm.tm_round_end.is_some() {
+                differences.push((gsi_tm.tm_round_end.unwrap() - demo_tm.tm_round_end.unwrap()).num_milliseconds());
+            }
+        }
+    }
+    differences.sort();
+
+    Ok(
+        if differences.is_empty() {
+            0
+        } else {
+            // Use the median difference? Seems pretty reasonable.
+            let mid = differences.len() / 2;
+            if differences.len() % 2 == 0 {
+                (differences[mid - 1] + differences[mid]) / 2
+            } else {
+                differences[mid]
+            }
+        }
+    )
+}
+
 pub async fn get_steam_ids_in_match_for_user_uuids(ex: &PgPool, match_uuid: &Uuid, user_uuids: &[Uuid]) -> Result<Vec<(Uuid, i64)>, SquadOvError> {
     Ok(
         sqlx::query!(
@@ -602,6 +681,7 @@ async fn store_csgo_common_players_for_container(ex: &mut Transaction<'_, Postgr
     }
 
     let mut valid_players: HashSet<i32> = HashSet::new();
+    let mut seen_steam_players: HashSet<i64> = HashSet::new();
 
     // Need to run two SQL statements here. One to insert the
     // players into the Steam account cache. And another to store the player
@@ -652,28 +732,33 @@ async fn store_csgo_common_players_for_container(ex: &mut Transaction<'_, Postgr
                 mvps=p.mvps,
             ));
             container_sql.push(String::from(","));
-
-            steam_sql.push(format!("(
-                {steam_id},
-                {steam_name}
-            )",
-                steam_id=p.steam_account.steam_id,
-                steam_name=crate::sql::sql_format_string(&p.steam_account.name),
-            ));
-            steam_sql.push(String::from(","));
-
             added += 1;
+
+            if !seen_steam_players.contains(&p.steam_account.steam_id) {
+                steam_sql.push(format!("(
+                    {steam_id},
+                    {steam_name}
+                )",
+                    steam_id=p.steam_account.steam_id,
+                    steam_name=crate::sql::sql_format_string(&p.steam_account.name),
+                ));
+                steam_sql.push(String::from(","));
+                seen_steam_players.insert(p.steam_account.steam_id);
+            }
         }
+    }
+
+    if !seen_steam_players.is_empty() {
+        steam_sql.truncate(steam_sql.len() - 1);
+        steam_sql.push(String::from(" ON CONFLICT (steam_id) DO UPDATE SET steam_name=EXCLUDED.steam_name"));
+
+        sqlx::query(&steam_sql.join("")).execute(&mut *ex).await?;
     }
 
     if added > 0 {
         container_sql.truncate(container_sql.len() - 1);
         container_sql.push(String::from(" ON CONFLICT DO NOTHING"));
-
-        steam_sql.truncate(steam_sql.len() - 1);
-        steam_sql.push(String::from(" ON CONFLICT (steam_id) DO UPDATE SET steam_name=EXCLUDED.steam_name"));
-
-        sqlx::query(&steam_sql.join("")).execute(&mut *ex).await?;
+        
         sqlx::query(&container_sql.join("")).execute(&mut *ex).await?;
     }
     Ok(valid_players)

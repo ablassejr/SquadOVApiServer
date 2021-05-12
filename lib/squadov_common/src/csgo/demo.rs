@@ -392,6 +392,7 @@ pub struct CsgoDemoRound {
     pub damage: Vec<CsgoDemoDamage>,
     // Players in this round and their econ/weapons.
     pub players: HashMap<i32, CsgoDemoRoundPlayerInfo>,
+    pub round_frozen: bool,
 }
 
 impl Default for CsgoDemoRound {
@@ -408,6 +409,7 @@ impl Default for CsgoDemoRound {
             kills: vec![],
             damage: vec![],
             players: HashMap::new(),
+            round_frozen: false,
         }
     }
 }
@@ -552,54 +554,71 @@ impl CsgoDemo {
             "round_announce_match_start" => {
                 log::debug!("csgo game start at: {} [{}]", tick, event_name);
                 self.game_start_tick = Some(tick);
+                // Freeze whatever round we're in because this gets "announced" after the freeze round.
+                if let Some(round) = self.rounds.get_mut(current_round_idx) {
+                    round.round_frozen = true;
+                }
             },
             "player_death" => {
                 log::debug!("csgo player death at: {}", tick);
                 if let Some(round) = self.rounds.get_mut(current_round_idx) {
-                    // Determine who died and who killed them (and how they died).
-                    // We want to keep these events associated with rounds.
-                    let mut msg = parse_csgo_game_event_message(event, desc)?;
-                    let kill = CsgoDemoKill{
-                        tick,
-                        victim: msg.remove("userid").ok_or(SquadOvError::NotFound)?.val_short(),
-                        killer: msg.remove("attacker").map(|x| { x.val_short() }),
-                        assister: msg.remove("assister").map(|x| { x.val_short() }),
-                        flash_assist: msg.remove("assistedflash").map(|x| { x.val_bool() }).unwrap_or(false),
-                        headshot: msg.remove("headshot").map(|x| { x.val_bool() }).unwrap_or(false),
-                        smoke: msg.remove("thrusmoke").map(|x| { x.val_bool() }).unwrap_or(false),
-                        blind: msg.remove("attackerblind").map(|x| { x.val_bool() }).unwrap_or(false),
-                        wallbang: msg.remove("penetrated").map(|x| { x.val_short() }).unwrap_or(0) > 0,
-                        noscope: msg.remove("noscope").map(|x| { x.val_bool() }).unwrap_or(false),
-                        weapon: csgo_string_to_weapon(&msg.remove("weapon").map(|x| { String::from(x.val_string()) }).unwrap_or(String::new())),
-                    };
-                    round.kills.push(kill);
+                    if round.round_frozen {
+                        // Determine who died and who killed them (and how they died).
+                        // We want to keep these events associated with rounds.
+                        let mut msg = parse_csgo_game_event_message(event, desc)?;
+                        let kill = CsgoDemoKill{
+                            tick,
+                            victim: msg.remove("userid").ok_or(SquadOvError::NotFound)?.val_short(),
+                            killer: msg.remove("attacker").map(|x| { x.val_short() }),
+                            assister: msg.remove("assister").map(|x| { x.val_short() }),
+                            flash_assist: msg.remove("assistedflash").map(|x| { x.val_bool() }).unwrap_or(false),
+                            headshot: msg.remove("headshot").map(|x| { x.val_bool() }).unwrap_or(false),
+                            smoke: msg.remove("thrusmoke").map(|x| { x.val_bool() }).unwrap_or(false),
+                            blind: msg.remove("attackerblind").map(|x| { x.val_bool() }).unwrap_or(false),
+                            wallbang: msg.remove("penetrated").map(|x| { x.val_short() }).unwrap_or(0) > 0,
+                            noscope: msg.remove("noscope").map(|x| { x.val_bool() }).unwrap_or(false),
+                            weapon: csgo_string_to_weapon(&msg.remove("weapon").map(|x| { String::from(x.val_string()) }).unwrap_or(String::new())),
+                        };
+                        round.kills.push(kill);
+                    }
                 }
             },
             "player_hurt" => {
                 log::debug!("csgo player hurt at: {}", tick);
                 if let Some(round) = self.rounds.get_mut(current_round_idx) {
-                    let mut msg = parse_csgo_game_event_message(event, desc)?;
-                    let damage = CsgoDemoDamage{
-                        tick,
-                        attacker: msg.remove("attacker").map(|x| { x.val_short() }),
-                        receiver: msg.remove("userid").ok_or(SquadOvError::NotFound)?.val_short(),
-                        remaining_health: msg.remove("health").map(|x| { x.val_byte() }).unwrap_or(0),
-                        remaining_armor: msg.remove("armor").map(|x| { x.val_byte() }).unwrap_or(0),
-                        damage_health: msg.remove("dmg_health").map(|x| { x.val_short() }).unwrap_or(0),
-                        damage_armor: msg.remove("dmg_armor").map(|x| { x.val_byte() }).unwrap_or(0),
-                        weapon: csgo_string_to_weapon(&msg.remove("weapon").map(|x| { String::from(x.val_string()) }).unwrap_or(String::new())),
-                        hitgroup: CsgoDemoHitGroup::try_from(msg.remove("hitgroup").map(|x| { x.val_byte() }).unwrap_or(0))?,
-                    };
-                    round.damage.push(damage);
+                    if round.round_frozen {
+                        let mut msg = parse_csgo_game_event_message(event, desc)?;
+                        let damage = CsgoDemoDamage{
+                            tick,
+                            attacker: msg.remove("attacker").map(|x| { x.val_short() }),
+                            receiver: msg.remove("userid").ok_or(SquadOvError::NotFound)?.val_short(),
+                            remaining_health: msg.remove("health").map(|x| { x.val_byte() }).unwrap_or(0),
+                            remaining_armor: msg.remove("armor").map(|x| { x.val_byte() }).unwrap_or(0),
+                            damage_health: msg.remove("dmg_health").map(|x| { x.val_short() }).unwrap_or(0),
+                            damage_armor: msg.remove("dmg_armor").map(|x| { x.val_byte() }).unwrap_or(0),
+                            weapon: csgo_string_to_weapon(&msg.remove("weapon").map(|x| { String::from(x.val_string()) }).unwrap_or(String::new())),
+                            hitgroup: CsgoDemoHitGroup::try_from(msg.remove("hitgroup").map(|x| { x.val_byte() }).unwrap_or(0))?,
+                        };
+                        round.damage.push(damage);
+                    }
                 }
             },
             "round_start" => {
                 log::debug!("csgo round start at: {}", tick);
+
+                // If the previous round hasn't been "frozen" then we want to overwrite it instead.
+                // A frozen round has experienced a valid "round freeze end".
+                let overwrite = !self.rounds.is_empty() && !self.rounds[self.rounds.len() - 1].round_frozen;
+
                 // Create a new empty round - we assume that we've tracked
                 // all the rounds properly so that the number of rounds in the
                 // rounds vector is accurate.
                 let mut new_round = CsgoDemoRound::default();
-                new_round.round_num = self.rounds.len();
+                new_round.round_num = if overwrite {
+                    current_round_idx
+                } else {
+                    self.rounds.len()
+                };
                 new_round.round_start_tick = tick;
 
                 // Populate player info.
@@ -607,7 +626,12 @@ impl CsgoDemo {
                     new_round.players.insert(*uid, CsgoDemoRoundPlayerInfo::default());
                 }
 
-                self.rounds.push(new_round);
+                if overwrite {
+                    let idx = self.rounds.len() - 1;
+                    self.rounds[idx] = new_round;
+                } else {
+                    self.rounds.push(new_round);
+                }
             },
             "round_end" => {
                 log::debug!("csgo round end at: {}", tick);
@@ -767,6 +791,10 @@ impl CsgoDemo {
             "round_freeze_end" => {
                 log::debug!("csgo round freeze end: {}", tick);
                 if let Some(round) = self.rounds.get_mut(current_round_idx) {
+                    if let Some(game_start_tick) = self.game_start_tick {
+                        round.round_frozen = tick >= game_start_tick;
+                    }
+
                     // There's gonna be an extra round_freeze_end when the game ends so we want to ignore that one.
                     if round.freeze_end_tick.is_some() {
                         return Ok(());

@@ -42,6 +42,13 @@ pub struct CsgoViewData {
     demo_timestamp: Option<DateTime<Utc>>,
 }
 
+#[derive(Deserialize,Debug)]
+#[serde(rename_all="camelCase")]
+pub struct CsgoDemoData {
+    demo: String,
+    demo_timestamp: DateTime<Utc>,
+}
+
 pub async fn create_csgo_view_for_user_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<CsgoCreateViewPath>, data: web::Json<CsgoCreateViewData>) -> Result<HttpResponse, SquadOvError> {
     let mut tx = app.pool.begin().await?;
     let view = db::create_csgo_view_for_user(&mut tx, path.user_id, &data.server, &data.start_time, &data.map, &data.mode).await?;
@@ -86,4 +93,9 @@ pub async fn finish_csgo_view_for_user_handler(app : web::Data<Arc<api::ApiAppli
     }
 
     Err(SquadOvError::InternalError(String::from("Reached CSGO finish view retry threshold.")))
+}
+
+pub async fn associate_csgo_demo_with_view_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<CsgoViewPath>, data: web::Json<CsgoDemoData>) -> Result<HttpResponse, SquadOvError> {
+    app.csgo_itf.request_parse_csgo_demo_from_url(&path.view_uuid, &data.demo, &data.demo_timestamp).await?;
+    Ok(HttpResponse::NoContent().finish())
 }

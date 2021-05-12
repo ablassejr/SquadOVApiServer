@@ -621,6 +621,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                         // Note that we should be submitting GZIP here so this shouldn't get super super large.
                                                         cfg.limit(5 * 1024 * 1024)
                                                     }))
+                                                .route("/demo", web::post().to(v1::associate_csgo_demo_with_view_handler))
                                         )
                                 )
                                 .service(
