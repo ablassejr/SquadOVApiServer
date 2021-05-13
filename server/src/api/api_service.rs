@@ -750,7 +750,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 )
                                 .service(
                                     web::scope("/view")
-                                        .route("", web::post().to(v1::mark_clip_view_handler))
+                                        .route("", web::get().to(v1::mark_clip_view_handler))
                                 )
                                 .service(
                                     web::scope("/comments")
