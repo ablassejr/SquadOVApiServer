@@ -18,7 +18,7 @@ spec:
                 task: infra
             containers:
                 - name: fusionauth
-                  image: fusionauth/fusionauth-app:1.25.0
+                  image: fusionauth/fusionauth-app:1.27.2
                   ports:
                     - containerPort: 9011
                   livenessProbe:
@@ -43,8 +43,10 @@ spec:
                       value: 1G
                     - name: FUSIONAUTH_SEARCH_ENGINE_TYPE
                       value: database
-                    - name: FUSIONAUTH_RUNTIME_MODE 
+                    - name: FUSIONAUTH_APP_RUNTIME_MODE 
                       value: production
+                    - name: FUSIONAUTH_APP_SILENT_MODE
+                      value: true
                     - name: DATABASE_ROOT_USER
                       valueFrom:
                         secretKeyRef:

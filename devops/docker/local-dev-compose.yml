@@ -16,7 +16,7 @@ services:
             c3p0:
                 ipv4_address: "172.22.0.2"
     fusionauth:
-        image: "fusionauth/fusionauth-app:1.19.8"
+        image: "fusionauth/fusionauth-app:1.27.2"
         volumes:
             - type: volume
               source: fa-config
@@ -25,10 +25,12 @@ services:
             - "DATABASE_URL=jdbc:postgresql://172.22.0.2:5432/fusionauth?timezone=UTC"
             - "DATABASE_ROOT_USER=${POSTGRES_USER}"
             - "DATABASE_ROOT_PASSWORD=${POSTGRES_PASSWORD}"
-            - "DATABASE_USER=${FUSIONAUTH_DB_USER}"
+            - "DATABASE_USERNAME=${FUSIONAUTH_DB_USER}"
             - "DATABASE_PASSWORD=${FUSIONAUTH_DB_PASSWORD}"
-            - "FUSIONAUTH_MEMORY=1G"
+            - "FUSIONAUTH_APP_MEMORY=1G"
             - "FUSIONAUTH_SEARCH_ENGINE_TYPE=database"
+            - "FUSIONAUTH_APP_SILENT_MODE=true"
+            - "FUSIONAUTH_APP_RUNTIME_MODE=production"
         ports:
             - "9011:9011"
         networks:
