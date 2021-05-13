@@ -39,7 +39,7 @@ spec:
                   env:
                     - name: DATABASE_URL
                       value: "jdbc:postgresql://127.0.0.1:5432/fusionauth?timezone=UTC"
-                    - name: FUSIONAUTH_MEMORY
+                    - name: FUSIONAUTH_APP_MEMORY
                       value: 1G
                     - name: FUSIONAUTH_SEARCH_ENGINE_TYPE
                       value: database
@@ -55,7 +55,7 @@ spec:
                         secretKeyRef:
                             name: postgres-secret
                             key: password
-                    - name: DATABASE_USER
+                    - name: DATABASE_USERNAME
                       valueFrom:
                         secretKeyRef:
                             name: fusionauth-db-secret
