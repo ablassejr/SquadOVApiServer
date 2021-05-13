@@ -1,6 +1,9 @@
 use serde::{Serialize,Deserialize};
 use derive_more::{Display};
-use squadov_common::encode::url_encode;
+use squadov_common::{
+    SquadOvError,
+    encode::url_encode,
+};
 
 #[derive(Debug, Serialize,Deserialize)]
 pub struct FusionAuthRegistration {
@@ -60,6 +63,14 @@ struct FusionAuthStartForgotPasswordInput<'a> {
 #[derive(Serialize)]
 struct FusionAuthChangePasswordInput<'a> {
     password: &'a str
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct FusionAuthChangePasswordWithUserInput<'a> {
+    password: &'a str,
+    current_password: &'a str,
+    login_id: &'a str,
 }
 
 impl super::FusionAuthClient {
@@ -247,6 +258,34 @@ impl super::FusionAuthClient {
                 }
             },
             Err(err) => Err(FusionAuthUserError::Generic(format!("{}", err))),
+        }
+    }
+
+    pub async fn change_user_password_with_id(&self, current_password: &str, new_password: &str, login_id: &str) -> Result<(), SquadOvError> {
+        let resp = self.client.post(self.build_url("/api/user/change-password").as_str())
+            .json(&FusionAuthChangePasswordWithUserInput{
+                password: new_password,
+                current_password: current_password,
+                login_id: login_id,
+            })
+            .send()
+            .await?;
+        
+        match resp.status().as_u16() {
+            200 => Ok(()),
+            400 => {
+                let body = resp.text().await?;
+                log::warn!("Failure in request to change user password: {}", body);
+                Err(SquadOvError::BadRequest)
+            },
+            401 => Err(SquadOvError::Unauthorized),
+            404 => Err(SquadOvError::NotFound),
+            500 => Err(SquadOvError::InternalError(String::from("FA Error"))),
+            503 => {
+                let body = resp.text().await?;
+                Err(SquadOvError::InternalError(body))
+            }
+            _ => Err(SquadOvError::InternalError(String::from("Unknown change password error."))),
         }
     }
 }

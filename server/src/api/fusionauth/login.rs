@@ -97,7 +97,7 @@ impl super::FusionAuthClient {
                 let status = resp.status();
 
                 match status.as_u16() {
-                    200 | 212 => {
+                    200 | 212 | 213 => {
                         let body = resp.json::<FusionAuthLoginResult>().await;
                         match body {
                             Ok(j) => Ok(j),
