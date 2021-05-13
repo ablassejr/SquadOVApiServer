@@ -17,6 +17,7 @@ pub struct PlaytimeRequestQuery {
 #[serde(rename_all = "camelCase")]
 pub struct PlaytimeInfo {
     aimlab_ms: i64,
+    csgo_ms: i64,
     hearthstone_ms: i64,
     lol_ms: i64,
     tft_ms: i64,
@@ -51,6 +52,12 @@ impl api::ApiApplication {
                         INNER JOIN squadov.aimlab_tasks AS at
                             ON at.match_uuid = rm.match_uuid
                     ) AS "aimlab_ms!",
+                    (
+                        SELECT COALESCE(SUM(rm.duration)::BIGINT,0)
+                        FROM relevant_matches AS rm
+                        INNER JOIN squadov.csgo_matches AS cm
+                            ON cm.match_uuid = rm.match_uuid
+                    ) AS "csgo_ms!",
                     (
                         SELECT COALESCE(SUM(rm.duration)::BIGINT,0)
                         FROM relevant_matches AS rm
