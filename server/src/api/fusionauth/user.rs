@@ -4,6 +4,7 @@ use squadov_common::{
     SquadOvError,
     encode::url_encode,
 };
+use uuid::Uuid;
 
 #[derive(Debug, Serialize,Deserialize)]
 pub struct FusionAuthRegistration {
@@ -15,9 +16,25 @@ pub struct FusionAuthRegistration {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct FusionAuthTwoFactorMethod {
+    pub id: String,
+    pub method: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct FusionAuthTwoFactor {
+    pub methods: Option<Vec<FusionAuthTwoFactorMethod>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all="camelCase")]
 pub struct FusionAuthUser {
+    pub id: Uuid,
     pub email: String,
     pub registrations: Vec<FusionAuthRegistration>,
+    pub two_factor: FusionAuthTwoFactor,
     pub verified: bool,
 }
 

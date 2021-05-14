@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use derive_more::{Display};
+use squadov_common::SquadOvError;
+
 #[derive(Serialize)]
 pub struct FusionAuthLoginInput {
     #[serde(rename = "applicationId")]
@@ -49,6 +51,14 @@ struct FusionAuthLoginTwoFactor {
     two_factor_id: String
 }
 
+#[derive(Serialize,Debug,Clone)]
+#[serde(rename_all="camelCase")]
+pub struct FusionAuthMfaLoginInput {
+    code: String,
+    two_factor_id: String,
+    application_id: String,
+}
+
 impl super::FusionAuthClient {
     pub fn build_login_input(&self, username : String, password: String, ip : Option<&str>) -> FusionAuthLoginInput {
         return FusionAuthLoginInput{
@@ -83,6 +93,22 @@ impl super::FusionAuthClient {
                 code: 0,
                 message: format!("{}", err)
             }),
+        }
+    }
+
+    pub async fn mfa_login(&self, id: &str, code: &str) -> Result<FusionAuthLoginResult, SquadOvError> {
+        let resp = self.client.post(self.build_url("/api/two-factor/login").as_str())
+            .json(&FusionAuthMfaLoginInput{
+                code: code.to_string(),
+                two_factor_id: id.to_string(),
+                application_id: self.cfg.application_id.clone()
+            })
+            .send()
+            .await?;
+
+        match resp.status().as_u16() {
+            200 | 212 | 213 => Ok(resp.json::<FusionAuthLoginResult>().await?),
+            _ => Err(SquadOvError::InternalError(format!("FA MFA Login Internal Error {} - {}", resp.status().as_u16(), resp.text().await?)))
         }
     }
 

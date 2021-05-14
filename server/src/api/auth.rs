@@ -5,6 +5,7 @@ mod forgot_password;
 mod verify_email;
 mod logout;
 mod session;
+mod mfa;
 
 pub use user::*;
 pub use login::*;
@@ -13,6 +14,7 @@ pub use forgot_password::*;
 pub use verify_email::*;
 pub use logout::*;
 pub use session::*;
+pub use mfa::*;
 
 use squadov_common::SquadOvError;
 use std::sync::Arc;

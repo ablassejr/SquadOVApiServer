@@ -2,6 +2,7 @@ mod login;
 mod register;
 mod user;
 mod jwt;
+mod mfa;
 
 use serde::{Deserialize};
 use reqwest::header;
@@ -47,3 +48,4 @@ pub use login::*;
 pub use register::*;
 pub use user::*;
 pub use jwt::*;
+pub use mfa::*;

@@ -33,6 +33,8 @@ pub enum SquadOvError {
     Defer(i64),
     #[display(fmt = "[SquadovError] Rate Limit")]
     RateLimit,
+    #[display(fmt = "[SquadovError] Two Factor Request")]
+    TwoFactor(String),
 }
 
 impl error::ResponseError for SquadOvError {
@@ -54,6 +56,7 @@ impl error::ResponseError for SquadOvError {
             SquadOvError::Duplicate => StatusCode::BAD_REQUEST,
             SquadOvError::Defer(_) => StatusCode::SERVICE_UNAVAILABLE,
             SquadOvError::RateLimit => StatusCode::TOO_MANY_REQUESTS,
+            SquadOvError::TwoFactor(_) => StatusCode::ACCEPTED,
         }
     }
 }

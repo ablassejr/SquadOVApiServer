@@ -38,6 +38,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
         .service(
             web::scope("/auth")
                 .route("/login", web::post().to(auth::login_handler))
+                .route("/login/mfa", web::post().to(auth::mfa_login_handler))
                 .route("/logout", web::post().to(auth::logout_handler))
                 .route("/register", web::post().to(auth::register_handler))
                 .route("/forgotpw", web::get().to(auth::forgot_pw_handler))
@@ -143,6 +144,14 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .route("/referral", web::get().to(v1::get_user_me_referral_link_handler))
                                 .route("/squadmates", web::get().to(v1::get_user_squadmates_handler))
                                 .route("/changepw", web::post().to(auth::change_pw_handler))
+                                .route("/pw/verify", web::post().to(auth::verify_pw_handler))
+                                .service(
+                                    web::scope("/2fa")
+                                        .route("/qr", web::get().to(auth::get_2fa_qr_code_handler))
+                                        .route("", web::get().to(auth::check_2fa_status_handler))
+                                        .route("", web::delete().to(auth::remove_2fa_handler))
+                                        .route("", web::post().to(auth::enable_2fa_handler))
+                                )
                         )
                         .service(
                             web::scope("/{user_id}")
