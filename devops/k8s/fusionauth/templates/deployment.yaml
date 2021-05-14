@@ -46,7 +46,7 @@ spec:
                     - name: FUSIONAUTH_APP_RUNTIME_MODE 
                       value: production
                     - name: FUSIONAUTH_APP_SILENT_MODE
-                      value: true
+                      value: "true"
                     - name: DATABASE_ROOT_USER
                       valueFrom:
                         secretKeyRef:
