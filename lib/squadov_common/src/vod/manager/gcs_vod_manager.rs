@@ -174,4 +174,10 @@ impl VodManager for GCSVodManager {
         let client = self.get_gcp_client().gcs();
         Ok(client.set_object_public_acl(&self.bucket, &fname).await?)
     }
+
+    async fn check_vod_segment_is_public(&self, segment: &VodSegmentId) -> Result<bool, SquadOvError> {
+        let fname = self.get_fname_from_segment_id(segment);
+        let client = self.get_gcp_client().gcs();
+        Ok(client.check_object_public_acl(&self.bucket, &fname).await?)
+    }
 }

@@ -19,6 +19,30 @@ pub enum GCSUploadStatus {
 }
 
 impl super::GCSClient {
+    pub async fn check_object_public_acl(&self, bucket_id: &str, path: &str) -> Result<bool, SquadOvError> {
+        let client = self.http.read()?.create_http_client()?;
+        let url = format!(
+            "{}/b/{}/o/{}/acl/allUsers",
+            super::STORAGE_BASE_URL,
+            bucket_id,
+            crate::url_encode(path),
+        );
+
+        let resp = client.get(&url)
+            .send()
+            .await?;
+
+        if resp.status() != StatusCode::OK {
+            let status = resp.status().as_u16();
+            match status {
+                404 => Ok(false),
+                _ => Err(SquadOvError::InternalError(format!("GCS Get Object ACL [Public] Error: {} - {} [{}]", status, resp.text().await?, &url)))
+            }
+        } else {
+            Ok(true)
+        }
+    }
+
     pub async fn set_object_public_acl(&self, bucket_id: &str, path: &str) -> Result<(), SquadOvError> {
         let client = self.http.read()?.create_http_client()?;
 

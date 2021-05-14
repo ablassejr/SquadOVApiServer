@@ -79,4 +79,8 @@ impl VodManager for FilesystemVodManager {
     async fn make_segment_public(&self, _segment: &VodSegmentId) -> Result<(), SquadOvError> {
         Ok(())
     }
+
+    async fn check_vod_segment_is_public(&self, _segment: &VodSegmentId) -> Result<bool, SquadOvError> {
+        Ok(false)
+    }
 }

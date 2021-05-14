@@ -9,7 +9,7 @@ use openssl::{
 };
 use sha2::{Sha256, Digest};
 
-#[derive(Deserialize)]
+#[derive(Deserialize,Debug)]
 pub struct OAuthAccessToken {
     pub access_token: String,
     pub token_type: String,

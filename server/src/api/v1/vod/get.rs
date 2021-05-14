@@ -139,7 +139,7 @@ pub async fn get_vod_association_handler(data : web::Path<VodFindFromVideoUuid>,
 
 pub async fn get_vod_track_segment_handler(data : web::Path<squadov_common::VodSegmentId>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
     // If the VOD is public (shared), then we can return the public URL instead of the signed private one.
-    let redirect_uri = if db::check_if_vod_public(&*app.pool, &data.video_uuid).await? {
+    let redirect_uri = if data.segment_name != "preview.mp4" && db::check_if_vod_public(&*app.pool, &data.video_uuid).await? && app.vod.check_vod_segment_is_public(&data).await? {
         app.vod.get_public_segment_redirect_uri(&data).await?
     } else {
         app.vod.get_segment_redirect_uri(&data).await?
