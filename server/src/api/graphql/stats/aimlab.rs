@@ -271,7 +271,7 @@ impl GraphqlAimlabStats {
 
     fn pentakill(&self, context: &api::graphql::GraphqlContext) -> FieldResult<pentakill::GraphqlAimlabPentakillStats> {
         if !context.has_access_to_stat(&[StatPermission::AimlabPentakill])? {
-            return Err(juniper::FieldError::new("No gridshot access.", juniper::Value::Null));
+            return Err(juniper::FieldError::new("No pentakill access.", juniper::Value::Null));
         }
         
         Ok(pentakill::GraphqlAimlabPentakillStats {

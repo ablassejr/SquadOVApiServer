@@ -845,6 +845,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
     if graphql_debug {
         scope = scope.service(
             web::resource("/graphql")
+                .wrap(auth::ApiSessionValidator{})
                 .route(web::post().to(graphql::graphql_handler))
                 .route(web::get().to(graphql::graphiql_handler))
         );

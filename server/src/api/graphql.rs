@@ -15,12 +15,9 @@ pub struct GraphqlContext {
 
 impl GraphqlContext {
     pub fn has_access_to_stat(&self, stats: &[StatPermission]) -> FieldResult<bool> {
-        if self.app.config.server.graphql_debug {
-            return Ok(true);
-        }
-
         Ok(stats.iter().all(|x| {
             if self.session.is_none() {
+                log::warn!("Denying GraphQL due to no session.");
                 return false;
             }
 
@@ -31,6 +28,7 @@ impl GraphqlContext {
 
             let share_token = session.share_token.as_ref().unwrap();
             if share_token.graphql_stats.is_none() {
+                log::warn!("Denying GraphQL due to no stats on share token.");
                 return false;
             }
 
@@ -77,14 +75,12 @@ pub fn create_schema() -> GraphqlSchema {
 pub async fn graphql_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<GraphQLRequest>, req: HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
     let context = Arc::new(GraphqlContext{
         app: app.get_ref().clone(),
-        session: if !app.config.server.graphql_debug {
+        session: {
             let extensions = req.extensions();
             match extensions.get::<api::auth::SquadOVSession>() {
                 Some(s) => Some(s.clone()),
                 None => return Err(squadov_common::SquadOvError::Unauthorized),
             }
-        } else {
-            None
         },
     });
     let resp = data.execute(&app.schema, &context).await;

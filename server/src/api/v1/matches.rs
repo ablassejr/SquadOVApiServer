@@ -508,7 +508,7 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
             clip_uuid: None,
             graphql_stats: data.graphql_stats.clone(),
         };
-
+        
         let encryption_request = AESEncryptRequest{
             data: serde_json::to_vec(&access_request)?,
             aad: session.user.uuid.as_bytes().to_vec(),
