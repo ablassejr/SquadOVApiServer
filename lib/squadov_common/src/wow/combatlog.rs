@@ -600,21 +600,26 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                     overkill: payload.parts[idx+1].parse()?,
                 })
             }),
-            "COMBATANT_INFO" => Ok((None, WoWCombatLogEventType::CombatantInfo{
-                guid: payload.parts[1].clone(),
-                team: payload.parts[2].parse()?,
-                strength: payload.parts[3].parse()?,
-                agility: payload.parts[4].parse()?,
-                stamina: payload.parts[5].parse()?,
-                intelligence: payload.parts[6].parse()?,
-                armor: payload.parts[23].parse()?,
-                spec_id: payload.parts[24].parse()?,
-                talents: parse_wow_talents_from_str(&payload.parts[25])?,
-                pvp_talents: parse_wow_talents_from_str(&payload.parts[26])?,
-                covenant: parse_wow_covenant_from_str(&payload.parts[27])?,
-                items: parse_wow_item_info_from_str(&payload.parts[28])?,
-                rating: payload.parts[32].parse()?,
-            })),
+            "COMBATANT_INFO" => if payload.parts.len() >= 33 {
+                Ok((None, WoWCombatLogEventType::CombatantInfo{
+                    guid: payload.parts[1].clone(),
+                    team: payload.parts[2].parse()?,
+                    strength: payload.parts[3].parse()?,
+                    agility: payload.parts[4].parse()?,
+                    stamina: payload.parts[5].parse()?,
+                    intelligence: payload.parts[6].parse()?,
+                    armor: payload.parts[23].parse()?,
+                    spec_id: payload.parts[24].parse()?,
+                    talents: parse_wow_talents_from_str(&payload.parts[25])?,
+                    pvp_talents: parse_wow_talents_from_str(&payload.parts[26])?,
+                    covenant: parse_wow_covenant_from_str(&payload.parts[27])?,
+                    items: parse_wow_item_info_from_str(&payload.parts[28])?,
+                    rating: payload.parts[32].parse()?,
+                }))
+            } else {
+                log::warn!("Bad COMBATANT_INFO line: {}", payload.flatten());
+                Ok((None, WoWCombatLogEventType::Unknown))
+            },
             "ENCOUNTER_START" => Ok((None, WoWCombatLogEventType::EncounterStart{
                 encounter_id: payload.parts[1].parse()?,
                 encounter_name: payload.parts[2].clone(),
