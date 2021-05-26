@@ -69,7 +69,7 @@ pub struct RawRecentMatchData {
     game: SquadOvGames,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct RecentMatchQuery {
     pub games: Option<Vec<SquadOvGames>>,

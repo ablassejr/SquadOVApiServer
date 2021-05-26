@@ -75,7 +75,14 @@ fn replace_pagination_parameters_in_url(url: &str, start : i64, end : i64) -> Re
         }
     }
 
-    Ok(String::from(url.as_str()))
+    // Sometimes the query key has [] in it for array parameters. The URL
+    // will url encode those characters which causes them to be invalid so
+    // we need to keep them in their original form.
+    Ok(String::from(url.as_str()).replace(
+        "%5B", "[",
+    ).replace(
+        "%5D", "]",
+    ))
 }
 
 pub fn construct_hal_pagination_response<T>(data : T, req: &HttpRequest, params: &PaginationParameters, has_next: bool) -> Result<HalResponse<T>, SquadOvError> {
