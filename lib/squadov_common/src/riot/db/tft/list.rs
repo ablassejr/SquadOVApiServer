@@ -1,12 +1,15 @@
 use crate::{
     SquadOvError,
-    riot::games::{
-        TftPlayerMatchSummary,
-        TftCompanionDto,
-        TftUnitDto,
-        TftTraitDto,
+    riot::{
+        games::{
+            TftPlayerMatchSummary,
+            TftCompanionDto,
+            TftUnitDto,
+            TftTraitDto,
+        },
+        db::summoner,
+        TftMatchFilters,
     },
-    riot::db::summoner,
     matches::MatchPlayerPair,
 };
 use sqlx::PgPool;
@@ -182,21 +185,28 @@ pub async fn list_tft_match_summaries_for_uuids(ex: &PgPool, uuids: &[MatchPlaye
     Ok(match_summaries)
 }
 
-pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start: i64, end: i64) -> Result<Vec<TftPlayerMatchSummary>, SquadOvError> {
+pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_uuid: &Uuid, start: i64, end: i64, filters: &TftMatchFilters) -> Result<Vec<TftPlayerMatchSummary>, SquadOvError> {
     let uuids: Vec<Uuid> = sqlx::query!(
         r#"
         SELECT tmi.match_uuid
         FROM squadov.tft_match_info AS tmi
         INNER JOIN squadov.tft_match_participants AS tmp
             ON tmp.match_uuid = tmi.match_uuid
+        LEFT JOIN squadov.vods AS v
+            ON v.match_uuid = tmi.match_uuid
+                AND v.user_uuid = $4
+                AND v.is_clip = FALSE
         WHERE tmp.puuid = $1
             AND tmi.tft_set_number >= 3
+            AND (NOT $5::BOOLEAN OR v.video_uuid IS NOT NULL)
         ORDER BY tmi.game_datetime DESC
         LIMIT $2 OFFSET $3
         "#,
         puuid,
         end - start,
-        start
+        start,
+        user_uuid,
+        filters.has_vod.unwrap_or(false),
     )
         .fetch_all(&*ex)
         .await?
@@ -205,9 +215,6 @@ pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start:
             x.match_uuid
         })
         .collect();
-
-    // We do make the assumption that this account is associated with some user we have stored.
-    let user_uuid = summoner::get_riot_summoner_user_uuid(&*ex, puuid).await?;
 
     list_tft_match_summaries_for_uuids(ex, &uuids.into_iter().map(|x| {
         MatchPlayerPair{

@@ -52,3 +52,9 @@ pub struct LolMatchFilters {
     modes: Option<Vec<String>>,
     has_vod: Option<bool>,
 }
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all="camelCase")]
+pub struct TftMatchFilters {
+    has_vod: Option<bool>,
+}
