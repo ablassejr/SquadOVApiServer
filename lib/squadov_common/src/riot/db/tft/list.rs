@@ -7,7 +7,6 @@ use crate::{
             TftUnitDto,
             TftTraitDto,
         },
-        db::summoner,
         TftMatchFilters,
     },
     matches::MatchPlayerPair,

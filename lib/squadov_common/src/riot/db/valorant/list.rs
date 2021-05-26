@@ -1,10 +1,12 @@
 use crate::{
     SquadOvError,
-    riot::games::valorant::{
-        ValorantPlayerMatchSummary
+    riot::{
+        ValorantMatchFilters,
+        games::valorant::{
+            ValorantPlayerMatchSummary
+        },
     },
     matches::MatchPlayerPair,
-    riot::db::account,
 };
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -100,20 +102,33 @@ pub async fn list_valorant_match_summaries_for_uuids(ex: &PgPool, uuids: &[Match
     )
 }
 
-pub async fn list_valorant_match_summaries_for_puuid(ex: &PgPool, puuid: &str, start: i64, end: i64) -> Result<Vec<ValorantPlayerMatchSummary>, SquadOvError> {
+pub async fn list_valorant_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_uuid: &Uuid, start: i64, end: i64, filters: &ValorantMatchFilters) -> Result<Vec<ValorantPlayerMatchSummary>, SquadOvError> {
     let uuids: Vec<Uuid> = sqlx::query!(
         r#"
             SELECT vm.match_uuid
             FROM squadov.valorant_matches AS vm
             INNER JOIN squadov.valorant_match_players AS vmp
                 ON vmp.match_uuid = vm.match_uuid
+            LEFT JOIN squadov.vods AS v
+                ON v.match_uuid = vm.match_uuid
+                    AND v.user_uuid = $4
+                    AND v.is_clip = FALSE
             WHERE vmp.puuid = $1
+                AND (CARDINALITY($5::VARCHAR[]) = 0 OR vm.map_id = ANY($5))
+                AND (CARDINALITY($6::VARCHAR[]) = 0 OR vm.game_mode = ANY($6))
+                AND (NOT $7::BOOLEAN OR v.video_uuid IS NOT NULL)
+                AND (NOT $8::BOOLEAN OR vm.is_ranked)
             ORDER BY vm.server_start_time_utc DESC
             LIMIT $2 OFFSET $3
         "#,
         puuid,
         end - start,
-        start
+        start,
+        user_uuid,
+        &filters.maps.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<String>>(),
+        &filters.modes.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<String>>(),
+        filters.has_vod.unwrap_or(false),
+        filters.is_ranked.unwrap_or(false),
     )
         .fetch_all(&*ex)
         .await?
@@ -122,9 +137,6 @@ pub async fn list_valorant_match_summaries_for_puuid(ex: &PgPool, puuid: &str, s
             x.match_uuid
         })
         .collect();
-
-    // We do make the assumption that this account is associated with some user we have stored.
-    let user_uuid = account::get_riot_account_user_uuid(&*ex, puuid).await?;
 
     list_valorant_match_summaries_for_uuids(ex, &uuids.into_iter().map(|x| {
         MatchPlayerPair{
