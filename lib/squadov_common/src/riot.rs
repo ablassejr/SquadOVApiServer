@@ -44,3 +44,11 @@ pub struct RiotUserInfo {
     pub sub: String,
     pub cpid: Option<String>,
 }
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all="camelCase")]
+pub struct LolMatchFilters {
+    maps: Option<Vec<i32>>,
+    modes: Option<Vec<String>>,
+    has_vod: Option<bool>,
+}

@@ -1,8 +1,11 @@
 use crate::{
     SquadOvError,
-    riot::games::{
-        LolPlayerMatchSummary,
-        LolMiniParticipantStats,
+    riot::{
+        LolMatchFilters,
+        games::{
+            LolPlayerMatchSummary,
+            LolMiniParticipantStats,
+        },
     },
     matches::MatchPlayerPair,
 };
@@ -130,7 +133,7 @@ pub async fn list_lol_match_summaries_for_uuids(ex: &PgPool, uuids: &[MatchPlaye
     Ok(match_summaries)
 }
 
-pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_uuid: &Uuid, start: i64, end: i64) -> Result<Vec<LolPlayerMatchSummary>, SquadOvError> {
+pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_uuid: &Uuid, start: i64, end: i64, filters: &LolMatchFilters) -> Result<Vec<LolPlayerMatchSummary>, SquadOvError> {
     let uuids: Vec<MatchPlayerPair> = sqlx::query!(
         r#"
         SELECT lmi.match_uuid
@@ -139,13 +142,24 @@ pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_u
             ON lmpi.match_uuid = lmi.match_uuid
         INNER JOIN squadov.riot_accounts AS ra
             ON ra.summoner_id = lmpi.summoner_id
+        LEFT JOIN squadov.vods AS v
+            ON v.match_uuid = lmi.match_uuid
+                AND v.user_uuid = $4
+                AND v.is_clip = FALSE
         WHERE ra.puuid = $1
+            AND (CARDINALITY($5::INTEGER[]) = 0 OR lmi.map_id = ANY($5))
+            AND (CARDINALITY($6::VARCHAR[]) = 0 OR lmi.game_mode = ANY($6))
+            AND (NOT $7::BOOLEAN OR v.video_uuid IS NOT NULL)
         ORDER BY lmi.game_creation DESC
         LIMIT $2 OFFSET $3
         "#,
         puuid,
         end - start,
-        start
+        start,
+        user_uuid,
+        &filters.maps.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
+        &filters.modes.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<String>>(),
+        filters.has_vod.unwrap_or(false),
     )
         .fetch_all(&*ex)
         .await?
