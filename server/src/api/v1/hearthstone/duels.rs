@@ -7,6 +7,7 @@ use uuid::Uuid;
 use sqlx::{Transaction, Postgres};
 use std::sync::Arc;
 use std::convert::TryFrom;
+use serde_qs::actix::QsQuery;
 
 impl api::ApiApplication {
     pub async fn create_hearthstone_duels_run(&self, tx: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, user_id: i64, start_time: &DateTime<Utc>) -> Result<Uuid, SquadOvError> {
@@ -53,8 +54,8 @@ impl api::ApiApplication {
         )
     }
 
-    async fn list_matches_for_duel_run(&self, collection_uuid: &Uuid, user_id: i64) -> Result<Vec<Uuid>, SquadOvError> {
-        Ok(sqlx::query_scalar(
+    async fn list_matches_for_duel_run(&self, collection_uuid: &Uuid, user_id: i64, filters: &super::HearthstoneListQuery) -> Result<Vec<Uuid>, SquadOvError> {
+        Ok(sqlx::query!(
             "
             SELECT mmc.match_uuid
             FROM squadov.match_to_match_collection AS mmc
@@ -62,14 +63,29 @@ impl api::ApiApplication {
                 ON had.collection_uuid = mmc.collection_uuid AND had.user_id = $2
             INNER JOIN squadov.hearthstone_matches AS hm
                 ON hm.match_uuid = mmc.match_uuid
+            CROSS JOIN (
+                SELECT *
+                FROM squadov.users
+                WHERE id = $2
+            ) AS u
+            LEFT JOIN squadov.vods AS v
+                ON v.match_uuid = mmc.match_uuid
+                    AND v.user_uuid = u.uuid
             WHERE mmc.collection_uuid = $1
+                AND (NOT $3::BOOLEAN OR v.video_uuid IS NOT NULL)
             ORDER BY hm.match_time DESC
             ",
+            collection_uuid,
+            user_id,
+            filters.has_vod.unwrap_or(false),
         )
-            .bind(collection_uuid)
-            .bind(user_id)
             .fetch_all(&*self.pool)
             .await?
+            .into_iter()
+            .map(|x| {
+                x.match_uuid
+            })
+            .collect()
         )
     }
 
@@ -142,7 +158,7 @@ impl api::ApiApplication {
         // as to what the duel run's hero is. Instead, look at the latest game and grab the hero entity from that.
         // If there's no matches (which technically is impossible since we only create a duel run upon uploading a match)
         // then we fall back to the deck's hero card.
-        let matches = self.list_matches_for_duel_run(collection_uuid, user_id).await?;
+        let matches = self.list_matches_for_duel_run(collection_uuid, user_id, &super::HearthstoneListQuery::default()).await?;
         let hero_card = if matches.len() > 0 {
             let snapshot_ids = self.get_hearthstone_snapshots_for_match(&matches[0], user_id).await?;
             let player_entity = match snapshot_ids.last() {
@@ -191,8 +207,8 @@ pub async fn list_duel_runs_for_user_handler(data : web::Path<super::Hearthstone
     Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(runs, &req, &query, expected_total == got_total)?)) 
 }
 
-pub async fn list_matches_for_duel_run_handler(data : web::Path<super::HearthstoneCollectionGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
-    let matches = app.list_matches_for_duel_run(&data.collection_uuid, data.user_id).await?;
+pub async fn list_matches_for_duel_run_handler(data : web::Path<super::HearthstoneCollectionGetInput>, app : web::Data<Arc<api::ApiApplication>>, filters: QsQuery<super::HearthstoneListQuery>) -> Result<HttpResponse, SquadOvError> {
+    let matches = app.list_matches_for_duel_run(&data.collection_uuid, data.user_id, &filters).await?;
     Ok(HttpResponse::Ok().json(&matches))
 }
 

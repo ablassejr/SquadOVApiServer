@@ -26,6 +26,20 @@ pub struct HearthstoneUserMatchInput {
     user_id: i64,
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all="camelCase")]
+pub struct HearthstoneListQuery {
+    has_vod: Option<bool>,
+}
+
+impl Default for HearthstoneListQuery {
+    fn default() -> Self {
+        Self {
+            has_vod: None,
+        }
+    }
+}
+
 pub use arena::*;
 pub use cards::*;
 pub use create::*;

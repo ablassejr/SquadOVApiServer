@@ -8,6 +8,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 use chrono::{DateTime,Utc};
 use squadov_common::hearthstone::{HearthstoneArenaRun, HearthstoneDeck};
+use serde_qs::actix::QsQuery;
 
 #[derive(Deserialize)]
 pub struct CreateHearthstoneArenaDeckInput {
@@ -119,8 +120,8 @@ impl api::ApiApplication {
         )
     }
 
-    async fn list_matches_for_arena_run(&self, collection_uuid: &Uuid, user_id: i64) -> Result<Vec<Uuid>, SquadOvError> {
-        Ok(sqlx::query_scalar(
+    async fn list_matches_for_arena_run(&self, collection_uuid: &Uuid, user_id: i64, filters: &super::HearthstoneListQuery) -> Result<Vec<Uuid>, SquadOvError> {
+        Ok(sqlx::query!(
             "
             SELECT mmc.match_uuid
             FROM squadov.match_to_match_collection AS mmc
@@ -128,14 +129,29 @@ impl api::ApiApplication {
                 ON had.collection_uuid = mmc.collection_uuid AND had.user_id = $2
             INNER JOIN squadov.hearthstone_matches AS hm
                 ON hm.match_uuid = mmc.match_uuid
+            CROSS JOIN (
+                SELECT *
+                FROM squadov.users
+                WHERE id = $2
+            ) AS u
+            LEFT JOIN squadov.vods AS v
+                ON v.match_uuid = mmc.match_uuid
+                    AND v.user_uuid = u.uuid
             WHERE mmc.collection_uuid = $1
+                AND (NOT $3::BOOLEAN OR v.video_uuid IS NOT NULL)
             ORDER BY hm.match_time DESC
             ",
+            collection_uuid,
+            user_id,
+            filters.has_vod.unwrap_or(false),
         )
-            .bind(collection_uuid)
-            .bind(user_id)
             .fetch_all(&*self.pool)
             .await?
+            .into_iter()
+            .map(|x| {
+                x.match_uuid
+            })
+            .collect()
         )
     }
 
@@ -162,7 +178,7 @@ impl api::ApiApplication {
         let mut wins = 0;
         let mut loss = 0;
 
-        let matches = self.list_matches_for_arena_run(collection_uuid, user_id).await?;
+        let matches = self.list_matches_for_arena_run(collection_uuid, user_id, &super::HearthstoneListQuery::default()).await?;
         if !matches.is_empty() {
             let match_players = self.get_hearthstone_players_for_match(&matches[0], user_id).await?;
             for (_, player) in match_players {
@@ -217,8 +233,8 @@ pub async fn list_arena_runs_for_user_handler(data : web::Path<super::Hearthston
     Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(runs, &req, &query, expected_total == got_total)?)) 
 }
 
-pub async fn list_matches_for_arena_run_handler(data : web::Path<super::HearthstoneCollectionGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
-    let matches = app.list_matches_for_arena_run(&data.collection_uuid, data.user_id).await?;
+pub async fn list_matches_for_arena_run_handler(data : web::Path<super::HearthstoneCollectionGetInput>, app : web::Data<Arc<api::ApiApplication>>, filters: QsQuery<super::HearthstoneListQuery>) -> Result<HttpResponse, SquadOvError> {
+    let matches = app.list_matches_for_arena_run(&data.collection_uuid, data.user_id, &filters).await?;
     Ok(HttpResponse::Ok().json(&matches))
 }
 

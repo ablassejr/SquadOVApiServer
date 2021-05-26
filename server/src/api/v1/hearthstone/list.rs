@@ -6,6 +6,7 @@ use uuid::Uuid;
 use squadov_common::hearthstone::{GameType, get_all_hearthstone_game_types};
 use serde::{Deserialize};
 use std::convert::TryFrom;
+use serde_qs::actix::QsQuery;
 
 pub struct HearthstoneMatchListEntry {
     match_uuid: Uuid
@@ -19,7 +20,7 @@ pub struct FilteredMatchParameters {
 }
 
 impl api::ApiApplication {
-    pub async fn list_hearthstone_matches_for_user(&self, user_id: i64, start: i64, end: i64, filters: &[GameType]) -> Result<Vec<Uuid>, squadov_common::SquadOvError> {
+    pub async fn list_hearthstone_matches_for_user(&self, user_id: i64, start: i64, end: i64, filters: &[GameType], aux_filters: &super::HearthstoneListQuery) -> Result<Vec<Uuid>, squadov_common::SquadOvError> {
         // Need to inner join on hearthstone_match_metadata as we won't be able to
         // successfully display the match otherwise.
         Ok(sqlx::query_as!(
@@ -33,15 +34,22 @@ impl api::ApiApplication {
                 ON hmp.view_uuid = hmv.view_uuid
             INNER JOIN squadov.hearthstone_match_metadata AS hmm
                 ON hmm.view_uuid = hmv.view_uuid
+            INNER JOIN squadov.users AS u
+                ON u.id = hmp.user_id
+            LEFT JOIN squadov.vods AS v
+                ON v.match_uuid = hm.match_uuid
+                    AND v.user_uuid = u.uuid
             WHERE hmp.user_id = $1
                 AND hmm.game_type = any($4)
+                AND (NOT $5::BOOLEAN OR v.video_uuid IS NOT NULL)
             ORDER BY hm.id DESC
             LIMIT $2 OFFSET $3
             ",
             user_id,
             end - start,
             start,
-            &filters.iter().map(|e| { e.clone() as i32 }).collect::<Vec<i32>>()
+            &filters.iter().map(|e| { e.clone() as i32 }).collect::<Vec<i32>>(),
+            aux_filters.has_vod.unwrap_or(false),
         )
             .fetch_all(&*self.pool)
             .await?
@@ -52,7 +60,7 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn list_hearthstone_matches_for_user_handler(data : web::Path<super::HearthstoneUserMatchInput>, query: web::Query<FilteredMatchParameters>, app : web::Data<Arc<api::ApiApplication>>, req : HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_hearthstone_matches_for_user_handler(data : web::Path<super::HearthstoneUserMatchInput>, query: web::Query<FilteredMatchParameters>, filters: QsQuery<super::HearthstoneListQuery>, app : web::Data<Arc<api::ApiApplication>>, req : HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let query = query.into_inner();
     let gametype_filter = if query.filter.is_empty() {
         vec![]
@@ -69,6 +77,7 @@ pub async fn list_hearthstone_matches_for_user_handler(data : web::Path<super::H
         } else {
             &gametype_filter
         },
+        &filters,
     ).await?;
 
     let expected_total = query.end - query.start;
