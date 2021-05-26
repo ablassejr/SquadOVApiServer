@@ -33,6 +33,7 @@ impl api::ApiApplication {
             LEFT JOIN squadov.vods AS v
                 ON v.match_uuid = at.match_uuid
                     AND v.user_uuid = u.uuid
+                    AND v.is_clip = FALSE
             WHERE at.user_id = $1
                 AND (CARDINALITY($4::VARCHAR[]) = 0 OR at.task_name = ANY($4))
                 AND (NOT $5::BOOLEAN OR v.video_uuid IS NOT NULL)

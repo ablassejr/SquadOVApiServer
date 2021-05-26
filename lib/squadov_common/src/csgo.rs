@@ -11,3 +11,14 @@ pub mod db;
 pub mod schema;
 pub mod rabbitmq;
 pub mod summary;
+
+use serde::Deserialize;
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all="camelCase")]
+pub struct CsgoListQuery {
+    modes: Option<Vec<String>>,
+    maps: Option<Vec<String>>,
+    has_vod: Option<bool>,
+    has_demo: Option<bool>,
+}

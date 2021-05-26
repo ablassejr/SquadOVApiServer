@@ -39,6 +39,7 @@ impl api::ApiApplication {
             LEFT JOIN squadov.vods AS v
                 ON v.match_uuid = hm.match_uuid
                     AND v.user_uuid = u.uuid
+                    AND v.is_clip = FALSE
             WHERE hmp.user_id = $1
                 AND hmm.game_type = any($4)
                 AND (NOT $5::BOOLEAN OR v.video_uuid IS NOT NULL)

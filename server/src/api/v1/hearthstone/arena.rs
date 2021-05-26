@@ -137,6 +137,7 @@ impl api::ApiApplication {
             LEFT JOIN squadov.vods AS v
                 ON v.match_uuid = mmc.match_uuid
                     AND v.user_uuid = u.uuid
+                    AND v.is_clip = FALSE
             WHERE mmc.collection_uuid = $1
                 AND (NOT $3::BOOLEAN OR v.video_uuid IS NOT NULL)
             ORDER BY hm.match_time DESC
