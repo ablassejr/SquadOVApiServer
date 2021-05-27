@@ -189,7 +189,7 @@ impl api::ApiApplication {
                 AND ($4::UUID IS NULL OR m.uuid = $4)
                 AND (CARDINALITY($5::INTEGER[]) = 0 OR m.game = ANY($5))
                 AND (CARDINALITY($6::BIGINT[]) = 0 OR sra.squad_id = ANY($6))
-                AND (CARDINALITY($7::BIGINT[]) = 0 OR ou.id = ANY($7))
+                AND (CARDINALITY($7::BIGINT[]) = 0 OR vc.clip_user_id = ANY($7))
                 AND COALESCE(v.end_time >= $8, TRUE)
                 AND COALESCE(v.end_time <= $9, TRUE)
                 AND (NOT $10::BOOLEAN OR ufv.video_uuid IS NOT NULL)
