@@ -59,7 +59,7 @@ pub struct TftParticipantDto {
     pub companion: TftCompanionDto,
 }
 
-#[derive(Serialize,Deserialize,Clone)]
+#[derive(Serialize,Deserialize,Clone,Debug)]
 pub struct TftCompanionDto {
     #[serde(rename(deserialize="content_ID", serialize="contentId"))]
     pub content_id: String,
@@ -68,7 +68,7 @@ pub struct TftCompanionDto {
     pub species: String,
 }
 
-#[derive(Serialize,Deserialize,Clone)]
+#[derive(Serialize,Deserialize,Clone,Debug)]
 pub struct TftTraitDto {
     pub name: String,
     #[serde(rename(serialize="numUnits"))]
@@ -80,7 +80,7 @@ pub struct TftTraitDto {
     pub tier_total: i32
 }
 
-#[derive(Serialize,Deserialize,Clone)]
+#[derive(Serialize,Deserialize,Clone,Debug)]
 pub struct TftUnitDto {
     pub items: Vec<i32>,
     #[serde(rename(serialize="characterId"))]
@@ -91,7 +91,7 @@ pub struct TftUnitDto {
     pub tier: i32
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TftPlayerMatchSummary {
     pub match_uuid: Uuid,

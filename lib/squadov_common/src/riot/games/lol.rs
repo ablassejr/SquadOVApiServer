@@ -314,7 +314,7 @@ pub struct LolMatchEventDto {
     pub victim_id: Option<i32>,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LolMiniParticipantStats {
     pub participant_id: i32,
@@ -331,7 +331,7 @@ pub struct LolMiniParticipantStats {
     pub win: bool,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LolPlayerMatchSummary {
     pub match_uuid: Uuid,

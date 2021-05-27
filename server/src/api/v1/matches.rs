@@ -57,10 +57,12 @@ pub struct GenericMatchPathInput {
     match_uuid: Uuid
 }
 
+#[derive(Debug)]
 pub struct RawRecentMatchData {
     video_uuid: Uuid,
     match_uuid: Uuid,
     user_uuid: Uuid,
+    is_local: bool,
     tm: DateTime<Utc>,
     username: String,
     user_id: i64,
@@ -103,6 +105,7 @@ fn recent_match_data_uuid_pairs(data: &[&RawRecentMatchData]) -> Vec<MatchPlayer
     }).collect()
 }
 
+#[derive(Debug)]
 pub struct RecentMatchHandle {
     pub match_uuid: Uuid,
     pub user_uuid: Uuid,
@@ -122,6 +125,7 @@ impl api::ApiApplication {
                     v.match_uuid AS "match_uuid!",
                     v.user_uuid AS "user_uuid!",
                     v.end_time AS "tm!",
+                    v.is_local AS "is_local!",
                     ou.username AS "username!",
                     ou.id AS "user_id!",
                     ufm.reason AS "favorite_reason?",
@@ -142,7 +146,6 @@ impl api::ApiApplication {
                     ON uwv.video_uuid = v.video_uuid
                         AND uwv.user_id = $3
                 WHERE v.is_clip = FALSE
-                    AND v.is_local = FALSE
                 ORDER BY v.end_time DESC
                 "#,
                 &match_uuids,
@@ -157,6 +160,7 @@ impl api::ApiApplication {
                         video_uuid: x.video_uuid,
                         match_uuid: x.match_uuid,
                         user_uuid: x.user_uuid,
+                        is_local: x.is_local,
                         tm: x.tm,
                         username: x.username,
                         user_id: x.user_id,
@@ -208,8 +212,7 @@ impl api::ApiApplication {
                 AND COALESCE(v.end_time <= $8, TRUE)
                 AND (NOT $9::BOOLEAN OR ufm.match_uuid IS NOT NULL)
                 AND (NOT $10::BOOLEAN OR uwv.video_uuid IS NOT NULL)
-                AND v.is_local = FALSE
-                    AND v.is_clip = FALSE
+                AND v.is_clip = FALSE
             ORDER BY v.end_time DESC
             LIMIT $2 OFFSET $3
             "#,
@@ -238,6 +241,7 @@ impl api::ApiApplication {
                 user_uuid: x.uuid,
              }})
             .collect();
+
         Ok(self.get_recent_base_matches(&handles, user_id).await?)
     }
 
@@ -411,6 +415,7 @@ impl api::ApiApplication {
                         user_id: x.user_id,
                         favorite_reason: x.favorite_reason.clone(),
                         is_watchlist: x.is_watchlist,
+                        is_local: x.is_local,
                     },
                     aimlab_task: aimlab_task.cloned(),
                     lol_match,
@@ -435,7 +440,7 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
 
     let raw_base_matches = app.get_recent_base_matches_for_user(session.user.id, query.start, query.end, &filter).await?;
     let matches = app.get_recent_matches_from_uuids(&raw_base_matches).await?;
-    
+
     let expected_total = query.end - query.start;
     let got_total = raw_base_matches.len() as i64;
     

@@ -45,7 +45,7 @@ where
     Ok(uuid)
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct BaseRecentMatch {
     pub match_uuid: Uuid,
@@ -56,9 +56,10 @@ pub struct BaseRecentMatch {
     pub user_id: i64,
     pub favorite_reason: Option<String>,
     pub is_watchlist: bool,
+    pub is_local: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct RecentMatch {
     pub base: BaseRecentMatch,

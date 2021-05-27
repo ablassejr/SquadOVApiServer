@@ -212,7 +212,7 @@ pub struct ValorantMatchEconomyDto {
     pub spent: i32,
 }
 
-#[derive(Serialize,Deserialize, Clone)]
+#[derive(Serialize,Deserialize, Clone, Debug)]
 pub struct ValorantPlayerMatchSummary {
     #[serde(rename = "matchId")]
     pub match_id: String,

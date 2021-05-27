@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-#[derive(Serialize,Deserialize,Clone)]
+#[derive(Serialize,Deserialize,Clone,Debug)]
 pub struct AimlabTask {
     pub id: i64,
     #[serde(rename = "userId", default)]

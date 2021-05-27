@@ -45,7 +45,7 @@ pub struct VodAssociation {
     pub is_local: bool,
 }
 
-#[derive(Serialize,Deserialize,Clone)]
+#[derive(Serialize,Deserialize,Clone,Debug)]
 pub struct VodMetadata {
     #[serde(rename = "videoUuid", default)]
     pub video_uuid: Uuid,
@@ -108,7 +108,7 @@ pub struct ClipComment {
     pub tm: DateTime<Utc>,
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize,Debug)]
 pub struct VodSegment {
     pub uri: String,
     pub duration: f32,
@@ -118,14 +118,14 @@ pub struct VodSegment {
     pub mime_type: String,
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize,Debug)]
 pub struct VodTrack {
     pub metadata: VodMetadata,
     pub segments: Vec<VodSegment>,
     pub preview: Option<String>,
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize,Debug)]
 pub struct VodManifest {
     #[serde(rename="videoTracks")]
     pub video_tracks: Vec<VodTrack>

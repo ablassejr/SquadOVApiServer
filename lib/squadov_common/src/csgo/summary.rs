@@ -2,7 +2,7 @@ use uuid::Uuid;
 use serde::Serialize;
 use chrono::{DateTime, Utc};
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct CsgoPlayerMatchSummary {
     pub match_uuid: Uuid,
