@@ -391,6 +391,7 @@ pub async fn list_csgo_match_summaries_for_user(ex: &PgPool, user_id: i64, start
                     AND v.user_uuid = u.uuid
                     AND v.is_clip = FALSE
             WHERE cmv.user_id = $1
+                AND cmv.match_uuid IS NOT NULL
                 AND (CARDINALITY($4::VARCHAR[]) = 0 OR cmv.mode = ANY($4))
                 AND (CARDINALITY($5::VARCHAR[]) = 0 OR cmv.map = ANY($5))
                 AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
