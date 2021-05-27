@@ -25,6 +25,7 @@ use sqlx::{Postgres, Transaction};
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
+use serde_qs::actix::QsQuery;
 
 #[derive(Deserialize)]
 pub struct GenericMatchCreationRequest<T> {
@@ -38,6 +39,16 @@ pub struct GenericMatchFinishCreationRequest<T> {
     pub timestamp: DateTime<Utc>,
     pub data: T,
     pub combatants: Vec<WoWCombatantInfo>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all="camelCase")]
+pub struct WowListQuery {
+    has_vod: Option<bool>,
+    encounters: Option<Vec<i32>>,
+    raids: Option<Vec<i32>>,
+    dungeons: Option<Vec<i32>>,
+    arenas: Option<Vec<i32>>,
 }
 
 impl api::ApiApplication {
@@ -73,7 +84,7 @@ impl api::ApiApplication {
         Ok((match_uuids, player_ids))
     }
 
-    async fn list_wow_encounters_for_character(&self, character_guid: &str, user_id: i64, start: i64, end: i64) -> Result<Vec<WoWEncounter>, SquadOvError> {
+    async fn list_wow_encounters_for_character(&self, character_guid: &str, user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWEncounter>, SquadOvError> {
         let pairs = sqlx::query_as!(
             MatchPlayerPair,
             r#"
@@ -87,16 +98,26 @@ impl api::ApiApplication {
                 ON wcp.view_id = wmv.id
             INNER JOIN squadov.users AS u
                 ON u.id = wmv.user_id
+            LEFT JOIN squadov.vods AS v
+                ON v.match_uuid = wmv.match_uuid
+                    AND v.user_uuid = u.uuid
+                    AND v.is_clip = FALSE
             WHERE wmv.user_id = $2
                 AND wcp.unit_guid = $1
                 AND wmv.match_uuid IS NOT NULL
+                AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))
+                AND (CARDINALITY($6::INTEGER[]) = 0 OR wav.encounter_id = ANY($6))
+                AND (NOT $7::BOOLEAN OR v.video_uuid IS NOT NULL)
             ORDER BY wmv.start_tm DESC
             LIMIT $3 OFFSET $4
             "#,
             character_guid,
             user_id,
             end - start,
-            start
+            start,
+            &filters.raids.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
+            &filters.encounters.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
+            filters.has_vod.unwrap_or(false),
         )
             .fetch_all(&*self.heavy_pool)
             .await?;
@@ -146,7 +167,7 @@ impl api::ApiApplication {
         )
     }
 
-    async fn list_wow_challenges_for_character(&self, character_guid: &str, user_id: i64, start: i64, end: i64) -> Result<Vec<WoWChallenge>, SquadOvError> {
+    async fn list_wow_challenges_for_character(&self, character_guid: &str, user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWChallenge>, SquadOvError> {
         let pairs = sqlx::query_as!(
             MatchPlayerPair,
             r#"
@@ -160,16 +181,24 @@ impl api::ApiApplication {
                 ON wcp.view_id = wmv.id
             INNER JOIN squadov.users AS u
                 ON u.id = wmv.user_id
+            LEFT JOIN squadov.vods AS v
+                ON v.match_uuid = wmv.match_uuid
+                    AND v.user_uuid = u.uuid
+                    AND v.is_clip = FALSE
             WHERE wmv.user_id = $2
                 AND wcp.unit_guid = $1
                 AND wmv.match_uuid IS NOT NULL
+                AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))
+                AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
             ORDER BY wmv.start_tm DESC
             LIMIT $3 OFFSET $4
             "#,
             character_guid,
             user_id,
             end - start,
-            start
+            start,
+            &filters.dungeons.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
+            filters.has_vod.unwrap_or(false),
         )
             .fetch_all(&*self.heavy_pool)
             .await?;
@@ -218,7 +247,7 @@ impl api::ApiApplication {
         )
     }
 
-    async fn list_wow_arenas_for_character(&self, character_guid: &str, user_id: i64, start: i64, end: i64) -> Result<Vec<WoWArena>, SquadOvError> {
+    async fn list_wow_arenas_for_character(&self, character_guid: &str, user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWArena>, SquadOvError> {
         let pairs = sqlx::query_as!(
             MatchPlayerPair,
             r#"
@@ -232,16 +261,24 @@ impl api::ApiApplication {
                 ON wcp.view_id = wmv.id
             INNER JOIN squadov.users AS u
                 ON u.id = wmv.user_id
+            LEFT JOIN squadov.vods AS v
+                ON v.match_uuid = wmv.match_uuid
+                    AND v.user_uuid = u.uuid
+                    AND v.is_clip = FALSE
             WHERE wmv.user_id = $2
                 AND wcp.unit_guid = $1
                 AND wmv.match_uuid IS NOT NULL
+                AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))
+                AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
             ORDER BY wmv.start_tm DESC
             LIMIT $3 OFFSET $4
             "#,
             character_guid,
             user_id,
             end - start,
-            start
+            start,
+            &filters.arenas.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
+            filters.has_vod.unwrap_or(false),
         )
             .fetch_all(&*self.heavy_pool)
             .await?;
@@ -896,13 +933,14 @@ pub async fn finish_wow_arena_handler(app : web::Data<Arc<api::ApiApplication>>,
     Err(SquadOvError::InternalError(String::from("Too many errors in finishing WoW arena...Retry limit reached.")))
 }
 
-pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: QsQuery<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let query = query.into_inner();
     let encounters = app.list_wow_encounters_for_character(
         &path.character_guid,
         path.user_id,
         query.start,
         query.end,
+        &filters,
     ).await?;
 
     let expected_total = query.end - query.start;
@@ -910,13 +948,14 @@ pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::
     Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(encounters, &req, &query, expected_total == got_total)?))
 }
 
-pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: QsQuery<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let query = query.into_inner();
     let challenges = app.list_wow_challenges_for_character(
         &path.character_guid,
         path.user_id,
         query.start,
         query.end,
+        &filters,
     ).await?;
 
     let expected_total = query.end - query.start;
@@ -924,20 +963,20 @@ pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::
     Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(challenges, &req, &query, expected_total == got_total)?))
 }
 
-pub async fn list_wow_arenas_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_wow_arenas_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: QsQuery<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let query = query.into_inner();
     let challenges = app.list_wow_arenas_for_character(
         &path.character_guid,
         path.user_id,
         query.start,
         query.end,
+        &filters,
     ).await?;
 
     let expected_total = query.end - query.start;
     let got_total = challenges.len() as i64;
     Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(challenges, &req, &query, expected_total == got_total)?))
 }
-
 
 pub async fn get_wow_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>) -> Result<HttpResponse, SquadOvError> {
     #[derive(Serialize)]
