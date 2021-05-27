@@ -76,10 +76,13 @@ impl CsgoRabbitmqInterface {
             log::info!("Uncompress BZ2 CSGO demo...");
             let mut decoder = BzDecoder::new(bytes);
             let mut buffer: Vec<u8> = vec![];
-            decoder.read_to_end(&mut buffer)?;
+            decoder.read_to_end(&mut buffer).map_err(|x| {
+                log::warn!("Error in decoding BZ2 - mapping to defer: {:?}", x);
+                SquadOvError::Defer(1000)
+            })?;
             self.parse_csgo_demo_from_bytes(view_uuid, timestamp, &buffer).await?;
         } else {
-            log::warn!("Failed to recognize CSGO demo compression time: {}", og_url);
+            log::warn!("Failed to recognize CSGO demo compression: {}", og_url);
             return Err(SquadOvError::BadRequest);
         }
         Ok(())
