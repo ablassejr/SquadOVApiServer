@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.8.4",
+        "description": "Match filters!",
+        "timestamp": 1622221696000,
+        "data": "data/update-v0.8.4.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.8.0",
         "description": "CS:GO support and more.",
         "timestamp": 1621007211000,

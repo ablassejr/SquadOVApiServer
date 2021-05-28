@@ -40,7 +40,9 @@ spec:
                     - name: DATABASE_URL
                       value: "jdbc:postgresql://127.0.0.1:5432/fusionauth?timezone=UTC"
                     - name: FUSIONAUTH_APP_MEMORY
-                      value: 1G
+                      value: 768M
+                    - name: FUSIONAUTH_SEARCH_MEMORY
+                      value: 512M
                     - name: FUSIONAUTH_SEARCH_ENGINE_TYPE
                       value: database
                     - name: FUSIONAUTH_APP_RUNTIME_MODE 
