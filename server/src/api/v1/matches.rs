@@ -34,6 +34,11 @@ use squadov_common::{
             CsgoPlayerMatchSummary,
         },
     },
+    vod::{
+        VodMetadata,
+        VodTrack,
+        VodManifest,
+    }
 };
 use std::sync::Arc;
 use chrono::{DateTime, Utc, TimeZone};
@@ -410,7 +415,19 @@ impl api::ApiApplication {
                         match_uuid: x.match_uuid.clone(),
                         tm: x.tm,
                         game: x.game,
-                        vod: vod_manifests.remove(&x.video_uuid).ok_or(SquadOvError::InternalError(String::from("Failed to find expected VOD manifest.")))?,
+                        // Need to give a dummy manifest for locally recorded VODs.
+                        vod: vod_manifests.remove(&x.video_uuid).unwrap_or(VodManifest{
+                            video_tracks: vec![
+                                VodTrack{
+                                    metadata: VodMetadata{
+                                        video_uuid: x.video_uuid.clone(),
+                                        ..VodMetadata::default()
+                                    },
+                                    segments: vec![],
+                                    preview: None,
+                                }
+                            ]
+                        }),
                         username: x.username.clone(),
                         user_id: x.user_id,
                         favorite_reason: x.favorite_reason.clone(),

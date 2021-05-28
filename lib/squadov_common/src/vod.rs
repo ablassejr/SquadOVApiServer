@@ -69,6 +69,23 @@ pub struct VodMetadata {
     pub has_preview: bool,
 }
 
+impl Default for  VodMetadata {
+    fn default() -> Self {
+        Self {
+            video_uuid: Uuid::new_v4(),
+            res_x: 0,
+            res_y: 0,
+            fps: 0,
+            min_bitrate: 0,
+            avg_bitrate: 0,
+            max_bitrate: 0,
+            id: String::new(),
+            has_fastify: false,
+            has_preview: false,
+        }
+    }
+}
+
 #[derive(Deserialize,Debug)]
 pub struct VodSegmentId {
     pub video_uuid: Uuid,
