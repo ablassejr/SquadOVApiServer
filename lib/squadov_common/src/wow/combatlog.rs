@@ -664,8 +664,9 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
 }
 
 pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, alt_id: i64, user_id: i64, state: &WoWCombatLogState, payload: &RawWoWCombatLogPayload) -> Result<Option<WoWCombatLogEvent>, crate::SquadOvError> {
-    let (advanced, event) = parse_advanced_cvars_and_event_from_wow_combat_log(state, payload)?;
+    let (advanced, event) = parse_advanced_cvars_and_event_from_wow_combat_log(state, payload).unwrap_or((None, WoWCombatLogEventType::Unknown));
     if event == WoWCombatLogEventType::Unknown {
+        log::warn!("Unknown/unparseable combat log line: {}", payload.flatten());
         return Ok(None)
     }
 
