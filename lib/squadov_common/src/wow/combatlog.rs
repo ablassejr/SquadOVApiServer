@@ -367,6 +367,10 @@ pub struct WoWCombatLogSourceDest {
 
 impl WoWCombatLogSourceDest {
     fn new(data: &[String; 4]) -> Result<Self, crate::SquadOvError> {
+        if !data[2].starts_with("0x") || !data[3].starts_with("0x") {
+            return Err(crate::SquadOvError::BadRequest);
+        }
+
         Ok(Self {
             guid: data[0].clone(),
             name: data[1].clone(),
@@ -695,8 +699,26 @@ pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, alt_id: i64, user_id: i64, 
         user_id,
         log_line: payload.log_line,
         timestamp: payload.timestamp.clone(),
-        source: if has_source_dest { Some(WoWCombatLogSourceDest::new(payload.parts[1..5].try_into()?)?) } else { None },
-        dest: if has_source_dest { Some(WoWCombatLogSourceDest::new(payload.parts[5..9].try_into()?)?) } else { None },
+        source: if has_source_dest {
+            if let Ok(x) = WoWCombatLogSourceDest::new(payload.parts[1..5].try_into()?) {
+                Some(x)
+            } else {
+                log::warn!("Failed to parse source for WoW combat log payload: {}", payload.flatten());
+                None
+            }
+        } else {
+            None
+        },
+        dest: if has_source_dest {
+            if let Ok(x) = WoWCombatLogSourceDest::new(payload.parts[5..9].try_into()?) {
+                Some(x)
+            } else {
+                log::warn!("Failed to parse dest for WoW combat log payload: {}", payload.flatten());
+                None
+            }
+        } else {
+            None
+        },
         advanced,
         event
     }))
