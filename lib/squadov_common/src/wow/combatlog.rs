@@ -478,6 +478,12 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                     }
 
                     let mut idx = 9;
+
+                    if !payload.parts[idx+2].starts_with("0x") {
+                        log::warn!("Invalid spell school: {}", payload.flatten());
+                        return Ok((None, WoWCombatLogEventType::Unknown));
+                    }
+
                     let spell_info = WoWSpellInfo{
                         id: payload.parts[idx].parse()?,
                         name: payload.parts[idx+1].clone(),
