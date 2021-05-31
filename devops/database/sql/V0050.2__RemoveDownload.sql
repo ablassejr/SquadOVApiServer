@@ -1,0 +1,2 @@
+ALTER TABLE share_match_vod_connections
+DROP COLUMN can_download;

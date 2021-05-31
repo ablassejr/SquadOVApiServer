@@ -1,5 +1,6 @@
 use squadov_common::SquadOvError;
 use crate::api;
+use crate::api::auth::SquadOVSession;
 use actix_web::{web, HttpResponse, HttpRequest};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -20,7 +21,7 @@ pub struct FilteredMatchParameters {
 }
 
 impl api::ApiApplication {
-    pub async fn list_hearthstone_matches_for_user(&self, user_id: i64, start: i64, end: i64, filters: &[GameType], aux_filters: &super::HearthstoneListQuery) -> Result<Vec<Uuid>, squadov_common::SquadOvError> {
+    pub async fn list_hearthstone_matches_for_user(&self, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &[GameType], aux_filters: &super::HearthstoneListQuery) -> Result<Vec<Uuid>, squadov_common::SquadOvError> {
         // Need to inner join on hearthstone_match_metadata as we won't be able to
         // successfully display the match otherwise.
         Ok(sqlx::query_as!(
@@ -40,9 +41,13 @@ impl api::ApiApplication {
                 ON v.match_uuid = hm.match_uuid
                     AND v.user_uuid = u.uuid
                     AND v.is_clip = FALSE
+            LEFT JOIN squadov.view_share_connections_access_users AS sau
+                ON sau.match_uuid = hm.match_uuid
+                    AND sau.user_id = $6
             WHERE hmp.user_id = $1
                 AND hmm.game_type = any($4)
                 AND (NOT $5::BOOLEAN OR v.video_uuid IS NOT NULL)
+                AND ($1 = $6 OR sau.match_uuid IS NOT NULL)
             ORDER BY hm.id DESC
             LIMIT $2 OFFSET $3
             ",
@@ -51,6 +56,7 @@ impl api::ApiApplication {
             start,
             &filters.iter().map(|e| { e.clone() as i32 }).collect::<Vec<i32>>(),
             aux_filters.has_vod.unwrap_or(false),
+            req_user_id,
         )
             .fetch_all(&*self.pool)
             .await?
@@ -69,8 +75,12 @@ pub async fn list_hearthstone_matches_for_user_handler(data : web::Path<super::H
         serde_json::from_str::<Vec<i32>>(&query.filter)?.into_iter().map(|e| { GameType::try_from(e).unwrap_or(GameType::Unknown) }).collect::<Vec<GameType>>()
     };
 
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
     let matches = app.list_hearthstone_matches_for_user(
         data.user_id,
+        session.user.id,
         query.start,
         query.end,
         if gametype_filter.is_empty() {

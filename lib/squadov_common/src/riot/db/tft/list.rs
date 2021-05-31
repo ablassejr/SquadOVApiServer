@@ -184,7 +184,7 @@ pub async fn list_tft_match_summaries_for_uuids(ex: &PgPool, uuids: &[MatchPlaye
     Ok(match_summaries)
 }
 
-pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_uuid: &Uuid, start: i64, end: i64, filters: &TftMatchFilters) -> Result<Vec<TftPlayerMatchSummary>, SquadOvError> {
+pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_uuid: &Uuid, req_user_id: i64, start: i64, end: i64, filters: &TftMatchFilters) -> Result<Vec<TftPlayerMatchSummary>, SquadOvError> {
     let uuids: Vec<Uuid> = sqlx::query!(
         r#"
         SELECT tmi.match_uuid
@@ -195,9 +195,18 @@ pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_u
             ON v.match_uuid = tmi.match_uuid
                 AND v.user_uuid = $4
                 AND v.is_clip = FALSE
+        LEFT JOIN squadov.view_share_connections_access_users AS sau
+            ON sau.match_uuid = tmi.match_uuid
+                AND sau.user_id = $6
+        CROSS JOIN (
+            SELECT *
+            FROM squadov.users
+            WHERE uuid = $4
+        ) AS u
         WHERE tmp.puuid = $1
             AND tmi.tft_set_number >= 3
             AND (NOT $5::BOOLEAN OR v.video_uuid IS NOT NULL)
+            AND (u.id = $6 OR sau.match_uuid IS NOT NULL)
         ORDER BY tmi.game_datetime DESC
         LIMIT $2 OFFSET $3
         "#,
@@ -206,6 +215,7 @@ pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_u
         start,
         user_uuid,
         filters.has_vod.unwrap_or(false),
+        req_user_id,
     )
         .fetch_all(&*ex)
         .await?

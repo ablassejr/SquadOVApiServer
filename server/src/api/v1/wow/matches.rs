@@ -84,7 +84,7 @@ impl api::ApiApplication {
         Ok((match_uuids, player_ids))
     }
 
-    async fn list_wow_encounters_for_character(&self, character_guid: &str, user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWEncounter>, SquadOvError> {
+    async fn list_wow_encounters_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWEncounter>, SquadOvError> {
         let pairs = sqlx::query_as!(
             MatchPlayerPair,
             r#"
@@ -102,12 +102,16 @@ impl api::ApiApplication {
                 ON v.match_uuid = wmv.match_uuid
                     AND v.user_uuid = u.uuid
                     AND v.is_clip = FALSE
+            LEFT JOIN squadov.view_share_connections_access_users AS sau
+                ON sau.match_uuid = wmv.match_uuid
+                    AND sau.user_id = $8
             WHERE wmv.user_id = $2
                 AND wcp.unit_guid = $1
                 AND wmv.match_uuid IS NOT NULL
                 AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))
                 AND (CARDINALITY($6::INTEGER[]) = 0 OR wav.encounter_id = ANY($6))
                 AND (NOT $7::BOOLEAN OR v.video_uuid IS NOT NULL)
+                AND ($2 = $8 OR sau.match_uuid IS NOT NULL)
             ORDER BY wmv.start_tm DESC
             LIMIT $3 OFFSET $4
             "#,
@@ -118,6 +122,7 @@ impl api::ApiApplication {
             &filters.raids.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
             &filters.encounters.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
             filters.has_vod.unwrap_or(false),
+            req_user_id,
         )
             .fetch_all(&*self.heavy_pool)
             .await?;
@@ -167,7 +172,7 @@ impl api::ApiApplication {
         )
     }
 
-    async fn list_wow_challenges_for_character(&self, character_guid: &str, user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWChallenge>, SquadOvError> {
+    async fn list_wow_challenges_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWChallenge>, SquadOvError> {
         let pairs = sqlx::query_as!(
             MatchPlayerPair,
             r#"
@@ -185,11 +190,15 @@ impl api::ApiApplication {
                 ON v.match_uuid = wmv.match_uuid
                     AND v.user_uuid = u.uuid
                     AND v.is_clip = FALSE
+            LEFT JOIN squadov.view_share_connections_access_users AS sau
+                ON sau.match_uuid = wmv.match_uuid
+                    AND sau.user_id = $7
             WHERE wmv.user_id = $2
                 AND wcp.unit_guid = $1
                 AND wmv.match_uuid IS NOT NULL
                 AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))
                 AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
+                AND ($2 = $7 OR sau.match_uuid IS NOT NULL)
             ORDER BY wmv.start_tm DESC
             LIMIT $3 OFFSET $4
             "#,
@@ -199,6 +208,7 @@ impl api::ApiApplication {
             start,
             &filters.dungeons.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
             filters.has_vod.unwrap_or(false),
+            req_user_id,
         )
             .fetch_all(&*self.heavy_pool)
             .await?;
@@ -247,7 +257,7 @@ impl api::ApiApplication {
         )
     }
 
-    async fn list_wow_arenas_for_character(&self, character_guid: &str, user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWArena>, SquadOvError> {
+    async fn list_wow_arenas_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWArena>, SquadOvError> {
         let pairs = sqlx::query_as!(
             MatchPlayerPair,
             r#"
@@ -265,11 +275,15 @@ impl api::ApiApplication {
                 ON v.match_uuid = wmv.match_uuid
                     AND v.user_uuid = u.uuid
                     AND v.is_clip = FALSE
+            LEFT JOIN squadov.view_share_connections_access_users AS sau
+                ON sau.match_uuid = wmv.match_uuid
+                    AND sau.user_id = $7
             WHERE wmv.user_id = $2
                 AND wcp.unit_guid = $1
                 AND wmv.match_uuid IS NOT NULL
                 AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))
                 AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
+                AND ($2 = $7 OR sau.match_uuid IS NOT NULL)
             ORDER BY wmv.start_tm DESC
             LIMIT $3 OFFSET $4
             "#,
@@ -279,6 +293,7 @@ impl api::ApiApplication {
             start,
             &filters.arenas.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
             filters.has_vod.unwrap_or(false),
+            req_user_id,
         )
             .fetch_all(&*self.heavy_pool)
             .await?;
@@ -934,10 +949,14 @@ pub async fn finish_wow_arena_handler(app : web::Data<Arc<api::ApiApplication>>,
 }
 
 pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: QsQuery<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
     let query = query.into_inner();
     let encounters = app.list_wow_encounters_for_character(
         &path.character_guid,
         path.user_id,
+        session.user.id,
         query.start,
         query.end,
         &filters,
@@ -949,10 +968,14 @@ pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::
 }
 
 pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: QsQuery<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    
     let query = query.into_inner();
     let challenges = app.list_wow_challenges_for_character(
         &path.character_guid,
         path.user_id,
+        session.user.id,
         query.start,
         query.end,
         &filters,
@@ -964,10 +987,14 @@ pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::
 }
 
 pub async fn list_wow_arenas_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: QsQuery<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
     let query = query.into_inner();
     let challenges = app.list_wow_arenas_for_character(
         &path.character_guid,
         path.user_id,
+        session.user.id,
         query.start,
         query.end,
         &filters,

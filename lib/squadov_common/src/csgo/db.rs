@@ -378,7 +378,7 @@ pub async fn get_csgo_event_container_from_view(ex: &PgPool, view_uuid: &Uuid) -
     )
 }
 
-pub async fn list_csgo_match_summaries_for_user(ex: &PgPool, user_id: i64, start: i64, end: i64, filters: &CsgoListQuery) -> Result<Vec<CsgoPlayerMatchSummary>, SquadOvError> {
+pub async fn list_csgo_match_summaries_for_user(ex: &PgPool, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &CsgoListQuery) -> Result<Vec<CsgoPlayerMatchSummary>, SquadOvError> {
     let uuids: Vec<MatchPlayerPair> = sqlx::query_as!(
         MatchPlayerPair,
         r#"
@@ -390,12 +390,16 @@ pub async fn list_csgo_match_summaries_for_user(ex: &PgPool, user_id: i64, start
                 ON v.match_uuid = cmv.match_uuid
                     AND v.user_uuid = u.uuid
                     AND v.is_clip = FALSE
+            LEFT JOIN squadov.view_share_connections_access_users AS sau
+                ON sau.match_uuid = cmv.match_uuid
+                    AND sau.user_id = $8
             WHERE cmv.user_id = $1
                 AND cmv.match_uuid IS NOT NULL
                 AND (CARDINALITY($4::VARCHAR[]) = 0 OR cmv.mode = ANY($4))
                 AND (CARDINALITY($5::VARCHAR[]) = 0 OR cmv.map = ANY($5))
                 AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
                 AND (NOT $7::BOOLEAN OR cmv.has_demo)
+                AND ($1 = $8 OR sau.match_uuid IS NOT NULL)
             ORDER BY cmv.start_time DESC
             LIMIT $2 OFFSET $3
         "#,
@@ -406,6 +410,7 @@ pub async fn list_csgo_match_summaries_for_user(ex: &PgPool, user_id: i64, start
         &filters.maps.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<String>>(),
         filters.has_vod.unwrap_or(false),
         filters.has_demo.unwrap_or(false),
+        req_user_id,
     )
         .fetch_all(&*ex)
         .await?;

@@ -181,25 +181,23 @@ impl api::ApiApplication {
     async fn get_recent_base_matches_for_user(&self, user_id: i64, start: i64, end: i64, filter: &RecentMatchQuery) -> Result<Vec<RawRecentMatchData>, SquadOvError> {
         let handles: Vec<RecentMatchHandle> = sqlx::query!(
             r#"
-            SELECT DISTINCT v.match_uuid AS "match_uuid!", ou.uuid AS "uuid!", v.end_time
+            SELECT DISTINCT v.match_uuid AS "match_uuid!", v.user_uuid AS "uuid!", v.end_time
             FROM squadov.users AS u
             CROSS JOIN LATERAL (
-                SELECT DISTINCT ou.id, ou.uuid
-                FROM squadov.squad_role_assignments AS sra
-                LEFT JOIN squadov.squad_role_assignments AS ora
-                    ON ora.squad_id = sra.squad_id
-                INNER JOIN squadov.users AS ou
-                    ON ou.id = ora.user_id
-                        OR ou.id = u.id
-                WHERE sra.user_id = u.id
+                SELECT vi.*
+                FROM squadov.view_share_connections_access_users AS vi
+                LEFT JOIN squadov.squad_role_assignments AS sra
+                    ON sra.user_id = vi.user_id
+                WHERE vi.user_id = u.id
                     AND (CARDINALITY($5::BIGINT[]) = 0 OR sra.squad_id = ANY($5))
-                UNION
-                SELECT u.id, u.uuid
             ) AS ou
             INNER JOIN squadov.vods AS v
-                ON v.user_uuid = ou.uuid
+                ON v.video_uuid = ou.video_uuid
+                    OR v.user_uuid = u.uuid
+            INNER JOIN squadov.users AS vu
+                ON vu.uuid = v.user_uuid
             INNER JOIN squadov.matches AS m
-                ON v.match_uuid = m.uuid
+                ON m.uuid = v.match_uuid
             LEFT JOIN squadov.user_favorite_matches AS ufm
                 ON ufm.match_uuid = m.uuid
                     AND ufm.user_id = $1
@@ -212,7 +210,7 @@ impl api::ApiApplication {
                 AND v.start_time IS NOT NULL
                 AND v.end_time IS NOT NULL
                 AND (CARDINALITY($4::INTEGER[]) = 0 OR m.game = ANY($4))
-                AND (CARDINALITY($6::BIGINT[]) = 0 OR ou.id = ANY($6))
+                AND (CARDINALITY($6::BIGINT[]) = 0 OR vu.id = ANY($6))
                 AND COALESCE(v.end_time >= $7, TRUE)
                 AND COALESCE(v.end_time <= $8, TRUE)
                 AND (NOT $9::BOOLEAN OR ufm.match_uuid IS NOT NULL)

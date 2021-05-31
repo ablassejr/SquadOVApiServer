@@ -1,5 +1,6 @@
 use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
+use crate::api::auth::SquadOVSession;
 use squadov_common::{
     SquadOvError,
     csgo::{
@@ -17,10 +18,14 @@ pub struct CsgoUserMatchListInput {
 }
 
 pub async fn list_csgo_matches_for_user_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<CsgoUserMatchListInput>, query: web::Query<api::PaginationParameters>, filter: QsQuery<CsgoListQuery>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
     let query = query.into_inner();
     let matches = db::list_csgo_match_summaries_for_user(
         &*app.pool,
         path.user_id,
+        session.user.id,
         query.start,
         query.end,
         &filter,
