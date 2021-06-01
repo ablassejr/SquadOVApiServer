@@ -8,11 +8,13 @@ mod format_type;
 pub use game_type::*;
 pub use format_type::*;
 
+use crate::SquadOvError;
 use serde::{Serialize,Deserialize};
 use chrono::{DateTime, Utc, serde::ts_seconds};
 use ipnetwork::IpNetwork;
 use uuid::Uuid;
 use std::collections::HashMap;
+use sqlx::{Executor, Postgres};
 
 #[derive(Deserialize)]
 pub struct HearthstoneGameConnectionInfo {
@@ -209,4 +211,27 @@ pub struct HearthstoneDuelRun {
     pub loss: i64,
     pub rating: Option<i32>,
     pub timestamp: DateTime<Utc>
+}
+
+pub async fn is_user_in_hearthstone_match<'a, T>(ex: T, user_id: i64, match_uuid: &Uuid) -> Result<bool, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            r#"
+            SELECT EXISTS(
+                SELECT 1
+                FROM squadov.hearthstone_match_view
+                WHERE match_uuid = $1
+                    AND user_id = $2
+            ) AS "exists!"
+            "#,
+            match_uuid,
+            user_id,
+        )
+            .fetch_one(ex)
+            .await?
+            .exists
+    )
 }

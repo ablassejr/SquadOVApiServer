@@ -35,12 +35,13 @@ impl super::AccessChecker<VodAccessBasicData> for VodAccessChecker {
     async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: VodAccessBasicData) -> Result<bool, SquadOvError> {
         // The only users who should be able to access the VOD are those who are in the same squad as the owner of the VOD.
         // Ideally this would just use the SameSquadAccessChecker somehow?
-        if self.must_be_vod_owner {
-            let user_id = app.get_vod_owner(&data.video_uuid).await?;
-            Ok(user_id.unwrap_or(-1) == session.user.id)
+        let owner_user_id = app.get_vod_owner(&data.video_uuid).await?.unwrap_or(-1);
+        let is_owner = owner_user_id == session.user.id;
+        if is_owner {
+            Ok(true)
         } else {
             let same_squad_user_ids: HashSet<i64> = HashSet::from_iter(app.list_squadov_accounts_can_access_vod(&data.video_uuid).await?.into_iter());
-            Ok(same_squad_user_ids.contains(&session.user.id))
+            Ok(!self.must_be_vod_owner && same_squad_user_ids.contains(&session.user.id))
         }
     }
 

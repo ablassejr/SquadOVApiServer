@@ -18,6 +18,23 @@ pub struct AccessTokenRequest {
     pub graphql_stats: Option<Vec<StatPermission>>,
 }
 
+pub async fn delete_encrypted_access_token_for_match_user<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        DELETE FROM squadov.share_tokens
+        WHERE match_uuid = $1 AND user_id = $2
+        ",
+        match_uuid,
+        user_id,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
 pub async fn find_encrypted_access_token_for_match_user<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64) -> Result<Option<Uuid>, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
@@ -161,5 +178,47 @@ where
             .fetch_one(ex)
             .await?
             .id
+    )
+}
+
+pub async fn check_user_has_access_to_match_vod_from_user<'a, T>(ex: T, dest_user_id: i64, source_user_id: Option<i64>, match_uuid: Option<Uuid>, video_uuid: Option<Uuid>) -> Result<bool, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    if let Some(user_id) = source_user_id {
+        if user_id == dest_user_id {
+            return Ok(true);
+        }
+    }
+
+    Ok(
+        sqlx::query!(
+            r#"
+            WITH RECURSIVE access_cte AS (
+                SELECT vau.*
+                FROM squadov.view_share_connections_access_users AS vau
+                WHERE ($3::UUID IS NULL OR vau.match_uuid = $3)
+                    AND ($4::UUID IS NULL OR vau.video_uuid = $4)
+                    AND vau.user_id = $1
+                UNION
+                SELECT vau.*
+                FROM squadov.view_share_connections_access_users AS vau
+                INNER JOIN access_cte AS ac
+                    ON ac.parent_connection_id = vau.id
+            )
+            SELECT EXISTS (
+                SELECT 1
+                FROM access_cte
+                WHERE $2::BIGINT IS NULL OR source_user_id = $2
+            ) AS "exists!"
+            "#,
+            dest_user_id,
+            source_user_id,
+            match_uuid,
+            video_uuid,
+        )
+            .fetch_one(ex)
+            .await?
+            .exists
     )
 }

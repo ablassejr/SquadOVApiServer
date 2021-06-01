@@ -33,6 +33,7 @@ pub mod http;
 pub mod csgo;
 pub mod math;
 pub mod steam;
+pub mod share;
 
 pub use error::*;
 pub use parse::*;

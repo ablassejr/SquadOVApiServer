@@ -118,7 +118,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .wrap(access::ApiAccess::new(
                             Box::new(access::DenyShareTokenAccess{}),
                         ))
-                        .route("/share", web::post().to(v1::create_match_share_signature_handler))
+                        .route("/share/internal", web::get().to(v1::get_match_share_permissions_handler))
+                        .route("/share/public", web::delete().to(v1::delete_match_share_link_handler))
+                        .route("/share/public", web::get().to(v1::get_match_share_link_handler))
+                        .route("/share/public", web::post().to(v1::create_match_share_signature_handler))
                         .route("/favorite", web::post().to(v1::favorite_match_handler))
                         .route("/favorite", web::get().to(v1::check_favorite_match_handler))
                         .route("/favorite", web::delete().to(v1::remove_favorite_match_handler))
@@ -426,16 +429,26 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("", web::post().to(v1::create_new_aimlab_task_handler))
                         .service(
                             web::scope("/user/{user_id}")
-                                .wrap(access::ApiAccess::new(
-                                    Box::new(access::SameSquadAccessChecker{
-                                        obtainer: access::UserIdPathSetObtainer{
-                                            key: "user_id"
-                                        },
-                                    })
-                                ))
                                 .route("", web::get().to(v1::list_aimlab_matches_for_user_handler))
                                 .service(
                                     web::scope("/match/{match_uuid}")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::AimlabMatchUserMatchupChecker{
+                                                obtainer: access::AimlabMatchUserPathObtainer{
+                                                    match_uuid_key: "match_uuid",
+                                                    user_id_key: "user_id",
+                                                },
+                                            })
+                                        ))
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::MatchVodAccessChecker{
+                                                obtainer: access::MatchVodPathObtainer{
+                                                    match_key: Some("match_uuid"),
+                                                    video_key: None,
+                                                    user_key: Some("user_id"),
+                                                },
+                                            })
+                                        ))
                                         .service(
                                             web::resource("/task")
                                                 .route(web::get().to(v1::get_aimlab_task_data_handler))
@@ -452,18 +465,14 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/user/{user_id}")
                                 .wrap(access::ApiAccess::new(
+                                    Box::new(access::NullUserSetAccessChecker{})
+                                ).verb_override(
+                                    "POST",
                                     Box::new(access::UserSpecificAccessChecker{
                                         obtainer: access::UserIdPathSetObtainer{
                                             key: "user_id"
                                         },
                                     }),
-                                ).verb_override(
-                                    "GET",
-                                    Box::new(access::SameSquadAccessChecker{
-                                        obtainer: access::UserIdPathSetObtainer{
-                                            key: "user_id"
-                                        },
-                                    })
                                 ))
                                 .service(
                                     web::scope("/match")
@@ -476,9 +485,29 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                         // Note that we should be submitting GZIP here so this shouldn't get super super large.
                                                         cfg.limit(5 * 1024 * 1024)
                                                     }))
-                                                .route("", web::get().to(v1::get_hearthstone_match_handler))
-                                                .route("/logs", web::get().to(v1::get_hearthstone_match_logs_handler))
-                                                .route("/vods", web::get().to(v1::get_hearthstone_match_user_accessible_vod_handler))
+                                                .service(
+                                                    web::scope("")
+                                                        .wrap(access::ApiAccess::new(
+                                                            Box::new(access::HearthstoneMatchUserMatchupChecker{
+                                                                obtainer: access::HearthstoneMatchUserPathObtainer{
+                                                                    match_uuid_key: "match_uuid",
+                                                                    user_id_key: "user_id",
+                                                                },
+                                                            })
+                                                        ))
+                                                        .wrap(access::ApiAccess::new(
+                                                            Box::new(access::MatchVodAccessChecker{
+                                                                obtainer: access::MatchVodPathObtainer{
+                                                                    match_key: Some("match_uuid"),
+                                                                    video_key: None,
+                                                                    user_key: Some("user_id"),
+                                                                },
+                                                            })
+                                                        ))
+                                                        .route("", web::get().to(v1::get_hearthstone_match_handler))
+                                                        .route("/logs", web::get().to(v1::get_hearthstone_match_logs_handler))
+                                                        .route("/vods", web::get().to(v1::get_hearthstone_match_user_accessible_vod_handler))
+                                                )
                                         )
                                 )
                                 .service(
@@ -546,9 +575,11 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .service(
                                             web::scope("/users/{user_id}")
                                                 .wrap(access::ApiAccess::new(
-                                                    Box::new(access::SameSquadAccessChecker{
-                                                        obtainer: access::UserIdPathSetObtainer{
-                                                            key: "user_id"
+                                                    Box::new(access::MatchVodAccessChecker{
+                                                        obtainer: access::MatchVodPathObtainer{
+                                                            match_key: Some("match_uuid"),
+                                                            video_key: None,
+                                                            user_key: Some("user_id"),
                                                         },
                                                     })
                                                 ))
@@ -559,15 +590,15 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         )
                         .service(
                             web::scope("/users/{user_id}")
-                                .wrap(access::ApiAccess::new(
-                                    Box::new(access::SameSquadAccessChecker{
-                                        obtainer: access::UserIdPathSetObtainer{
-                                            key: "user_id"
-                                        },
-                                    })
-                                ))
                                 .service(
                                     web::scope("/characters")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::SameSquadAccessChecker{
+                                                obtainer: access::UserIdPathSetObtainer{
+                                                    key: "user_id"
+                                                },
+                                            })
+                                        ))
                                         .wrap(access::ApiAccess::new(
                                             Box::new(access::DenyShareTokenAccess{}),
                                         ))
@@ -586,6 +617,15 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                 obtainer: access::WowMatchUserPathObtainer{
                                                     match_uuid_key: "match_uuid",
                                                     user_id_key: "user_id",
+                                                },
+                                            })
+                                        ))
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::MatchVodAccessChecker{
+                                                obtainer: access::MatchVodPathObtainer{
+                                                    match_key: Some("match_uuid"),
+                                                    video_key: None,
+                                                    user_key: Some("user_id"),
                                                 },
                                             })
                                         ))
@@ -608,11 +648,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/user/{user_id}")
                                 .wrap(access::ApiAccess::new(
-                                    Box::new(access::UserSpecificAccessChecker{
-                                        obtainer: access::UserIdPathSetObtainer{
-                                            key: "user_id"
-                                        },
-                                    }),
+                                    Box::new(access::NullUserSetAccessChecker{})
                                 ).verb_override(
                                     "GET",
                                     Box::new(access::SameSquadAccessChecker{
@@ -623,6 +659,13 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 ))
                                 .service(
                                     web::scope("/view")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::UserSpecificAccessChecker{
+                                                obtainer: access::UserIdPathSetObtainer{
+                                                    key: "user_id"
+                                                },
+                                            }),
+                                        ))
                                         .route("", web::post().to(v1::create_csgo_view_for_user_handler))
                                         .service(
                                             web::scope("/{view_uuid}")
@@ -639,6 +682,23 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route("", web::get().to(v1::list_csgo_matches_for_user_handler))
                                         .service(
                                             web::scope("/{match_uuid}")
+                                                .wrap(access::ApiAccess::new(
+                                                    Box::new(access::CsgoMatchUserMatchupChecker{
+                                                        obtainer: access::CsgoMatchUserPathObtainer{
+                                                            match_uuid_key: "match_uuid",
+                                                            user_id_key: "user_id",
+                                                        },
+                                                    })
+                                                ))
+                                                .wrap(access::ApiAccess::new(
+                                                    Box::new(access::MatchVodAccessChecker{
+                                                        obtainer: access::MatchVodPathObtainer{
+                                                            match_key: Some("match_uuid"),
+                                                            video_key: None,
+                                                            user_key: Some("user_id"),
+                                                        },
+                                                    })
+                                                ))
                                                 .route("", web::get().to(v1::get_csgo_match_handler))
                                                 .route("/vods", web::get().to(v1::get_csgo_match_accessible_vods_handler))
                                         )
@@ -656,9 +716,11 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .service(
                                             web::resource("/id/{user_id}")
                                                 .wrap(access::ApiAccess::new(
-                                                    Box::new(access::SameSquadAccessChecker{
-                                                        obtainer: access::UserIdPathSetObtainer{
-                                                            key: "user_id"
+                                                    Box::new(access::MatchVodAccessChecker{
+                                                        obtainer: access::MatchVodPathObtainer{
+                                                            match_key: Some("match_uuid"),
+                                                            video_key: None,
+                                                            user_key: Some("user_id"),
                                                         },
                                                     })
                                                 ))
@@ -741,7 +803,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("/bulkDelete", web::post().to(v1::bulk_delete_vods_handler))
                         .service(
                             web::scope("/{clip_uuid}")
-                                .route("", web::get().to(v1::get_clip_handler))
                                 .service(
                                     web::scope("/share")
                                         .wrap(access::ApiAccess::new(
@@ -773,6 +834,19 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                             web::scope("/{comment_id}")
                                                 .route("", web::delete().to(v1::delete_clip_comment_handler))
                                         )
+                                )
+                                .service(
+                                    web::scope("")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::MatchVodAccessChecker{
+                                                obtainer: access::MatchVodPathObtainer{
+                                                    match_key: None,
+                                                    video_key: Some("clip_uuid"),
+                                                    user_key: None,
+                                                },
+                                            })
+                                        ))
+                                        .route("", web::get().to(v1::get_clip_handler))
                                 )
                         )
                 )

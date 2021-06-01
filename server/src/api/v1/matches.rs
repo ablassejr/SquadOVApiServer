@@ -38,7 +38,12 @@ use squadov_common::{
         VodMetadata,
         VodTrack,
         VodManifest,
-    }
+    },
+    share,
+    share::{
+        LinkShareData,
+        MatchVideoSharePermissions,
+    },
 };
 use std::sync::Arc;
 use chrono::{DateTime, Utc, TimeZone};
@@ -470,19 +475,68 @@ pub struct MatchShareSignatureData {
     graphql_stats: Option<Vec<StatPermission>>,
 }
 
+#[derive(Deserialize,Debug)]
+#[serde(rename_all="camelCase")]
+pub struct MatchSharePermQuery {
+    game: SquadOvGames,
+}
+
+pub async fn get_match_share_permissions_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, query: web::Query<MatchSharePermQuery>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    Ok(
+        HttpResponse::Ok().json(
+            if squadov_common::matches::is_user_in_match(&*app.pool, session.user.id, &path.match_uuid, query.game).await? {
+                MatchVideoSharePermissions{
+                    can_share: true,
+                    can_clip: true,
+                }
+            } else {
+                share::get_match_vod_share_permissions_for_user(&*app.pool, Some(&path.match_uuid), None, session.user.id).await?
+            }
+        )
+    )
+}
+
+pub async fn delete_match_share_link_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    squadov_common::access::delete_encrypted_access_token_for_match_user(&*app.pool, &path.match_uuid, session.user.id).await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn get_match_share_link_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    let token = squadov_common::access::find_encrypted_access_token_for_match_user(&*app.pool, &path.match_uuid, session.user.id).await?;
+
+    Ok(
+        HttpResponse::Ok().json(
+            LinkShareData{
+                is_link_shared: token.is_some(),
+                share_url: token.map(|x| {
+                    format!(
+                        "{}/share/{}",
+                        &app.config.cors.domain,
+                        &x,
+                    )
+                }),
+            }
+        )
+    )
+}
+
 pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, data: web::Json<MatchShareSignatureData>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
-    let session = match extensions.get::<SquadOVSession>() {
-        Some(s) => s,
-        None => return Err(SquadOvError::Unauthorized),
-    };
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
-    // We need to verify that the requesting user is actually a part of the match. Note that we should not
-    // check for the presence of a VOD because we should keep it possible to share matches that are VOD-less.
     if !squadov_common::matches::is_user_in_match(&*app.pool, session.user.id, &path.match_uuid, data.game).await? {
-        return Err(SquadOvError::Unauthorized);
+        let permissions = share::get_match_vod_share_permissions_for_user(&*app.pool, Some(&path.match_uuid), None, session.user.id).await?;
+        if !permissions.can_share {
+            return Err(SquadOvError::Unauthorized);
+        }
     }
-
+    
     // Next we need to generate the share URL for this match. This is dependent on
     // 1) The app domain
     // 2) The game of the match being requested.
@@ -557,11 +611,20 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
     // many times it was used and be able to revoke it and stuff but I don't think the gains are worth it at
     // the moment. I'd rather have a more distributed version where we toss a URL out there and just let it be
     // valid.
-    Ok(HttpResponse::Ok().json(&format!(
-        "{}/share/{}",
-        &app.config.cors.domain,
-        &token,
-    )))
+    Ok(
+        HttpResponse::Ok().json(
+            LinkShareData{
+                is_link_shared: true,
+                share_url: Some(
+                    format!(
+                        "{}/share/{}",
+                        &app.config.cors.domain,
+                        &token,
+                    )
+                ),
+            }
+        )
+    )
 }
 
 #[derive(Deserialize,Debug)]

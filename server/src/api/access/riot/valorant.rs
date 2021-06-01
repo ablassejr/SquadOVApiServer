@@ -1,5 +1,8 @@
 use actix_web::{HttpRequest};
-use squadov_common::SquadOvError;
+use squadov_common::{
+    SquadOvError,
+    access
+};
 use crate::api::auth::SquadOVSession;
 use crate::api::ApiApplication;
 use crate::api::access::AccessChecker;
@@ -34,8 +37,12 @@ impl AccessChecker<ValorantMatchUuidData> for ValorantMatchAccessChecker {
 
     async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: ValorantMatchUuidData) -> Result<bool, SquadOvError> {
         // The user must be either in the match or a squad member of a user in that match.        
-        let access_set: HashSet<i64> = HashSet::from_iter(app.list_squadov_accounts_can_access_valorant_match(&data.match_uuid).await?);
-        Ok(access_set.contains(&session.user.id))
+        let base_access_set: HashSet<i64> = HashSet::from_iter(app.list_squadov_accounts_in_valorant_match(&data.match_uuid).await?);
+        if base_access_set.contains(&session.user.id) {
+            return Ok(true);
+        } else {
+            return Ok(access::check_user_has_access_to_match_vod_from_user(&*app.pool, session.user.id, None, Some(data.match_uuid.clone()), None).await?);
+        }
     }
 
     async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: ValorantMatchUuidData) -> Result<bool, SquadOvError> {

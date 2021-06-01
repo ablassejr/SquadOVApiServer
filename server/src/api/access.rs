@@ -5,6 +5,11 @@ mod riot;
 mod vod;
 mod wow;
 mod share;
+mod matches;
+mod null;
+mod aimlab;
+mod hearthstone;
+mod csgo;
 
 pub use user_specific::*;
 pub use squad::*;
@@ -13,6 +18,11 @@ pub use riot::*;
 pub use vod::*;
 pub use wow::*;
 pub use share::*;
+pub use matches::*;
+pub use null::*;
+pub use aimlab::*;
+pub use hearthstone::*;
+pub use csgo::*;
 
 use squadov_common;
 use actix_web::{web, HttpRequest};
