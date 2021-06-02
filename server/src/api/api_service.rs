@@ -114,11 +114,21 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("/info", web::get().to(v1::get_kafka_info_handler))
                 )
                 .service(
+                    web::scope("/share")
+                        .route("", web::post().to(v1::create_new_share_connection_handler))
+                        .service(
+                            web::scope("/{connection_id}")
+                                .route("", web::delete().to(v1::delete_share_connection_handler))
+                                .route("", web::post().to(v1::edit_share_connection_handler))
+                        )
+                )
+                .service(
                     web::scope("/match/{match_uuid}")
                         .wrap(access::ApiAccess::new(
                             Box::new(access::DenyShareTokenAccess{}),
                         ))
-                        .route("/share/internal", web::get().to(v1::get_match_share_permissions_handler))
+                        .route("/share/internal", web::get().to(v1::get_match_share_connections_handler))
+                        .route("/share/permissions", web::get().to(v1::get_match_share_permissions_handler))
                         .route("/share/public", web::delete().to(v1::delete_match_share_link_handler))
                         .route("/share/public", web::get().to(v1::get_match_share_link_handler))
                         .route("/share/public", web::post().to(v1::create_match_share_signature_handler))

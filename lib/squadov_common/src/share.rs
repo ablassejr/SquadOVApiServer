@@ -1,14 +1,29 @@
-use crate::SquadOvError;
+use crate::{
+    SquadOvError,
+};
 use uuid::Uuid;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use sqlx::{Executor, Postgres};
 use std::collections::HashMap;
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct MatchVideoSharePermissions {
+    pub id: i64,
     pub can_share: bool,
     pub can_clip: bool,
+}
+
+#[derive(Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct MatchVideoShareConnection {
+    pub can_share: bool,
+    pub can_clip: bool,
+    pub id: i64,
+    pub match_uuid: Option<Uuid>,
+    pub video_uuid: Option<Uuid>,
+    pub dest_user_id: Option<i64>,
+    pub dest_squad_id: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -38,6 +53,7 @@ pub struct ShareEdge {
 
 fn trace_edge_permission(start: &ShareEdge, graph: &HashMap<i64, ShareEdge>, current: MatchVideoSharePermissions) -> MatchVideoSharePermissions {
     let start_perm = MatchVideoSharePermissions {
+        id: -1,
         can_share: start.can_share,
         can_clip: start.can_clip,
     };
@@ -53,9 +69,33 @@ fn trace_edge_permission(start: &ShareEdge, graph: &HashMap<i64, ShareEdge>, cur
     };
 
     MatchVideoSharePermissions {
+        id: -1,
         can_share: merge_parent.can_share && current.can_share,
         can_clip: merge_parent.can_clip && current.can_clip,
     }
+}
+
+pub async fn get_match_vod_share_connections_for_user<'a, T>(ex: T, match_uuid: Option<&Uuid>, video_uuid: Option<&Uuid>, user_id: i64) -> Result<Vec<MatchVideoShareConnection>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            MatchVideoShareConnection,
+            "
+            SELECT id, match_uuid, video_uuid, can_share, can_clip, dest_user_id, dest_squad_id
+            FROM squadov.share_match_vod_connections
+            WHERE source_user_id = $1
+                AND ($2::UUID IS NULL OR match_uuid = $2)
+                AND ($3::UUID IS NULL OR video_uuid = $3)
+            ",
+            user_id,
+            match_uuid,
+            video_uuid,
+        )
+            .fetch_all(ex)
+            .await?
+    )
 }
 
 pub async fn get_match_vod_share_permissions_for_user<'a, T>(ex: T, match_uuid: Option<&Uuid>, video_uuid: Option<&Uuid>, user_id: i64) -> Result<MatchVideoSharePermissions, SquadOvError>
@@ -107,19 +147,120 @@ where
     });
 
     let mut permission = MatchVideoSharePermissions{
+        id: -1,
         can_share: false,
         can_clip: false,
     };
 
     for te in terminal_edges {
         let p = trace_edge_permission(&te, &other_edges, MatchVideoSharePermissions{
+            id: -1,
             can_share: true,
             can_clip: true,
         });
 
+        permission.id = te.id;
         permission.can_share |= p.can_share;
         permission.can_clip |= p.can_clip;
     }
     
     Ok(permission)
+}
+
+pub async fn create_new_share_connection<'a, T>(ex: T, conn: &MatchVideoShareConnection, source_user_id: i64, parent_connection_id: Option<i64>) -> Result<MatchVideoShareConnection, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            MatchVideoShareConnection,
+            "
+            INSERT INTO squadov.share_match_vod_connections (
+                match_uuid,
+                video_uuid,
+                source_user_id,
+                dest_user_id,
+                dest_squad_id,
+                can_share,
+                can_clip,
+                parent_connection_id,
+                share_depth
+            )
+            VALUES (
+                $1,
+                $2,
+                $3,
+                $4,
+                $5,
+                $6,
+                $7,
+                $8,
+                COALESCE(
+                    (
+                        SELECT share_depth
+                        FROM squadov.share_match_vod_connections
+                        WHERE id = $8
+                    ),
+                    -1
+                ) + 1
+            )
+            RETURNING
+                id,
+                match_uuid,
+                video_uuid,
+                dest_user_id,
+                dest_squad_id,
+                can_share,
+                can_clip
+            ",
+            conn.match_uuid,
+            conn.video_uuid,
+            source_user_id,
+            conn.dest_user_id,
+            conn.dest_squad_id,
+            conn.can_share,
+            conn.can_clip,
+            parent_connection_id,
+        )
+            .fetch_one(ex)
+            .await?
+    )
+}
+
+pub async fn delete_share_connection<'a, T>(ex: T, conn_id: i64, user_id: i64) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        DELETE FROM squadov.share_match_vod_connections
+        WHERE id = $1 AND source_user_id = $2
+        ",
+        conn_id,
+        user_id,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
+pub async fn edit_share_connection<'a, T>(ex: T, conn_id: i64, user_id: i64, can_share: bool, can_clip: bool) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        UPDATE squadov.share_match_vod_connections
+        SET can_share = $3,
+            can_clip = $4
+        WHERE id = $1 AND source_user_id = $2
+        ",
+        conn_id,
+        user_id,
+        can_share,
+        can_clip,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
 }

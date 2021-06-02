@@ -75,8 +75,12 @@ impl api::ApiApplication {
                 ON sra.user_id = u.id
             LEFT JOIN squadov.squad_role_assignments AS ora
                 ON ora.squad_id = sra.squad_id
+            LEFT JOIN squadov.view_share_connections_access_users AS vau
+                ON vau.video_uuid = v.video_uuid
+                    AND vau.match_uuid = $1
+                    AND vau.user_id = $2
             WHERE v.match_uuid = $1 
-                AND (u.id = $2 OR (ora.user_id = $2 AND $3))
+                AND (u.id = $2 OR (ora.user_id = $2 AND $3 AND vau.video_uuid IS NOT NULL))
                 AND v.is_clip = FALSE
                 AND (v.is_local = FALSE OR u.id = $2)
             ",

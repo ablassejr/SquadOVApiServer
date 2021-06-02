@@ -14,6 +14,7 @@ mod oauth;
 mod features;
 mod analytics;
 mod csgo;
+mod share;
 
 pub use user::*;
 pub use matches::*;
@@ -31,6 +32,7 @@ pub use oauth::*;
 pub use features::*;
 pub use analytics::*;
 pub use csgo::*;
+pub use share::*;
 
 use serde::Serialize;
 

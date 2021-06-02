@@ -481,6 +481,16 @@ pub struct MatchSharePermQuery {
     game: SquadOvGames,
 }
 
+pub async fn get_match_share_connections_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    Ok(
+        HttpResponse::Ok().json(
+            share::get_match_vod_share_connections_for_user(&*app.pool, Some(&path.match_uuid), None, session.user.id).await?
+        )
+    )
+}
+
 pub async fn get_match_share_permissions_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, query: web::Query<MatchSharePermQuery>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
@@ -488,6 +498,7 @@ pub async fn get_match_share_permissions_handler(app : web::Data<Arc<api::ApiApp
         HttpResponse::Ok().json(
             if squadov_common::matches::is_user_in_match(&*app.pool, session.user.id, &path.match_uuid, query.game).await? {
                 MatchVideoSharePermissions{
+                    id: -1,
                     can_share: true,
                     can_clip: true,
                 }
