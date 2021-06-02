@@ -57,6 +57,23 @@ where
     )
 }
 
+pub async fn delete_encrypted_access_token_for_clip_user<'a, T>(ex: T, clip_uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        DELETE FROM squadov.share_tokens
+        WHERE clip_uuid = $1 AND user_id = $2
+        ",
+        clip_uuid,
+        user_id,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
 pub async fn find_encrypted_access_token_for_clip_user<'a, T>(ex: T, clip_uuid: &Uuid, user_id: i64) -> Result<Option<Uuid>, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>

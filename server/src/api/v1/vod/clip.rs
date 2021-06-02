@@ -185,7 +185,10 @@ impl api::ApiApplication {
             LEFT JOIN squadov.user_watchlist_vods AS uwv
                 ON uwv.video_uuid = v.video_uuid
                     AND uwv.user_id = $1
-            WHERE (vc.clip_user_id = $1 OR ora.user_id = $1)
+            LEFT JOIN squadov.view_share_connections_access_users AS vau
+                ON vau.video_uuid = v.video_uuid
+                    AND vau.user_id = $1
+            WHERE (vc.clip_user_id = $1 OR (ora.user_id = $1 AND vau.video_uuid IS NOT NULL))
                 AND ($4::UUID IS NULL OR m.uuid = $4)
                 AND (CARDINALITY($5::INTEGER[]) = 0 OR m.game = ANY($5))
                 AND (CARDINALITY($6::BIGINT[]) = 0 OR sra.squad_id = ANY($6))

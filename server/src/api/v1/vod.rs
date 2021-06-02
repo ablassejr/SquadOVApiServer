@@ -24,6 +24,11 @@ use squadov_common::{
         AESEncryptRequest,
         squadov_encrypt,
     },
+    share,
+    share::{
+        LinkShareData,
+        MatchVideoSharePermissions,
+    },
 };
 
 #[derive(Deserialize)]
@@ -37,6 +42,74 @@ pub struct ClipShareSignatureData {
     full_path: String,
 }
 
+pub async fn get_clip_share_connections_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericClipPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    Ok(
+        HttpResponse::Ok().json(
+            share::get_match_vod_share_connections_for_user(&*app.pool, None, Some(&path.clip_uuid), session.user.id).await?
+        )
+    )
+}
+
+pub async fn get_clip_share_permissions_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericClipPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
+    let clips = app.get_vod_clip_from_clip_uuids(&[path.clip_uuid.clone()], session.user.id).await?;
+    let is_clip_owner = if let Some(clip) = clips.get(0) {
+        if let Some(user_uuid) = clip.clip.user_uuid {
+            user_uuid == session.user.uuid
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    Ok(
+        HttpResponse::Ok().json(
+            if is_clip_owner {
+                MatchVideoSharePermissions{
+                    id: -1,
+                    can_share: true,
+                    can_clip: true,
+                }
+            } else {
+                share::get_match_vod_share_permissions_for_user(&*app.pool, None, Some(&path.clip_uuid), session.user.id).await?
+            }
+        )
+    )
+}
+
+pub async fn get_clip_share_signature_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericClipPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    let token = squadov_common::access::find_encrypted_access_token_for_clip_user(&*app.pool, &path.clip_uuid, session.user.id).await?;
+
+    Ok(
+        HttpResponse::Ok().json(
+            LinkShareData{
+                is_link_shared: token.is_some(),
+                share_url: token.map(|x| {
+                    format!(
+                        "{}/share/{}",
+                        &app.config.cors.domain,
+                        &x,
+                    )
+                }),
+            }
+        )
+    )
+}
+
+pub async fn delete_clip_share_signature_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericClipPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    squadov_common::access::delete_encrypted_access_token_for_clip_user(&*app.pool, &path.clip_uuid, session.user.id).await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
 pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericClipPathInput>, data: web::Json<ClipShareSignatureData>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
@@ -44,7 +117,7 @@ pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApp
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    // Only the owner of the clip can share.
+    // Only the owner of the clip and those with the share permission can share.
     let clips = app.get_vod_clip_from_clip_uuids(&[path.clip_uuid.clone()], session.user.id).await?;
     if clips.is_empty() {
         return Err(SquadOvError::BadRequest);
@@ -55,7 +128,10 @@ pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApp
     }
 
     if clips[0].clip.user_uuid.as_ref().unwrap() != &session.user.uuid {
-        return Err(SquadOvError::Unauthorized);
+        let permissions = share::get_match_vod_share_permissions_for_user(&*app.pool, None, Some(&path.clip_uuid), session.user.id).await?;
+        if !permissions.can_share {
+            return Err(SquadOvError::Unauthorized);
+        }
     }
     
     // If the user already shared this match, reuse that token so we don't fill up our databases with a bunch of useless tokens.
@@ -100,11 +176,20 @@ pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApp
     // many times it was used and be able to revoke it and stuff but I don't think the gains are worth it at
     // the moment. I'd rather have a more distributed version where we toss a URL out there and just let it be
     // valid.
-    Ok(HttpResponse::Ok().json(&format!(
-        "{}/share/{}",
-        &app.config.cors.domain,
-        &token,
-    )))
+    Ok(
+        HttpResponse::Ok().json(
+            LinkShareData{
+                is_link_shared: true,
+                share_url: Some(
+                    format!(
+                        "{}/share/{}",
+                        &app.config.cors.domain,
+                        &token,
+                    )
+                ),
+            }
+        )
+    )
 }
 
 #[derive(Deserialize)]

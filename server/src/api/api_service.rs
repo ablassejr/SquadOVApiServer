@@ -818,7 +818,11 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .wrap(access::ApiAccess::new(
                                             Box::new(access::DenyShareTokenAccess{}),
                                         ))
-                                        .route("", web::post().to(v1::create_clip_share_signature_handler))
+                                        .route("/public", web::post().to(v1::create_clip_share_signature_handler))
+                                        .route("/public", web::get().to(v1::get_clip_share_signature_handler))
+                                        .route("/public", web::delete().to(v1::delete_clip_share_signature_handler))
+                                        .route("/internal", web::get().to(v1::get_clip_share_connections_handler))
+                                        .route("/permissions", web::get().to(v1::get_clip_share_permissions_handler))
                                 )
                                 .service(
                                     web::scope("/react")
