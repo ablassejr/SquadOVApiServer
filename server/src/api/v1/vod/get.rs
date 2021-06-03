@@ -44,6 +44,24 @@ impl api::ApiApplication {
         Ok(ret)
     }
 
+    pub async fn get_vod_owner_user_id(&self, video_uuid: &Uuid) -> Result<i64, SquadOvError> {
+        Ok(
+            sqlx::query!(
+                "
+                SELECT u.id
+                FROM squadov.vods AS v
+                INNER JOIN squadov.users AS u
+                    ON u.uuid = v.user_uuid
+                WHERE v.video_uuid = $1
+                ",
+                video_uuid
+            )
+                .fetch_one(&*self.pool)
+                .await?
+                .id
+        )
+    }
+
     pub async fn get_vod(&self, video_uuid: &[Uuid]) -> Result<HashMap<Uuid, VodManifest>, SquadOvError> {
         let quality_options = self.get_vod_quality_options(video_uuid).await?;
         let associations = self.find_vod_associations(video_uuid).await?;

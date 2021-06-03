@@ -5,7 +5,10 @@ use squadov_common::{
     SquadOvError,
     SquadOvGames,
     share,
-    share::MatchVideoShareConnection,
+    share::{
+        MatchVideoShareConnection,
+        MatchVideoSharePermissions,
+    }
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -167,4 +170,54 @@ pub async fn edit_share_connection_handler(app : web::Data<Arc<api::ApiApplicati
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
     share::edit_share_connection(&*app.pool, path.connection_id, session.user.id, data.can_share, data.can_clip).await?;
     Ok(HttpResponse::NoContent().finish())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct SharePermissionsQueryData {
+    match_uuid: Option<Uuid>,
+    video_uuid: Option<Uuid>,
+    game: Option<SquadOvGames>,
+}
+
+pub async fn get_share_permissions_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<SharePermissionsQueryData>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
+    // Early exists for when we know for sure that the user doesn't need a permission check (aka they're the "owner").
+    // For matches, this means that the user themself is in the match. For VODs/clips, this means that they're the owner of the VOD.
+    let is_owner = if let Some(match_uuid) = data.match_uuid {
+        if let Some(game) = data.game {
+            squadov_common::matches::is_user_in_match(&*app.pool, session.user.id, &match_uuid, game).await?
+        } else {
+            false
+        }
+    } else if let Some(video_uuid) = data.video_uuid {
+        let assocs = app.find_vod_associations(&[video_uuid.clone()]).await?;
+        if let Some(vod) = assocs.get(&video_uuid) {
+            if let Some(user_uuid) = vod.user_uuid {
+                user_uuid == session.user.uuid
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    } else {
+        return Err(SquadOvError::BadRequest);
+    };
+
+    Ok(
+        HttpResponse::Ok().json(
+            if is_owner {
+                MatchVideoSharePermissions{
+                    id: -1,
+                    can_share: true,
+                    can_clip: true,
+                }
+            } else {
+                share::get_match_vod_share_permissions_for_user(&*app.pool, data.match_uuid.as_ref(), data.video_uuid.as_ref(), session.user.id).await?
+            }
+        )
+    )
 }

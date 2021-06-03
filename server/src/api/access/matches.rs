@@ -65,7 +65,15 @@ impl super::AccessChecker<MatchVodBasicData> for MatchVodAccessChecker<MatchVodP
         Ok(check_user_has_access_to_match_vod_from_user(
             &*app.pool,
             session.user.id,
-            data.user_id,
+            if data.user_id.is_some() {
+                data.user_id
+            } else {
+                if let Some(video_uuid) = data.video_uuid {
+                    Some(app.get_vod_owner_user_id(&video_uuid).await?)
+                } else {
+                    None
+                }
+            },
             data.match_uuid,
             data.video_uuid,
         ).await?)

@@ -27,7 +27,6 @@ use squadov_common::{
     share,
     share::{
         LinkShareData,
-        MatchVideoSharePermissions,
     },
 };
 
@@ -48,36 +47,6 @@ pub async fn get_clip_share_connections_handler(app : web::Data<Arc<api::ApiAppl
     Ok(
         HttpResponse::Ok().json(
             share::get_match_vod_share_connections_for_user(&*app.pool, None, Some(&path.clip_uuid), session.user.id).await?
-        )
-    )
-}
-
-pub async fn get_clip_share_permissions_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericClipPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
-    let extensions = req.extensions();
-    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
-
-    let clips = app.get_vod_clip_from_clip_uuids(&[path.clip_uuid.clone()], session.user.id).await?;
-    let is_clip_owner = if let Some(clip) = clips.get(0) {
-        if let Some(user_uuid) = clip.clip.user_uuid {
-            user_uuid == session.user.uuid
-        } else {
-            false
-        }
-    } else {
-        false
-    };
-
-    Ok(
-        HttpResponse::Ok().json(
-            if is_clip_owner {
-                MatchVideoSharePermissions{
-                    id: -1,
-                    can_share: true,
-                    can_clip: true,
-                }
-            } else {
-                share::get_match_vod_share_permissions_for_user(&*app.pool, None, Some(&path.clip_uuid), session.user.id).await?
-            }
         )
     )
 }

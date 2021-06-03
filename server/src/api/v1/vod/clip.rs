@@ -4,7 +4,7 @@ use crate::api::v1::RecentMatchQuery;
 use actix_web::{web, HttpResponse, HttpRequest};
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
-use squadov_common::{SquadOvError, VodSegmentId, SquadOvGames, VodClip, ClipReact, ClipComment};
+use squadov_common::{SquadOvError, VodSegmentId, SquadOvGames, VodClip, ClipReact, ClipComment, access};
 use std::sync::Arc;
 use std::convert::TryFrom;
 use serde_qs::actix::QsQuery;
@@ -174,11 +174,6 @@ impl api::ApiApplication {
                 ON m.uuid = v.match_uuid
             LEFT JOIN squadov.squad_role_assignments AS sra
                 ON sra.user_id = vc.clip_user_id
-            LEFT JOIN squadov.squad_role_assignments AS ora
-                ON ora.squad_id = sra.squad_id
-            INNER JOIN squadov.users AS ou
-                ON ou.id = ora.user_id
-                    OR ou.uuid = v.user_uuid
             LEFT JOIN squadov.user_favorite_vods AS ufv
                 ON ufv.video_uuid = v.video_uuid
                     AND ufv.user_id = $1
@@ -188,7 +183,7 @@ impl api::ApiApplication {
             LEFT JOIN squadov.view_share_connections_access_users AS vau
                 ON vau.video_uuid = v.video_uuid
                     AND vau.user_id = $1
-            WHERE (vc.clip_user_id = $1 OR (ora.user_id = $1 AND vau.video_uuid IS NOT NULL))
+            WHERE (vc.clip_user_id = $1 OR vau.video_uuid IS NOT NULL)
                 AND ($4::UUID IS NULL OR m.uuid = $4)
                 AND (CARDINALITY($5::INTEGER[]) = 0 OR m.game = ANY($5))
                 AND (CARDINALITY($6::BIGINT[]) = 0 OR sra.squad_id = ANY($6))
@@ -308,28 +303,12 @@ impl api::ApiApplication {
     }
 
     async fn check_user_has_access_to_clip(&self, clip_uuid: &Uuid, user_id: i64) -> Result<bool, SquadOvError> {
-        Ok(
-            sqlx::query!(
-                r#"
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM squadov.vod_clips AS vc
-                    LEFT JOIN squadov.squad_role_assignments AS sra
-                        ON sra.user_id = vc.clip_user_id
-                    LEFT JOIN squadov.squad_role_assignments AS ora
-                        ON ora.squad_id = sra.squad_id
-                    WHERE vc.clip_uuid = $1
-                        AND (vc.clip_user_id = $2 OR ora.user_id = $2)
-                    LIMIT 1
-                ) AS "exists!"
-                "#,
-                clip_uuid,
-                user_id
-            )
-                .fetch_one(&*self.pool)
-                .await?
-                .exists
-        )
+        let owner_id = self.get_vod_owner_user_id(clip_uuid).await?;
+        if owner_id == user_id {
+            return Ok(true);
+        } else {
+            return Ok(access::check_user_has_access_to_match_vod_from_user(&*self.pool, user_id, None, None, Some(clip_uuid.clone())).await?);
+        }
     }
 
     async fn get_clip_comments(&self, clip_uuid: &Uuid, start: i64, end: i64) -> Result<Vec<ClipComment>, SquadOvError> {

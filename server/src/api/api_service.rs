@@ -116,6 +116,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 .service(
                     web::scope("/share")
                         .route("", web::post().to(v1::create_new_share_connection_handler))
+                        .route("/permissions", web::post().to(v1::get_share_permissions_handler))
                         .service(
                             web::scope("/{connection_id}")
                                 .route("", web::delete().to(v1::delete_share_connection_handler))
@@ -128,7 +129,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                             Box::new(access::DenyShareTokenAccess{}),
                         ))
                         .route("/share/internal", web::get().to(v1::get_match_share_connections_handler))
-                        .route("/share/permissions", web::get().to(v1::get_match_share_permissions_handler))
                         .route("/share/public", web::delete().to(v1::delete_match_share_link_handler))
                         .route("/share/public", web::get().to(v1::get_match_share_link_handler))
                         .route("/share/public", web::post().to(v1::create_match_share_signature_handler))
@@ -660,22 +660,15 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .wrap(access::ApiAccess::new(
                                     Box::new(access::NullUserSetAccessChecker{})
                                 ).verb_override(
-                                    "GET",
-                                    Box::new(access::SameSquadAccessChecker{
+                                    "POST",
+                                    Box::new(access::UserSpecificAccessChecker{
                                         obtainer: access::UserIdPathSetObtainer{
                                             key: "user_id"
                                         },
-                                    })
+                                    }),
                                 ))
                                 .service(
                                     web::scope("/view")
-                                        .wrap(access::ApiAccess::new(
-                                            Box::new(access::UserSpecificAccessChecker{
-                                                obtainer: access::UserIdPathSetObtainer{
-                                                    key: "user_id"
-                                                },
-                                            }),
-                                        ))
                                         .route("", web::post().to(v1::create_csgo_view_for_user_handler))
                                         .service(
                                             web::scope("/{view_uuid}")
@@ -822,7 +815,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route("/public", web::get().to(v1::get_clip_share_signature_handler))
                                         .route("/public", web::delete().to(v1::delete_clip_share_signature_handler))
                                         .route("/internal", web::get().to(v1::get_clip_share_connections_handler))
-                                        .route("/permissions", web::get().to(v1::get_clip_share_permissions_handler))
                                 )
                                 .service(
                                     web::scope("/react")
