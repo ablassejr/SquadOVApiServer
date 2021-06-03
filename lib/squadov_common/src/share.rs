@@ -1,3 +1,5 @@
+pub mod auto;
+
 use crate::{
     SquadOvError,
 };

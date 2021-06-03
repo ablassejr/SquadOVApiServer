@@ -118,9 +118,19 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("", web::post().to(v1::create_new_share_connection_handler))
                         .route("/permissions", web::post().to(v1::get_share_permissions_handler))
                         .service(
-                            web::scope("/{connection_id}")
+                            web::scope("/conn/{connection_id}")
                                 .route("", web::delete().to(v1::delete_share_connection_handler))
                                 .route("", web::post().to(v1::edit_share_connection_handler))
+                        )
+                        .service(
+                            web::scope("/auto")
+                                .route("", web::get().to(v1::get_auto_share_settings_handler))
+                                .route("", web::post().to(v1::new_auto_share_setting_handler))
+                                .service(
+                                    web::scope("/{setting_id}")
+                                        .route("", web::delete().to(v1::delete_auto_share_setting_handler))
+                                        .route("", web::post().to(v1::edit_auto_share_setting_handler))
+                                )
                         )
                 )
                 .service(

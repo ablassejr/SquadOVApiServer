@@ -1,3 +1,6 @@
+pub mod auto;
+pub use auto::*;
+
 use crate::api;
 use crate::api::auth::SquadOVSession;
 use actix_web::{web, HttpResponse, HttpRequest};
