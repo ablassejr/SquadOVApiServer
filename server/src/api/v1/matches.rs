@@ -63,7 +63,7 @@ pub struct MatchCollection {
 
 #[derive(Deserialize,Debug)]
 pub struct GenericMatchPathInput {
-    match_uuid: Uuid
+    pub match_uuid: Uuid
 }
 
 #[derive(Debug)]

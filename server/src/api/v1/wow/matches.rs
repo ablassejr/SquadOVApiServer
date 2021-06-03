@@ -18,6 +18,7 @@ use squadov_common::{
 use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
 use crate::api::auth::SquadOVSession;
+use crate::api::v1::GenericMatchPathInput;
 use squadov_common::vod::VodAssociation;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -1028,13 +1029,13 @@ struct WowUserAccessibleVodOutput {
     pub user_to_id: HashMap<Uuid, i64>
 }
 
-pub async fn list_wow_vods_for_squad_in_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_wow_vods_for_squad_in_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
-    let vods = app.find_accessible_vods_in_match_for_user(&path.match_uuid, path.user_id, session.share_token.is_some()).await?;
+    let vods = app.find_accessible_vods_in_match_for_user(&path.match_uuid, session.user.id, session.share_token.is_some()).await?;
 
     // Note that for each VOD we also need to figure out the mapping from user uuid to puuid.
     let user_uuids: Vec<Uuid> = vods.iter()

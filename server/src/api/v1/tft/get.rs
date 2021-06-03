@@ -4,10 +4,10 @@ use squadov_common::{
 };
 use crate::api;
 use crate::api::auth::SquadOVSession;
+use crate::api::v1::GenericMatchPathInput;
 use squadov_common::vod::VodAssociation;
 use actix_web::{web, HttpResponse, HttpRequest};
 use std::sync::Arc;
-use super::TftMatchUserInput;
 use serde::Serialize;
 use uuid::Uuid;
 use std::iter::FromIterator;
@@ -25,14 +25,14 @@ pub async fn get_tft_match_handler(data : web::Path<super::TftMatchInput>, app :
     Ok(HttpResponse::Ok().json(&tft_match))
 }
 
-pub async fn get_tft_match_user_accessible_vod_handler(data: web::Path<TftMatchUserInput>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_tft_match_user_accessible_vod_handler(data: web::Path<GenericMatchPathInput>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    let vods = app.find_accessible_vods_in_match_for_user(&data.match_uuid, data.user_id, session.share_token.is_some()).await?;
+    let vods = app.find_accessible_vods_in_match_for_user(&data.match_uuid, session.user.id, session.share_token.is_some()).await?;
 
     // Note that for each VOD we also need to figure out the mapping from user uuid to participant ID.
     let user_uuids: Vec<Uuid> = vods.iter()

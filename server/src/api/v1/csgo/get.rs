@@ -1,6 +1,7 @@
 use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
 use crate::api::auth::SquadOVSession;
+use crate::api::v1::GenericMatchPathInput;
 use squadov_common::{
     SquadOvError,
     csgo::{
@@ -62,13 +63,13 @@ pub async fn get_csgo_match_handler(app : web::Data<Arc<api::ApiApplication>>, p
     }))
 }
 
-pub async fn get_csgo_match_accessible_vods_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<CsgoUserMatchInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_csgo_match_accessible_vods_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
-    let vods = app.find_accessible_vods_in_match_for_user(&path.match_uuid, path.user_id, session.share_token.is_some()).await?;
+    let vods = app.find_accessible_vods_in_match_for_user(&path.match_uuid, session.user.id, session.share_token.is_some()).await?;
 
     // Note that for each VOD we also need to figure out the mapping from user uuid to steam ID.
     let user_uuids: Vec<Uuid> = vods.iter()

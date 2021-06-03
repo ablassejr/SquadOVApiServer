@@ -13,6 +13,7 @@ use squadov_common::hearthstone::game_packet::{
 use squadov_common::vod::VodAssociation;
 use crate::api;
 use crate::api::auth::SquadOVSession;
+use crate::api::v1::GenericMatchPathInput;
 use actix_web::{web, HttpResponse, HttpRequest};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -552,13 +553,13 @@ struct HearthstoneUserAccessibleVodOutput {
 }
 
 
-pub async fn get_hearthstone_match_user_accessible_vod_handler(data: web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
+pub async fn get_hearthstone_match_user_accessible_vod_handler(data: web::Path<GenericMatchPathInput>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, squadov_common::SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
-    let vods = app.find_accessible_vods_in_match_for_user(&data.match_uuid, data.user_id, session.share_token.is_some()).await?;
+    let vods = app.find_accessible_vods_in_match_for_user(&data.match_uuid, session.user.id, session.share_token.is_some()).await?;
 
     let user_uuids: Vec<Uuid> = vods.iter()
         .filter(|x| { x.user_uuid.is_some() })

@@ -260,17 +260,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/match/{match_uuid}")
                                 .route("/finish", web::post().to(v1::finish_lol_match_handler))
-                                .service(
-                                    web::scope("/user/{user_id}")
-                                        .wrap(access::ApiAccess::new(
-                                            Box::new(access::UserSpecificAccessChecker{
-                                                obtainer: access::UserIdPathSetObtainer{
-                                                    key: "user_id"
-                                                },
-                                            }),
-                                        ))
-                                        .route("/vods", web::get().to(v1::get_lol_match_user_accessible_vod_handler))
-                                )
+                                .route("/vods", web::get().to(v1::get_lol_match_user_accessible_vod_handler))
                                 .service(
                                     web::scope("")
                                         .wrap(access::ApiAccess::new(
@@ -316,17 +306,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/match/{match_uuid}")
                                 .route("/finish", web::post().to(v1::finish_tft_match_handler))
-                                .service(
-                                    web::scope("/user/{user_id}")
-                                        .wrap(access::ApiAccess::new(
-                                            Box::new(access::UserSpecificAccessChecker{
-                                                obtainer: access::UserIdPathSetObtainer{
-                                                    key: "user_id"
-                                                },
-                                            }),
-                                        ))
-                                        .route("/vods", web::get().to(v1::get_tft_match_user_accessible_vod_handler))
-                                )
+                                .route("/vods", web::get().to(v1::get_tft_match_user_accessible_vod_handler))
                                 .service(
                                     web::scope("")
                                         .wrap(access::ApiAccess::new(
@@ -421,17 +401,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::resource("/metadata/{puuid}")
                                         .route(web::get().to(v1::get_valorant_player_match_metadata_handler))
                                 )
-                                .service(
-                                    web::scope("/user/{user_id}")
-                                        .wrap(access::ApiAccess::new(
-                                            Box::new(access::UserSpecificAccessChecker{
-                                                obtainer: access::UserIdPathSetObtainer{
-                                                    key: "user_id"
-                                                },
-                                            }),
-                                        ))
-                                        .route("/vods", web::get().to(v1::get_valorant_match_user_accessible_vod_handler))
-                                )
+                                .route("/vods", web::get().to(v1::get_valorant_match_user_accessible_vod_handler))
                         )
                 )
                 .service(
@@ -472,6 +442,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 )
                 .service(
                     web::scope("/hearthstone")
+                        .route("/match/{match_uuid}/vods", web::get().to(v1::get_hearthstone_match_user_accessible_vod_handler))
                         .service(
                             web::scope("/user/{user_id}")
                                 .wrap(access::ApiAccess::new(
@@ -516,7 +487,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                         ))
                                                         .route("", web::get().to(v1::get_hearthstone_match_handler))
                                                         .route("/logs", web::get().to(v1::get_hearthstone_match_logs_handler))
-                                                        .route("/vods", web::get().to(v1::get_hearthstone_match_user_accessible_vod_handler))
                                                 )
                                         )
                                 )
@@ -582,6 +552,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 )
                                 .service(
                                     web::scope("/{match_uuid}")
+                                        .route("/vods", web::get().to(v1::list_wow_vods_for_squad_in_match_handler))
                                         .service(
                                             web::scope("/users/{user_id}")
                                                 .wrap(access::ApiAccess::new(
@@ -594,7 +565,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                     })
                                                 ))
                                                 .route("/characters", web::get().to(v1::list_wow_characters_association_for_squad_in_match_handler))
-                                                .route("/vods", web::get().to(v1::list_wow_vods_for_squad_in_match_handler))
                                         )
                                 )
                         )
@@ -655,6 +625,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 )
                 .service(
                     web::scope("/csgo")
+                        .route("/match/{match_uuid}/vods", web::get().to(v1::get_csgo_match_accessible_vods_handler))
                         .service(
                             web::scope("/user/{user_id}")
                                 .wrap(access::ApiAccess::new(
@@ -703,7 +674,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                     })
                                                 ))
                                                 .route("", web::get().to(v1::get_csgo_match_handler))
-                                                .route("/vods", web::get().to(v1::get_csgo_match_accessible_vods_handler))
                                         )
                                 )
                         )

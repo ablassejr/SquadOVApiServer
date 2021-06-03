@@ -13,9 +13,3 @@ use uuid::Uuid;
 pub struct TftMatchInput {
     match_uuid: Uuid
 }
-
-#[derive(Deserialize)]
-pub struct TftMatchUserInput {
-    match_uuid: Uuid,
-    user_id: i64
-}
