@@ -50,6 +50,7 @@ pub struct WowListQuery {
     raids: Option<Vec<i32>>,
     dungeons: Option<Vec<i32>>,
     arenas: Option<Vec<i32>>,
+    brackets: Option<Vec<String>>,
 }
 
 impl api::ApiApplication {
@@ -285,6 +286,7 @@ impl api::ApiApplication {
                 AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))
                 AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
                 AND ($2 = $7 OR sau.match_uuid IS NOT NULL)
+                AND (CARDINALITY($8::VARCHAR[]) = 0 OR wav.arena_type = ANY($8))
             ORDER BY wmv.start_tm DESC
             LIMIT $3 OFFSET $4
             "#,
@@ -295,6 +297,7 @@ impl api::ApiApplication {
             &filters.arenas.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
             filters.has_vod.unwrap_or(false),
             req_user_id,
+            &filters.brackets.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<String>>(),
         )
             .fetch_all(&*self.heavy_pool)
             .await?;
