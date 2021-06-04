@@ -29,6 +29,8 @@ pub struct FullWoWCombatLogState {
 pub struct RawWoWCombatLogPayload {
     pub timestamp: DateTime<Utc>,
     pub parts: Vec<String>,
+    #[serde(rename="rawLog")]
+    pub raw_log: Option<String>,
     #[serde(rename="logLine")]
     pub log_line: i64,
     pub version: i32,
@@ -128,15 +130,22 @@ impl RawWoWCombatLogPayload {
         format!(
             "{} {}\n",
             self.timestamp.format("%m/%d %T").to_string(),
-            self.parts.join(","),
+            if let Some(raw) = &self.raw_log {
+                raw.clone()
+            } else {
+                self.parts.join(",")
+            },
         )
     }
 
     pub fn redo_parts(&mut self) {
         // I'm not really sure if we need to do unicode aware stepping here
         // but it's probably better safe than sorry.
-        let full_log = self.parts.join(",");
-        self.parts = split_wow_combat_log_tokens(&full_log);
+        self.parts = split_wow_combat_log_tokens(&if let Some(raw) = &self.raw_log {
+            raw.clone()
+        } else {
+            self.parts.join(",")
+        });
     }
 
     pub fn is_finish_token(&self) -> bool {
