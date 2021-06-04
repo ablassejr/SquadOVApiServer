@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.8.5",
+        "description": "Advanced sharing features.",
+        "timestamp": 1622825137000,
+        "data": "data/update-v0.8.5.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.8.4",
         "description": "Match filters!",
         "timestamp": 1622221696000,
@@ -75,33 +82,5 @@
         "timestamp": 1615315799000,
         "data": "data/hotfix-v0.7.3.md",
         "type": "hotfix"
-    },
-    {
-        "title": "SquadOV v0.7.0",
-        "description": "Reducing our database size from 1TB to 100GB!",
-        "timestamp": 1614631465000,
-        "data": "data/update-v0.7.0.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.6.6",
-        "description": "Minor update - welcome emails!",
-        "timestamp": 1614631465000,
-        "data": "data/update-v0.6.6.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.6.4",
-        "description": "Performance improvements - SquadOV goes zoom.",
-        "timestamp": 1614390069000,
-        "data": "data/update-v0.6.4.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.6.0",
-        "description": "Clip sharing at long last!",
-        "timestamp": 1613762989000,
-        "data": "data/update-v0.6.0.md",
-        "type": "update"
     }
 ]

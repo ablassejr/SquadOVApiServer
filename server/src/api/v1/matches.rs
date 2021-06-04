@@ -188,16 +188,19 @@ impl api::ApiApplication {
             SELECT DISTINCT v.match_uuid AS "match_uuid!", v.user_uuid AS "uuid!", v.end_time
             FROM squadov.users AS u
             CROSS JOIN LATERAL (
-                SELECT vi.*
+                SELECT *
+                FROM squadov.vods
+                WHERE user_uuid = u.uuid
+                UNION
+                SELECT v.*
                 FROM squadov.view_share_connections_access_users AS vi
+                INNER JOIN squadov.vods AS v
+                    ON v.video_uuid = vi.video_uuid
                 LEFT JOIN squadov.squad_role_assignments AS sra
                     ON sra.user_id = vi.user_id
                 WHERE vi.user_id = u.id
                     AND (CARDINALITY($5::BIGINT[]) = 0 OR sra.squad_id = ANY($5))
-            ) AS ou
-            INNER JOIN squadov.vods AS v
-                ON v.video_uuid = ou.video_uuid
-                    OR v.user_uuid = u.uuid
+            ) AS v
             INNER JOIN squadov.users AS vu
                 ON vu.uuid = v.user_uuid
             INNER JOIN squadov.matches AS m

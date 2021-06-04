@@ -23,10 +23,10 @@ impl api::ApiApplication {
         let squad_id = self.create_squad(&mut *tx, &group, &name, user.id, true).await?;
 
         // Mike
-        self.force_add_user_to_squad(&mut *tx, squad_id, 1).await?;
+        //self.force_add_user_to_squad(&mut *tx, squad_id, 1).await?;
 
         // Derek
-        self.force_add_user_to_squad(&mut *tx, squad_id, 4).await?;
+        //self.force_add_user_to_squad(&mut *tx, squad_id, 4).await?;
         Ok(())
     }
 
