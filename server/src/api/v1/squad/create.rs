@@ -20,7 +20,7 @@ impl api::ApiApplication {
     pub async fn create_default_squad(&self, tx: &mut Transaction<'_, Postgres>, user: &SquadOVUser) -> Result<(), SquadOvError> {
         let group = user.username.clone();
         let name = format!("{}'s Squad", &user.username);
-        let squad_id = self.create_squad(&mut *tx, &group, &name, user.id, true).await?;
+        self.create_squad(&mut *tx, &group, &name, user.id, true).await?;
 
         // Mike
         //self.force_add_user_to_squad(&mut *tx, squad_id, 1).await?;

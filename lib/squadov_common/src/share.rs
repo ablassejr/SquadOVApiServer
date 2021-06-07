@@ -84,13 +84,13 @@ where
     Ok(
         sqlx::query_as!(
             MatchVideoShareConnection,
-            "
-            SELECT id, match_uuid, video_uuid, can_share, can_clip, dest_user_id, dest_squad_id
+            r#"
+            SELECT id AS "id!", match_uuid, video_uuid, can_share AS "can_share!", can_clip AS "can_clip!", dest_user_id, dest_squad_id
             FROM squadov.share_match_vod_connections
             WHERE source_user_id = $1
                 AND ($2::UUID IS NULL OR match_uuid = $2)
                 AND ($3::UUID IS NULL OR video_uuid = $3)
-            ",
+            "#,
             user_id,
             match_uuid,
             video_uuid,
@@ -124,7 +124,7 @@ where
             INNER JOIN access_cte AS ac
                 ON ac.parent_connection_id = vau.id
         )
-        SELECT mvc.id, mvc.can_share, mvc.can_clip, mvc.parent_connection_id, at.is_terminal AS "is_terminal!"
+        SELECT mvc.id AS "id!", mvc.can_share AS "can_share!", mvc.can_clip AS "can_clip!", mvc.parent_connection_id, at.is_terminal AS "is_terminal!"
         FROM access_cte AS at
         INNER JOIN squadov.share_match_vod_connections AS mvc
             ON mvc.id = at.id
@@ -176,7 +176,7 @@ where
     Ok(
         sqlx::query_as!(
             MatchVideoShareConnection,
-            "
+            r#"
             INSERT INTO squadov.share_match_vod_connections (
                 match_uuid,
                 video_uuid,
@@ -207,14 +207,14 @@ where
                 ) + 1
             )
             RETURNING
-                id,
+                id AS "id!",
                 match_uuid,
                 video_uuid,
                 dest_user_id,
                 dest_squad_id,
-                can_share,
-                can_clip
-            ",
+                can_share AS "can_share!",
+                can_clip AS "can_clip!"
+            "#,
             conn.match_uuid,
             conn.video_uuid,
             source_user_id,
