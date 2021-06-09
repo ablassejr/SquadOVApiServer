@@ -4,6 +4,7 @@ use std::sync::Arc;
 use crate::api;
 use crate::api::auth::SquadOVSession;
 use serde::Deserialize;
+use sqlx::{Transaction, Postgres};
 
 #[derive(Deserialize)]
 pub struct ReferralQuery {
@@ -12,6 +13,25 @@ pub struct ReferralQuery {
 }
 
 impl api::ApiApplication {
+    pub async fn regenerate_user_referral_code(&self, tx: &mut Transaction<'_, Postgres>, user_id: i64) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            "
+            UPDATE squadov.referral_codes
+            SET code = LOWER(sub.username)
+            FROM (
+                SELECT username
+                FROM squadov.users
+                WHERE id = $1
+            ) AS sub
+            WHERE user_id = $1
+            ",
+            user_id,
+        )
+            .execute(tx)
+            .await?;
+        Ok(())
+    }
+
     pub async fn get_user_referral_code(&self, user_id: i64) -> Result<Option<String>, SquadOvError> {
         Ok(
             sqlx::query!(

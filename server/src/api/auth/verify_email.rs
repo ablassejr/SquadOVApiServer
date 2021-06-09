@@ -28,7 +28,7 @@ async fn verify_email(fa: &fusionauth::FusionAuthClient, verification_id: &str) 
 async fn resend_verify_email(fa: &fusionauth::FusionAuthClient, email: &str) -> Result<(), squadov_common::SquadOvError> {
     match fa.resend_verify_email(email).await {
         Ok(_) => Ok(()),
-        Err(err) => Err(squadov_common::SquadOvError::InternalError(format!("Failed to resend verificationh email: {}", err))),
+        Err(err) => Err(squadov_common::SquadOvError::InternalError(format!("Failed to resend verification email: {}", err))),
     }
 }
 

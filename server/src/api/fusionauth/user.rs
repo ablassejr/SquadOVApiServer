@@ -90,6 +90,19 @@ struct FusionAuthChangePasswordWithUserInput<'a> {
     login_id: &'a str,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct FusionAuthPatchUserData<'a> {
+    email: Option<&'a str>,
+    username: Option<&'a str>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct FusionAuthPatchUserInput<'a> {
+    user: FusionAuthPatchUserData<'a>
+}
+
 impl super::FusionAuthClient {
     pub fn find_auth_registration<'a>(&self, u: &'a FusionAuthUser) -> Option<&'a FusionAuthRegistration> {
         for reg in &u.registrations {
@@ -146,7 +159,7 @@ impl super::FusionAuthClient {
     }
 
     pub async fn resend_verify_email(&self, email: &str) -> Result<(), FusionAuthResendVerificationEmailError> {
-        match self.client.put(self.build_url(format!("/api/user/verify-email?email={}", &email).as_str()).as_str())
+        match self.client.put(self.build_url(format!("/api/user/verify-email?email={}", url_encode(email)).as_str()).as_str())
             .send()
             .await {
             Ok(resp) => {
@@ -304,5 +317,39 @@ impl super::FusionAuthClient {
             }
             _ => Err(SquadOvError::InternalError(String::from("Unknown change password error."))),
         }
+    }
+
+    async fn update_user(&self, user_id: &Uuid, data: FusionAuthPatchUserInput<'_>) -> Result<(), SquadOvError> {
+        let resp = self.client.patch(self.build_url(&format!("/api/user/{}", user_id)).as_str())
+            .json(&data)
+            .send()
+            .await?;
+        
+        match resp.status().as_u16() {
+            200 => Ok(()),
+            400 => {
+                let body = resp.text().await?;
+                log::warn!("Failure in request to update user: {}", body);
+                Err(SquadOvError::BadRequest)
+            },
+            401 => Err(SquadOvError::Unauthorized),
+            404 => Err(SquadOvError::NotFound),
+            500 => Err(SquadOvError::InternalError(String::from("FA Error"))),
+            503 => {
+                let body = resp.text().await?;
+                Err(SquadOvError::InternalError(body))
+            }
+            _ => Err(SquadOvError::InternalError(String::from("Unknown update user error."))),
+        }
+    }
+
+    pub async fn update_user_id(&self, user_id: &Uuid, username: &str, email: &str) -> Result<(), SquadOvError> {
+        self.update_user(user_id, FusionAuthPatchUserInput{
+            user: FusionAuthPatchUserData{
+                email: Some(email),
+                username: Some(username),
+            },
+        }).await?;
+        Ok(())
     }
 }

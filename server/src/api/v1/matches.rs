@@ -90,6 +90,7 @@ pub struct RecentMatchQuery {
     pub time_end: Option<i64>,
     pub only_favorite: bool,
     pub only_watchlist: bool,
+    pub vods: Option<Vec<Uuid>>,
 }
 
 fn filter_recent_match_data_by_game(data: &[RawRecentMatchData], game: SquadOvGames) -> Vec<&RawRecentMatchData> {
@@ -223,6 +224,7 @@ impl api::ApiApplication {
                 AND (NOT $9::BOOLEAN OR ufm.match_uuid IS NOT NULL)
                 AND (NOT $10::BOOLEAN OR uwv.video_uuid IS NOT NULL)
                 AND v.is_clip = FALSE
+                AND (CARDINALITY($11::UUID[]) = 0 OR v.video_uuid = ANY($11))
             ORDER BY v.end_time DESC
             LIMIT $2 OFFSET $3
             "#,
@@ -241,7 +243,8 @@ impl api::ApiApplication {
                 Utc.timestamp_millis(x)
             }).unwrap_or(Utc::now()),
             filter.only_favorite,
-            filter.only_watchlist
+            filter.only_watchlist,
+            &filter.vods.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<Uuid>>(),
         )
             .fetch_all(&*self.pool)
             .await?
@@ -450,6 +453,29 @@ impl api::ApiApplication {
                 })
             }).collect::<Result<Vec<RecentMatch>, SquadOvError>>()?
         )
+    }
+}
+
+pub async fn get_vod_recent_match_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, path: web::Path<super::GenericVodPathInput>) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
+    let raw_base_matches = app.get_recent_base_matches_for_user(session.user.id, 0, 1, &RecentMatchQuery{
+        games: None,
+        squads: None,
+        users: None,
+        time_start: None,
+        time_end: None,
+        only_favorite: false,
+        only_watchlist: false,
+        vods: Some(vec![path.video_uuid.clone()]),
+    }).await?;
+    let matches = app.get_recent_matches_from_uuids(&raw_base_matches).await?;
+
+    if matches.is_empty() {
+        Err(SquadOvError::NotFound)
+    } else {
+        Ok(HttpResponse::Ok().json(&matches[0]))
     }
 }
 

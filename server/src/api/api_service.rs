@@ -154,8 +154,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/me")
                                 .service(
-                                    web::resource("/profile")
-                                        .route(web::get().to(v1::get_current_user_profile_handler))
+                                    web::scope("/profile")
+                                        .route("", web::get().to(v1::get_current_user_profile_handler))
+                                        .route("/username", web::post().to(v1::edit_current_user_username_handler))
+                                        .route("/email", web::post().to(v1::edit_current_user_email_handler))
                                 )
                                 .service(
                                     web::resource("/notifications")
@@ -777,6 +779,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route("", web::post().to(v1::associate_vod_handler))
                                         .route("/assoc", web::get().to(v1::get_vod_association_handler))
                                         .route("/upload", web::get().to(v1::get_vod_upload_path_handler))
+                                        .route("/match", web::get().to(v1::get_vod_recent_match_handler))
                                 )
                         )
                 )

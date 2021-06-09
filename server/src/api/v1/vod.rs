@@ -163,7 +163,7 @@ pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApp
 
 #[derive(Deserialize)]
 pub struct GenericVodPathInput {
-    video_uuid: Uuid
+    pub video_uuid: Uuid
 }
 
 #[derive(Deserialize,Debug)]
