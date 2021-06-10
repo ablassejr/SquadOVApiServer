@@ -87,12 +87,12 @@ impl api::ApiApplication {
     }
 
     async fn list_wow_encounters_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWEncounter>, SquadOvError> {
-        let pairs = sqlx::query_as!(
-            MatchPlayerPair,
+        let pairs = sqlx::query!(
             r#"
-            SELECT
+            SELECT DISTINCT
                 wmv.match_uuid AS "match_uuid!",
-                u.uuid AS "player_uuid!"
+                u.uuid AS "player_uuid!",
+                wmv.start_tm
             FROM squadov.wow_match_view AS wmv
             INNER JOIN squadov.wow_encounter_view AS wav
                 ON wav.view_id = wmv.id
@@ -114,7 +114,7 @@ impl api::ApiApplication {
                 AND (CARDINALITY($6::INTEGER[]) = 0 OR wav.encounter_id = ANY($6))
                 AND (NOT $7::BOOLEAN OR v.video_uuid IS NOT NULL)
                 AND ($2 = $8 OR sau.match_uuid IS NOT NULL)
-            ORDER BY wmv.start_tm DESC
+            ORDER BY wmv.start_tm DESC, wmv.match_uuid, u.uuid
             LIMIT $3 OFFSET $4
             "#,
             character_guid,
@@ -127,7 +127,15 @@ impl api::ApiApplication {
             req_user_id,
         )
             .fetch_all(&*self.heavy_pool)
-            .await?;
+            .await?
+            .into_iter()
+            .map(|x| {
+                MatchPlayerPair{
+                    match_uuid: x.match_uuid,
+                    player_uuid: x.player_uuid,
+                }
+            })
+            .collect::<Vec<MatchPlayerPair>>();
         Ok(self.list_wow_encounter_for_uuids(&pairs).await?)
     }
 
@@ -175,12 +183,12 @@ impl api::ApiApplication {
     }
 
     async fn list_wow_challenges_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWChallenge>, SquadOvError> {
-        let pairs = sqlx::query_as!(
-            MatchPlayerPair,
+        let pairs = sqlx::query!(
             r#"
-            SELECT
+            SELECT DISTINCT
                 wmv.match_uuid AS "match_uuid!",
-                u.uuid AS "player_uuid!"
+                u.uuid AS "player_uuid!",
+                wmv.start_tm
             FROM squadov.wow_match_view AS wmv
             INNER JOIN squadov.wow_challenge_view AS wav
                 ON wav.view_id = wmv.id
@@ -201,7 +209,7 @@ impl api::ApiApplication {
                 AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))
                 AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
                 AND ($2 = $7 OR sau.match_uuid IS NOT NULL)
-            ORDER BY wmv.start_tm DESC
+            ORDER BY wmv.start_tm DESC, wmv.match_uuid, u.uuid
             LIMIT $3 OFFSET $4
             "#,
             character_guid,
@@ -213,7 +221,15 @@ impl api::ApiApplication {
             req_user_id,
         )
             .fetch_all(&*self.heavy_pool)
-            .await?;
+            .await?
+            .into_iter()
+            .map(|x| {
+                MatchPlayerPair{
+                    match_uuid: x.match_uuid,
+                    player_uuid: x.player_uuid,
+                }
+            })
+            .collect::<Vec<MatchPlayerPair>>();
         Ok(self.list_wow_challenges_for_uuids(&pairs).await?)
     }
 
@@ -260,12 +276,12 @@ impl api::ApiApplication {
     }
 
     async fn list_wow_arenas_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWArena>, SquadOvError> {
-        let pairs = sqlx::query_as!(
-            MatchPlayerPair,
+        let pairs = sqlx::query!(
             r#"
-            SELECT
+            SELECT DISTINCT
                 wmv.match_uuid AS "match_uuid!",
-                u.uuid AS "player_uuid!"
+                u.uuid AS "player_uuid!",
+                wmv.start_tm
             FROM squadov.wow_match_view AS wmv
             INNER JOIN squadov.wow_arena_view AS wav
                 ON wav.view_id = wmv.id
@@ -287,7 +303,7 @@ impl api::ApiApplication {
                 AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
                 AND ($2 = $7 OR sau.match_uuid IS NOT NULL)
                 AND (CARDINALITY($8::VARCHAR[]) = 0 OR wav.arena_type = ANY($8))
-            ORDER BY wmv.start_tm DESC
+            ORDER BY wmv.start_tm DESC, wmv.match_uuid, u.uuid
             LIMIT $3 OFFSET $4
             "#,
             character_guid,
@@ -300,7 +316,15 @@ impl api::ApiApplication {
             &filters.brackets.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<String>>(),
         )
             .fetch_all(&*self.heavy_pool)
-            .await?;
+            .await?
+            .into_iter()
+            .map(|x| {
+                MatchPlayerPair{
+                    match_uuid: x.match_uuid,
+                    player_uuid: x.player_uuid,
+                }
+            })
+            .collect::<Vec<MatchPlayerPair>>();
         Ok(self.list_wow_arenas_for_uuids(&pairs).await?)
     }
 
