@@ -1860,9 +1860,9 @@
         ]
       },
       "nullable": [
-        false,
-        false,
-        false,
+        true,
+        true,
+        true,
         true,
         null
       ]
@@ -2040,6 +2040,64 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "2d0fe5a0781337395dda8d6e23c6026965924b14f34d68f3e0d1994d5ffc2d29": {
+    "query": "\n            SELECT id AS \"id!\", match_uuid, video_uuid, can_share AS \"can_share!\", can_clip AS \"can_clip!\", dest_user_id, dest_squad_id\n            FROM squadov.share_match_vod_connections\n            WHERE source_user_id = $1\n                AND ($2::UUID IS NULL OR match_uuid = $2)\n                AND ($3::UUID IS NULL OR video_uuid = $3)\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 3,
+          "name": "can_share!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "can_clip!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "dest_user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "dest_squad_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid",
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
     }
   },
   "2e5d3295b13002c9e0a2ea787d8970096db0e9e2c910bc6813ccc1c9323c61fe": {
@@ -3959,6 +4017,21 @@
       "nullable": []
     }
   },
+  "504e9ac0ea3227666ed464731224b732d357404137be285a3c1066b1192ad8e4": {
+    "query": "\n            UPDATE squadov.users\n            SET username = $2,\n                email = $3,\n                verified = $4\n            WHERE id = $1\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Varchar",
+          "Varchar",
+          "Bool"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "50e5bf138da27e6485d3a633d157e16b749c5ab21dd6b9fef9faa304f5fb16b8": {
     "query": "\n        SELECT *\n        FROM squadov.csgo_event_container_round_kills\n        WHERE container_id = $1\n        ORDER BY tm ASC\n        ",
     "describe": {
@@ -4115,6 +4188,44 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "54e94dbdcb6a384ff2c99c77e4462bb0601ad6bdfbda236a54bd82dedc9f76ca": {
+    "query": "\n            SELECT DISTINCT\n                wmv.match_uuid AS \"match_uuid!\",\n                u.uuid AS \"player_uuid!\",\n                wmv.start_tm\n            FROM squadov.wow_match_view AS wmv\n            INNER JOIN squadov.wow_challenge_view AS wav\n                ON wav.view_id = wmv.id\n            INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                ON wcp.view_id = wmv.id\n            INNER JOIN squadov.users AS u\n                ON u.id = wmv.user_id\n            LEFT JOIN squadov.vods AS v\n                ON v.match_uuid = wmv.match_uuid\n                    AND v.user_uuid = u.uuid\n                    AND v.is_clip = FALSE\n            LEFT JOIN squadov.view_share_connections_access_users AS sau\n                ON sau.match_uuid = wmv.match_uuid\n                    AND sau.user_id = $7\n            WHERE wmv.user_id = $2\n                AND wcp.unit_guid = $1\n                AND wmv.match_uuid IS NOT NULL\n                AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))\n                AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)\n                AND ($2 = $7 OR sau.match_uuid IS NOT NULL)\n            ORDER BY wmv.start_tm DESC, wmv.match_uuid, u.uuid\n            LIMIT $3 OFFSET $4\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "player_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "start_tm",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int4Array",
+          "Bool",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        true,
+        false,
+        false
+      ]
     }
   },
   "55102cadafe2786c7df37209106f4ae07cac6ce858073148834da041076664c1": {
@@ -5027,6 +5138,45 @@
       ]
     }
   },
+  "657b66e77dc88b93807f8102ac4f3951993a45ba314743d34260b0f4a15a7d3e": {
+    "query": "\n            SELECT DISTINCT\n                wmv.match_uuid AS \"match_uuid!\",\n                u.uuid AS \"player_uuid!\",\n                wmv.start_tm\n            FROM squadov.wow_match_view AS wmv\n            INNER JOIN squadov.wow_encounter_view AS wav\n                ON wav.view_id = wmv.id\n            INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                ON wcp.view_id = wmv.id\n            INNER JOIN squadov.users AS u\n                ON u.id = wmv.user_id\n            LEFT JOIN squadov.vods AS v\n                ON v.match_uuid = wmv.match_uuid\n                    AND v.user_uuid = u.uuid\n                    AND v.is_clip = FALSE\n            LEFT JOIN squadov.view_share_connections_access_users AS sau\n                ON sau.match_uuid = wmv.match_uuid\n                    AND sau.user_id = $8\n            WHERE wmv.user_id = $2\n                AND wcp.unit_guid = $1\n                AND wmv.match_uuid IS NOT NULL\n                AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))\n                AND (CARDINALITY($6::INTEGER[]) = 0 OR wav.encounter_id = ANY($6))\n                AND (NOT $7::BOOLEAN OR v.video_uuid IS NOT NULL)\n                AND ($2 = $8 OR sau.match_uuid IS NOT NULL)\n            ORDER BY wmv.start_tm DESC, wmv.match_uuid, u.uuid\n            LIMIT $3 OFFSET $4\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "player_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "start_tm",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int4Array",
+          "Int4Array",
+          "Bool",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        true,
+        false,
+        false
+      ]
+    }
+  },
   "67d145c0431201069eb430413fc11b78cb7386307a883541da76f120a26e196f": {
     "query": "\n            SELECT match_uuid\n            FROM squadov.csgo_matches\n            WHERE connected_server = $1\n                AND tr && tstzrange($2, $3, '[]') \n            ",
     "describe": {
@@ -5327,6 +5477,72 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "70f31951f5a336fc34ea3a0c11a5e319384df03eecb4c31110218f33195a1eb7": {
+    "query": "\n        WITH RECURSIVE access_cte AS (\n            SELECT vau.*, TRUE AS \"is_terminal\"\n            FROM squadov.view_share_connections_access_users AS vau\n            WHERE ($2::UUID IS NULL OR vau.match_uuid = $2)\n                AND ($3::UUID IS NULL OR vau.video_uuid = $3)\n                AND vau.user_id = $1\n            UNION\n            SELECT vau.*, FALSE AS \"is_terminal\"\n            FROM squadov.view_share_connections_access_users AS vau\n            INNER JOIN access_cte AS ac\n                ON ac.parent_connection_id = vau.id\n        )\n        SELECT mvc.id AS \"id!\", mvc.can_share AS \"can_share!\", mvc.can_clip AS \"can_clip!\", mvc.parent_connection_id, at.is_terminal AS \"is_terminal!\"\n        FROM access_cte AS at\n        INNER JOIN squadov.share_match_vod_connections AS mvc\n            ON mvc.id = at.id\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "can_share!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 2,
+          "name": "can_clip!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 3,
+          "name": "parent_connection_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "is_terminal!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid",
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        null
+      ]
+    }
+  },
+  "71eb6b6ff82f6c9abb78940578e04fbf47cce62a3a5b71be803a95b967def0c2": {
+    "query": "\n                DELETE FROM squadov.deferred_rabbitmq_messages\n                WHERE id = $1\n                RETURNING message                \n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "message",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "7208f56ad9f4e0bd881d374d0e36d35f4874f093dc8a06ec6a83bf8abe9cc6a6": {
@@ -5787,6 +6003,69 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "7febc9be5f196429278444107a5b48ce9fe72b54e68aae635fd300265398ef10": {
+    "query": "\n            INSERT INTO squadov.share_match_vod_connections (\n                match_uuid,\n                video_uuid,\n                source_user_id,\n                dest_user_id,\n                dest_squad_id,\n                can_share,\n                can_clip,\n                parent_connection_id,\n                share_depth\n            )\n            VALUES (\n                $1,\n                $2,\n                $3,\n                $4,\n                $5,\n                $6,\n                $7,\n                $8,\n                COALESCE(\n                    (\n                        SELECT share_depth\n                        FROM squadov.share_match_vod_connections\n                        WHERE id = $8\n                    ),\n                    -1\n                ) + 1\n            )\n            RETURNING\n                id AS \"id!\",\n                match_uuid,\n                video_uuid,\n                dest_user_id,\n                dest_squad_id,\n                can_share AS \"can_share!\",\n                can_clip AS \"can_clip!\"\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 3,
+          "name": "dest_user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "dest_squad_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "can_share!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "can_clip!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Bool",
+          "Bool",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
     }
   },
   "81494b91b27d25f8c1c55fb5e7b93dc957e66f1aaeb4907774849f92a1eab7d3": {
@@ -6675,11 +6954,11 @@
         ]
       },
       "nullable": [
-        false,
         true,
         true,
-        false,
-        false,
+        true,
+        true,
+        true,
         true,
         true
       ]
@@ -6845,6 +7124,30 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "9d7d297df223530a42b05e92f19b8b3d30edac88ccae9070127f9839e4f0a929": {
+    "query": "\n            SELECT id, execute_time\n            FROM squadov.deferred_rabbitmq_messages\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "execute_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false
+      ]
     }
   },
   "9dc60fd5e5d07f7f412e64c0f46ff549f0349b1a7407a6185ef8ef994151e2db": {
@@ -8074,6 +8377,60 @@
         null,
         null,
         null,
+        null,
+        null,
+        null
+      ]
+    }
+  },
+  "c76de302cf5319d6e84bd18589036859ff9662a924901678f614d5c28b69706f": {
+    "query": "\n            UPDATE squadov.referral_codes\n            SET code = LOWER(sub.username)\n            FROM (\n                SELECT username\n                FROM squadov.users\n                WHERE id = $1\n            ) AS sub\n            WHERE user_id = $1\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "c7d13cd0c0ea1e87e783c2009e448bc63ced50f829616485bcc4e487c2612da5": {
+    "query": "\n            SELECT DISTINCT v.match_uuid AS \"match_uuid!\", v.user_uuid AS \"uuid!\", v.end_time\n            FROM squadov.users AS u\n            CROSS JOIN LATERAL (\n                SELECT *\n                FROM squadov.vods\n                WHERE user_uuid = u.uuid\n                UNION\n                SELECT v.*\n                FROM squadov.view_share_connections_access_users AS vi\n                INNER JOIN squadov.vods AS v\n                    ON v.video_uuid = vi.video_uuid\n                LEFT JOIN squadov.squad_role_assignments AS sra\n                    ON sra.user_id = vi.user_id\n                WHERE vi.user_id = u.id\n                    AND (CARDINALITY($5::BIGINT[]) = 0 OR sra.squad_id = ANY($5))\n            ) AS v\n            INNER JOIN squadov.users AS vu\n                ON vu.uuid = v.user_uuid\n            INNER JOIN squadov.matches AS m\n                ON m.uuid = v.match_uuid\n            LEFT JOIN squadov.user_favorite_matches AS ufm\n                ON ufm.match_uuid = m.uuid\n                    AND ufm.user_id = $1\n            LEFT JOIN squadov.user_watchlist_vods AS uwv\n                ON uwv.video_uuid = v.video_uuid\n                    AND uwv.user_id = $1\n            WHERE u.id = $1\n                AND v.match_uuid IS NOT NULL\n                AND v.user_uuid IS NOT NULL\n                AND v.start_time IS NOT NULL\n                AND v.end_time IS NOT NULL\n                AND (CARDINALITY($4::INTEGER[]) = 0 OR m.game = ANY($4))\n                AND (CARDINALITY($6::BIGINT[]) = 0 OR vu.id = ANY($6))\n                AND COALESCE(v.end_time >= $7, TRUE)\n                AND COALESCE(v.end_time <= $8, TRUE)\n                AND (NOT $9::BOOLEAN OR ufm.match_uuid IS NOT NULL)\n                AND (NOT $10::BOOLEAN OR uwv.video_uuid IS NOT NULL)\n                AND v.is_clip = FALSE\n                AND (CARDINALITY($11::UUID[]) = 0 OR v.video_uuid = ANY($11))\n            ORDER BY v.end_time DESC\n            LIMIT $2 OFFSET $3\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "end_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int4Array",
+          "Int8Array",
+          "Int8Array",
+          "Timestamptz",
+          "Timestamptz",
+          "Bool",
+          "Bool",
+          "UuidArray"
+        ]
+      },
+      "nullable": [
         null,
         null,
         null
@@ -10244,6 +10601,45 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "f8be4e85d8e0ceb737daf379473382020a7ab50a0912afa2dc4fc107fda20097": {
+    "query": "\n            SELECT DISTINCT\n                wmv.match_uuid AS \"match_uuid!\",\n                u.uuid AS \"player_uuid!\",\n                wmv.start_tm\n            FROM squadov.wow_match_view AS wmv\n            INNER JOIN squadov.wow_arena_view AS wav\n                ON wav.view_id = wmv.id\n            INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                ON wcp.view_id = wmv.id\n            INNER JOIN squadov.users AS u\n                ON u.id = wmv.user_id\n            LEFT JOIN squadov.vods AS v\n                ON v.match_uuid = wmv.match_uuid\n                    AND v.user_uuid = u.uuid\n                    AND v.is_clip = FALSE\n            LEFT JOIN squadov.view_share_connections_access_users AS sau\n                ON sau.match_uuid = wmv.match_uuid\n                    AND sau.user_id = $7\n            WHERE wmv.user_id = $2\n                AND wcp.unit_guid = $1\n                AND wmv.match_uuid IS NOT NULL\n                AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))\n                AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)\n                AND ($2 = $7 OR sau.match_uuid IS NOT NULL)\n                AND (CARDINALITY($8::VARCHAR[]) = 0 OR wav.arena_type = ANY($8))\n            ORDER BY wmv.start_tm DESC, wmv.match_uuid, u.uuid\n            LIMIT $3 OFFSET $4\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "player_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "start_tm",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int4Array",
+          "Bool",
+          "Int8",
+          "VarcharArray"
+        ]
+      },
+      "nullable": [
+        true,
+        false,
+        false
       ]
     }
   },

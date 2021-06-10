@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.8.6",
+        "description": "Local recording management!",
+        "timestamp": 1623350534000,
+        "data": "data/update-v0.8.6.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.8.5",
         "description": "Advanced sharing features.",
         "timestamp": 1622825137000,
