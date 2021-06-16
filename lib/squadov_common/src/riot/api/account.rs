@@ -156,7 +156,13 @@ impl super::RiotApiApplicationInterface {
         let user_info = self.api.get_user_info(&access_token).await?;
         let account = self.api.get_account_me(&access_token).await?;
         let summoner = if let Some(cpid) = &user_info.cpid {
-            self.api.get_summoner_me(&access_token, cpid).await?
+            match self.api.get_summoner_me(&access_token, cpid).await {
+                Ok(x) => x,
+                Err(err) => {
+                    log::warn!("Failed to get my summoner: {:?}", err);
+                    None
+                }
+            }
         } else {
             None
         };
