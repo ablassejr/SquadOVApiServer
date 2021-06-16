@@ -903,6 +903,106 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 )
                         )
                 )
+                .service(
+                    web::scope("/community")
+                        .wrap(access::ApiAccess::new(
+                            Box::new(access::DenyShareTokenAccess{}),
+                        ))
+                        .route("", web::post().to(v1::create_community_handler))
+                        .service(
+                            web::scope("/{community_id}")
+                                .route("", web::get().to(v1::get_community_handler))
+                                .route("/join", web::post().to(v1::join_community_handler))
+                                .route("/leave", web::post().to(v1::leave_community_handler))
+                                .service(
+                                    web::scope("/owner")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::CommunityAccessChecker{
+                                                obtainer: access::CommunityIdPathSetObtainer{
+                                                    key: "community_id"
+                                                },
+                                                is_owner: true,
+                                                can_manage: false,
+                                                can_moderate: false,
+                                                can_invite: false,
+                                                can_share: false,
+                                            }),
+                                        ))
+                                        .route("", web::delete().to(v1::delete_community_handler))
+                                        .route("", web::post().to(v1::edit_community_handler))
+                                )
+                                .service(
+                                    web::scope("/manage")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::CommunityAccessChecker{
+                                                obtainer: access::CommunityIdPathSetObtainer{
+                                                    key: "community_id"
+                                                },
+                                                is_owner: false,
+                                                can_manage: true,
+                                                can_moderate: false,
+                                                can_invite: false,
+                                                can_share: false,
+                                            }),
+                                        ))
+                                        .service(
+                                            web::scope("/users")
+                                                .route("", web::get().to(v1::list_users_in_community_handler))
+                                                .service(
+                                                    web::scope("/{user_id}")
+                                                        .route("", web::delete().to(v1::remove_user_from_community_handler))
+                                                        .route("", web::post().to(v1::edit_user_in_community_handler))
+                                                )
+                                        )
+                                        .service(
+                                            web::scope("/roles")
+                                                .route("", web::get().to(v1::list_roles_in_community_handler))
+                                                .route("", web::post().to(v1::create_role_in_community_handler))
+                                                .service(
+                                                    web::scope("/{role_id}")
+                                                        .route("", web::delete().to(v1::remove_role_from_community_handler))
+                                                        .route("", web::post().to(v1::edit_role_in_community_handler))
+                                                )
+                                        )
+                                )
+                                .service(
+                                    web::scope("/moderate")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::CommunityAccessChecker{
+                                                obtainer: access::CommunityIdPathSetObtainer{
+                                                    key: "community_id"
+                                                },
+                                                is_owner: false,
+                                                can_manage: false,
+                                                can_moderate: true,
+                                                can_invite: false,
+                                                can_share: false,
+                                            }),
+                                        ))
+                                )
+                                .service(
+                                    web::scope("/invite")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::CommunityAccessChecker{
+                                                obtainer: access::CommunityIdPathSetObtainer{
+                                                    key: "community_id"
+                                                },
+                                                is_owner: false,
+                                                can_manage: false,
+                                                can_moderate: false,
+                                                can_invite: true,
+                                                can_share: false,
+                                            }),
+                                        ))
+                                        .route("", web::post().to(v1::create_community_invite_handler))
+                                        .route("", web::get().to(v1::get_community_invites_handler))
+                                        .service(
+                                            web::scope("/{code}")
+                                                .route("", web::delete().to(v1::delete_community_invite_handler))
+                                        )
+                                )
+                        )
+                )
         );
 
     if graphql_debug {

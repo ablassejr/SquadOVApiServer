@@ -34,6 +34,9 @@ pub mod csgo;
 pub mod math;
 pub mod steam;
 pub mod share;
+pub mod community;
+pub mod subscriptions;
+pub mod user;
 
 pub use error::*;
 pub use parse::*;

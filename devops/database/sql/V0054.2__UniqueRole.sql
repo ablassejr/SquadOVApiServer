@@ -1,0 +1,5 @@
+DROP INDEX community_membership_user_id_role_id_idx;
+
+ALTER TABLE community_membership
+ADD CONSTRAINT community_membership_user_id_role_id_unique
+UNIQUE (user_id, role_id);

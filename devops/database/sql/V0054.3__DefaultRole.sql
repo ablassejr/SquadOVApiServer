@@ -1,0 +1,2 @@
+ALTER TABLE community_roles
+ADD COLUMN is_default BOOLEAN NOT NULL DEFAULT FALSE;

@@ -10,6 +10,7 @@ mod null;
 mod aimlab;
 mod hearthstone;
 mod csgo;
+mod community;
 
 pub use user_specific::*;
 pub use squad::*;
@@ -23,6 +24,7 @@ pub use null::*;
 pub use aimlab::*;
 pub use hearthstone::*;
 pub use csgo::*;
+pub use community::*;
 
 use squadov_common;
 use actix_web::{web, HttpRequest};
