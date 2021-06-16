@@ -909,6 +909,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                             Box::new(access::DenyShareTokenAccess{}),
                         ))
                         .route("", web::post().to(v1::create_community_handler))
+                        .route("", web::get().to(v1::list_communities_handler))
                         .service(
                             web::scope("/{community_id}")
                                 .route("", web::get().to(v1::get_community_handler))
