@@ -147,7 +147,7 @@ impl api::ApiApplication {
                 WoWEncounter,
                 r#"
                 SELECT * FROM (
-                    SELECT DISTINCT ON (wmv.match_uuid)
+                    SELECT DISTINCT ON (wmv.match_uuid, u.uuid)
                         wmv.match_uuid AS "match_uuid!",
                         wmv.start_tm AS "tm!",
                         wmv.end_tm AS "finish_time", 
@@ -170,7 +170,7 @@ impl api::ApiApplication {
                         ON wav.view_id = wmv.id
                     INNER JOIN squadov.users AS u
                         ON u.id = wmv.user_id
-                    ORDER BY wmv.match_uuid
+                    ORDER BY wmv.match_uuid, u.uuid
                 ) AS t
                 ORDER BY finish_time DESC
                 "#,
@@ -241,7 +241,7 @@ impl api::ApiApplication {
                 WoWChallenge,
                 r#"
                 SELECT * FROM (
-                    SELECT DISTINCT ON (wmv.match_uuid)
+                    SELECT DISTINCT ON (wmv.match_uuid, u.uuid)
                         wmv.match_uuid AS "match_uuid!",
                         wmv.start_tm AS "tm!",
                         wmv.end_tm AS "finish_time", 
@@ -263,7 +263,7 @@ impl api::ApiApplication {
                         ON wav.view_id = wmv.id
                     INNER JOIN squadov.users AS u
                         ON u.id = wmv.user_id
-                    ORDER BY wmv.match_uuid
+                    ORDER BY wmv.match_uuid, u.uuid
                 ) AS t
                 ORDER BY finish_time DESC
                 "#,
@@ -336,7 +336,7 @@ impl api::ApiApplication {
                 WoWArena,
                 r#"
                 SELECT * FROM (
-                    SELECT DISTINCT ON (wmv.match_uuid)
+                    SELECT DISTINCT ON (wmv.match_uuid, u.uuid)
                         wmv.match_uuid AS "match_uuid!",
                         wmv.start_tm AS "tm!",
                         wmv.end_tm AS "finish_time", 
@@ -370,7 +370,7 @@ impl api::ApiApplication {
                             AND wucc.user_id = inp.user_id
                     INNER JOIN squadov.users AS u
                         ON u.id = wmv.user_id
-                    ORDER BY wmv.match_uuid
+                    ORDER BY wmv.match_uuid, u.uuid
                 ) AS t
                 ORDER BY finish_time DESC
                 "#,

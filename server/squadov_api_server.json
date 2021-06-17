@@ -155,6 +155,80 @@
       ]
     }
   },
+  "0618b82fb5d7b6aeb23514cffb9f61a0c3df55be4c945a28f80ed53b1c157d63": {
+    "query": "\n        SELECT\n            u.id,\n            u.email,\n            u.username,\n            u.verified,\n            u.uuid,\n            u.is_test,\n            u.is_admin,\n            u.welcome_sent,\n            u.registration_time,\n            ARRAY_AGG(cr.id) AS \"roles!\"\n        FROM squadov.community_membership AS cm\n        INNER JOIN squadov.community_roles AS cr\n            ON cr.id = cm.role_id\n        INNER JOIN squadov.users AS u\n            ON u.id = cm.user_id\n        WHERE cr.community_id = $1\n        GROUP BY u.id, u.email, u.username, u.verified, u.uuid, u.is_test, u.is_admin, u.welcome_sent, u.registration_time\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "email",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "username",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "verified",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 5,
+          "name": "is_test",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "is_admin",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "welcome_sent",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "registration_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 9,
+          "name": "roles!",
+          "type_info": "Int8Array"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        null
+      ]
+    }
+  },
   "06924108c0da13d78eac8195c0a7507b8e984b819f8031fa2626e2812abf8bfc": {
     "query": "\n            SELECT u.uuid, lmpi.participant_id\n            FROM squadov.lol_match_participant_identities AS lmpi\n            INNER JOIN squadov.riot_accounts AS ra\n                ON ra.summoner_id = lmpi.summoner_id\n            INNER JOIN squadov.riot_account_links AS ral\n                ON ral.puuid = ra.puuid\n            INNER JOIN squadov.users AS u\n                ON u.id = ral.user_id\n            WHERE lmpi.match_uuid = $1\n                AND u.uuid = ANY($2)\n            ",
     "describe": {
@@ -754,39 +828,6 @@
       ]
     }
   },
-  "1059723bb7ce0ab88319a470d184606cd8893f33bd78938bdfc7c619939b265b": {
-    "query": "\n            SELECT\n                wmv.match_uuid AS \"match_uuid!\",\n                u.uuid AS \"player_uuid!\"\n            FROM squadov.wow_match_view AS wmv\n            INNER JOIN squadov.wow_encounter_view AS wav\n                ON wav.view_id = wmv.id\n            INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                ON wcp.view_id = wmv.id\n            INNER JOIN squadov.users AS u\n                ON u.id = wmv.user_id\n            LEFT JOIN squadov.vods AS v\n                ON v.match_uuid = wmv.match_uuid\n                    AND v.user_uuid = u.uuid\n                    AND v.is_clip = FALSE\n            LEFT JOIN squadov.view_share_connections_access_users AS sau\n                ON sau.match_uuid = wmv.match_uuid\n                    AND sau.user_id = $8\n            WHERE wmv.user_id = $2\n                AND wcp.unit_guid = $1\n                AND wmv.match_uuid IS NOT NULL\n                AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))\n                AND (CARDINALITY($6::INTEGER[]) = 0 OR wav.encounter_id = ANY($6))\n                AND (NOT $7::BOOLEAN OR v.video_uuid IS NOT NULL)\n                AND ($2 = $8 OR sau.match_uuid IS NOT NULL)\n            ORDER BY wmv.start_tm DESC\n            LIMIT $3 OFFSET $4\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "player_uuid!",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int4Array",
-          "Int4Array",
-          "Bool",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        true,
-        false
-      ]
-    }
-  },
   "107c47b9b2453000ffaac45b2945930c7e56e8fc2ddcd6f2513243a3e05fe89a": {
     "query": "\n                INSERT INTO squadov.matches (uuid, game)\n                VALUES ($1, $2)\n                ",
     "describe": {
@@ -919,6 +960,50 @@
         false,
         false,
         true
+      ]
+    }
+  },
+  "115065cccf49cfdca338b8a0175b6130e1868bc5b1ee9ab88300fd0c2a1328a7": {
+    "query": "\n            SELECT *\n            FROM squadov.user_to_user_subscriptions\n            WHERE id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "source_user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "dest_user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "is_twitch",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "last_checked",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
       ]
     }
   },
@@ -1221,6 +1306,19 @@
         false,
         false
       ]
+    }
+  },
+  "18dfcd29bfec0daf50c4b5908fa8f63fb3253fd5c4cf27795c6a19d139cae1ec": {
+    "query": "\n        DELETE FROM squadov.community_member_roles AS cmr\n        USING squadov.community_membership AS cm\n        WHERE cm.id = cmr.membership_id\n            AND cm.user_id = $1\n            AND cmr.role_id = $2\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "19da982e6bfdb23d8b77bd2d2763c6e61fe4bc6abf9b0885f8964e7692ac67f9": {
@@ -1729,6 +1827,63 @@
       ]
     }
   },
+  "265c3bbbe8992412335d2cc837481eb48bbd391e85aaecdf144710a8675c0c60": {
+    "query": "\n            SELECT *\n            FROM squadov.community_invites\n            WHERE community_id = $1\n                AND inviter_user_id = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "code",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "community_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "inviter_user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "num_uses",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "max_uses",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "expiration",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "created_tm",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false
+      ]
+    }
+  },
   "26d1912ad176c79028d60778b03400014c4656490958cd1d628306f9f64a215f": {
     "query": "\n            INSERT INTO squadov.hearthstone_match_metadata (\n                view_uuid,\n                game_type,\n                format_type,\n                scenario_id,\n                match_winner_player_id\n            )\n            SELECT\n                hmv.view_uuid,\n                $3,\n                $4,\n                $5,\n                $6\n            FROM squadov.hearthstone_match_view AS hmv\n            WHERE hmv.match_uuid = $1 AND hmv.user_id = $2\n            ",
     "describe": {
@@ -1822,52 +1977,6 @@
       ]
     }
   },
-  "28b8e21455b5bd1ca0dd3793a133a5a3860f086d6f912f783ff4f0696348626e": {
-    "query": "\n        WITH RECURSIVE access_cte AS (\n            SELECT vau.*, TRUE AS \"is_terminal\"\n            FROM squadov.view_share_connections_access_users AS vau\n            WHERE ($2::UUID IS NULL OR vau.match_uuid = $2)\n                AND ($3::UUID IS NULL OR vau.video_uuid = $3)\n                AND vau.user_id = $1\n            UNION\n            SELECT vau.*, FALSE AS \"is_terminal\"\n            FROM squadov.view_share_connections_access_users AS vau\n            INNER JOIN access_cte AS ac\n                ON ac.parent_connection_id = vau.id\n        )\n        SELECT mvc.id, mvc.can_share, mvc.can_clip, mvc.parent_connection_id, at.is_terminal AS \"is_terminal!\"\n        FROM access_cte AS at\n        INNER JOIN squadov.share_match_vod_connections AS mvc\n            ON mvc.id = at.id\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "can_share",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 2,
-          "name": "can_clip",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 3,
-          "name": "parent_connection_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "is_terminal!",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Uuid",
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        true,
-        true,
-        true,
-        true,
-        null
-      ]
-    }
-  },
   "28ff54f0d1cce0978436eb7884981b3f9fe446adf75433cf971b3f605690c3e9": {
     "query": "\n                    SELECT EXISTS (\n                        SELECT 1\n                        FROM squadov.tft_match_participants AS tmp\n                        INNER JOIN squadov.riot_account_links AS ral\n                            ON ral.puuid = tmp.puuid\n                        WHERE ral.user_id = $1 AND tmp.match_uuid = $2\n                    ) as \"exists!\"\n                    ",
     "describe": {
@@ -1907,6 +2016,68 @@
         ]
       },
       "nullable": [
+        false
+      ]
+    }
+  },
+  "29c632638ac38ae09f351ecd6cbd48dd2dffe1ba34abd6ae41c06983db595bc9": {
+    "query": "\n            SELECT c.*\n            FROM squadov.community_membership AS cm\n            INNER JOIN squadov.communities AS c\n                ON c.id = cm.community_id \n            WHERE cm.user_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "create_tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "creator_user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "security_level",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "requires_subscription",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "allow_twitch_sub",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "slug",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
         false
       ]
     }
@@ -2090,11 +2261,11 @@
         ]
       },
       "nullable": [
+        false,
         true,
         true,
-        true,
-        true,
-        true,
+        false,
+        false,
         true,
         true
       ]
@@ -2252,6 +2423,68 @@
         false,
         true,
         true
+      ]
+    }
+  },
+  "335a0330517884d402e4072e2170f66fc6a8d72562e43bc5b25949391790eb25": {
+    "query": "\n            SELECT cr.*\n            FROM squadov.community_roles AS cr\n            WHERE cr.community_id = $1\n                AND cr.is_default\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "community_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "can_manage",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "can_moderate",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "can_invite",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "can_share",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "is_default",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
       ]
     }
   },
@@ -3026,6 +3259,19 @@
       ]
     }
   },
+  "3d7aba67dfe3827c3e0b46212ac03ef38cc61b302dd85556a083e3188ac46cca": {
+    "query": "\n        DELETE FROM squadov.community_roles\n        WHERE community_id = $1\n            AND id = $2\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "3d8e9077c49741b5deaf7fb96564902ba96d395d8e00cb5acead9e8d1470b5fd": {
     "query": "\n            SELECT id\n            FROM squadov.share_tokens\n            WHERE clip_uuid = $1 AND user_id = $2\n            ",
     "describe": {
@@ -3071,6 +3317,87 @@
       "nullable": []
     }
   },
+  "3ec5159d5f7f8c6877e79b1264f93fb67d69050df7e38b8489137d90a91b9d86": {
+    "query": "\n                SELECT * FROM (\n                    SELECT DISTINCT ON (wmv.match_uuid, u.uuid)\n                        wmv.match_uuid AS \"match_uuid!\",\n                        wmv.start_tm AS \"tm!\",\n                        wmv.end_tm AS \"finish_time\", \n                        wmv.build_version AS \"build!\",\n                        u.uuid AS \"user_uuid!\",\n                        wa.combatants_key,\n                        wav.challenge_name,\n                        wav.instance_id,\n                        wav.keystone_level,\n                        COALESCE(wav.time_ms, 0) AS \"time_ms!\",\n                        COALESCE(wav.success, FALSE) AS \"success!\"\n                    FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)\n                    INNER JOIN squadov.wow_match_view AS wmv\n                        ON wmv.match_uuid = inp.match_uuid\n                            AND wmv.user_id = inp.user_id\n                    INNER JOIN squadov.new_wow_challenges AS wa\n                        ON wa.match_uuid = wmv.match_uuid\n                    INNER JOIN squadov.wow_challenge_view AS wav\n                        ON wav.view_id = wmv.id\n                    INNER JOIN squadov.users AS u\n                        ON u.id = wmv.user_id\n                    ORDER BY wmv.match_uuid, u.uuid\n                ) AS t\n                ORDER BY finish_time DESC\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "tm!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "finish_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "build!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "user_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 5,
+          "name": "combatants_key",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "challenge_name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 7,
+          "name": "instance_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 8,
+          "name": "keystone_level",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 9,
+          "name": "time_ms!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 10,
+          "name": "success!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int8Array"
+        ]
+      },
+      "nullable": [
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        null,
+        null
+      ]
+    }
+  },
   "3f854d0cb50fbbe984db4ae6e2fdad95675fdd2cd059cb920654cfbf55e28660": {
     "query": "\n            INSERT INTO squadov.matches (uuid, game)\n            SELECT gen_random_uuid(), $2\n            FROM generate_series(1, $1)\n            RETURNING uuid\n            ",
     "describe": {
@@ -3111,6 +3438,165 @@
       "nullable": [
         null
       ]
+    }
+  },
+  "4020c83e7e6cffbfd996648e8852f3340ae077c5f23c4067529af59c11eeb4a2": {
+    "query": "\n            INSERT INTO squadov.community_roles (\n                community_id,\n                name,\n                can_manage,\n                can_moderate,\n                can_invite,\n                can_share\n            )\n            VALUES (\n                $1,\n                $2,\n                $3,\n                $4,\n                $5,\n                $6\n            )\n            RETURNING *\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "community_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "can_manage",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "can_moderate",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "can_invite",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "can_share",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Varchar",
+          "Bool",
+          "Bool",
+          "Bool",
+          "Bool"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "40d65f11def1d27d5c00441f720d1affe5cd60a30eaadabf66dec10363ccb257": {
+    "query": "\n        SELECT\n            u.id,\n            u.email,\n            u.username,\n            u.verified,\n            u.uuid,\n            u.is_test,\n            u.is_admin,\n            u.welcome_sent,\n            u.registration_time,\n            ARRAY_AGG(cr.id) AS \"roles!\",\n            cm.sub_id AS \"sub_id\"\n        FROM squadov.community_membership AS cm\n        INNER JOIN squadov.community_member_roles AS cmr\n            ON cmr.membership_id = cm.id\n        INNER JOIN squadov.community_roles AS cr\n            ON cr.id = cmr.role_id\n        INNER JOIN squadov.users AS u\n            ON u.id = cm.user_id\n        WHERE cm.community_id = $1\n        GROUP BY u.id, u.email, u.username, u.verified, u.uuid, u.is_test, u.is_admin, u.welcome_sent, u.registration_time, cm.sub_id\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "email",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "username",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "verified",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 5,
+          "name": "is_test",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "is_admin",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "welcome_sent",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "registration_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 9,
+          "name": "roles!",
+          "type_info": "Int8Array"
+        },
+        {
+          "ordinal": 10,
+          "name": "sub_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        null,
+        true
+      ]
+    }
+  },
+  "4115829a738f784b8cede5426aecaf4ad601ffd4abf931a8286f7fbaede93872": {
+    "query": "\n        UPDATE squadov.community_roles\n        SET name = $3,\n            can_manage = $4,\n            can_moderate = $5,\n            can_invite = $6,\n            can_share = $7\n        WHERE id = $1\n            AND community_id = $2\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Varchar",
+          "Bool",
+          "Bool",
+          "Bool",
+          "Bool"
+        ]
+      },
+      "nullable": []
     }
   },
   "41b5ba6e9b893c5605b5d75579656e0834a84f063e83223c0b76d75363b5972c": {
@@ -4732,6 +5218,86 @@
       "nullable": []
     }
   },
+  "5c5620568c78f38ae8fed70f28b5030baa47c829d2831aa6b02b842704a7a0e7": {
+    "query": "\n            SELECT COUNT(*) AS \"count!\"\n            FROM squadov.community_roles AS cr\n            WHERE cr.community_id = $1\n                AND id = ANY($2)\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8Array"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
+  "5dcc3dcbffca7c3d34b1825e4ee01d9d5674f4f93475fc7f82ea2667bb01cc92": {
+    "query": "\n            INSERT INTO squadov.community_invites (\n                code,\n                community_id,\n                inviter_user_id,\n                num_uses,\n                max_uses,\n                expiration,\n                created_tm\n            ) VALUES (\n                gen_random_uuid(),\n                $1,\n                $2,\n                0,\n                $3,\n                $4,\n                NOW()\n            )\n            RETURNING *\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "code",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "community_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "inviter_user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "num_uses",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "max_uses",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "expiration",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "created_tm",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int4",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false
+      ]
+    }
+  },
   "5e934c479c07f98fca07ad9ec9e8d167004afa7d737f4048ab1479b26a879d30": {
     "query": "\n            SELECT at.*\n            FROM squadov.aimlab_tasks AS at\n            INNER JOIN squadov.users AS u\n                ON u.id = at.user_id\n            LEFT JOIN squadov.vods AS v\n                ON v.match_uuid = at.match_uuid\n                    AND v.user_uuid = u.uuid\n                    AND v.is_clip = FALSE\n            LEFT JOIN squadov.view_share_connections_access_users AS sau\n                ON sau.match_uuid = at.match_uuid\n                    AND sau.user_id = $6\n            WHERE at.user_id = $1\n                AND (CARDINALITY($4::VARCHAR[]) = 0 OR at.task_name = ANY($4))\n                AND (NOT $5::BOOLEAN OR v.video_uuid IS NOT NULL)\n                AND ($1 = $6 OR sau.match_uuid IS NOT NULL)\n            ORDER BY at.create_date DESC\n            LIMIT $2 OFFSET $3\n            ",
     "describe": {
@@ -5199,47 +5765,6 @@
       ]
     }
   },
-  "6840cd833f6bca024a086de3cda7a10b923cc23b3114e42de14ac0293354f2f0": {
-    "query": "\n            SELECT DISTINCT v.match_uuid AS \"match_uuid!\", v.user_uuid AS \"uuid!\", v.end_time\n            FROM squadov.users AS u\n            CROSS JOIN LATERAL (\n                SELECT *\n                FROM squadov.vods\n                WHERE user_uuid = u.uuid\n                UNION\n                SELECT v.*\n                FROM squadov.view_share_connections_access_users AS vi\n                INNER JOIN squadov.vods AS v\n                    ON v.video_uuid = vi.video_uuid\n                LEFT JOIN squadov.squad_role_assignments AS sra\n                    ON sra.user_id = vi.user_id\n                WHERE vi.user_id = u.id\n                    AND (CARDINALITY($5::BIGINT[]) = 0 OR sra.squad_id = ANY($5))\n            ) AS v\n            INNER JOIN squadov.users AS vu\n                ON vu.uuid = v.user_uuid\n            INNER JOIN squadov.matches AS m\n                ON m.uuid = v.match_uuid\n            LEFT JOIN squadov.user_favorite_matches AS ufm\n                ON ufm.match_uuid = m.uuid\n                    AND ufm.user_id = $1\n            LEFT JOIN squadov.user_watchlist_vods AS uwv\n                ON uwv.video_uuid = v.video_uuid\n                    AND uwv.user_id = $1\n            WHERE u.id = $1\n                AND v.match_uuid IS NOT NULL\n                AND v.user_uuid IS NOT NULL\n                AND v.start_time IS NOT NULL\n                AND v.end_time IS NOT NULL\n                AND (CARDINALITY($4::INTEGER[]) = 0 OR m.game = ANY($4))\n                AND (CARDINALITY($6::BIGINT[]) = 0 OR vu.id = ANY($6))\n                AND COALESCE(v.end_time >= $7, TRUE)\n                AND COALESCE(v.end_time <= $8, TRUE)\n                AND (NOT $9::BOOLEAN OR ufm.match_uuid IS NOT NULL)\n                AND (NOT $10::BOOLEAN OR uwv.video_uuid IS NOT NULL)\n                AND v.is_clip = FALSE\n            ORDER BY v.end_time DESC\n            LIMIT $2 OFFSET $3\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 2,
-          "name": "end_time",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int4Array",
-          "Int8Array",
-          "Int8Array",
-          "Timestamptz",
-          "Timestamptz",
-          "Bool",
-          "Bool"
-        ]
-      },
-      "nullable": [
-        null,
-        null,
-        null
-      ]
-    }
-  },
   "6a7bdbc901a1d87c63df59622625144f6a1d82335c8cb4bd0196cf7353abe3da": {
     "query": "\n                SELECT\n                    data.tm AS \"tm!\",\n                    (EXTRACT(EPOCH FROM data.tm - $3) * 1000)::BIGINT AS \"diff_ms!\",\n                    (data.amount)::INTEGER AS \"diff_hp!\",\n                    data.spell_id AS \"spell_id?\",\n                    data.source_guid AS \"source_guid?\",\n                    data.source_name AS \"source_name?\"\n                FROM (\n                    SELECT\n                        wve.tm,\n                        wve.log_line,\n                        0-wde.amount AS \"amount\",\n                        wde.spell_id,\n                        wcp.unit_name AS \"source_name\",\n                        wcp.unit_guid AS \"source_guid\"\n                    FROM squadov.wow_match_view_damage_events AS wde\n                    INNER JOIN squadov.wow_match_view_events AS wve\n                        ON wve.event_id = wde.event_id\n                    LEFT JOIN squadov.wow_match_view_character_presence AS wcp\n                        ON wcp.character_id = wve.source_char\n                    INNER JOIN squadov.wow_match_view AS wmv\n                        ON wmv.alt_id = wve.view_id\n                    WHERE wmv.id = $1\n                        AND wve.tm BETWEEN $2 AND $3\n                        AND wve.dest_char = $4\n                    UNION\n                    SELECT\n                        wve.tm,\n                        wve.log_line,\n                        whe.amount,\n                        whe.spell_id,\n                        wcp.unit_name AS \"source_name\",\n                        wcp.unit_guid AS \"source_guid\"\n                    FROM squadov.wow_match_view_healing_events AS whe\n                    INNER JOIN squadov.wow_match_view_events AS wve\n                        ON wve.event_id = whe.event_id\n                    LEFT JOIN squadov.wow_match_view_character_presence AS wcp\n                        ON wcp.character_id = wve.source_char\n                    INNER JOIN squadov.wow_match_view AS wmv\n                        ON wmv.alt_id = wve.view_id\n                    WHERE wmv.id = $1\n                        AND wve.tm BETWEEN $2 AND $3\n                        AND wve.dest_char = $4\n                ) AS data\n                ORDER BY data.log_line DESC\n                ",
     "describe": {
@@ -5405,17 +5930,67 @@
       ]
     }
   },
-  "6daae9a37de24b8c163bd407fcf1a5a208397c1ffdab3423dbb2d78a926ab3ec": {
-    "query": "\n            INSERT INTO squadov.squad_role_assignments (\n                squad_id,\n                user_id,\n                squad_role\n            )\n            VALUES (\n                $1,\n                $2,\n                'Member'\n            )\n            ",
+  "6deb08f853a20e0b352a23089a4091d115e35f3d0b6717dbc7f431ce438651dd": {
+    "query": "\n            SELECT cr.*\n            FROM squadov.community_roles AS cr\n            INNER JOIN squadov.community_membership AS cm\n                ON cm.role_id = cr.id\n            WHERE cr.community_id = $1\n                AND cm.user_id = $2\n            ",
     "describe": {
-      "columns": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "community_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "can_manage",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "can_moderate",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "can_invite",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "can_share",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "is_default",
+          "type_info": "Bool"
+        }
+      ],
       "parameters": {
         "Left": [
           "Int8",
           "Int8"
         ]
       },
-      "nullable": []
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
     }
   },
   "6e0c2d2b4814a21d38b2274843bd57dc646ca5a9fbbb1a1d73386760056e7938": {
@@ -5517,9 +6092,9 @@
         ]
       },
       "nullable": [
-        true,
-        true,
-        true,
+        false,
+        false,
+        false,
         true,
         null
       ]
@@ -5734,6 +6309,20 @@
       ]
     }
   },
+  "78995f22fe003da80f1bec1d398bf90ca40e152ccb2746a5059acc5bddb8f0a2": {
+    "query": "\n        INSERT INTO squadov.community_membership (\n            user_id,\n            role_id,\n            sub_id\n        ) VALUES (\n            $1,\n            $2,\n            $3\n        ) ON CONFLICT DO NOTHING\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "79bbe74adeb52bd21131efd638ca94cd292186cfa35b3b9389587c24025dd3e4": {
     "query": "\n        SELECT ra.puuid, ra.account_id, ra.summoner_id, ra.summoner_name, ra.last_backfill_lol_time, ra.last_backfill_tft_time\n        FROM squadov.riot_accounts AS ra\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.puuid = ra.puuid\n        WHERE ral.user_id = $1\n            AND ra.summoner_name = $2\n        ",
     "describe": {
@@ -5783,6 +6372,19 @@
         true,
         true
       ]
+    }
+  },
+  "79bf29c4b2d720e9e7186b478ed76b7f43304a3b9027d76f52c8bed7dcf0f8a7": {
+    "query": "\n        INSERT INTO squadov.community_member_roles (\n            role_id,\n            membership_id\n        )\n        SELECT $2, cm.id\n        FROM squadov.community_roles AS cr\n        INNER JOIN squadov.community_membership AS cm\n            ON cm.community_id = cr.community_id\n                AND cm.user_id = $1\n        WHERE cr.id = $2\n        ON CONFLICT DO NOTHING\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "7b66b2c6300c2b5a1361c3499f0cb7ee7c16aa824cc82a8c740872c21089c32a": {
@@ -6058,18 +6660,18 @@
         ]
       },
       "nullable": [
+        false,
         true,
         true,
         true,
         true,
-        true,
-        true,
-        true
+        false,
+        false
       ]
     }
   },
-  "81494b91b27d25f8c1c55fb5e7b93dc957e66f1aaeb4907774849f92a1eab7d3": {
-    "query": "\n            SELECT\n                wmv.match_uuid AS \"match_uuid!\",\n                u.uuid AS \"player_uuid!\"\n            FROM squadov.wow_match_view AS wmv\n            INNER JOIN squadov.wow_arena_view AS wav\n                ON wav.view_id = wmv.id\n            INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                ON wcp.view_id = wmv.id\n            INNER JOIN squadov.users AS u\n                ON u.id = wmv.user_id\n            LEFT JOIN squadov.vods AS v\n                ON v.match_uuid = wmv.match_uuid\n                    AND v.user_uuid = u.uuid\n                    AND v.is_clip = FALSE\n            LEFT JOIN squadov.view_share_connections_access_users AS sau\n                ON sau.match_uuid = wmv.match_uuid\n                    AND sau.user_id = $7\n            WHERE wmv.user_id = $2\n                AND wcp.unit_guid = $1\n                AND wmv.match_uuid IS NOT NULL\n                AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))\n                AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)\n                AND ($2 = $7 OR sau.match_uuid IS NOT NULL)\n                AND (CARDINALITY($8::VARCHAR[]) = 0 OR wav.arena_type = ANY($8))\n            ORDER BY wmv.start_tm DESC\n            LIMIT $3 OFFSET $4\n            ",
+  "809f0d334cd3d0ca1a7101cdaa60aa059f205874e3b2fc4a0ca6aa4487d237c4": {
+    "query": "\n                SELECT * FROM (\n                    SELECT DISTINCT ON (wmv.match_uuid, u.uuid)\n                        wmv.match_uuid AS \"match_uuid!\",\n                        wmv.start_tm AS \"tm!\",\n                        wmv.end_tm AS \"finish_time\", \n                        wmv.build_version AS \"build!\",\n                        wa.combatants_key,\n                        wav.instance_id,\n                        wav.arena_type,\n                        wav.winning_team_id,\n                        wav.match_duration_seconds,\n                        wav.new_ratings,\n                        u.uuid AS \"user_uuid\",\n                        (\n                            CASE WHEN wvc.event_id IS NOT NULL THEN wvc.team = wav.winning_team_id\n                                ELSE FALSE\n                            END\n                        ) AS \"success!\"\n                    FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)\n                    INNER JOIN squadov.wow_match_view AS wmv\n                        ON wmv.match_uuid = inp.match_uuid\n                            AND wmv.user_id = inp.user_id\n                    INNER JOIN squadov.new_wow_arenas AS wa\n                        ON wa.match_uuid = wmv.match_uuid\n                    INNER JOIN squadov.wow_arena_view AS wav\n                        ON wav.view_id = wmv.id\n                    INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                        ON wcp.view_id = wmv.id\n                    LEFT JOIN squadov.wow_match_view_combatants AS wvc\n                        ON wvc.character_id = wcp.character_id\n                    INNER JOIN squadov.wow_user_character_cache AS wucc\n                        ON wucc.unit_guid = wcp.unit_guid\n                            AND wucc.user_id = inp.user_id\n                    INNER JOIN squadov.users AS u\n                        ON u.id = wmv.user_id\n                    ORDER BY wmv.match_uuid, u.uuid\n                ) AS t\n                ORDER BY finish_time DESC\n                ",
     "describe": {
       "columns": [
         {
@@ -6079,25 +6681,79 @@
         },
         {
           "ordinal": 1,
-          "name": "player_uuid!",
+          "name": "tm!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "finish_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "build!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "combatants_key",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "instance_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "arena_type",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 7,
+          "name": "winning_team_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 8,
+          "name": "match_duration_seconds",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 9,
+          "name": "new_ratings",
+          "type_info": "Int4Array"
+        },
+        {
+          "ordinal": 10,
+          "name": "user_uuid",
           "type_info": "Uuid"
+        },
+        {
+          "ordinal": 11,
+          "name": "success!",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
         "Left": [
-          "Text",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int4Array",
-          "Bool",
-          "Int8",
-          "VarcharArray"
+          "UuidArray",
+          "Int8Array"
         ]
       },
       "nullable": [
         true,
-        false
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+        null
       ]
     }
   },
@@ -6219,6 +6875,68 @@
         true,
         true,
         true
+      ]
+    }
+  },
+  "86433affa81748c950d547b9e953591335d22cb3324964dadebf801d4fa8bec1": {
+    "query": "\n            SELECT *\n            FROM squadov.community_roles\n            WHERE community_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "community_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "can_manage",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "can_moderate",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "can_invite",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "can_share",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "is_default",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
       ]
     }
   },
@@ -6472,6 +7190,18 @@
       ]
     }
   },
+  "8c6614b114c968b96460ebd3317739a04825a9f7394702bf3c3b034d3d8a1ef7": {
+    "query": "\n        DELETE FROM squadov.community_invites\n        WHERE code = $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "8c68c3d6d7de48ebcd6133dffb06330e91242421833aa38242bce99cfd02bb15": {
     "query": "\n            DELETE FROM squadov.vods\n            WHERE video_uuid = ANY($1)\n            ",
     "describe": {
@@ -6577,6 +7307,62 @@
         ]
       },
       "nullable": [
+        false
+      ]
+    }
+  },
+  "90853ecf6c5313a79bed526b6944175775e2b6e6573c943c858382c516f1c205": {
+    "query": "\n            SELECT *\n            FROM squadov.community_invites\n            WHERE code = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "code",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "community_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "inviter_user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "num_uses",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "max_uses",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "expiration",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "created_tm",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
         false
       ]
     }
@@ -6903,64 +7689,6 @@
         false,
         false,
         false
-      ]
-    }
-  },
-  "99dd4d6488c71837cb4f12ff1079e0aa5f4cc15b4cc6c036889baacf35764cd8": {
-    "query": "\n            SELECT id, match_uuid, video_uuid, can_share, can_clip, dest_user_id, dest_squad_id\n            FROM squadov.share_match_vod_connections\n            WHERE source_user_id = $1\n                AND ($2::UUID IS NULL OR match_uuid = $2)\n                AND ($3::UUID IS NULL OR video_uuid = $3)\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 2,
-          "name": "video_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 3,
-          "name": "can_share",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 4,
-          "name": "can_clip",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 5,
-          "name": "dest_user_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 6,
-          "name": "dest_squad_id",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Uuid",
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true
       ]
     }
   },
@@ -7293,6 +8021,19 @@
       "nullable": [
         false
       ]
+    }
+  },
+  "a0d97c18ebae7f9a27fb491d1a3ac5cb8044cd796c4b34fab55fc62149848c7c": {
+    "query": "\n        INSERT INTO squadov.community_invite_usage (\n            code,\n            user_id,\n            usage_tm\n        ) VALUES (\n            $1,\n            $2,\n            NOW()\n        )\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "a10122437e4cbc1060fda82a8179608dcc185462b320a67e8723a162b4080a00": {
@@ -7708,6 +8449,19 @@
       ]
     }
   },
+  "a93996ef8a1c680d65aa8eca541fb2867cf05b09e88e155c564bd8beb61e5ca5": {
+    "query": "\n        INSERT INTO squadov.community_membership (\n            user_id,\n            role_id,\n            sub_id\n        ) VALUES (\n            $1,\n            $2,\n            NULL\n        ) ON CONFLICT DO NOTHING\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "ab31b9de96ddfd358b4c8f58fa6ad2318f1b63a9c7ba1895d4b52758328796e7": {
     "query": "\n            SELECT\n                vmul.match_id,\n                vm.game_mode,\n                vm.map_id,\n                vm.is_ranked,\n                vm.provisioning_flow_id,\n                vm.server_start_time_utc,\n                vm.game_length_millis,\n                vm.season_id\n            FROM squadov.valorant_matches AS vm\n            INNER JOIN squadov.valorant_match_uuid_link AS vmul\n                ON vmul.match_uuid = vm.match_uuid\n            WHERE vm.match_uuid = $1\n            ",
     "describe": {
@@ -7821,6 +8575,18 @@
       "nullable": []
     }
   },
+  "adbed68a7a91de9211e9dd1ed38bc15317b57edb026e1ede76aa323b490c8c74": {
+    "query": "\n        DELETE FROM squadov.communities\n        WHERE id = $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "ae7753a944d0cd8dc373b194ed0818f31d7305a8b035e9bcfb4948d75f3cd38e": {
     "query": "\n        INSERT INTO squadov.valorant_match_uuid_link (\n            match_uuid,\n            match_id\n        )\n        VALUES (\n            $1,\n            $2\n        )\n        ",
     "describe": {
@@ -7882,6 +8648,19 @@
       ]
     }
   },
+  "b3ab356792b7479df479991d63691d92e93cfae476b81fc4f29ab69628764e94": {
+    "query": "\n        DELETE FROM squadov.community_membership\n        WHERE user_id = $1\n            AND community_id = $2\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "b4389dc123920a68c36d1ceb490bcf8581a0abd98ae10dcc66b3af44e5c84f6e": {
     "query": "\n            SELECT u.uuid, tmp.puuid\n            FROM squadov.tft_match_participants AS tmp\n            INNER JOIN squadov.riot_accounts AS ra\n                ON ra.puuid = tmp.puuid\n            INNER JOIN squadov.riot_account_links AS ral\n                ON ral.puuid = ra.puuid\n            INNER JOIN squadov.users AS u\n                ON u.id = ral.user_id\n            WHERE tmp.match_uuid = $1\n                AND u.uuid = ANY($2)\n            ",
     "describe": {
@@ -7940,6 +8719,22 @@
       "nullable": []
     }
   },
+  "b93f8a2bf880afbea624c3a84fea4576277c1b9e9a27ae60475341780a18d1ca": {
+    "query": "\n        UPDATE squadov.communities\n        SET name = $2,\n            security_level = $3,\n            requires_subscription = $4,\n            allow_twitch_sub = $5\n        WHERE id = $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Varchar",
+          "Int4",
+          "Bool",
+          "Bool"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "b95e530a4480386845a87c1f079b8416ad2a828294349cb2147ff7740dfb7745": {
     "query": "\n        INSERT INTO squadov.valorant_matches (\n            match_uuid,\n            map_id,\n            game_length_millis,\n            server_start_time_utc,\n            provisioning_flow_id,\n            game_mode,\n            is_ranked,\n            season_id\n        ) VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            $5,\n            $6,\n            $7,\n            $8\n        )\n        ",
     "describe": {
@@ -7973,6 +8768,86 @@
           "Int4",
           "Timestamptz",
           "Bool"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "bb822d832a0ee725d06a603d7128ca360168bb46318f89c152e196194c38b765": {
+    "query": "\n        INSERT INTO squadov.communities (\n            name,\n            create_tm,\n            creator_user_id,\n            security_level,\n            requires_subscription,\n            allow_twitch_sub,\n            slug\n        )\n        VALUES (\n            $1,\n            NOW(),\n            $2,\n            $3,\n            $4,\n            $5,\n            $6\n        )\n        RETURNING *\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "create_tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "creator_user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "security_level",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "requires_subscription",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "allow_twitch_sub",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "slug",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Int8",
+          "Int4",
+          "Bool",
+          "Bool",
+          "Varchar"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "bc2b6fef801adcec9890a443360f61c305f5294d5b8501d415e05a1d14ef5207": {
+    "query": "\n        DELETE FROM squadov.community_membership AS cm\n        USING squadov.community_roles AS cr\n        WHERE cr.id = cm.role_id\n            AND user_id = $1\n            AND cr.community_id = $2\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
         ]
       },
       "nullable": []
@@ -8437,6 +9312,93 @@
       ]
     }
   },
+  "c892150797fd6172c8f12d53b6efecfd97d574d3d581f7918bde1c1198552e67": {
+    "query": "\n                SELECT * FROM (\n                    SELECT DISTINCT ON (wmv.match_uuid, u.uuid)\n                        wmv.match_uuid AS \"match_uuid!\",\n                        wmv.start_tm AS \"tm!\",\n                        wmv.end_tm AS \"finish_time\", \n                        wmv.build_version AS \"build!\",\n                        u.uuid AS \"user_uuid!\",\n                        wa.combatants_key,\n                        wav.encounter_id,\n                        wav.encounter_name,\n                        wav.difficulty,\n                        wav.num_players,\n                        wav.instance_id,\n                        COALESCE(wav.success, FALSE) AS \"success!\"\n                    FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)\n                    INNER JOIN squadov.wow_match_view AS wmv\n                        ON wmv.match_uuid = inp.match_uuid\n                            AND wmv.user_id = inp.user_id\n                    INNER JOIN squadov.new_wow_encounters AS wa\n                        ON wa.match_uuid = wmv.match_uuid\n                    INNER JOIN squadov.wow_encounter_view AS wav\n                        ON wav.view_id = wmv.id\n                    INNER JOIN squadov.users AS u\n                        ON u.id = wmv.user_id\n                    ORDER BY wmv.match_uuid, u.uuid\n                ) AS t\n                ORDER BY finish_time DESC\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "tm!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "finish_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "build!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "user_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 5,
+          "name": "combatants_key",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "encounter_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "encounter_name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 8,
+          "name": "difficulty",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 9,
+          "name": "num_players",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 10,
+          "name": "instance_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 11,
+          "name": "success!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int8Array"
+        ]
+      },
+      "nullable": [
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        null
+      ]
+    }
+  },
   "c8d0de8586715f52082ecfbc5145de2188bf2e3b02c15141686dd7ea475b1c9f": {
     "query": "\n            INSERT INTO squadov.user_favorite_vods (\n                video_uuid,\n                user_id,\n                reason\n            )\n            VALUES (\n                $1,\n                $2,\n                $3\n            )\n            ON CONFLICT DO NOTHING\n            ",
     "describe": {
@@ -8449,6 +9411,51 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "ca0aa1a1ad8e13568f1b3e74b8f21d5c9dd03675412fbe0f7221735e7f5b0ff0": {
+    "query": "\n            SELECT *\n            FROM squadov.community_membership\n            WHERE community_id = $1\n                AND user_id = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "community_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "sub_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "join_tm",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        true,
+        false
+      ]
     }
   },
   "cad3615ac6bf373a8c00c1ca4b0f87a1012b5fb6f1f2f379dd3d8d507624452b": {
@@ -9409,6 +10416,66 @@
       ]
     }
   },
+  "dac1fbc31314ab0135e9234f892df56886fa2341c25d16e7094429e02cc5b34f": {
+    "query": "\n        INSERT INTO squadov.communities (\n            name,\n            create_tm,\n            creator_user_id,\n            security_level,\n            requires_subscription,\n            allow_twitch_sub\n        )\n        VALUES (\n            $1,\n            NOW(),\n            $2,\n            $3,\n            $4,\n            $5\n        )\n        RETURNING *\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "create_tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "creator_user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "security_level",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "requires_subscription",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "allow_twitch_sub",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Int8",
+          "Int4",
+          "Bool",
+          "Bool"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "dbfa6ebf66436b034ab08a6eeb571b3f26322d03d272e0e85eef05f1bf578aad": {
     "query": "\n                SELECT match_uuid\n                FROM squadov.new_wow_encounters AS wc\n                CROSS JOIN (\n                    SELECT wmv.start_tm, wcv.encounter_id, wcv.difficulty, wcv.instance_id\n                    FROM squadov.wow_match_view AS wmv\n                    INNER JOIN squadov.wow_encounter_view AS wcv\n                        ON wcv.view_id = wmv.id\n                    WHERE wmv.id = $2\n                ) AS wmv(start_tm, encounter_id, difficulty, instance_id)\n                WHERE wc.tr && tstzrange(wmv.start_tm, $3, '[]')\n                    AND wc.combatants_key = $1\n                    AND wc.encounter_id = wmv.encounter_id\n                    AND wc.difficulty = wmv.difficulty\n                    AND wc.instance_id = wmv.instance_id\n                ",
     "describe": {
@@ -9429,6 +10496,19 @@
       "nullable": [
         false
       ]
+    }
+  },
+  "dd245ec6c4de5de6bff2d23d5f0252da88ca395126dc358b7a849d581525d8cf": {
+    "query": "\n            INSERT INTO squadov.community_membership (\n                user_id,\n                role_id,\n                sub_id\n            ) VALUES (\n                $1,\n                $2,\n                NULL\n            ) ON CONFLICT DO NOTHING\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "dd3a49f3e78fd4eb68c43c15b4f54c51a8dc920ad3a52bd3e21bb5feaeaaf052": {
@@ -9504,6 +10584,50 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "de27501ea2fc1ace4d5f9506ffa6e3655c2c98a91cfca030f574ad7b47b30088": {
+    "query": "\n            SELECT *\n            FROM squadov.community_membership AS cm\n            WHERE cm.user_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "community_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "sub_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "join_tm",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        true,
+        false
+      ]
     }
   },
   "e09b798a6448b9bddffaef74a9a1c9541b734785b3eccf95c374ef0e72616dcd": {
@@ -9685,6 +10809,84 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "e2758db5e8f861beac21d5ef69cfd0725df21ae92b997359724aad88c840bbf2": {
+    "query": "\n        SELECT *\n        FROM squadov.communities\n        WHERE id = $1\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "create_tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "creator_user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "security_level",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "requires_subscription",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "allow_twitch_sub",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "e2c9fdd49bcb86b575dbaf8ec2cc215b0b5d8af1f3cdc995bab24e3fcf553f1f": {
+    "query": "\n            INSERT INTO squadov.community_membership (\n                community_id,\n                user_id,\n                sub_id,\n                join_tm\n            ) VALUES (\n                $1,\n                $2,\n                $3,\n                NOW()\n            ) RETURNING id\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
       ]
     }
   },
@@ -9880,38 +11082,6 @@
         ]
       },
       "nullable": [
-        false
-      ]
-    }
-  },
-  "ea0d24900b69379373ef0fb97d568e3fc331ff206aeee0ff2d6abf8984456785": {
-    "query": "\n            SELECT\n                wmv.match_uuid AS \"match_uuid!\",\n                u.uuid AS \"player_uuid!\"\n            FROM squadov.wow_match_view AS wmv\n            INNER JOIN squadov.wow_challenge_view AS wav\n                ON wav.view_id = wmv.id\n            INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                ON wcp.view_id = wmv.id\n            INNER JOIN squadov.users AS u\n                ON u.id = wmv.user_id\n            LEFT JOIN squadov.vods AS v\n                ON v.match_uuid = wmv.match_uuid\n                    AND v.user_uuid = u.uuid\n                    AND v.is_clip = FALSE\n            LEFT JOIN squadov.view_share_connections_access_users AS sau\n                ON sau.match_uuid = wmv.match_uuid\n                    AND sau.user_id = $7\n            WHERE wmv.user_id = $2\n                AND wcp.unit_guid = $1\n                AND wmv.match_uuid IS NOT NULL\n                AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))\n                AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)\n                AND ($2 = $7 OR sau.match_uuid IS NOT NULL)\n            ORDER BY wmv.start_tm DESC\n            LIMIT $3 OFFSET $4\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "player_uuid!",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int4Array",
-          "Bool",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        true,
         false
       ]
     }
@@ -10165,69 +11335,6 @@
       },
       "nullable": [
         null
-      ]
-    }
-  },
-  "efe969919e3883646ccb88107cb0e37a52a3a966a4253b79b6dcfc63f7631cfb": {
-    "query": "\n            INSERT INTO squadov.share_match_vod_connections (\n                match_uuid,\n                video_uuid,\n                source_user_id,\n                dest_user_id,\n                dest_squad_id,\n                can_share,\n                can_clip,\n                parent_connection_id,\n                share_depth\n            )\n            VALUES (\n                $1,\n                $2,\n                $3,\n                $4,\n                $5,\n                $6,\n                $7,\n                $8,\n                COALESCE(\n                    (\n                        SELECT share_depth\n                        FROM squadov.share_match_vod_connections\n                        WHERE id = $8\n                    ),\n                    -1\n                ) + 1\n            )\n            RETURNING\n                id,\n                match_uuid,\n                video_uuid,\n                dest_user_id,\n                dest_squad_id,\n                can_share,\n                can_clip\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 2,
-          "name": "video_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 3,
-          "name": "dest_user_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "dest_squad_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "can_share",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 6,
-          "name": "can_clip",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Uuid",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Bool",
-          "Bool",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        true,
-        true,
-        true,
-        true,
-        false,
-        false
       ]
     }
   },
@@ -10643,6 +11750,74 @@
       ]
     }
   },
+  "f9580aec5f2fa9933dce88aa8571282b8c90f7e6f78eecf2b6844b41acb3a9cd": {
+    "query": "\n            INSERT INTO squadov.community_roles (\n                community_id,\n                name,\n                can_manage,\n                can_moderate,\n                can_invite,\n                can_share,\n                is_default\n            )\n            VALUES (\n                $1,\n                $2,\n                $3,\n                $4,\n                $5,\n                $6,\n                $7\n            )\n            RETURNING *\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "community_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "can_manage",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "can_moderate",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "can_invite",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "can_share",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "is_default",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Varchar",
+          "Bool",
+          "Bool",
+          "Bool",
+          "Bool",
+          "Bool"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "f9e8defb29c01f5a838c20917c171cdeca0c290ccd6d6d95bdde09c90134ed94": {
     "query": "\n        DELETE FROM squadov.user_autosharing_settings\n        WHERE id = $1 AND source_user_id = $2\n        ",
     "describe": {
@@ -10752,6 +11927,18 @@
           "Varchar",
           "Varchar",
           "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "fbf1cf86b2dde5b9806a9ab318ea820f35b0af1844f094cfa1d5ad2751a20787": {
+    "query": "\n        UPDATE squadov.community_invites\n        SET num_uses = num_uses + 1\n        WHERE code = $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid"
         ]
       },
       "nullable": []
@@ -11180,6 +12367,69 @@
         false,
         true,
         false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "fe62119618f42abbe843b950f2993a9cd5f9963423db1e16f177eaf3d4f28d23": {
+    "query": "\n            SELECT cr.*\n            FROM squadov.community_roles AS cr\n            INNER JOIN squadov.community_member_roles AS cmr\n                ON cmr.role_id = cr.id\n            INNER JOIN squadov.community_membership AS cm\n                ON cm.id = cmr.membership_id\n            WHERE cr.community_id = $1\n                AND cm.user_id = $2\n                AND cm.community_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "community_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "can_manage",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "can_moderate",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "can_invite",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "can_share",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "is_default",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
         false,
         false,
         false,
