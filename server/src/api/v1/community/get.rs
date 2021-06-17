@@ -1,17 +1,20 @@
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpResponse, HttpRequest};
 use crate::{
     api,
-    api::v1::CommunityPathInput
+    api::{
+        v1::CommunityPathInput,
+        auth::SquadOVSession,
+    },
 };
 use std::sync::Arc;
 use squadov_common::{
     SquadOvError,
     community::{
         db,
+        CommunityListQuery,
     },
 };
 use serde_qs::actix::QsQuery;
-use serde::Deserialize;
 
 pub async fn get_community_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<CommunityPathInput>) -> Result<HttpResponse, SquadOvError> {
     Ok(
@@ -21,13 +24,14 @@ pub async fn get_community_handler(app : web::Data<Arc<api::ApiApplication>>, pa
     )
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(rename_all="camelCase")]
-pub struct CommunityListQuery {
-    #[serde(default)]
-    onlyMe: bool,
-}
+pub async fn list_communities_handler(app : web::Data<Arc<api::ApiApplication>>, filter: QsQuery<CommunityListQuery>, request: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let communities = if filter.only_me {
+        let extensions = request.extensions();
+        let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::BadRequest)?;
+        db::find_communities_for_user(&*app.pool, session.user.id).await?
+    } else {
+        vec![]
+    };
 
-pub async fn list_communities_handler(app : web::Data<Arc<api::ApiApplication>>, filter: QsQuery<CommunityListQuery>) -> Result<HttpResponse, SquadOvError> {
-    Err(SquadOvError::NotFound)
+    Ok(HttpResponse::Ok().json(communities))
 }

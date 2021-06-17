@@ -22,6 +22,7 @@ pub enum CommunitySecurityLevel {
 pub struct SquadOvCommunity {
     pub id: i64,
     pub name: String,
+    pub slug: String,
     pub create_tm: DateTime<Utc>,
     pub creator_user_id: i64,
     pub security_level: CommunitySecurityLevel,
@@ -60,4 +61,11 @@ pub struct CommunityUser {
     pub user: SquadOVUser,
     pub sub_id: Option<i64>,
     pub roles: Vec<i64>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all="camelCase")]
+pub struct CommunityListQuery {
+    #[serde(default)]
+    pub only_me: bool,
 }

@@ -11,6 +11,40 @@ use crate::{
 };
 use std::convert::TryFrom;
 
+pub async fn find_communities_for_user<'a, T>(ex: T, user_id: i64) -> Result<Vec<SquadOvCommunity>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT c.*
+            FROM squadov.community_membership AS cm
+            INNER JOIN squadov.communities AS c
+                ON c.id = cm.community_id 
+            WHERE cm.user_id = $1
+            ",
+            user_id
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                Ok(SquadOvCommunity{
+                    id: x.id,
+                    name: x.name,
+                    slug: x.slug,
+                    create_tm: x.create_tm,
+                    creator_user_id: x.creator_user_id,
+                    security_level: CommunitySecurityLevel::try_from(x.security_level)?,
+                    requires_subscription: x.requires_subscription,
+                    allow_twitch_sub: x.allow_twitch_sub,
+                })
+            })
+            .collect::<Result<Vec<SquadOvCommunity>, SquadOvError>>()?
+    )
+}
+
 pub async fn edit_community<'a, T>(ex: T, community: &SquadOvCommunity) -> Result<(), SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
@@ -69,6 +103,7 @@ where
         SquadOvCommunity{
             id: x.id,
             name: x.name,
+            slug: x.slug,
             create_tm: x.create_tm,
             creator_user_id: x.creator_user_id,
             security_level: CommunitySecurityLevel::try_from(x.security_level)?,
@@ -113,7 +148,8 @@ where
             creator_user_id,
             security_level,
             requires_subscription,
-            allow_twitch_sub
+            allow_twitch_sub,
+            slug
         )
         VALUES (
             $1,
@@ -121,7 +157,8 @@ where
             $2,
             $3,
             $4,
-            $5
+            $5,
+            $6
         )
         RETURNING *
         ",
@@ -130,6 +167,7 @@ where
         community.security_level as i32,
         community.requires_subscription,
         community.allow_twitch_sub,
+        community.slug,
     )
         .fetch_one(ex)
         .await?;
@@ -137,6 +175,7 @@ where
         SquadOvCommunity{
             id: x.id,
             name: x.name,
+            slug: x.slug,
             create_tm: x.create_tm,
             creator_user_id: x.creator_user_id,
             security_level: CommunitySecurityLevel::try_from(x.security_level)?,
