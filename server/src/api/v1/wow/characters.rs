@@ -376,7 +376,12 @@ pub async fn get_wow_armory_link_for_character_handler(app : web::Data<Arc<api::
         format!(
             "https://worldofwarcraft.com/en-us/character/{region}/{server}/{character}",
             region=region,
-            server=server_name.replace("'", "").replace(" ","-"),
+            server=server_name
+                // Certain server names get dumped out into the log differently...we might need to fix this at some point in 
+                // a way that uses info from the DB.
+                .replace("Area52", "Area 52")
+                .replace("'", "")
+                .replace(" ","-"),
             character=char_name,
         )
     ))
