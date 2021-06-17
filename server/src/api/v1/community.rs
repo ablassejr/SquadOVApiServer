@@ -19,6 +19,11 @@ pub struct CommunityPathInput {
 }
 
 #[derive(Deserialize)]
+pub struct CommunitySlugInput {
+    pub community_slug: String
+}
+
+#[derive(Deserialize)]
 pub struct CommunityInvitePathInput {
     pub community_id: i64,
     pub code: Uuid,

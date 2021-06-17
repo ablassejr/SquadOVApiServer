@@ -92,6 +92,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("/visit", web::get().to(v1::public_landing_visit_handler))
                         .route("/download", web::get().to(v1::public_landing_download_handler))
                 )
+                .service(
+                    web::scope("/community/slug/{community_slug}")
+                        .route("", web::get().to(v1::get_community_slug_handler))
+                )
         )
         .service(
             web::scope("/v1")
@@ -911,7 +915,12 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("", web::post().to(v1::create_community_handler))
                         .route("", web::get().to(v1::list_communities_handler))
                         .service(
-                            web::scope("/{community_id}")
+                            web::scope("/slug/{community_slug}")
+                                .route("/role", web::get().to(v1::get_community_role_handler))
+                                .route("/sub", web::get().to(v1::get_community_sub_handler))
+                        )
+                        .service(
+                            web::scope("/id/{community_id}")
                                 .route("", web::get().to(v1::get_community_handler))
                                 .route("/join", web::post().to(v1::join_community_handler))
                                 .route("/leave", web::post().to(v1::leave_community_handler))

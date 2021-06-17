@@ -85,6 +85,34 @@ where
     Ok(())
 }
 
+pub async fn get_community_from_slug<'a, T>(ex: T, slug: &str) -> Result<SquadOvCommunity, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    let x = sqlx::query!(
+        "
+        SELECT *
+        FROM squadov.communities
+        WHERE slug = $1
+        ",
+        slug,
+    )
+        .fetch_one(ex)
+        .await?;
+    Ok(
+        SquadOvCommunity{
+            id: x.id,
+            name: x.name,
+            slug: x.slug,
+            create_tm: x.create_tm,
+            creator_user_id: x.creator_user_id,
+            security_level: CommunitySecurityLevel::try_from(x.security_level)?,
+            requires_subscription: x.requires_subscription,
+            allow_twitch_sub: x.allow_twitch_sub,
+        }
+    )
+}
+
 pub async fn get_community_from_id<'a, T>(ex: T, id: i64) -> Result<SquadOvCommunity, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>

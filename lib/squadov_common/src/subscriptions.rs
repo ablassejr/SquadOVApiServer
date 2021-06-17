@@ -31,3 +31,24 @@ where
             .await?
     )
 }
+
+pub async fn get_u2u_subscription_from_user_ids<'a, T>(ex: T, src_user_id: i64, dest_user_id: i64) -> Result<Vec<User2UserSubscription>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            User2UserSubscription,
+            "
+            SELECT *
+            FROM squadov.user_to_user_subscriptions
+            WHERE source_user_id = $1
+                AND dest_user_id = $2
+            ",
+            src_user_id,
+            dest_user_id,
+        )
+            .fetch_all(ex)
+            .await?
+    )
+}
