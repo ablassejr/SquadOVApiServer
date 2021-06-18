@@ -51,6 +51,8 @@ pub struct WowListQuery {
     dungeons: Option<Vec<i32>>,
     arenas: Option<Vec<i32>>,
     brackets: Option<Vec<String>>,
+    // If not set, wins + losses. If true, only wins. If false, only losses.
+    is_winner: Option<bool>,
 }
 
 impl api::ApiApplication {
@@ -114,6 +116,7 @@ impl api::ApiApplication {
                 AND (CARDINALITY($6::INTEGER[]) = 0 OR wav.encounter_id = ANY($6))
                 AND (NOT $7::BOOLEAN OR v.video_uuid IS NOT NULL)
                 AND ($2 = $8 OR sau.match_uuid IS NOT NULL)
+                AND ($9::BOOLEAN IS NULL OR wav.success = $9)
             ORDER BY wmv.start_tm DESC, wmv.match_uuid, u.uuid
             LIMIT $3 OFFSET $4
             "#,
@@ -125,6 +128,7 @@ impl api::ApiApplication {
             &filters.encounters.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
             filters.has_vod.unwrap_or(false),
             req_user_id,
+            filters.is_winner,
         )
             .fetch_all(&*self.heavy_pool)
             .await?
@@ -209,6 +213,7 @@ impl api::ApiApplication {
                 AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))
                 AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
                 AND ($2 = $7 OR sau.match_uuid IS NOT NULL)
+                AND ($8::BOOLEAN IS NULL OR wav.success = $8)
             ORDER BY wmv.start_tm DESC, wmv.match_uuid, u.uuid
             LIMIT $3 OFFSET $4
             "#,
@@ -219,6 +224,7 @@ impl api::ApiApplication {
             &filters.dungeons.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
             filters.has_vod.unwrap_or(false),
             req_user_id,
+            filters.is_winner,
         )
             .fetch_all(&*self.heavy_pool)
             .await?
@@ -287,6 +293,8 @@ impl api::ApiApplication {
                 ON wav.view_id = wmv.id
             INNER JOIN squadov.wow_match_view_character_presence AS wcp
                 ON wcp.view_id = wmv.id
+            INNER JOIN squadov.wow_match_view_combatants AS mvc
+                ON mvc.character_id = wcp.character_id
             INNER JOIN squadov.users AS u
                 ON u.id = wmv.user_id
             LEFT JOIN squadov.vods AS v
@@ -303,6 +311,7 @@ impl api::ApiApplication {
                 AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
                 AND ($2 = $7 OR sau.match_uuid IS NOT NULL)
                 AND (CARDINALITY($8::VARCHAR[]) = 0 OR wav.arena_type = ANY($8))
+                AND ($9::BOOLEAN IS NULL OR ((wav.winning_team_id = mvc.team) = $9))
             ORDER BY wmv.start_tm DESC, wmv.match_uuid, u.uuid
             LIMIT $3 OFFSET $4
             "#,
@@ -314,6 +323,7 @@ impl api::ApiApplication {
             filters.has_vod.unwrap_or(false),
             req_user_id,
             &filters.brackets.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<String>>(),
+            filters.is_winner,
         )
             .fetch_all(&*self.heavy_pool)
             .await?
