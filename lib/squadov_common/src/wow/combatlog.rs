@@ -1842,6 +1842,7 @@ mod tests {
         let t1 = RawWoWCombatLogPayload{
             timestamp: Utc::now(),
             parts: vec![String::from("Test"), String::from("1")],
+            raw_log: None,
             log_line: 1,
             version: 2,
         };
@@ -1850,6 +1851,7 @@ mod tests {
         let t2 = RawWoWCombatLogPayload{
             timestamp: Utc::now(),
             parts: vec![String::from("SQUADOV_END_COMBAT_LOG")],
+            raw_log: None,
             log_line: 1,
             version: 2,
         };
@@ -1863,7 +1865,7 @@ mod tests {
         struct TestDatum {
             input: &'static str,
             output: Vec<&'static str>,
-        };
+        }
 
         let test_data = vec![
             TestDatum{
@@ -1914,6 +1916,17 @@ mod tests {
                     "0",
                     "0",
                     "0"
+                ]
+            },
+            TestDatum{
+                input: r#"ENCOUNTER_START,2382,"Amarth, The Harvester",23,5,2289"#,
+                output: vec![
+                    "ENCOUNTER_START",
+                    "2382",
+                    "Amarth, The Harvester",
+                    "23",
+                    "5",
+                    "2289"
                 ]
             }
         ];
