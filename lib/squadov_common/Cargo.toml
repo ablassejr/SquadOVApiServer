@@ -44,7 +44,7 @@ futures-util = "0.3.8"
 prost = "0.7.0"
 crossbeam = "0.8.0"
 bytes = "0.6.0"
-rdkafka = { version = "0.24", features = ["cmake-build", "ssl"] }
+rdkafka = { version = "0.24", features = ["cmake-build", "ssl", "libz-static"] }
 chashmap = { git = "https://gitlab.redox-os.org/redox-os/chashmap.git" }
 unicode-segmentation = "1.7.1"
 env_logger = "0.7.1"
