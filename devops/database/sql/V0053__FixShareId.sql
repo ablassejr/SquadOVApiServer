@@ -3,7 +3,7 @@ CREATE SEQUENCE share_match_vod_connections_id_seq OWNED BY share_match_vod_conn
 ALTER TABLE share_match_vod_connections
 ALTER COLUMN id SET DEFAULT nextval('share_match_vod_connections_id_seq');
 
-SELECT setval('share_match_vod_connections_id_seq', COALESCE(MAX(id), 0)) FROM share_match_vod_connections;
+SELECT setval('share_match_vod_connections_id_seq', COALESCE(MAX(id), 1)) FROM share_match_vod_connections;
 
 UPDATE share_match_vod_connections
 SET id = nextval('share_match_vod_connections_id_seq')

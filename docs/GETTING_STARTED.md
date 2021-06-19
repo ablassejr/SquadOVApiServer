@@ -1,13 +1,18 @@
 # Getting Started
 
+This tutorial assumes you've setup your machine and installed the pre-requisites for making the SquadOV client as well.
+
 ## Prerequisites
 
 From here on out, the `SquadOVApiServer` folder will be referred to as `$SRC`.
 
 * Install [Docker](https://docs.docker.com/docker-for-windows/wsl/).
 * Install [Docker Compose](https://docs.docker.com/compose/install/) (follow the instructions for Linux).
+* Install [Rust](https://www.rust-lang.org/tools/install).
 
-Other, you will need to install additional dependencies in the `deps` folder.
+After installing Rust, run `rustup default 1.51.0`.
+
+You will also need to install additional dependencies in the `deps` folder.
 
 1. `cd $SRC/deps`
 2. `.\pull_deps.ps1`
@@ -22,6 +27,7 @@ Other, you will need to install additional dependencies in the `deps` folder.
    1. `fusionauth.host` to `http://127.0.0.1`
    2. `database.url` to `postgresql://postgres:password@127.0.0.1/squadov`
    3. `cors.domain` to `http://localhost:3000`
+4. Copy the appropriate GCS access key into the file `devops\gcp\dev.json`.
 
 ### Set up FusionAuth
 
@@ -39,37 +45,52 @@ Other, you will need to install additional dependencies in the `deps` folder.
 
     Hit save.
 6. Set `FUSIONAUTH_CLIENT_ID` and `FUSIONAUTH_CLIENT_SECRET` in `$SRC/devops/env/dev_vars.json` to your application's client ID and client secret respectively.
-7. Setup a FusionAuth API key.
+7. Set `fusionauth.application_id` in `$SRC\config\config.toml` to your application's client ID.
+8. Set `fusionauth.tenant_id`in `$SRC\config\config.toml` and `FUSIONAUTH_TENANT_ID` in `$SRC/devops/env/dev_vars.json` to the Default tenant ID.
+9. Setup a FusionAuth API key.
 
     Copy the key and modify `FUSIONAUTH_API_KEY` in `$SRC/devops/docker/dev_env.sh` to the key value.
     TODO: Determine minimal set of endpoint permissions.
-8. Setup an SMTP server.
+10. Setup an SMTP server.
 
     Under General, set:
     * Issuer: squadov.gg
 
     Under Email, set:
 
-    * Host: smtp.sendgrid.net
+    * Host: smtp.postmarkapp.com
     * Port: 587
     * Security: TLS
-    * Username: apikey
-    * Password: Sendgrid API key
+    * Username: Postmark API token
+    * Password: Postmark API token
     * Verify Email: TRUE
     * Verify email when changed: TRUE
     * Verification template: Email Verification
-    * Delete unverified users: TRUE
-9. Set FusionAuth's `api_key`, `tenant_id`, and `application_id` in `$SRC/config/config.toml` to the appropriate value.
 
 ### Setup PostgreSQL
 
 1. `cd $SRC/devops/database`
-2. `.\migrate.ps1`
+2. `.\migrate.ps1 migrate`
 
 ### Build and Run
 
+There's a couple of environment variables that need to be set:
+* `SQUADOV_VOD_ROOT`: `gs:/${GCS_BUCKET}`, which is the bucket to store VODs in.
+* `SQUADAOV_BLOB_BUCKET`: GCS bucket to store binary blobs in.
+* `FFMPEG_BINARY_PATH`: Binary path to a pre-built FFmpeg.
+
 1. `cd $SRC`
-2. `cargo install sqlx-cli --no-default-features --features postgres --version 0.1.0-beta.1`
-3. `cargo sqlx prepare`
-4. `cargo build`
-5. `cargo run -- --config .\config\config.toml`
+2. `$env:CMAKE_TOOLCHAIN_FILE="$VCPKG\scripts\buildsystems\vcpkg.cmake"; cargo build --bin squadov_api_server`
+
+In the off-chance SQLx complains about `gen_random_uuid` not being defined you will have to re-create the `pgcrypto` extension in the PostgreSQL database:
+
+```
+DROP EXTENSION pgcrypto CASCADE;
+CREATE EXTENSION pgcrypto;
+
+ALTER TABLE squadov.users
+ALTER COLUMN uuid SET DEFAULT gen_random_uuid();
+
+ALTER TABLE squadov.squad_membership_invites
+ALTER COLUMN invite_uuid SET DEFAULT gen_random_uuid();
+```
