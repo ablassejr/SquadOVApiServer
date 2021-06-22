@@ -53,6 +53,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 .service(
                     web::scope("/oauth")
                         .route("/riot", web::post().to(v1::handle_riot_oauth_callback_handler))
+                        .route("/twitch", web::post().to(v1::handle_twitch_oauth_callback_handler))
                 )
                 .service(
                     // These are the only two endpoints where the user needs to provide a valid session to use.
@@ -180,6 +181,18 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route("", web::get().to(auth::check_2fa_status_handler))
                                         .route("", web::delete().to(auth::remove_2fa_handler))
                                         .route("", web::post().to(auth::enable_2fa_handler))
+                                )
+                                .service(
+                                    web::scope("/accounts")
+                                        .route("", web::get().to(v1::get_all_my_linked_accounts_handler))
+                                        .service(
+                                            web::scope("/twitch")
+                                                .route("", web::get().to(v1::get_my_linked_twitch_account_handler))
+                                        )
+                                )
+                                .service(
+                                    web::scope("/oauth")
+                                        .route("/twitch", web::get().to(v1::get_twitch_login_url_handler))
                                 )
                         )
                         .service(

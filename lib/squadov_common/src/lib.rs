@@ -37,6 +37,8 @@ pub mod share;
 pub mod community;
 pub mod subscriptions;
 pub mod user;
+pub mod accounts;
+pub mod twitch;
 
 pub use error::*;
 pub use parse::*;

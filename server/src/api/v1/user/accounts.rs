@@ -1,16 +1,29 @@
 mod riot;
+mod twitch;
 
 pub use riot::*;
+pub use twitch::*;
 
+use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
-use crate::api::auth::{SquadOVUser, SquadOVUserHandle};
+use crate::api::auth::{SquadOVUser, SquadOVUserHandle, SquadOVSession};
 use squadov_common::{
     SquadOvError,
     EmailTemplate, EmailUser,
+    accounts::{
+        twitch as twitch_acc,
+        TwitchAccount,
+    },
+    riot::{
+        RiotAccount,
+        db as riotdb,
+    }
 };
 use uuid::Uuid;
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
+use serde::Serialize;
+use std::sync::Arc;
 
 impl api::ApiApplication {
     pub async fn get_user_handles(&self, ids: &[i64]) -> Result<Vec<SquadOVUserHandle>, SquadOvError> {
@@ -103,4 +116,19 @@ impl api::ApiApplication {
             .await?;
         Ok(())
     }
+}
+
+#[derive(Serialize)]
+struct AllAccountsResponse {
+    riot: Vec<RiotAccount>,
+    twitch: Vec<TwitchAccount>,
+}
+
+pub async fn get_all_my_linked_accounts_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    Ok(HttpResponse::Ok().json(AllAccountsResponse{
+        riot: riotdb::list_riot_accounts_for_user(&*app.pool, session.user.id).await?,
+        twitch: twitch_acc::find_twitch_accounts_for_user(&*app.pool, session.user.id).await?,
+    }))
 }
