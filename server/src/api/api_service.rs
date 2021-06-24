@@ -94,6 +94,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("/download", web::get().to(v1::public_landing_download_handler))
                 )
                 .service(
+                    web::scope("/flags")
+                        .route("", web::get().to(v1::get_global_app_flags_handler))
+                )
+                .service(
                     web::scope("/community/slug/{community_slug}")
                         .route("", web::get().to(v1::get_community_slug_handler))
                 )

@@ -24,6 +24,40 @@ impl Default for FeatureFlags {
     }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlobalFlags {
+    disable_registration: bool,
+}
+
+impl Default for GlobalFlags {
+    fn default() -> Self {
+        Self {
+            disable_registration: false,
+        }
+    }
+}
+
+impl api::ApiApplication {
+    pub async fn get_global_app_flags(&self) -> Result<GlobalFlags, SquadOvError> {
+        let kvp_flags = sqlx::query!("
+            SELECT *
+            FROM squadov.global_app_flags
+        ")
+            .fetch_all(&*self.pool)
+            .await?;
+
+        let mut flags = GlobalFlags::default();
+        for kvp in kvp_flags {
+            match kvp.fkey.to_lowercase().as_str() {
+                "disable_registration" => flags.disable_registration = kvp.fvalue.parse::<bool>()?,
+                _ => (),
+            };
+        }
+        Ok(flags)
+    }
+}
+
 pub async fn get_user_feature_flags_handler(app : web::Data<Arc<api::ApiApplication>>, data : web::Path<super::UserResourcePath>) -> Result<HttpResponse, SquadOvError> {
     let flags = sqlx::query_as!(
         FeatureFlags,
@@ -45,4 +79,8 @@ pub async fn get_user_feature_flags_handler(app : web::Data<Arc<api::ApiApplicat
             ..FeatureFlags::default()
         }))
     }
+}
+
+pub async fn get_global_app_flags_handler(app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
+    Ok(HttpResponse::Ok().json(app.get_global_app_flags().await?))
 }
