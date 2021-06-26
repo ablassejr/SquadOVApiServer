@@ -75,7 +75,7 @@ pub async fn handle_riot_oauth_callback_handler(app : web::Data<Arc<api::ApiAppl
     // We can then use this access token to get account information.
     // TODO: When we have production key access for LoL/TFT we need to use this account information to summoner name info too.
     let access_token = squadov_common::riot::rso::exchange_authorization_code_for_access_token(&app.config.riot.rso_client_id, &app.config.riot.rso_client_secret, &data.code).await?;
-    app.rso_itf.request_riot_account_from_access_token(&access_token.access_token, &access_token.refresh_token, Utc::now() + Duration::seconds(access_token.expires_in.into()), session.user.id).await?;
+    app.rso_itf.obtain_riot_account_from_access_token(&access_token.access_token, &access_token.refresh_token, &(Utc::now() + Duration::seconds(access_token.expires_in.into())), session.user.id).await?;
     app.session.delete_session(&session_id, &*app.pool).await?;
     Ok(HttpResponse::Ok().finish())
 }
