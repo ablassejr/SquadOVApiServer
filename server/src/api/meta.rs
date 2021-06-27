@@ -67,7 +67,7 @@ impl api::ApiApplication {
     pub async fn get_share_meta_data(&self, share_token: &str, max_width: Option<i32>, max_height: Option<i32>) -> Result<MetaData, SquadOvError> {
         let mut metadata = MetaData::default();
 
-        let token = squadov_common::access::find_encrypted_access_token_from_flexible_id(&*self.pool, &share_token).await?;
+        let token = squadov_common::access::find_encrypted_access_token_from_flexible_id(&*self.pool, share_token).await?;
         let req = squadov_decrypt(token, &self.config.squadov.share_key)?;
 
         let access = serde_json::from_slice::<AccessTokenRequest>(&req.data)?;
@@ -171,42 +171,44 @@ impl api::ApiApplication {
 
         if let Some(video_uuid) = &access.video_uuid {
             let vod_metadata_map = self.get_vod_quality_options(&[video_uuid.clone()]).await?;
-            let vod_metadata = vod_metadata_map.get(&video_uuid).ok_or(SquadOvError::NotFound)?.first().ok_or(SquadOvError::NotFound)?;
-
-            if vod_metadata.has_fastify {
-                metadata.meta_has_video = true;
-                metadata.oembed_type = String::from("video");
-                metadata.twitter_card = String::from("player");
-                metadata.og_type = String::from("video.other");
-
-                let aspect_ratio = (vod_metadata.res_x as f32) / (vod_metadata.res_y as f32);
-                let mut video_height: i32 = max_height.unwrap_or(300);
-                let mut video_width: i32 = (video_height as f32 * aspect_ratio).floor() as i32;
-
-                if let Some(maxwidth) = max_width {
-                    if video_width > maxwidth {
-                        video_width = maxwidth;
-                        video_height = (video_width as f32 / aspect_ratio).floor() as i32;
+            if let Some(vmm) = vod_metadata_map.get(&video_uuid) {
+                if let Some(vod_metadata) = vmm.first() {
+                    if vod_metadata.has_fastify {
+                        metadata.meta_has_video = true;
+                        metadata.oembed_type = String::from("video");
+                        metadata.twitter_card = String::from("player");
+                        metadata.og_type = String::from("video.other");
+        
+                        let aspect_ratio = (vod_metadata.res_x as f32) / (vod_metadata.res_y as f32);
+                        let mut video_height: i32 = max_height.unwrap_or(300);
+                        let mut video_width: i32 = (video_height as f32 * aspect_ratio).floor() as i32;
+        
+                        if let Some(maxwidth) = max_width {
+                            if video_width > maxwidth {
+                                video_width = maxwidth;
+                                video_height = (video_width as f32 / aspect_ratio).floor() as i32;
+                            }
+                        }
+                        
+                        metadata.meta_video_width = Some(video_width);
+                        metadata.meta_video_height = Some(video_height);
+                        // A shared video is by definition public.
+                        metadata.meta_video = Some(self.vod.get_public_segment_redirect_uri(&VodSegmentId{
+                            video_uuid: video_uuid.clone(),
+                            quality: String::from("source"),
+                            segment_name: String::from("fastify.mp4"),
+                        }).await?);
+                        metadata.meta_player = Some(
+                            format!(
+                                "{host}/player/{video_uuid}?share={share_token}",
+                                host=&self.config.squadov.app_url,
+                                video_uuid=&video_uuid,
+                                share_token=&share_token,
+                            ),
+                        );
+                        metadata.meta_video_type = Some(String::from("video/mp4"));
                     }
                 }
-                
-                metadata.meta_video_width = Some(video_width);
-                metadata.meta_video_height = Some(video_height);
-                // A shared video is by definition public.
-                metadata.meta_video = Some(self.vod.get_public_segment_redirect_uri(&VodSegmentId{
-                    video_uuid: video_uuid.clone(),
-                    quality: String::from("source"),
-                    segment_name: String::from("fastify.mp4"),
-                }).await?);
-                metadata.meta_player = Some(
-                    format!(
-                        "{host}/player/{video_uuid}?share={share_token}",
-                        host=&self.config.squadov.app_url,
-                        video_uuid=&video_uuid,
-                        share_token=&share_token,
-                    ),
-                );
-                metadata.meta_video_type = Some(String::from("video/mp4"));
             }
         }
         Ok(metadata)

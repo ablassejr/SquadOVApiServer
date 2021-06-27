@@ -4,8 +4,6 @@ extern crate lazy_static;
 #[macro_use]
 extern crate nom;
 
-extern crate names;
-
 pub mod error;
 pub mod parse;
 pub mod hal;

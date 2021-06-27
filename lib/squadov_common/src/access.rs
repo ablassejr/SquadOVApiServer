@@ -6,7 +6,6 @@ use crate::{
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use sqlx::{Transaction, Executor, Postgres};
-use names::{Generator, Name};
 use convert_case::{Case, Casing};
 
 #[derive(Serialize,Deserialize,Debug,Clone)]
@@ -167,11 +166,17 @@ pub async fn generate_friendly_share_token(tx: &mut Transaction<'_, Postgres>, i
     // Try to generate a friendly share token within a few iterations.
     // If it doesn't work then say fuck it and move on. This is for
     // aesthetics and doesn't matter that much.
-    let mut generator = Generator::with_naming(Name::Plain);
-
+    let w1 = eff_wordlist::large::random_word();
+    let w2 = eff_wordlist::large::random_word();
+    let w3 = eff_wordlist::short::random_word();
     let id_str = String::from(id.to_hyphenated().to_string().split("-").collect::<Vec<&str>>()[0]);
+
     for _i in 0i32..5 {
-        let nm = format!("{}-{}", generator.next().ok_or(SquadOvError::BadRequest)?.to_case(Case::Pascal), id_str);
+        let nm = format!(
+            "{}-{}",
+            format!("{}-{}-{}", w1, w2, w3).to_case(Case::Pascal),
+            id_str
+        );
         match sqlx::query!(
             "
             UPDATE squadov.share_tokens
