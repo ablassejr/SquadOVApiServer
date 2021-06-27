@@ -54,6 +54,8 @@ nom = "6"
 funty = "=1.1.0"
 bitvec = "0.19.4"
 bzip2 = "0.4"
+names = "0.10.0"
+convert_case = "0.4.0"
 
 [build-dependencies]
 prost-build = "0.7.0"

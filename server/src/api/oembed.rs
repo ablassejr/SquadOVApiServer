@@ -6,7 +6,6 @@ use actix_web::{web, HttpResponse};
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use url::Url;
-use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct OEmbedParams {
@@ -73,13 +72,13 @@ pub async fn oembed_handler(app : web::Data<Arc<api::ApiApplication>>, params: w
     // ${APP_URL}/share/${SHARE_TOKEN}.
     let share_token = {
         if let Some(path_split) = url.path_segments() {
-            let mut token: Option<Uuid> = None;
+            let mut token: Option<String> = None;
             let mut found_token_indicator = false;
             for x in path_split {
                 if x == "share" {
                     found_token_indicator = true;
                 } else if found_token_indicator {
-                    token = Some(Uuid::parse_str(x)?);
+                    token = Some(String::from(x));
                     break;
                 }
             }

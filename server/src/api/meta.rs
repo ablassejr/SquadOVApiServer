@@ -12,11 +12,10 @@ use crate::api::v1::RecentMatchHandle;
 use actix_web::{web, HttpResponse};
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
-use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct MetaParams {
-    share: Uuid,
+    share: String,
 }
 
 #[derive(Serialize)]
@@ -65,10 +64,10 @@ impl Default for MetaData  {
 }
 
 impl api::ApiApplication {
-    pub async fn get_share_meta_data(&self, share_token: &Uuid, max_width: Option<i32>, max_height: Option<i32>) -> Result<MetaData, SquadOvError> {
+    pub async fn get_share_meta_data(&self, share_token: &str, max_width: Option<i32>, max_height: Option<i32>) -> Result<MetaData, SquadOvError> {
         let mut metadata = MetaData::default();
 
-        let token = squadov_common::access::find_encrypted_access_token_from_id(&*self.pool, &share_token).await?;
+        let token = squadov_common::access::find_encrypted_access_token_from_flexible_id(&*self.pool, &share_token).await?;
         let req = squadov_decrypt(token, &self.config.squadov.share_key)?;
 
         let access = serde_json::from_slice::<AccessTokenRequest>(&req.data)?;

@@ -535,13 +535,15 @@ pub async fn get_match_share_link_handler(app : web::Data<Arc<api::ApiApplicatio
         HttpResponse::Ok().json(
             LinkShareData{
                 is_link_shared: token.is_some(),
-                share_url: token.map(|x| {
-                    format!(
+                share_url: if let Some(token) = token {
+                    Some(format!(
                         "{}/share/{}",
                         &app.config.cors.domain,
-                        &x,
-                    )
-                }),
+                        &squadov_common::access::get_share_url_identifier_for_id(&*app.pool, &token).await?,
+                    ))
+                } else {
+                    None
+                },
             }
         )
     )
@@ -615,6 +617,7 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
         // This way we get a (relatively) shorter URL instead of a giant encrypted blob.
         let mut tx = app.pool.begin().await?;
         let token_id = squadov_common::access::store_encrypted_access_token_for_match_user(&mut tx, &path.match_uuid, session.user.id, &encryption_token).await?;
+        squadov_common::access::generate_friendly_share_token(&mut tx, &token_id).await?;
         tx.commit().await?;
 
         token = Some(token_id);
@@ -640,7 +643,7 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
                     format!(
                         "{}/share/{}",
                         &app.config.cors.domain,
-                        &token,
+                        &squadov_common::access::get_share_url_identifier_for_id(&*app.pool, &token).await?,
                     )
                 ),
             }
@@ -694,7 +697,7 @@ pub async fn remove_favorite_match_handler(app : web::Data<Arc<api::ApiApplicati
 
 #[derive(Deserialize,Debug)]
 pub struct ExchangeShareTokenPath {
-    access_token_id: Uuid
+    access_token_id: String
 }
 
 #[derive(Serialize)]
@@ -706,7 +709,7 @@ pub struct ShareTokenResponse {
 }
 
 pub async fn exchange_access_token_id_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<ExchangeShareTokenPath>) -> Result<HttpResponse, SquadOvError> {
-    let token = squadov_common::access::find_encrypted_access_token_from_id(&*app.pool, &path.access_token_id).await?;
+    let token = squadov_common::access::find_encrypted_access_token_from_flexible_id(&*app.pool, &path.access_token_id).await?;
     let key = token.to_string();
     let req = squadov_decrypt(token, &app.config.squadov.share_key)?;
 

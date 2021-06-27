@@ -60,13 +60,15 @@ pub async fn get_clip_share_signature_handler(app : web::Data<Arc<api::ApiApplic
         HttpResponse::Ok().json(
             LinkShareData{
                 is_link_shared: token.is_some(),
-                share_url: token.map(|x| {
-                    format!(
+                share_url: if let Some(token) = token {
+                    Some(format!(
                         "{}/share/{}",
                         &app.config.cors.domain,
-                        &x,
-                    )
-                }),
+                        &squadov_common::access::get_share_url_identifier_for_id(&*app.pool, &token).await?,
+                    ))
+                } else {
+                    None
+                },
             }
         )
     )
@@ -130,6 +132,7 @@ pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApp
         // This way we get a (relatively) shorter URL instead of a giant encrypted blob.
         let mut tx = app.pool.begin().await?;
         let token_id = squadov_common::access::store_encrypted_access_token_for_clip_user(&mut tx, &path.clip_uuid, session.user.id, &encryption_token).await?;
+        squadov_common::access::generate_friendly_share_token(&mut tx, &token_id).await?;
         tx.commit().await?;
 
         token = Some(token_id);
@@ -153,7 +156,7 @@ pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApp
                     format!(
                         "{}/share/{}",
                         &app.config.cors.domain,
-                        &token,
+                        &squadov_common::access::get_share_url_identifier_for_id(&*app.pool, &token).await?,
                     )
                 ),
             }
