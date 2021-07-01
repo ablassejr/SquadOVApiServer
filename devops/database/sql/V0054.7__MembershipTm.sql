@@ -1,0 +1,2 @@
+ALTER TABLE community_membership
+ADD COLUMN join_tm TIMESTAMPTZ NOT NULL;

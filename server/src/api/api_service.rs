@@ -53,6 +53,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 .service(
                     web::scope("/oauth")
                         .route("/riot", web::post().to(v1::handle_riot_oauth_callback_handler))
+                        .route("/twitch", web::post().to(v1::handle_twitch_oauth_callback_handler))
                 )
                 .service(
                     // These are the only two endpoints where the user needs to provide a valid session to use.
@@ -91,6 +92,14 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                     web::scope("/landing")
                         .route("/visit", web::get().to(v1::public_landing_visit_handler))
                         .route("/download", web::get().to(v1::public_landing_download_handler))
+                )
+                .service(
+                    web::scope("/flags")
+                        .route("", web::get().to(v1::get_global_app_flags_handler))
+                )
+                .service(
+                    web::scope("/community/slug/{community_slug}")
+                        .route("", web::get().to(v1::get_community_slug_handler))
                 )
         )
         .service(
@@ -176,6 +185,18 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route("", web::get().to(auth::check_2fa_status_handler))
                                         .route("", web::delete().to(auth::remove_2fa_handler))
                                         .route("", web::post().to(auth::enable_2fa_handler))
+                                )
+                                .service(
+                                    web::scope("/accounts")
+                                        .route("", web::get().to(v1::get_all_my_linked_accounts_handler))
+                                        .service(
+                                            web::scope("/twitch")
+                                                .route("", web::get().to(v1::get_my_linked_twitch_account_handler))
+                                        )
+                                )
+                                .service(
+                                    web::scope("/oauth")
+                                        .route("/twitch", web::get().to(v1::get_twitch_login_url_handler))
                                 )
                         )
                         .service(
@@ -899,6 +920,112 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                             web::scope("/membership")
                                                 .route("/{user_id}", web::get().to(v1::get_squad_user_membership_handler))
                                                 .route("", web::get().to(v1::get_all_squad_user_memberships_handler))
+                                        )
+                                )
+                        )
+                )
+                .service(
+                    web::scope("/community")
+                        .wrap(access::ApiAccess::new(
+                            Box::new(access::DenyShareTokenAccess{}),
+                        ))
+                        .route("", web::post().to(v1::create_community_handler))
+                        .route("", web::get().to(v1::list_communities_handler))
+                        .service(
+                            web::scope("/slug/{community_slug}")
+                                .route("/role", web::get().to(v1::get_community_role_handler))
+                                .route("/sub", web::get().to(v1::get_community_sub_handler))
+                        )
+                        .service(
+                            web::scope("/id/{community_id}")
+                                .route("", web::get().to(v1::get_community_handler))
+                                .route("/join", web::post().to(v1::join_community_handler))
+                                .route("/leave", web::post().to(v1::leave_community_handler))
+                                .service(
+                                    web::scope("/owner")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::CommunityAccessChecker{
+                                                obtainer: access::CommunityIdPathSetObtainer{
+                                                    key: "community_id"
+                                                },
+                                                is_owner: true,
+                                                can_manage: false,
+                                                can_moderate: false,
+                                                can_invite: false,
+                                                can_share: false,
+                                            }),
+                                        ))
+                                        .route("", web::delete().to(v1::delete_community_handler))
+                                        .route("", web::post().to(v1::edit_community_handler))
+                                )
+                                .service(
+                                    web::scope("/manage")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::CommunityAccessChecker{
+                                                obtainer: access::CommunityIdPathSetObtainer{
+                                                    key: "community_id"
+                                                },
+                                                is_owner: false,
+                                                can_manage: true,
+                                                can_moderate: false,
+                                                can_invite: false,
+                                                can_share: false,
+                                            }),
+                                        ))
+                                        .service(
+                                            web::scope("/users")
+                                                .route("", web::get().to(v1::list_users_in_community_handler))
+                                                .service(
+                                                    web::scope("/{user_id}")
+                                                        .route("", web::delete().to(v1::remove_user_from_community_handler))
+                                                        .route("", web::post().to(v1::edit_user_in_community_handler))
+                                                )
+                                        )
+                                        .service(
+                                            web::scope("/roles")
+                                                .route("", web::get().to(v1::list_roles_in_community_handler))
+                                                .route("", web::post().to(v1::create_role_in_community_handler))
+                                                .service(
+                                                    web::scope("/{role_id}")
+                                                        .route("", web::delete().to(v1::remove_role_from_community_handler))
+                                                        .route("", web::post().to(v1::edit_role_in_community_handler))
+                                                )
+                                        )
+                                )
+                                .service(
+                                    web::scope("/moderate")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::CommunityAccessChecker{
+                                                obtainer: access::CommunityIdPathSetObtainer{
+                                                    key: "community_id"
+                                                },
+                                                is_owner: false,
+                                                can_manage: false,
+                                                can_moderate: true,
+                                                can_invite: false,
+                                                can_share: false,
+                                            }),
+                                        ))
+                                )
+                                .service(
+                                    web::scope("/invite")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::CommunityAccessChecker{
+                                                obtainer: access::CommunityIdPathSetObtainer{
+                                                    key: "community_id"
+                                                },
+                                                is_owner: false,
+                                                can_manage: false,
+                                                can_moderate: false,
+                                                can_invite: true,
+                                                can_share: false,
+                                            }),
+                                        ))
+                                        .route("", web::post().to(v1::create_community_invite_handler))
+                                        .route("", web::get().to(v1::get_community_invites_handler))
+                                        .service(
+                                            web::scope("/{code}")
+                                                .route("", web::delete().to(v1::delete_community_invite_handler))
                                         )
                                 )
                         )

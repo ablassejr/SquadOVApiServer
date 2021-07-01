@@ -46,6 +46,8 @@
 	"AWS_ACCESS_KEY_ID": "ENC[AES256_GCM,data:2JDfgEWXy2u/V+UoT4VSQ06E/48=,iv:iduAmQZM6rmPbJajRYdrBZFiQRO3ZsNu38FHmsA3J/I=,tag:uE5qh8EWSJt9nNPbSg/WeQ==,type:str]",
 	"AWS_SECRET_ACCESS_KEY": "ENC[AES256_GCM,data:HvFfzlUWfOu2drJ0nxnnQoF/eRIxHLpi5/lFVJVElw3dpEfxJcFhhQ==,iv:S+duHcLwhCicfdtThHabujI4tO7+TbAKuN7c0aX5YJo=,tag:dUFtY4cX0r4Of21ywWlQyQ==,type:str]",
 	"STEAM_API_KEY": "ENC[AES256_GCM,data:Mr/REdXPUJIfeH7ww9qnMNSMYIrBf3ybd0ZkqwGb67Y=,iv:YEuQOFVaNViiwFVfb6iv7FKc9OWHiB5JidN3J2osuz4=,tag:ZZay+ibfrjrZXKItPhj2Zg==,type:str]",
+	"TWITCH_CLIENT_ID": "ENC[AES256_GCM,data:l909F5agDq91WeXsvc2vo+AYrL4C3/tsBkOEY7AB,iv:RAbKpd2xyJzIJHWSLa6SBdIIadzOlxNjToa1Qg9RqpE=,tag:zdCng6BBraVin5EFElGsWA==,type:str]",
+	"TWITCH_CLIENT_SECRET": "ENC[AES256_GCM,data:U3gavoFXCw+X/usa6BqiE6M5OEAXUW62ZSvWk7xR,iv:3AjaxnqB5CNJjW5uAhhAIPVyzOWamvXEKetZxwad9CE=,tag:WMAx/VVvX2jokSxUpU2iJA==,type:str]",
 	"sops": {
 		"kms": null,
 		"gcp_kms": [
@@ -57,8 +59,8 @@
 		],
 		"azure_kv": null,
 		"hc_vault": null,
-		"lastmodified": "2021-05-06T16:50:26Z",
-		"mac": "ENC[AES256_GCM,data:TVKGuS2883RamnskaRbUUi9+fgbyBh/rKxlrd/m4qwxe5lWsVIQBVczHrTEMNrFzH36SqIWASPDmpRip2DcBVHS7PBcBRA0O9D+Kq+lSOqC44w1j2PWJJBrWLFGFvQQ+xRgO5fkE0CURphzFe2aC9NhnMq2eZo5E09vepEcrH5I=,iv:cmyxauTYDNEecsqnJ/PAWIcq9APMyBOsG9ZaHD/lTc0=,tag:Ze0r3ayfvn0+zVRlPIwVzg==,type:str]",
+		"lastmodified": "2021-06-21T20:36:40Z",
+		"mac": "ENC[AES256_GCM,data:ePrMmeeAZMfhR9OrSQ/4CXmgObrI7aOOaV9M1G8MCkYpPUY5DsGP3bCNlXaYK7gSA/lqTB5xmTLU5Io+IsvjTETs3HF7+Emt2dK81FTe5jccH7y6snbzSgbExj4C+CeJH/0ylf0APJeHE8Wa5jHXzMQPJKY9Ch0KnvrgxeTbIi8=,iv:vAPxPpysB1AuYwLwsuaR42PXseKQYNIv2u2IEiboklI=,tag:1D3usvBmCpT3uTf6lsDyzw==,type:str]",
 		"pgp": null,
 		"unencrypted_suffix": "_unencrypted",
 		"version": "3.6.1"

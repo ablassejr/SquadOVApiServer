@@ -246,3 +246,9 @@ impl From<std::string::FromUtf8Error> for SquadOvError {
         return Self::InternalError(format!("From utf8 {:?}", err))
     }
 }
+
+impl From<std::str::ParseBoolError> for SquadOvError {
+    fn from(err: std::str::ParseBoolError) -> Self {
+        return Self::InternalError(format!("Parse Bool {:?}", err))
+    }
+}

@@ -1,0 +1,1 @@
+CREATE INDEX ON community_membership(user_id);

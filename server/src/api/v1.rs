@@ -15,6 +15,7 @@ mod features;
 mod analytics;
 mod csgo;
 mod share;
+mod community;
 
 pub use user::*;
 pub use matches::*;
@@ -33,6 +34,7 @@ pub use features::*;
 pub use analytics::*;
 pub use csgo::*;
 pub use share::*;
+pub use community::*;
 
 use serde::Serialize;
 

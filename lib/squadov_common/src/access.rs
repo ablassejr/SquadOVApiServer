@@ -5,7 +5,8 @@ use crate::{
 };
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
-use sqlx::{Executor, Postgres};
+use sqlx::{Transaction, Executor, Postgres};
+use convert_case::{Case, Casing};
 
 #[derive(Serialize,Deserialize,Debug,Clone)]
 #[serde(rename_all="camelCase")]
@@ -119,6 +120,85 @@ where
     )
 }
 
+pub async fn find_encrypted_access_token_from_flexible_id<'a, T>(ex: T, id: &str) -> Result<AESEncryptToken, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            AESEncryptToken,
+            r#"
+            SELECT
+                encrypted_token AS "data",
+                iv,
+                aad,
+                tag
+            FROM squadov.share_tokens
+            WHERE id::VARCHAR = $1 OR friendly_name = $1
+            "#,
+            id,
+        )
+            .fetch_one(ex)
+            .await?
+    )
+}
+
+pub async fn get_share_url_identifier_for_id<'a, T>(ex: T, id: &Uuid) -> Result<String, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            r#"
+            SELECT COALESCE(friendly_name, id::VARCHAR) AS "id!"
+            FROM squadov.share_tokens
+            WHERE id = $1
+            "#,
+            id,
+        )
+            .fetch_one(ex)
+            .await?
+            .id
+    )
+}
+
+pub async fn generate_friendly_share_token(tx: &mut Transaction<'_, Postgres>, id: &Uuid) -> Result<Option<String>, SquadOvError> {
+    // Try to generate a friendly share token within a few iterations.
+    // If it doesn't work then say fuck it and move on. This is for
+    // aesthetics and doesn't matter that much.
+    let w1 = eff_wordlist::large::random_word();
+    let w2 = eff_wordlist::large::random_word();
+    let w3 = eff_wordlist::short::random_word();
+    let id_str = String::from(id.to_hyphenated().to_string().split("-").collect::<Vec<&str>>()[0]);
+
+    for _i in 0i32..5 {
+        let nm = format!(
+            "{}-{}",
+            format!("{}-{}-{}", w1, w2, w3).to_case(Case::Pascal),
+            id_str
+        );
+        match sqlx::query!(
+            "
+            UPDATE squadov.share_tokens
+            SET friendly_name = $2
+            WHERE id = $1
+            ",
+            id,
+            &nm
+        )
+            .execute(&mut *tx)
+            .await {
+            Ok(_) => (),
+            Err(err) => match SquadOvError::from(err) {
+                SquadOvError::Duplicate => continue,
+                x => return Err(x),
+            }
+        }
+        return Ok(Some(nm));
+    }
+    
+    Ok(None)
+}
 
 pub async fn store_encrypted_access_token_for_match_user<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64, token: &AESEncryptToken) -> Result<Uuid, SquadOvError>
 where

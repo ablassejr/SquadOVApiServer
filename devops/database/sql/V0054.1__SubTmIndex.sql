@@ -1,0 +1,1 @@
+CREATE INDEX ON user_to_user_subscriptions(last_checked);
