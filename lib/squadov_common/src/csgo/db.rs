@@ -382,26 +382,29 @@ pub async fn list_csgo_match_summaries_for_user(ex: &PgPool, user_id: i64, req_u
     let uuids: Vec<MatchPlayerPair> = sqlx::query_as!(
         MatchPlayerPair,
         r#"
-            SELECT cmv.match_uuid AS "match_uuid!", u.uuid AS "player_uuid!"
-            FROM squadov.csgo_match_views AS cmv
-            INNER JOIN squadov.users AS u
-                ON u.id = cmv.user_id
-            LEFT JOIN squadov.vods AS v
-                ON v.match_uuid = cmv.match_uuid
-                    AND v.user_uuid = u.uuid
-                    AND v.is_clip = FALSE
-            LEFT JOIN squadov.view_share_connections_access_users AS sau
-                ON sau.match_uuid = cmv.match_uuid
-                    AND sau.user_id = $8
-            WHERE cmv.user_id = $1
-                AND cmv.match_uuid IS NOT NULL
-                AND (CARDINALITY($4::VARCHAR[]) = 0 OR cmv.mode = ANY($4))
-                AND (CARDINALITY($5::VARCHAR[]) = 0 OR cmv.map = ANY($5))
-                AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
-                AND (NOT $7::BOOLEAN OR cmv.has_demo)
-                AND ($1 = $8 OR sau.match_uuid IS NOT NULL)
-            ORDER BY cmv.start_time DESC
-            LIMIT $2 OFFSET $3
+            SELECT inp.match_uuid AS "match_uuid!", inp.uuid AS "player_uuid!"
+            FROM (
+                SELECT DISTINCT cmv.start_time, cmv.match_uuid, u.uuid
+                FROM squadov.csgo_match_views AS cmv
+                INNER JOIN squadov.users AS u
+                    ON u.id = cmv.user_id
+                LEFT JOIN squadov.vods AS v
+                    ON v.match_uuid = cmv.match_uuid
+                        AND v.user_uuid = u.uuid
+                        AND v.is_clip = FALSE
+                LEFT JOIN squadov.view_share_connections_access_users AS sau
+                    ON sau.match_uuid = cmv.match_uuid
+                        AND sau.user_id = $8
+                WHERE cmv.user_id = $1
+                    AND cmv.match_uuid IS NOT NULL
+                    AND (CARDINALITY($4::VARCHAR[]) = 0 OR cmv.mode = ANY($4))
+                    AND (CARDINALITY($5::VARCHAR[]) = 0 OR cmv.map = ANY($5))
+                    AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
+                    AND (NOT $7::BOOLEAN OR cmv.has_demo)
+                    AND ($1 = $8 OR sau.match_uuid IS NOT NULL)
+                ORDER BY cmv.start_time DESC, cmv.match_uuid, u.uuid
+                LIMIT $2 OFFSET $3
+            ) as inp
         "#,
         user_id,
         end - start,

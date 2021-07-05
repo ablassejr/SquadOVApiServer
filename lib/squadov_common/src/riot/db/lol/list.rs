@@ -136,7 +136,7 @@ pub async fn list_lol_match_summaries_for_uuids(ex: &PgPool, uuids: &[MatchPlaye
 pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_uuid: &Uuid, req_user_id: i64, start: i64, end: i64, filters: &LolMatchFilters) -> Result<Vec<LolPlayerMatchSummary>, SquadOvError> {
     let uuids: Vec<MatchPlayerPair> = sqlx::query!(
         r#"
-        SELECT lmi.match_uuid
+        SELECT DISTINCT lmi.game_creation, lmi.match_uuid
         FROM squadov.lol_match_info AS lmi
         INNER JOIN squadov.lol_match_participant_identities AS lmpi
             ON lmpi.match_uuid = lmi.match_uuid
@@ -159,7 +159,7 @@ pub async fn list_lol_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_u
             AND (CARDINALITY($6::VARCHAR[]) = 0 OR lmi.game_mode = ANY($6))
             AND (NOT $7::BOOLEAN OR v.video_uuid IS NOT NULL)
             AND (u.id = $8 OR sau.match_uuid IS NOT NULL)
-        ORDER BY lmi.game_creation DESC
+        ORDER BY lmi.game_creation DESC, lmi.match_uuid
         LIMIT $2 OFFSET $3
         "#,
         puuid,

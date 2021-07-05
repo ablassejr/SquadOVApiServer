@@ -27,7 +27,7 @@ impl api::ApiApplication {
         let matches = sqlx::query_as!(
             AimlabTask,
             "
-            SELECT at.*
+            SELECT DISTINCT ON (at.create_date, at.match_uuid) at.*
             FROM squadov.aimlab_tasks AS at
             INNER JOIN squadov.users AS u
                 ON u.id = at.user_id
@@ -42,7 +42,7 @@ impl api::ApiApplication {
                 AND (CARDINALITY($4::VARCHAR[]) = 0 OR at.task_name = ANY($4))
                 AND (NOT $5::BOOLEAN OR v.video_uuid IS NOT NULL)
                 AND ($1 = $6 OR sau.match_uuid IS NOT NULL)
-            ORDER BY at.create_date DESC
+            ORDER BY at.create_date DESC, at.match_uuid
             LIMIT $2 OFFSET $3
             ",
             user_id,

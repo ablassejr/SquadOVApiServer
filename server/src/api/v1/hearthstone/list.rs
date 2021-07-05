@@ -27,29 +27,32 @@ impl api::ApiApplication {
         Ok(sqlx::query_as!(
             HearthstoneMatchListEntry,
             "
-            SELECT hm.match_uuid
-            FROM squadov.hearthstone_matches AS hm
-            INNER JOIN squadov.hearthstone_match_view AS hmv
-                ON hmv.match_uuid = hm.match_uuid
-            INNER JOIN squadov.hearthstone_match_players AS hmp
-                ON hmp.view_uuid = hmv.view_uuid
-            INNER JOIN squadov.hearthstone_match_metadata AS hmm
-                ON hmm.view_uuid = hmv.view_uuid
-            INNER JOIN squadov.users AS u
-                ON u.id = hmp.user_id
-            LEFT JOIN squadov.vods AS v
-                ON v.match_uuid = hm.match_uuid
-                    AND v.user_uuid = u.uuid
-                    AND v.is_clip = FALSE
-            LEFT JOIN squadov.view_share_connections_access_users AS sau
-                ON sau.match_uuid = hm.match_uuid
-                    AND sau.user_id = $6
-            WHERE hmp.user_id = $1
-                AND hmm.game_type = any($4)
-                AND (NOT $5::BOOLEAN OR v.video_uuid IS NOT NULL)
-                AND ($1 = $6 OR sau.match_uuid IS NOT NULL)
-            ORDER BY hm.id DESC
-            LIMIT $2 OFFSET $3
+            SELECT inp.match_uuid
+            FROM (
+                SELECT DISTINCT hm.id, hm.match_uuid
+                FROM squadov.hearthstone_matches AS hm
+                INNER JOIN squadov.hearthstone_match_view AS hmv
+                    ON hmv.match_uuid = hm.match_uuid
+                INNER JOIN squadov.hearthstone_match_players AS hmp
+                    ON hmp.view_uuid = hmv.view_uuid
+                INNER JOIN squadov.hearthstone_match_metadata AS hmm
+                    ON hmm.view_uuid = hmv.view_uuid
+                INNER JOIN squadov.users AS u
+                    ON u.id = hmp.user_id
+                LEFT JOIN squadov.vods AS v
+                    ON v.match_uuid = hm.match_uuid
+                        AND v.user_uuid = u.uuid
+                        AND v.is_clip = FALSE
+                LEFT JOIN squadov.view_share_connections_access_users AS sau
+                    ON sau.match_uuid = hm.match_uuid
+                        AND sau.user_id = $6
+                WHERE hmp.user_id = $1
+                    AND hmm.game_type = any($4)
+                    AND (NOT $5::BOOLEAN OR v.video_uuid IS NOT NULL)
+                    AND ($1 = $6 OR sau.match_uuid IS NOT NULL)
+                ORDER BY hm.id DESC, hm.match_uuid
+                LIMIT $2 OFFSET $3
+            ) as inp
             ",
             user_id,
             end - start,

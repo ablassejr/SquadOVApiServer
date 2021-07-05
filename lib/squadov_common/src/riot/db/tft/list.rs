@@ -187,7 +187,7 @@ pub async fn list_tft_match_summaries_for_uuids(ex: &PgPool, uuids: &[MatchPlaye
 pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_uuid: &Uuid, req_user_id: i64, start: i64, end: i64, filters: &TftMatchFilters) -> Result<Vec<TftPlayerMatchSummary>, SquadOvError> {
     let uuids: Vec<Uuid> = sqlx::query!(
         r#"
-        SELECT tmi.match_uuid
+        SELECT DISTINCT tmi.game_datetime, tmi.match_uuid
         FROM squadov.tft_match_info AS tmi
         INNER JOIN squadov.tft_match_participants AS tmp
             ON tmp.match_uuid = tmi.match_uuid
@@ -207,7 +207,7 @@ pub async fn list_tft_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_u
             AND tmi.tft_set_number >= 3
             AND (NOT $5::BOOLEAN OR v.video_uuid IS NOT NULL)
             AND (u.id = $6 OR sau.match_uuid IS NOT NULL)
-        ORDER BY tmi.game_datetime DESC
+        ORDER BY tmi.game_datetime DESC, tmi.match_uuid
         LIMIT $2 OFFSET $3
         "#,
         puuid,

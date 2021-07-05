@@ -105,7 +105,7 @@ pub async fn list_valorant_match_summaries_for_uuids(ex: &PgPool, uuids: &[Match
 pub async fn list_valorant_match_summaries_for_puuid(ex: &PgPool, puuid: &str, user_uuid: &Uuid, req_user_id: i64, start: i64, end: i64, filters: &ValorantMatchFilters) -> Result<Vec<ValorantPlayerMatchSummary>, SquadOvError> {
     let uuids: Vec<Uuid> = sqlx::query!(
         r#"
-            SELECT vm.match_uuid
+            SELECT DISTINCT vm.server_start_time_utc, vm.match_uuid
             FROM squadov.valorant_matches AS vm
             INNER JOIN squadov.valorant_match_players AS vmp
                 ON vmp.match_uuid = vm.match_uuid
@@ -127,7 +127,7 @@ pub async fn list_valorant_match_summaries_for_puuid(ex: &PgPool, puuid: &str, u
                 AND (NOT $7::BOOLEAN OR v.video_uuid IS NOT NULL)
                 AND (NOT $8::BOOLEAN OR vm.is_ranked)
                 AND (u.id = $9 OR sau.match_uuid IS NOT NULL)
-            ORDER BY vm.server_start_time_utc DESC
+            ORDER BY vm.server_start_time_utc DESC, vm.match_uuid
             LIMIT $2 OFFSET $3
         "#,
         puuid,
