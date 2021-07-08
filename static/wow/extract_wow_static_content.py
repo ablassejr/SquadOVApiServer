@@ -212,14 +212,14 @@ def extract_items_to(data, interface, listfile, output):
 
             allItems[row['ID']]['inventorySlot'] = int(row['InventoryType'])
 
-            if row['IconFileDataID'] != '0':
+            if row['IconFileDataID'] != '0' and row['IconFileDataID'] in listfile:
                 allItems[row['ID']]['icon'] = listfile[row['IconFileDataID']]
 
     itemAppearance = {}
     with open(os.path.join(data, 'itemappearance.csv')) as items:
         reader = csv.DictReader(items)
         for row in reader:
-            if row['DefaultIconFileDataID'] == '0':
+            if row['DefaultIconFileDataID'] == '0' or row['DefaultIconFileDataID'] not in listfile:
                 continue
 
             itemAppearance[row['ID']] = {
