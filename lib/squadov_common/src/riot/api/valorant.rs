@@ -45,7 +45,7 @@ impl super::RiotApiHandler {
 impl super::RiotApiApplicationInterface {
     pub async fn backfill_user_valorant_matches(&self, puuid: &str) -> Result<(), SquadOvError> {
         // Refresh the user's active shard whenever they request a backfill (this corresponds to when
-        // they launch the game so it should work nicely).SquadOvError
+        // they launch the game so it should work nicely).
         let shard = self.api.get_active_shard_by_game_for_puuid(VALORANT_SHORTHAND, puuid).await?;
         db::set_user_account_shard(&*self.db, puuid, VALORANT_SHORTHAND, &shard).await?;
 

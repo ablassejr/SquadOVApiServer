@@ -44,7 +44,7 @@ bytes = "0.6.0"
 prost = "0.7.0"
 tempfile = "3.1.0"
 rand = "0.8.0"
-rdkafka = { version = "0.24", features = ["cmake-build", "ssl", "libz-static"] }
+rdkafka = { version = "0.24", features = ["cmake-build", "ssl", "libz-static", "zstd"] }
 num_enum = "0.5.1"
 serde_qs = { version = "0.8", features = ["actix"] }
 lru = "0.6.5"
