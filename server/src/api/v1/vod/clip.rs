@@ -4,7 +4,16 @@ use crate::api::v1::RecentMatchQuery;
 use actix_web::{web, HttpResponse, HttpRequest};
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
-use squadov_common::{SquadOvError, VodSegmentId, SquadOvGames, VodClip, ClipReact, ClipComment, access};
+use squadov_common::{
+    SquadOvError,
+    VodSegmentId,
+    SquadOvGames,
+    VodClip,
+    ClipReact,
+    ClipComment,
+    access,
+    storage::CloudStorageLocation,
+};
 use std::sync::Arc;
 use std::convert::TryFrom;
 use serde_qs::actix::QsQuery;
@@ -91,9 +100,12 @@ impl api::ApiApplication {
             .await?;
         tx.commit().await?;
 
+        let bucket = self.vod.get_bucket_for_location(CloudStorageLocation::Global).ok_or(SquadOvError::InternalError(String::from("No global storage location configured for Clip storage.")))?;
+        let manager = self.get_vod_manager(&bucket).await?;
+
         Ok(ClipResponse{
             uuid: clip_uuid.clone(),
-            upload_path: self.vod.get_segment_upload_uri(&VodSegmentId{
+            upload_path: manager.get_segment_upload_uri(&VodSegmentId{
                 video_uuid: clip_uuid.clone(),
                 quality: String::from("source"),
                 segment_name: String::from("video.mp4"),

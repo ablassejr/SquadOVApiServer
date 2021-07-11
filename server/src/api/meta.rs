@@ -192,8 +192,10 @@ impl api::ApiApplication {
                         
                         metadata.meta_video_width = Some(video_width);
                         metadata.meta_video_height = Some(video_height);
+
                         // A shared video is by definition public.
-                        metadata.meta_video = Some(self.vod.get_public_segment_redirect_uri(&VodSegmentId{
+                        let manager = self.get_vod_manager(&vod_metadata.bucket).await?;
+                        metadata.meta_video = Some(manager.get_public_segment_redirect_uri(&VodSegmentId{
                             video_uuid: video_uuid.clone(),
                             quality: String::from("source"),
                             segment_name: String::from("fastify.mp4"),

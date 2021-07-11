@@ -15,8 +15,7 @@ pub enum VodManagerType {
     GCS
 }
 
-pub fn get_current_vod_manager_type() -> VodManagerType {
-    let root = std::env::var("SQUADOV_VOD_ROOT").unwrap();
+pub fn get_vod_manager_type(root: &str) -> VodManagerType {
     if root.starts_with("gs://") {
         VodManagerType::GCS
     } else {

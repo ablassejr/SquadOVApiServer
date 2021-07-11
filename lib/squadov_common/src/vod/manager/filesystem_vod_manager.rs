@@ -12,9 +12,9 @@ pub struct FilesystemVodManager {
 }
 
 impl FilesystemVodManager {
-    pub fn new() -> Result<FilesystemVodManager, SquadOvError> {
+    pub fn new(root: &str) -> Result<FilesystemVodManager, SquadOvError> {
         let manager = FilesystemVodManager{
-            root: std::env::var("SQUADOV_VOD_ROOT").unwrap()
+            root: root.to_string(),
         };
 
         // The root folder must exist.

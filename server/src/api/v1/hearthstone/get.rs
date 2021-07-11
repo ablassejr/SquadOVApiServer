@@ -1,4 +1,7 @@
-use squadov_common::SquadOvError;
+use squadov_common::{
+    SquadOvError,
+    blob,
+};
 use squadov_common::hearthstone::{HearthstonePlayer, HearthstonePlayerMedalInfo, FormatType, GameType};
 use squadov_common::hearthstone::game_state::{
     HearthstoneGameSnapshot,
@@ -467,7 +470,10 @@ impl api::ApiApplication {
             .fetch_one(&*self.pool)
             .await?;
 
-        let raw_actions = self.blob.get_blob(&action_blob_uuid, true).await?;
+        let bucket = blob::get_blob_bucket(&*self.pool, &action_blob_uuid).await?;
+        let manager = self.get_blob_manager(&bucket).await?;
+
+        let raw_actions = manager.get_blob(&action_blob_uuid, true).await?;
         let blocks: Vec<HearthstoneSerializedGameBlock> = sqlx::query!(
             r#"
             SELECT 

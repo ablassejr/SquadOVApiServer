@@ -18,12 +18,19 @@ use crate::{
         RabbitMqInterface,
         RabbitMqListener,
     },
+    storage::StorageManager,
 };
-use std::sync::Arc;
+use std::sync::{Arc};
 use tempfile::NamedTempFile;
 use chrono::{DateTime, Utc};
 
 const VOD_MAX_AGE_SECONDS: i64 = 21600; // 6 hours
+
+#[derive(Serialize,Deserialize, Clone)]
+pub struct VodDestination {
+    pub url: String,
+    pub bucket: String,
+}
 
 #[derive(Serialize,Deserialize, Clone)]
 pub struct VodAssociation {
@@ -61,6 +68,7 @@ pub struct VodMetadata {
     pub avg_bitrate: i64,
     #[serde(rename = "maxBitrate")]
     pub max_bitrate: i64,
+    pub bucket: String,
 
     pub id: String,
     #[serde(skip)]
@@ -79,6 +87,7 @@ impl Default for  VodMetadata {
             min_bitrate: 0,
             avg_bitrate: 0,
             max_bitrate: 0,
+            bucket: String::new(),
             id: String::new(),
             has_fastify: false,
             has_preview: false,
@@ -160,7 +169,7 @@ pub struct VodProcessingInterface {
     queue: String,
     rmq: Arc<RabbitMqInterface>,
     db: Arc<PgPool>,
-    vod: Arc<dyn manager::VodManager + Send + Sync>,
+    vod: Arc<StorageManager<Arc<dyn manager::VodManager + Send + Sync>>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -169,6 +178,7 @@ pub enum VodProcessingTask {
     Process{
         vod_uuid: Uuid,
         session_id: Option<String>,
+        id: Option<String>,
     }
 }
 
@@ -177,14 +187,14 @@ impl RabbitMqListener for VodProcessingInterface {
     async fn handle(&self, data: &[u8]) -> Result<(), SquadOvError> {
         let task: VodProcessingTask = serde_json::from_slice(data)?;
         match task {
-            VodProcessingTask::Process{vod_uuid, session_id} => self.process_vod(&vod_uuid, session_id.as_ref()).await?, 
+            VodProcessingTask::Process{vod_uuid, id, session_id} => self.process_vod(&vod_uuid, &id.unwrap_or(String::from("source")), session_id.as_ref()).await?, 
         };
         Ok(())
     }
 }
 
 impl VodProcessingInterface {
-    pub fn new(queue: &str, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>, vod: Arc<dyn manager::VodManager + Send + Sync>) -> Self {
+    pub fn new(queue: &str, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>, vod: Arc<StorageManager<Arc<dyn manager::VodManager + Send + Sync>>>) -> Self {
         Self {
             queue: String::from(queue),
             rmq,
@@ -193,16 +203,26 @@ impl VodProcessingInterface {
         }
     }
 
-    pub async fn request_vod_processing(&self, vod_uuid: &Uuid, session_id: Option<String>, high_priority: bool) -> Result<(), SquadOvError> {
+    pub async fn request_vod_processing(&self, vod_uuid: &Uuid, id: &str, session_id: Option<String>, high_priority: bool) -> Result<(), SquadOvError> {
         self.rmq.publish(&self.queue, serde_json::to_vec(&VodProcessingTask::Process{
             vod_uuid: vod_uuid.clone(),
             session_id,
+            id: Some(id.to_string()),
         })?, if high_priority { RABBITMQ_HIGH_PRIORITY } else { RABBITMQ_DEFAULT_PRIORITY }, VOD_MAX_AGE_SECONDS).await;
         Ok(())
     }
 
-    pub async fn process_vod(&self, vod_uuid: &Uuid, session_id: Option<&String>) -> Result<(), SquadOvError> {
+    pub async fn process_vod(&self, vod_uuid: &Uuid, id: &str, session_id: Option<&String>) -> Result<(), SquadOvError> {
         log::info!("Start Processing VOD {} [{:?}]", vod_uuid, session_id);
+
+        log::info!("Get VOD Association");
+        let vod = db::get_vod_association(&*self.db, vod_uuid).await?;
+
+        // Need to grab the metadata so we know where this VOD was stored.
+        let metadata = db::get_vod_metadata(&*self.db, vod_uuid, id).await?;
+
+        // Grab the appropriate VOD manager. The manager should already exist!
+        let manager = self.vod.get_bucket(&metadata.bucket).await.ok_or(SquadOvError::InternalError(format!("Invalid bucket: {}", &metadata.bucket)))?;
 
         // Note that we can only proceed with "fastifying" the VOD if the entire VOD has been uploaded.
         // We can query GCS's XML API to determine this. If the GCS Session URI is not provided then
@@ -210,14 +230,11 @@ impl VodProcessingInterface {
         // then we want to defer taking care of this task until later.
         if session_id.is_some() {
             let session_id = session_id.unwrap().clone();
-            if !self.vod.is_vod_session_finished(&session_id).await? {
+            if !manager.is_vod_session_finished(&session_id).await? {
                 log::info!("Defer Fastifying {:?}", vod_uuid);
                 return Err(SquadOvError::Defer(1000));
             }
         }
-
-        log::info!("Get VOD Association");
-        let vod = db::get_vod_association(&*self.db, vod_uuid).await?;
 
         log::info!("Get Container Extension");
         let raw_extension = container_format_to_extension(&vod.raw_container_format);
@@ -239,7 +256,7 @@ impl VodProcessingInterface {
             quality: String::from("source"),
             segment_name: format!("video.{}", &raw_extension),
         };
-        self.vod.download_vod_to_path(&source_segment_id, &input_filename).await?;
+        manager.download_vod_to_path(&source_segment_id, &input_filename).await?;
 
         let fastify_filename = NamedTempFile::new()?.into_temp_path();
         let preview_filename = NamedTempFile::new()?.into_temp_path();
@@ -256,10 +273,10 @@ impl VodProcessingInterface {
             quality: String::from("source"),
             segment_name: String::from("fastify.mp4"),
         };
-        self.vod.upload_vod_from_file(&fastify_segment, &fastify_filename).await?;
+        manager.upload_vod_from_file(&fastify_segment, &fastify_filename).await?;
 
         log::info!("Upload Preview VOD - {}", vod_uuid);
-        self.vod.upload_vod_from_file(&VodSegmentId{
+        manager.upload_vod_from_file(&VodSegmentId{
             video_uuid: vod_uuid.clone(),
             quality: String::from("source"),
             segment_name: String::from("preview.mp4"),
@@ -274,7 +291,7 @@ impl VodProcessingInterface {
         log::info!("Process VOD TX (Commit) - {}", vod_uuid);
         tx.commit().await?;
         log::info!("Delete Source VOD - {}", vod_uuid);
-        match self.vod.delete_vod(&source_segment_id).await {
+        match manager.delete_vod(&source_segment_id).await {
             Ok(()) => (),
             Err(err) => log::warn!("Failed to delete source VOD: {}", err),
         };
@@ -282,7 +299,7 @@ impl VodProcessingInterface {
         log::info!("Check if VOD is Public - {}", vod_uuid);
         if db::check_if_vod_public(&*self.db, vod_uuid).await? {
             log::info!("Setting Fastify as Public - {}", vod_uuid);
-            self.vod.make_segment_public(&fastify_segment).await?;
+            manager.make_segment_public(&fastify_segment).await?;
         }
 
         log::info!("Finish Fastifying {:?}", vod_uuid);

@@ -24,10 +24,6 @@ spec:
                       value: "2"
                     - name: PROCESSING_THREADS
                       value: "1"
-                    - name: "SQUADOV_VOD_ROOT"
-                      value: "gs://squadov-vod-bucket"
-                    - name: "SQUADOV_BLOB_BUCKET"
-                      value: "squadov-blob-bucket"
                     - name: "FFMPEG_BINARY_PATH"
                       value: "ffmpeg"
                     - name: POSTGRES_USER

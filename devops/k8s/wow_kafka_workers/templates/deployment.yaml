@@ -26,10 +26,6 @@ spec:
                       value: "16"
                     - name: KAFKA_THREADS
                       value: "16"
-                    - name: "SQUADOV_VOD_ROOT"
-                      value: "gs://squadov-vod-bucket"
-                    - name: "SQUADOV_BLOB_BUCKET"
-                      value: "squadov-blob-bucket"
                     - name: "DISABLE_RABBITMQ"
                       value: "1"
                     - name: POSTGRES_USER

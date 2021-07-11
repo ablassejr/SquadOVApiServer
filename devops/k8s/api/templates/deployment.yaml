@@ -37,10 +37,6 @@ spec:
                     limits:
                         cpu: "2000m"
                   env:
-                    - name: SQUADOV_VOD_ROOT
-                      value: gs://{{ .Values.vodBucket }}
-                    - name: SQUADOV_BLOB_BUCKET
-                      value: {{ .Values.blobBucket }}
                     - name: FFMPEG_BINARY_PATH
                       value: ffmpeg
                 - name: cloudsql-proxy

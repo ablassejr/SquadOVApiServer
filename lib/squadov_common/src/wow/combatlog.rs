@@ -22,7 +22,6 @@ pub struct WoWCombatLogState {
 
 pub struct FullWoWCombatLogState {
     pub state: WoWCombatLogState,
-    pub blob: crate::BlobResumableIdentifier,
 }
 
 #[derive(Deserialize)]

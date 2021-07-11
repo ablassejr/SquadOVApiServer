@@ -25,14 +25,12 @@ pub struct GCSVodManager {
 }
 
 impl GCSVodManager {
-    pub async fn new(client: Arc<Option<GCPClient>>) -> Result<GCSVodManager, SquadOvError> {
-        let uri = std::env::var("SQUADOV_VOD_ROOT").unwrap();
-
+    pub async fn new(full_bucket: &str, client: Arc<Option<GCPClient>>) -> Result<GCSVodManager, SquadOvError> {
         if client.is_none() {
             return Err(SquadOvError::InternalError(String::from("GCP Client not found.")));
         }
 
-        let bucket = uri[GS_URI_PREFIX.len()..].to_string();
+        let bucket = full_bucket[GS_URI_PREFIX.len()..].to_string();
 
         // Do a sanity check to make sure the bucket exists to protect against dev typos!!!!
         // If this fails we'll force panic and fail

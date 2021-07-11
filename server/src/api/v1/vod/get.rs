@@ -4,7 +4,8 @@ use squadov_common::{
     VodSegment,
     VodManifest,
     VodTrack,
-    vod::db
+    vod::db,
+    storage::CloudStorageLocation,
 };
 use crate::api;
 use actix_web::{web, HttpResponse};
@@ -144,14 +145,7 @@ pub async fn get_vod_handler(data : web::Path<VodFindFromVideoUuid>, app : web::
 pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
     let mut assocs = app.find_vod_associations(&[data.video_uuid.clone()]).await?;
     let vod = assocs.remove(&data.video_uuid).ok_or(SquadOvError::NotFound)?;
-
-    let extension = squadov_common::container_format_to_extension(&vod.raw_container_format);
-    let path = app.vod.get_segment_upload_uri(&squadov_common::VodSegmentId{
-        video_uuid: data.video_uuid.clone(),
-        quality: String::from("source"),
-        segment_name: format!("video.{}", &extension),
-    }).await?;
-    Ok(HttpResponse::Ok().json(&path))
+    Ok(HttpResponse::Ok().json(&app.get_vod_destination(&data.video_uuid, &vod.raw_container_format).await?))
 }
 
 pub async fn get_vod_association_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
@@ -160,11 +154,14 @@ pub async fn get_vod_association_handler(data : web::Path<VodFindFromVideoUuid>,
 }
 
 pub async fn get_vod_track_segment_handler(data : web::Path<squadov_common::VodSegmentId>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
+    let bucket = app.vod.get_bucket_for_location(CloudStorageLocation::Global).ok_or(SquadOvError::InternalError(String::from("No global storage location configured for VOD storage.")))?;
+    let manager = app.get_vod_manager(&bucket).await?;
+
     // If the VOD is public (shared), then we can return the public URL instead of the signed private one.
-    let redirect_uri = if data.segment_name != "preview.mp4" && db::check_if_vod_public(&*app.pool, &data.video_uuid).await? && app.vod.check_vod_segment_is_public(&data).await? {
-        app.vod.get_public_segment_redirect_uri(&data).await?
+    let redirect_uri = if data.segment_name != "preview.mp4" && db::check_if_vod_public(&*app.pool, &data.video_uuid).await? && manager.check_vod_segment_is_public(&data).await? {
+        manager.get_public_segment_redirect_uri(&data).await?
     } else {
-        app.vod.get_segment_redirect_uri(&data).await?
+        manager.get_segment_redirect_uri(&data).await?
     };
     // You may be tempted to make this into a TemporaryRedirect and point
     // a media player (e.g. VideoJS) to load from this directly. Don't do that

@@ -6,8 +6,6 @@ services:
       squadov_c3p0:
           ipv4_address: "172.22.0.5"
     environment:
-      - "SQUADOV_VOD_ROOT=gs://${VOD_BUCKET}"
-      - "SQUADOV_BLOB_BUCKET=${BLOB_BUCKET}"
       - "FFMPEG_BINARY_PATH=ffmpeg"
   app:
     image: "registry.gitlab.com/squadov/squadovapiserver/${GCP_PROJECT}/squadov_webapp:latest"

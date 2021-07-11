@@ -9,7 +9,7 @@ flyway \
     -user="$POSTGRES_USER" \
     -password="$POSTGRES_PASSWORD" \
     -url="jdbc:postgresql://127.0.0.1:5555/squadov"  \
-    -locations="filesystem:$PWD/sql" \
+    -locations="filesystem:$PWD/sql,filesystem:$PWD/prod" \
     -schemas="squadov" \
     $OP
 

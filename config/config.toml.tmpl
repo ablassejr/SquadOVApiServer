@@ -136,3 +136,11 @@ share_key = "${SHARE_ENCRYPTION_KEY}"
 api_key = "${STEAM_API_KEY}"
 requests = 100000
 seconds = 86400
+
+[storage.vods]
+global = "${DEFAULT_VOD_STORAGE_BUCKET}"
+legacy = "${LEGACY_VOD_STORAGE_BUCKET}"
+
+[storage.blobs]
+global = "${DEFAULT_BLOB_STORAGE_BUCKET}"
+legacy = "${LEGACY_VOD_STORAGE_BUCKET}"

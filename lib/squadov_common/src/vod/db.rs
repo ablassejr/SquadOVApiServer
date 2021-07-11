@@ -1,7 +1,8 @@
 use crate::SquadOvError;
-use crate::vod::VodAssociation;
+use crate::vod::{VodAssociation, VodMetadata};
 use sqlx::{Executor, Transaction, Postgres};
 use uuid::Uuid;
+use std::collections::HashMap;
 
 pub async fn check_if_vod_public<'a, T>(ex: T, video_uuid: &Uuid) -> Result<bool, SquadOvError>
 where
@@ -49,6 +50,57 @@ where
         )
             .fetch_one(ex)
             .await?
+    )
+}
+
+pub async fn get_vod_metadata<'a, T>(ex: T, uuid: &Uuid, id: &str) -> Result<VodMetadata, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            VodMetadata,
+            "
+            SELECT *
+            FROM squadov.vod_metadata
+            WHERE video_uuid = $1
+                AND id = $2
+            ",
+            uuid,
+            id,
+        )
+            .fetch_one(ex)
+            .await?
+    )
+}
+
+pub async fn get_bulk_vod_metadata<'a, T>(ex: T, pairs: &[(Uuid, &str)]) -> Result<HashMap<(Uuid, String), VodMetadata>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    let uuids: Vec<Uuid> = pairs.iter().map(|x| { x.0.clone() }).collect();
+    let ids: Vec<String> = pairs.iter().map(|x| { x.1.to_string() }).collect();
+
+    Ok(
+        sqlx::query_as!(
+            VodMetadata,
+            "
+            SELECT vm.*
+            FROM UNNEST($1::UUID[], $2::VARCHAR[]) AS inp(uuid, id)
+            INNER JOIN squadov.vod_metadata AS vm
+                ON vm.video_uuid = inp.uuid
+                    AND vm.id = inp.id
+            ",
+            &uuids,
+            &ids,
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                ((x.video_uuid.clone(), x.id.clone()), x)
+            })
+            .collect()
     )
 }
 

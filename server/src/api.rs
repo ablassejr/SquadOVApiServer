@@ -36,10 +36,18 @@ use squadov_common::{
         api::{SteamApiConfig, SteamApiClient},
         rabbitmq::SteamApiRabbitmqInterface,
     },
+    blob,
+    blob::{
+        BlobManagerType,
+        gcp::GCPBlobManager,
+        aws::AWSBlobManager,
+    },
+    storage::{StorageManager, CloudStorageLocation, CloudStorageBucketsConfig},
+    GCPClient,
 };
 use url::Url;
 use std::vec::Vec;
-use std::sync::Arc;
+use std::sync::{Arc};
 use sqlx::postgres::{PgPoolOptions};
 
 // TODO: REMOVE THIS.
@@ -162,6 +170,12 @@ pub struct SquadOvConfig {
 }
 
 #[derive(Deserialize,Debug,Clone)]
+pub struct SquadOvStorageConfig {
+    pub vods: CloudStorageBucketsConfig,
+    pub blobs: CloudStorageBucketsConfig,
+}
+
+#[derive(Deserialize,Debug,Clone)]
 pub struct ApiConfig {
     fusionauth: fusionauth::FusionAuthConfig,
     pub gcp: squadov_common::GCPConfig,
@@ -177,6 +191,7 @@ pub struct ApiConfig {
     pub squadov: SquadOvConfig,
     pub steam: SteamApiConfig,
     pub twitch: TwitchConfig,
+    pub storage: SquadOvStorageConfig,
 }
 
 pub struct ApiClients {
@@ -188,11 +203,11 @@ pub struct ApiApplication {
     pub clients: ApiClients,
     pub users: auth::UserManager,
     session: auth::SessionManager,
-    vod: Arc<dyn VodManager + Send + Sync>,
+    vod: Arc<StorageManager<Arc<dyn VodManager + Send + Sync>>>,
     pub pool: Arc<PgPool>,
     pub heavy_pool: Arc<PgPool>,
     schema: Arc<graphql::GraphqlSchema>,
-    pub blob: Arc<BlobManagementClient>,
+    pub blob: Arc<StorageManager<Arc<dyn BlobManagementClient + Send + Sync>>>,
     pub rso_itf: Arc<RiotApiApplicationInterface>,
     pub valorant_itf: Arc<RiotApiApplicationInterface>,
     pub lol_itf: Arc<RiotApiApplicationInterface>,
@@ -201,9 +216,35 @@ pub struct ApiApplication {
     pub vod_itf: Arc<VodProcessingInterface>,
     pub csgo_itf: Arc<CsgoRabbitmqInterface>,
     pub steam_itf: Arc<SteamApiRabbitmqInterface>,
+    gcp: Arc<Option<GCPClient>>,
 }
 
 impl ApiApplication {
+    pub async fn get_vod_manager(&self, bucket: &str) -> Result<Arc<dyn VodManager + Send + Sync>, SquadOvError> {
+        self.vod.get_bucket(bucket).await.ok_or(SquadOvError::NotFound)
+    }
+
+    async fn create_vod_manager(&mut self, bucket: &str) -> Result<(), SquadOvError> {
+        let vod_manager = match vod::manager::get_vod_manager_type(bucket) {
+            VodManagerType::GCS => Arc::new(GCSVodManager::new(bucket, self.gcp.clone()).await?) as Arc<dyn VodManager + Send + Sync>,
+            VodManagerType::FileSystem => Arc::new(FilesystemVodManager::new(bucket)?) as Arc<dyn VodManager + Send + Sync>
+        };
+        self.vod.new_bucket(bucket, vod_manager).await;
+        Ok(())
+    }
+
+    pub async fn get_blob_manager(&self, bucket: &str) -> Result<Arc<dyn BlobManagementClient + Send + Sync>, SquadOvError> {
+        self.blob.get_bucket(bucket).await.ok_or(SquadOvError::NotFound)
+    }
+
+    async fn create_blob_manager(&mut self, bucket: &str) -> Result<(), SquadOvError> {
+        let blob_manager = match blob::get_blob_manager_type(bucket) {
+            BlobManagerType::GCS => Arc::new(GCPBlobManager::new(bucket, self.gcp.clone(), self.pool.clone())) as Arc<dyn BlobManagementClient + Send + Sync>,
+        };
+        self.blob.new_bucket(bucket, blob_manager).await;
+        Ok(())
+    }
+
     pub async fn new(config: &ApiConfig) -> ApiApplication {
         let disable_rabbitmq = std::env::var("DISABLE_RABBITMQ").is_ok();
 
@@ -235,8 +276,6 @@ impl ApiApplication {
             }
         );
 
-        let blob = Arc::new(BlobManagementClient::new(gcp.clone(), pool.clone()));
-        
         let rso_api = Arc::new(RiotApiHandler::new(config.riot.rso_api_key.clone()));
         let valorant_api = Arc::new(RiotApiHandler::new(config.riot.valorant_api_key.clone()));
         let lol_api = Arc::new(RiotApiHandler::new(config.riot.lol_api_key.clone()));
@@ -278,10 +317,13 @@ impl ApiApplication {
             }
         }
 
-        let vod_manager = match vod::manager::get_current_vod_manager_type() {
-            VodManagerType::GCS => Arc::new(GCSVodManager::new(gcp.clone()).await.unwrap()) as Arc<dyn VodManager + Send + Sync>,
-            VodManagerType::FileSystem => Arc::new(FilesystemVodManager::new().unwrap()) as Arc<dyn VodManager + Send + Sync>
-        };
+        let mut vod_manager = StorageManager::<Arc<dyn VodManager + Send + Sync>>::new(); 
+        vod_manager.set_location_map(CloudStorageLocation::Global, &config.storage.vods.global);
+        let vod_manager = Arc::new(vod_manager);
+
+        let mut blob = StorageManager::<Arc<dyn BlobManagementClient + Send + Sync>>::new();
+        blob.set_location_map(CloudStorageLocation::Global, &config.storage.blobs.global);
+        let blob = Arc::new(blob);
 
         // One VOD interface for publishing - individual interfaces for consuming.
         let vod_itf = Arc::new(VodProcessingInterface::new(&config.rabbitmq.vod_queue, rabbitmq.clone(), pool.clone(), vod_manager.clone()));
@@ -292,7 +334,7 @@ impl ApiApplication {
             }
         }
 
-        ApiApplication{
+        let mut app = ApiApplication{
             config: config.clone(),
             clients: ApiClients{
                 fusionauth: fusionauth::FusionAuthClient::new(config.fusionauth.clone()),
@@ -312,6 +354,15 @@ impl ApiApplication {
             vod_itf,
             csgo_itf,
             steam_itf,
-        }
+            gcp,
+        };
+
+        app.create_vod_manager(&config.storage.vods.global).await.unwrap();
+        app.create_vod_manager(&config.storage.vods.legacy).await.unwrap();
+
+        app.create_blob_manager(&config.storage.blobs.global).await.unwrap();
+        app.create_blob_manager(&config.storage.blobs.legacy).await.unwrap();
+
+        app
     }
 }

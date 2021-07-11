@@ -1,4 +1,7 @@
-use squadov_common::SquadOvError;
+use squadov_common::{
+    SquadOvError,
+    vod::db,
+};
 use crate::api;
 use crate::api::auth::SquadOVSession;
 use actix_web::{web, HttpResponse, HttpRequest};
@@ -64,33 +67,40 @@ impl api::ApiApplication {
 
         let quality_options = self.get_vod_quality_options(&uuids).await?;
         let assocs = self.find_vod_associations(&uuids).await?;
+        let metadata = db::get_bulk_vod_metadata(&*self.pool, &uuids.iter().map(|x| {
+            ( x.clone(), "source")
+        }).collect::<Vec<(Uuid, &str)>>()).await?;
         self.bulk_delete_vods_database(&uuids).await?;
 
         for u in &uuids {
             if let Some(quality_arr) = quality_options.get(u) {
                 if let Some(vod) = assocs.get(u) {
-                    let raw_extension = squadov_common::container_format_to_extension(&vod.raw_container_format);
-                    for quality in quality_arr {
-                        let _ = self.vod.delete_vod(&squadov_common::VodSegmentId{
-                            video_uuid: u.clone(),
-                            quality: quality.id.clone(),
-                            segment_name: format!("video.{}", &raw_extension),
-                        }).await;
-            
-                        if quality.has_fastify {
-                            let _ = self.vod.delete_vod(&squadov_common::VodSegmentId{
+                    if let Some(metadata) = metadata.get(&(u.clone(), String::from("source"))) {
+                        let manager = self.get_vod_manager(&metadata.bucket).await?;
+
+                        let raw_extension = squadov_common::container_format_to_extension(&vod.raw_container_format);
+                        for quality in quality_arr {
+                            let _ = manager.delete_vod(&squadov_common::VodSegmentId{
                                 video_uuid: u.clone(),
                                 quality: quality.id.clone(),
-                                segment_name: String::from("fastify.mp4"),
+                                segment_name: format!("video.{}", &raw_extension),
                             }).await;
-                        }
-            
-                        if quality.has_preview {
-                            let _ = self.vod.delete_vod(&squadov_common::VodSegmentId{
-                                video_uuid: u.clone(),
-                                quality: quality.id.clone(),
-                                segment_name: String::from("preview.mp4"),
-                            }).await;
+                
+                            if quality.has_fastify {
+                                let _ = manager.delete_vod(&squadov_common::VodSegmentId{
+                                    video_uuid: u.clone(),
+                                    quality: quality.id.clone(),
+                                    segment_name: String::from("fastify.mp4"),
+                                }).await;
+                            }
+                
+                            if quality.has_preview {
+                                let _ = manager.delete_vod(&squadov_common::VodSegmentId{
+                                    video_uuid: u.clone(),
+                                    quality: quality.id.clone(),
+                                    segment_name: String::from("preview.mp4"),
+                                }).await;
+                            }
                         }
                     }
                 }

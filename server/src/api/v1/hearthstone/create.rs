@@ -1,4 +1,7 @@
-use squadov_common;
+use squadov_common::{
+    SquadOvError,
+    storage::CloudStorageLocation,
+};
 use squadov_common::SquadOvGames;
 use squadov_common::hearthstone;
 use squadov_common::hearthstone::{HearthstoneRawLog, power_parser::{HearthstonePowerLogParser, HearthstoneGameState} };
@@ -28,7 +31,7 @@ pub struct CreateHearthstoneMatchInput {
 }
 
 impl api::ApiApplication {
-    pub async fn check_if_hearthstone_match_exists(&self, timestamp: &DateTime<Utc>, info: &hearthstone::HearthstoneGameConnectionInfo) -> Result<Option<v1::Match>, squadov_common::SquadOvError> {
+    pub async fn check_if_hearthstone_match_exists(&self, timestamp: &DateTime<Utc>, info: &hearthstone::HearthstoneGameConnectionInfo) -> Result<Option<v1::Match>, SquadOvError> {
         Ok(sqlx::query_as!(
             v1::Match,
             "
@@ -49,14 +52,14 @@ impl api::ApiApplication {
     }
 
     // Creates a Hearthstone match if there's no conflict and returns the match UUID.
-    pub async fn create_hearthstone_match(&self, tx : &mut Transaction<'_, Postgres>, timestamp: &DateTime<Utc>, info: &hearthstone::HearthstoneGameConnectionInfo) -> Result<Uuid, squadov_common::SquadOvError> {
+    pub async fn create_hearthstone_match(&self, tx : &mut Transaction<'_, Postgres>, timestamp: &DateTime<Utc>, info: &hearthstone::HearthstoneGameConnectionInfo) -> Result<Uuid, SquadOvError> {
         // Check if a match already exists as we want to be as close to storing 1 entry per actual server-side match as possible.
         let current_match = match self.check_if_hearthstone_match_exists(timestamp, info).await? {
             Some(x) => x,
             None => {
                 // A reconnecting game should already exist in our database.
                 if info.reconnecting {
-                    return Err(squadov_common::SquadOvError::NotFound);
+                    return Err(SquadOvError::NotFound);
                 } else {
                     let mt = self.create_new_match(tx, SquadOvGames::Hearthstone).await?;
                     sqlx::query!(
@@ -95,7 +98,7 @@ impl api::ApiApplication {
         Ok(current_match.uuid)
     }
 
-    pub async fn create_hearthstone_match_view(&self,  tx : &mut Transaction<'_, Postgres>, match_uuid: &Uuid, user_id: i64) -> Result<Uuid, squadov_common::SquadOvError> {
+    pub async fn create_hearthstone_match_view(&self,  tx : &mut Transaction<'_, Postgres>, match_uuid: &Uuid, user_id: i64) -> Result<Uuid, SquadOvError> {
         let view_uuid = Uuid::new_v4();
         sqlx::query!(
             "
@@ -119,7 +122,7 @@ impl api::ApiApplication {
         Ok(view_uuid)
     }
 
-    pub async fn store_hearthstone_player_medal_info(&self, tx : &mut Transaction<'_, Postgres>, player_match_id: i32, view_uuid: &Uuid, info: &hearthstone::HearthstoneMedalInfo, is_standard: bool) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn store_hearthstone_player_medal_info(&self, tx : &mut Transaction<'_, Postgres>, player_match_id: i32, view_uuid: &Uuid, info: &hearthstone::HearthstoneMedalInfo, is_standard: bool) -> Result<(), SquadOvError> {
         sqlx::query!(
             "
             INSERT INTO squadov.hearthstone_match_player_medals (
@@ -161,7 +164,7 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_match_player(&self, tx : &mut Transaction<'_, Postgres>, player_match_id: i32, player: &hearthstone::HearthstonePlayer, view_uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn store_hearthstone_match_player(&self, tx : &mut Transaction<'_, Postgres>, player_match_id: i32, player: &hearthstone::HearthstonePlayer, view_uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
         tx.execute(
             sqlx::query!(
                 "
@@ -236,8 +239,11 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_raw_power_logs(&self, tx : &mut Transaction<'_, Postgres>, data: &[u8], match_uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
-        let blob_uuid = self.blob.store_new_blob(tx, data).await?;
+    pub async fn store_hearthstone_raw_power_logs(&self, tx : &mut Transaction<'_, Postgres>, data: &[u8], match_uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
+        let bucket = self.blob.get_bucket_for_location(CloudStorageLocation::Global).ok_or(SquadOvError::InternalError(String::from("No global location for blob storage.")))?;
+        let manager = self.get_blob_manager(&bucket).await?;
+
+        let blob_uuid = manager.store_new_blob(tx, data).await?;
         tx.execute(
             sqlx::query!(
                 "
@@ -263,7 +269,7 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_match_metadata(&self, tx : &mut Transaction<'_, Postgres>, st: &HearthstoneGameState, uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn store_hearthstone_match_metadata(&self, tx : &mut Transaction<'_, Postgres>, st: &HearthstoneGameState, uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
         sqlx::query!(
             "
             INSERT INTO squadov.hearthstone_match_metadata (
@@ -294,7 +300,7 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_match_game_actions(&self, tx: &mut Transaction<'_, Postgres>, logs: Arc<RwLock<HearthstoneGameLog>>, uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn store_hearthstone_match_game_actions(&self, tx: &mut Transaction<'_, Postgres>, logs: Arc<RwLock<HearthstoneGameLog>>, uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
         let raw_data;
 
         {
@@ -305,7 +311,10 @@ impl api::ApiApplication {
             raw_data = serde_json::to_value(actions)?;
         }
 
-        let blob_uuid = self.blob.store_new_json_blob(tx, &raw_data).await?;
+        let bucket = self.blob.get_bucket_for_location(CloudStorageLocation::Global).ok_or(SquadOvError::InternalError(String::from("No global location for blob storage.")))?;
+        let manager = self.get_blob_manager(&bucket).await?;
+
+        let blob_uuid = manager.store_new_json_blob(tx, &raw_data).await?;
         sqlx::query!(
             "
             INSERT INTO squadov.hearthstone_match_action_blobs (
@@ -328,7 +337,7 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_match_game_snapshots(&self, tx: &mut Transaction<'_, Postgres> , logs: Arc<RwLock<HearthstoneGameLog>>, uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn store_hearthstone_match_game_snapshots(&self, tx: &mut Transaction<'_, Postgres> , logs: Arc<RwLock<HearthstoneGameLog>>, uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
         // Each snapshot contains information that needs to be inserted into 3 different tables:
         // 1) hearthstone_snapshots: Contains general information about the snapshot (time, turn, etc)
         // 2) hearthstone_snapshots_player_map: Contains information about what we know about the player name -> player id -> entity id map at that point in time.
@@ -447,7 +456,7 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_match_game_blocks(&self, tx: &mut Transaction<'_, Postgres>, logs: Arc<RwLock<HearthstoneGameLog>>, uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn store_hearthstone_match_game_blocks(&self, tx: &mut Transaction<'_, Postgres>, logs: Arc<RwLock<HearthstoneGameLog>>, uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
         // Each snapshot contains information that needs to be inserted into 3 different tables:
         // 1) hearthstone_snapshots: Contains general information about the snapshot (time, turn, etc)
         // 2) hearthstone_snapshots_player_map: Contains information about what we know about the player name -> player id -> entity id map at that point in time.
@@ -504,7 +513,7 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn store_hearthstone_match_game_log(&self, tx: &mut Transaction<'_, Postgres> , logs: Arc<RwLock<HearthstoneGameLog>>, uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn store_hearthstone_match_game_log(&self, tx: &mut Transaction<'_, Postgres> , logs: Arc<RwLock<HearthstoneGameLog>>, uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
         self.store_hearthstone_match_game_blocks(tx, logs.clone(), uuid, user_id).await?;
         self.store_hearthstone_match_game_actions(tx, logs.clone(), uuid, user_id).await?;
         self.store_hearthstone_match_game_snapshots(tx, logs.clone(), uuid, user_id).await?;
@@ -523,7 +532,7 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn associate_hearthstone_match_with_arena_run(&self, tx: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn associate_hearthstone_match_with_arena_run(&self, tx: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
         // Note that each hearthstone match could be associated with 2 arena runs - one for each player.
         sqlx::query!(
             "
@@ -545,7 +554,7 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn associate_hearthstone_match_with_duels_run(&self, tx: &mut Transaction<'_, Postgres> , match_uuid: &Uuid, user_id: i64, start_time: &DateTime<Utc>) -> Result<(), squadov_common::SquadOvError> {
+    pub async fn associate_hearthstone_match_with_duels_run(&self, tx: &mut Transaction<'_, Postgres> , match_uuid: &Uuid, user_id: i64, start_time: &DateTime<Utc>) -> Result<(), SquadOvError> {
         // First check if a duels run already exists.
         let mut duels_run_uuid = sqlx::query_scalar(
             "
@@ -587,7 +596,7 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    async fn parse_hearthstone_power_logs(&self, data: &[u8], match_uuid: &Uuid, user_id: i64) -> Result<(), squadov_common::SquadOvError> {
+    async fn parse_hearthstone_power_logs(&self, data: &[u8], match_uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
         // Need to try to uncompress using GZIP. If that fails we'll assume that the input data is raw JSON data.
         // TODO: Use the HTTP headers instead?
         let mut gz = flate2::read::GzDecoder::new(data);
@@ -643,7 +652,7 @@ pub struct CreateHearthstoneMatchPathInput {
     user_id: i64
 }
 
-pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstoneMatchInput>, app : web::Data<Arc<api::ApiApplication>>, path: web::Path<CreateHearthstoneMatchPathInput>) -> Result<HttpResponse, squadov_common::SquadOvError> {
+pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstoneMatchInput>, app : web::Data<Arc<api::ApiApplication>>, path: web::Path<CreateHearthstoneMatchPathInput>) -> Result<HttpResponse, SquadOvError> {
     // We need to retry creating the hearthstone match just in case it's a duplicate match and the
     // create_hearthstone_match function fails on the unique key because of some race condition.
     let match_uuid = {
@@ -653,7 +662,7 @@ pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstone
             uuid = match app.create_hearthstone_match(&mut tx, &data.timestamp, &data.info).await {
                 Ok(x) => Some(x),
                 Err(err) => match err {
-                    squadov_common::SquadOvError::Duplicate => {
+                    SquadOvError::Duplicate => {
                         tx.rollback().await?;
                         continue;
                     },
@@ -667,7 +676,7 @@ pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstone
     };
     
     if match_uuid.is_none() {
-        return Err(squadov_common::SquadOvError::InternalError(String::from("Failed to obtain Hearthstone match UUID")));
+        return Err(SquadOvError::InternalError(String::from("Failed to obtain Hearthstone match UUID")));
     }
     let match_uuid = match_uuid.unwrap();
 
@@ -705,7 +714,7 @@ pub async fn create_hearthstone_match_handler(data : web::Json<CreateHearthstone
 }
 
 // Note that we don't parse directly into the expected data structures immediately as that can happen in an async thread so we can return to the user faster.
-pub async fn upload_hearthstone_logs_handler(mut body : web::Payload, path : web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, squadov_common::SquadOvError> {
+pub async fn upload_hearthstone_logs_handler(mut body : web::Payload, path : web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
     let user_id = path.user_id;
 
     // This grabs the raw byte data (it may be compressed or uncompressed!).
