@@ -4,6 +4,7 @@ use serde::Serialize;
 use byteorder::{ByteOrder, BigEndian};
 use rand::Rng;
 use actix_web::web::Bytes;
+use md5::Digest;
 
 #[derive(Serialize)]
 struct GCSObjectMetadata {
@@ -258,7 +259,7 @@ impl super::GCSClient {
 
             let metadata = GCSObjectMetadata{
                 crc32c: base64::encode(crc32c_bytes),
-                md5_hash: format!("{:x}", md5::compute(data)),
+                md5_hash: format!("{:x}", md5::Md5::digest(data)),
                 name: path.clone(),
             };
             send_data.push(serde_json::to_string_pretty(&metadata)?);

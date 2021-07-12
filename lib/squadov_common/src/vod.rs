@@ -30,6 +30,7 @@ const VOD_MAX_AGE_SECONDS: i64 = 21600; // 6 hours
 pub struct VodDestination {
     pub url: String,
     pub bucket: String,
+    pub session: String,
 }
 
 #[derive(Serialize,Deserialize, Clone)]
@@ -100,6 +101,16 @@ pub struct VodSegmentId {
     pub video_uuid: Uuid,
     pub quality: String,
     pub segment_name: String
+}
+
+impl VodSegmentId {
+    fn get_path_parts(&self) -> Vec<String> {
+        vec![self.video_uuid.to_string(), self.quality.clone(), self.segment_name.clone()]
+    }
+
+    fn get_fname(&self) -> String {
+        self.get_path_parts().join("/")
+    }
 }
 
 #[derive(Serialize)]

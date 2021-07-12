@@ -8,6 +8,8 @@ use jsonwebtoken;
 use reqwest;
 use openssl;
 use serde::Serialize;
+use rusoto_core::RusotoError;
+use rusoto_credential::CredentialsError;
 
 #[derive(Serialize)]
 struct ErrorBody {
@@ -250,5 +252,17 @@ impl From<std::string::FromUtf8Error> for SquadOvError {
 impl From<std::str::ParseBoolError> for SquadOvError {
     fn from(err: std::str::ParseBoolError) -> Self {
         return Self::InternalError(format!("Parse Bool {:?}", err))
+    }
+}
+
+impl<T: std::fmt::Debug> From<RusotoError<T>> for SquadOvError {
+    fn from(err: RusotoError<T>) -> Self {
+        return Self::InternalError(format!("Rusoto (AWS) {:?}", err))
+    }
+}
+
+impl From<CredentialsError> for SquadOvError {
+    fn from(err: CredentialsError) -> Self {
+        return Self::InternalError(format!("Rusoto (AWS, Creds) {:?}", err))
     }
 }

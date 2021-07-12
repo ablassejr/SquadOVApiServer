@@ -6,13 +6,12 @@ use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use squadov_common::{
     SquadOvError,
-    VodSegmentId,
+    VodDestination,
     SquadOvGames,
     VodClip,
     ClipReact,
     ClipComment,
     access,
-    storage::CloudStorageLocation,
 };
 use std::sync::Arc;
 use std::convert::TryFrom;
@@ -40,7 +39,7 @@ pub struct ClipBodyInput {
 #[serde(rename_all="camelCase")]
 pub struct ClipResponse {
     uuid: Uuid,
-    upload_path: String,
+    destination: VodDestination,
 }
 
 #[derive(Deserialize)]
@@ -100,16 +99,9 @@ impl api::ApiApplication {
             .await?;
         tx.commit().await?;
 
-        let bucket = self.vod.get_bucket_for_location(CloudStorageLocation::Global).ok_or(SquadOvError::InternalError(String::from("No global storage location configured for Clip storage.")))?;
-        let manager = self.get_vod_manager(&bucket).await?;
-
         Ok(ClipResponse{
             uuid: clip_uuid.clone(),
-            upload_path: manager.get_segment_upload_uri(&VodSegmentId{
-                video_uuid: clip_uuid.clone(),
-                quality: String::from("source"),
-                segment_name: String::from("video.mp4"),
-            }).await?,
+            destination: self.create_vod_destination(&clip_uuid, "mp4").await?,
         })
     }
 

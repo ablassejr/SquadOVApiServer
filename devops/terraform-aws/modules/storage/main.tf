@@ -10,6 +10,14 @@ resource "aws_s3_bucket" "vod_storage_bucket" {
             storage_class = "STANDARD_IA"
         }
     }
+
+    server_side_encryption_configuration {
+        rule {
+            apply_server_side_encryption_by_default {
+                sse_algorithm = "AES256"
+            }
+        }
+    }
 }
 
 resource "aws_s3_bucket" "blob_storage_bucket" {
@@ -22,6 +30,14 @@ resource "aws_s3_bucket" "blob_storage_bucket" {
         transition {
             days = 30
             storage_class = "STANDARD_IA"
+        }
+    }
+
+    server_side_encryption_configuration {
+        rule {
+            apply_server_side_encryption_by_default {
+                sse_algorithm = "AES256"
+            }
         }
     }
 }

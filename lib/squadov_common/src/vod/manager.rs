@@ -1,8 +1,10 @@
 pub mod filesystem_vod_manager;
 pub mod gcs_vod_manager;
+pub mod aws_vod_manager;
 
 pub use filesystem_vod_manager::*;
 pub use gcs_vod_manager::*;
+pub use aws_vod_manager::*;
 
 use async_trait::async_trait;
 use crate::{
@@ -12,12 +14,15 @@ use crate::{
 
 pub enum VodManagerType {
     FileSystem,
-    GCS
+    GCS,
+    S3,
 }
 
 pub fn get_vod_manager_type(root: &str) -> VodManagerType {
     if root.starts_with("gs://") {
         VodManagerType::GCS
+    } else if root.starts_with("s3://") {
+        VodManagerType::S3
     } else {
         VodManagerType::FileSystem
     }
@@ -25,7 +30,13 @@ pub fn get_vod_manager_type(root: &str) -> VodManagerType {
 
 #[async_trait]
 pub trait VodManager {
-    async fn get_segment_upload_uri(&self, segment: &VodSegmentId) -> Result<String, SquadOvError>;
+    // Returns a session string that can be passed to get_segment_upload_uri
+    async fn start_segment_upload(&self, segment: &VodSegmentId) -> Result<String, SquadOvError>;
+    // User can request to get a separate URL for each uploaded segment (though it isn't necessarily guaranteed to be different for each segment).
+    async fn get_segment_upload_uri(&self, segment: &VodSegmentId, session_id: &str, part: i64) -> Result<String, SquadOvError>;
+    // At the end, the user may need to finish the segment upload by giving us the session id as well as a list of parts that were uploaded.
+    async fn finish_segment_upload(&self, segment: &VodSegmentId, session_id: &str, parts: &[String]) -> Result<(), SquadOvError>;
+
     async fn download_vod_to_path(&self, segment: &VodSegmentId, path: &std::path::Path) -> Result<(), SquadOvError>;
     async fn upload_vod_from_file(&self, segment: &VodSegmentId, path: &std::path::Path) -> Result<(), SquadOvError>;
     async fn is_vod_session_finished(&self, session: &str) -> Result<bool, SquadOvError>;

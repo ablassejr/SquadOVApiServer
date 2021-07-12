@@ -129,7 +129,7 @@ impl VodManager for GCSVodManager {
         Ok(client.get_upload_status(session).await? == GCSUploadStatus::Complete)
     }
     
-    async fn get_segment_upload_uri(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
+    async fn start_segment_upload(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
         let fname = self.get_fname_from_segment_id(segment);
         let client = self.get_gcp_client().gcs();
 
@@ -147,7 +147,45 @@ impl VodManager for GCSVodManager {
         headers.insert("x-goog-resumable".to_string(), vec!["start".to_string()]);
         headers.insert("content-type".to_string(), vec!["application/octet-stream".to_string()]);
 
-        client.create_signed_url("POST", &format!("/{}/{}", &self.bucket, fname), &headers)
+        let start_resumable_url = client.create_signed_url("POST", &format!("/{}/{}", &self.bucket, fname), &headers)?;
+
+        // Need to send an HTTP post request (empty json body) to the start resumable URL location.
+        // Additional headers needed:
+        // x-goog-resumable: start
+        // content-type: application/octet-stream
+        // Expect a 201 response.
+        let client = reqwest::ClientBuilder::new()
+            .timeout(std::time::Duration::from_secs(120))
+            .connect_timeout(std::time::Duration::from_secs(60))
+            .build()?;
+
+        let result = client
+            .post(&start_resumable_url)
+            .header("x-goog-resumable", "start")
+            .header("content-type", "application/octet-stream")
+            .send()
+            .await?;
+        
+        let status = result.status().as_u16();
+        if status != 201 {
+            return Err(SquadOvError::InternalError(format!("Failed to start Google Cloud resumable upload [{}]: {}", status, result.text().await?)));
+        }
+
+        // The URL that the user should upload to (and what we consider to be the "session_id") is stored
+        // in the "Location" header in the response.
+        if let Some(loc) = result.headers().get("Location") {
+            Ok(loc.to_str()?.to_string())
+        } else {
+            Err(SquadOvError::InternalError(String::from("No location header detected in Google Cloud resumable upload return.")))
+        }
+    }
+
+    async fn get_segment_upload_uri(&self, _segment: &VodSegmentId, session_id: &str, _part: i64) -> Result<String, SquadOvError> {
+        Ok(session_id.to_string())
+    }
+
+    async fn finish_segment_upload(&self, _segment: &VodSegmentId, _session_id: &str, _parts: &[String]) -> Result<(), SquadOvError> {
+        Ok(())
     }
 
     async fn delete_vod(&self, segment: &VodSegmentId) -> Result<(), SquadOvError> {

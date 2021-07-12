@@ -59,8 +59,16 @@ impl VodManager for FilesystemVodManager {
         Ok(())
     }
 
-    async fn get_segment_upload_uri(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
+    async fn start_segment_upload(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
         Ok(String::from(self.segment_id_to_path(segment).to_str().unwrap_or("")))
+    }
+
+    async fn get_segment_upload_uri(&self, _segment: &VodSegmentId, session_id: &str, _part: i64) -> Result<String, SquadOvError> {
+        Ok(session_id.to_string())
+    }
+
+    async fn finish_segment_upload(&self, _segment: &VodSegmentId, _session_id: &str, _parts: &[String]) -> Result<(), SquadOvError> {
+        Ok(())
     }
 
     async fn delete_vod(&self, segment: &VodSegmentId) -> Result<(), SquadOvError> {

@@ -15,7 +15,6 @@ use squadov_common;
 use squadov_common::{
     SquadOvError,
     HalResponse,
-    BlobManagementClient,
     KafkaCredentialKeyPair,
     riot::{
         api::{RiotApiHandler, RiotApiApplicationInterface, RiotConfig},
@@ -30,6 +29,7 @@ use squadov_common::{
         VodManager,
         GCSVodManager,
         FilesystemVodManager,
+        S3VodManager,
     },
     csgo::rabbitmq::CsgoRabbitmqInterface,
     steam::{
@@ -39,11 +39,17 @@ use squadov_common::{
     blob,
     blob::{
         BlobManagerType,
-        gcp::GCPBlobManager,
-        aws::AWSBlobManager,
+        BlobStorageClient,
+        BlobManagementClient,
+        gcp::GCPBlobStorage,
+        aws::AWSBlobStorage,
     },
     storage::{StorageManager, CloudStorageLocation, CloudStorageBucketsConfig},
     GCPClient,
+    aws::{
+        AWSClient,
+        AWSConfig,
+    },
 };
 use url::Url;
 use std::vec::Vec;
@@ -179,6 +185,7 @@ pub struct SquadOvStorageConfig {
 pub struct ApiConfig {
     fusionauth: fusionauth::FusionAuthConfig,
     pub gcp: squadov_common::GCPConfig,
+    pub aws: AWSConfig,
     pub database: DatabaseConfig,
     pub cors: CorsConfig,
     pub server: ServerConfig,
@@ -207,7 +214,7 @@ pub struct ApiApplication {
     pub pool: Arc<PgPool>,
     pub heavy_pool: Arc<PgPool>,
     schema: Arc<graphql::GraphqlSchema>,
-    pub blob: Arc<StorageManager<Arc<dyn BlobManagementClient + Send + Sync>>>,
+    pub blob: Arc<StorageManager<Arc<BlobManagementClient>>>,
     pub rso_itf: Arc<RiotApiApplicationInterface>,
     pub valorant_itf: Arc<RiotApiApplicationInterface>,
     pub lol_itf: Arc<RiotApiApplicationInterface>,
@@ -217,6 +224,7 @@ pub struct ApiApplication {
     pub csgo_itf: Arc<CsgoRabbitmqInterface>,
     pub steam_itf: Arc<SteamApiRabbitmqInterface>,
     gcp: Arc<Option<GCPClient>>,
+    aws: Arc<Option<AWSClient>>,
 }
 
 impl ApiApplication {
@@ -227,21 +235,23 @@ impl ApiApplication {
     async fn create_vod_manager(&mut self, bucket: &str) -> Result<(), SquadOvError> {
         let vod_manager = match vod::manager::get_vod_manager_type(bucket) {
             VodManagerType::GCS => Arc::new(GCSVodManager::new(bucket, self.gcp.clone()).await?) as Arc<dyn VodManager + Send + Sync>,
+            VodManagerType::S3 => Arc::new(S3VodManager::new(bucket, self.aws.clone()).await?) as Arc<dyn VodManager + Send + Sync>,
             VodManagerType::FileSystem => Arc::new(FilesystemVodManager::new(bucket)?) as Arc<dyn VodManager + Send + Sync>
         };
         self.vod.new_bucket(bucket, vod_manager).await;
         Ok(())
     }
 
-    pub async fn get_blob_manager(&self, bucket: &str) -> Result<Arc<dyn BlobManagementClient + Send + Sync>, SquadOvError> {
+    pub async fn get_blob_manager(&self, bucket: &str) -> Result<Arc<BlobManagementClient>, SquadOvError> {
         self.blob.get_bucket(bucket).await.ok_or(SquadOvError::NotFound)
     }
 
     async fn create_blob_manager(&mut self, bucket: &str) -> Result<(), SquadOvError> {
-        let blob_manager = match blob::get_blob_manager_type(bucket) {
-            BlobManagerType::GCS => Arc::new(GCPBlobManager::new(bucket, self.gcp.clone(), self.pool.clone())) as Arc<dyn BlobManagementClient + Send + Sync>,
+        let storage = match blob::get_blob_manager_type(bucket) {
+            BlobManagerType::GCS => Arc::new(GCPBlobStorage::new(self.gcp.clone())) as Arc<dyn BlobStorageClient + Send + Sync>,
+            BlobManagerType::S3 => Arc::new(AWSBlobStorage::new(self.aws.clone())) as Arc<dyn BlobStorageClient + Send + Sync>,
         };
-        self.blob.new_bucket(bucket, blob_manager).await;
+        self.blob.new_bucket(bucket, Arc::new(BlobManagementClient::new(bucket, self.pool.clone(), storage))).await;
         Ok(())
     }
 
@@ -271,6 +281,14 @@ impl ApiApplication {
         let gcp = Arc::new(
             if config.gcp.enabled {
                 Some(squadov_common::GCPClient::new(&config.gcp).await)
+            } else {
+                None
+            }
+        );
+
+        let aws = Arc::new(
+            if config.aws.enabled {
+                Some(AWSClient::new(&config.aws))
             } else {
                 None
             }
@@ -321,7 +339,7 @@ impl ApiApplication {
         vod_manager.set_location_map(CloudStorageLocation::Global, &config.storage.vods.global);
         let vod_manager = Arc::new(vod_manager);
 
-        let mut blob = StorageManager::<Arc<dyn BlobManagementClient + Send + Sync>>::new();
+        let mut blob = StorageManager::<Arc<BlobManagementClient>>::new();
         blob.set_location_map(CloudStorageLocation::Global, &config.storage.blobs.global);
         let blob = Arc::new(blob);
 
@@ -355,6 +373,7 @@ impl ApiApplication {
             csgo_itf,
             steam_itf,
             gcp,
+            aws,
         };
 
         app.create_vod_manager(&config.storage.vods.global).await.unwrap();

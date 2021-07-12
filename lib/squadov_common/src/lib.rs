@@ -40,6 +40,7 @@ pub mod user;
 pub mod accounts;
 pub mod twitch;
 pub mod storage;
+pub mod aws;
 
 pub use error::*;
 pub use parse::*;

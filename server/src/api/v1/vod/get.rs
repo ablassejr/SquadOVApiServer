@@ -4,6 +4,8 @@ use squadov_common::{
     VodSegment,
     VodManifest,
     VodTrack,
+    VodDestination,
+    VodSegmentId,
     vod::db,
     storage::CloudStorageLocation,
 };
@@ -18,6 +20,14 @@ use std::collections::HashMap;
 #[derive(Deserialize)]
 pub struct VodFindFromVideoUuid {
     video_uuid: Uuid,
+}
+
+#[derive(Deserialize)]
+pub struct VodPartQuery {
+    // Should all be set or none be set.
+    part: Option<i64>,
+    session: Option<String>,
+    bucket: Option<String>,
 }
 
 impl api::ApiApplication {
@@ -142,10 +152,36 @@ pub async fn get_vod_handler(data : web::Path<VodFindFromVideoUuid>, app : web::
     Ok(HttpResponse::Ok().json(data))
 }
 
-pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>, query: web::Query<VodPartQuery>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
     let mut assocs = app.find_vod_associations(&[data.video_uuid.clone()]).await?;
     let vod = assocs.remove(&data.video_uuid).ok_or(SquadOvError::NotFound)?;
-    Ok(HttpResponse::Ok().json(&app.get_vod_destination(&data.video_uuid, &vod.raw_container_format).await?))
+    Ok(HttpResponse::Ok().json(&
+        if let Some(session) = &query.session {
+            if let Some(bucket) = &query.bucket {
+                let part = query.part.unwrap_or(1);
+                if part > 1 {
+                    // If we have a session, bucket, and > 1 part, that means we already started the upload so it's a matter
+                    // of figuring out the next URL to upload parts to.
+                    let manager = app.get_vod_manager(&bucket).await?;
+                    VodDestination {
+                        url: manager.get_segment_upload_uri(&VodSegmentId{
+                            video_uuid: data.video_uuid.clone(),
+                            quality: String::from("source"),
+                            segment_name: format!("video.{}", &vod.raw_container_format),
+                        }, session, part).await?,
+                        bucket: bucket.clone(),
+                        session: session.clone(),
+                    }
+                } else {
+                    return Err(SquadOvError::BadRequest);
+                }
+            } else {
+                return Err(SquadOvError::BadRequest);
+            }
+        } else {
+            app.create_vod_destination(&data.video_uuid, &vod.raw_container_format).await?
+        }
+    ))
 }
 
 pub async fn get_vod_association_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {

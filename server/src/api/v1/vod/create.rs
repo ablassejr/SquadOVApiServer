@@ -125,21 +125,24 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    pub async fn get_vod_destination(&self, video_uuid: &Uuid, container_format: &str) -> Result<VodDestination, SquadOvError> {
+    pub async fn create_vod_destination(&self, video_uuid: &Uuid, container_format: &str) -> Result<VodDestination, SquadOvError> {
         let extension = squadov_common::container_format_to_extension(container_format);
 
         let bucket = self.vod.get_bucket_for_location(CloudStorageLocation::Global).ok_or(SquadOvError::InternalError(String::from("No global storage location configured for VOD storage.")))?;
         let manager = self.get_vod_manager(&bucket).await?;
 
-        let path = manager.get_segment_upload_uri(&squadov_common::VodSegmentId{
+        let vod_segment = squadov_common::VodSegmentId{
             video_uuid: video_uuid.clone(),
             quality: String::from("source"),
             segment_name: format!("video.{}", &extension),
-        }).await?;
+        };
+        let session_id = manager.start_segment_upload(&vod_segment).await?;
+        let path = manager.get_segment_upload_uri(&vod_segment, &session_id, 1).await?;
         Ok(
             VodDestination{
                 url: path,
                 bucket,
+                session: session_id,
             }
         )
     }
@@ -200,5 +203,5 @@ pub async fn create_vod_destination_handler(data : web::Json<VodCreateDestinatio
     app.reserve_vod_uuid(&mut tx, &data.video_uuid, &data.container_format, session.user.id, false).await?;
     tx.commit().await?;
 
-    Ok(HttpResponse::Ok().json(app.get_vod_destination(&data.video_uuid, &data.container_format).await?))
+    Ok(HttpResponse::Ok().json(app.create_vod_destination(&data.video_uuid, &data.container_format).await?))
 }
