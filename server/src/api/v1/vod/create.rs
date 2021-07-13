@@ -33,6 +33,7 @@ pub struct VodAssociateBodyInput {
     metadata: squadov_common::VodMetadata,
     #[serde(rename="sessionUri")]
     session_uri: Option<String>,
+    parts: Option<Vec<String>>,
 }
 
 impl api::ApiApplication {
@@ -91,7 +92,9 @@ impl api::ApiApplication {
                 avg_bitrate,
                 max_bitrate,
                 id,
-                fps
+                fps,
+                bucket,
+                session_id
             )
             VALUES
         "));
@@ -105,7 +108,9 @@ impl api::ApiApplication {
                 {avg_bitrate},
                 {max_bitrate},
                 '{id}',
-                {fps}
+                {fps},
+                '{bucket}',
+                {session_id}
             )",
                 video_uuid=vod_uuid,
                 res_x=m.res_x,
@@ -114,7 +119,9 @@ impl api::ApiApplication {
                 avg_bitrate=m.avg_bitrate,
                 max_bitrate=m.max_bitrate,
                 id=m.id,
-                fps=m.fps
+                fps=m.fps,
+                bucket=m.bucket,
+                session_id=squadov_common::sql::sql_format_option_string(&m.session_id),
             ));
 
             if idx != data.len() - 1 {
@@ -143,8 +150,26 @@ impl api::ApiApplication {
                 url: path,
                 bucket,
                 session: session_id,
+                loc: manager.manager_type(),
             }
         )
+    }
+
+    pub async fn update_vod_metadata_session_id(&self, tx : &mut Transaction<'_, Postgres>, video_uuid: &Uuid, metadata_id: &str, session_id: &str) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            "
+            UPDATE squadov.vod_metadata
+            SET session_id = $3
+            WHERE video_uuid = $1
+                AND id = $2
+            ",
+            video_uuid,
+            metadata_id,
+            session_id,
+        )
+            .execute(tx)
+            .await?;
+        Ok(())
     }
 }
 
@@ -179,13 +204,19 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
     if !data.association.is_local {
         app.bulk_add_video_metadata(&mut tx, &data.association.video_uuid, &[data.metadata]).await?;
     }
+
+    // Need to store the session id for the VOD upload just in case we need it later on.
+    if let Some(session_uri) = &data.session_uri {
+        app.update_vod_metadata_session_id(&mut tx, &data.association.video_uuid, &metadata_id, &session_uri).await?;
+    }
+
     tx.commit().await?;
 
     // Note that we don't want to spawn a task directly here to "fastify" the VOD
     // because it does take a significant amount of memory/disk space to do so.
     // So we toss it to the local job queue so we can better limit the amount of resources we end up using.
     if !data.association.is_local {
-        app.vod_itf.request_vod_processing(&data.association.video_uuid, &metadata_id, data.session_uri.clone(), true).await?;
+        app.vod_itf.request_vod_processing(&data.association.video_uuid, &metadata_id, data.session_uri.clone(), data.parts, true).await?;
     }
     return Ok(HttpResponse::Ok().finish());
 }

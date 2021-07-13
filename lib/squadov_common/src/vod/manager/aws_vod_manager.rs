@@ -61,6 +61,10 @@ impl S3VodManager {
 
 #[async_trait]
 impl VodManager for S3VodManager {
+    fn manager_type(&self) -> super::VodManagerType {
+        super::VodManagerType::S3
+    }
+
     async fn get_segment_redirect_uri(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
         let req = GetObjectRequest{
             bucket: self.bucket.clone(),
@@ -83,13 +87,13 @@ impl VodManager for S3VodManager {
             ..GetObjectRequest::default()
         };
 
-        let mut output_file = std::fs::File::create(path)?;
+        let mut output_file = TFile::create(path).await?;
         let resp = (*self.aws).as_ref().unwrap().s3.get_object(req).await?;
         if let Some(body) = resp.body {
-            let mut reader = body.into_blocking_read();
+            let mut reader = body.into_async_read();
 
             // Stream the download from GCS onto disk so we never have to have to entire file in memory.
-            std::io::copy(&mut reader, &mut output_file)?;
+            tokio::io::copy(&mut reader, &mut output_file).await?;
 
             Ok(())
         } else {
@@ -106,6 +110,11 @@ impl VodManager for S3VodManager {
             base64::encode(hash)
         };
 
+        let file_byte_size = {
+            let file = std::fs::File::open(path)?;
+            file.metadata()?.len()
+        };
+
         let file = TFile::open(path).await?;
         let framed_read = FramedRead::new(file, BytesCodec::new()).map_ok(BytesMut::freeze);
         
@@ -115,6 +124,7 @@ impl VodManager for S3VodManager {
                 StreamingBody::new(framed_read)
             ),
             content_md5: Some(md5_hash),
+            content_length: Some(file_byte_size as i64),
             content_type: Some(String::from("application/octet-stream")),
             key: segment.get_fname(),
             ..PutObjectRequest::default()
@@ -168,7 +178,7 @@ impl VodManager for S3VodManager {
                 parts: Some(parts.iter().enumerate().map(|(idx, x)| {
                     CompletedPart {
                         e_tag: Some(x.clone()),
-                        part_number: Some(idx as i64),
+                        part_number: Some(idx as i64 + 1),
                     }
                 }).collect()),
             }),

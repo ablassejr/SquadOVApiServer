@@ -11,7 +11,10 @@ use crate::{
     SquadOvError,
     VodSegmentId,
 };
+use serde_repr::{Serialize_repr, Deserialize_repr};
 
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
+#[repr(i32)]
 pub enum VodManagerType {
     FileSystem,
     GCS,
@@ -30,6 +33,8 @@ pub fn get_vod_manager_type(root: &str) -> VodManagerType {
 
 #[async_trait]
 pub trait VodManager {
+    fn manager_type(&self) -> VodManagerType;
+
     // Returns a session string that can be passed to get_segment_upload_uri
     async fn start_segment_upload(&self, segment: &VodSegmentId) -> Result<String, SquadOvError>;
     // User can request to get a separate URL for each uploaded segment (though it isn't necessarily guaranteed to be different for each segment).

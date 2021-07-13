@@ -34,6 +34,10 @@ impl FilesystemVodManager {
 
 #[async_trait]
 impl VodManager for FilesystemVodManager {
+    fn manager_type(&self) -> super::VodManagerType {
+        super::VodManagerType::FileSystem
+    }
+
     async fn get_segment_redirect_uri(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
         let fname = self.segment_id_to_path(segment);
         if !fname.exists() {

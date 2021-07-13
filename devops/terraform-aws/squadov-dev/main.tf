@@ -10,6 +10,7 @@ terraform {
         bucket = "squadov-aws-tf-dev-state"
         key = "tfstate"
         region = "us-east-2"
+        profile = "terraformdev"
     }
 
     required_version = ">= 1.0.2"
@@ -17,7 +18,12 @@ terraform {
 
 provider "aws" {
     region              = "us-east-2"
+    profile             = "terraformdev"
     allowed_account_ids = [ 897997503846 ]
+}
+
+module "iam" {
+    source = "../modules/iam"
 }
 
 module "storage" {

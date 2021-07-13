@@ -4,4 +4,3 @@ kubectl create secret docker-registry regcred --docker-server=registry.gitlab.co
 kubectl create secret generic postgres-secret --from-literal=username=${POSTGRES_USER} --from-literal=password="${POSTGRES_PASSWORD}"
 kubectl create secret generic mysql-secret --from-literal=username=${MYSQL_USER} --from-literal=password="${MYSQL_PASSWORD}"
 kubectl create secret generic fusionauth-db-secret --from-literal=username=${FUSIONAUTH_DB_USER} --from-literal=password="${FUSIONAUTH_DB_PASSWORD}"
-kubectl create secret generic aws-secret --from-literal=AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} --from-literal=AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"

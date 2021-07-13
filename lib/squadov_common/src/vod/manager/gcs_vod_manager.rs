@@ -57,6 +57,10 @@ impl GCSVodManager {
 
 #[async_trait]
 impl VodManager for GCSVodManager {
+    fn manager_type(&self) -> super::VodManagerType {
+        super::VodManagerType::GCS
+    }
+
     async fn get_segment_redirect_uri(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {       
         let fname = self.get_fname_from_segment_id(segment);
         let client = self.get_gcp_client().gcs();

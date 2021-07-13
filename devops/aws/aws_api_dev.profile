@@ -1,0 +1,3 @@
+[api]
+aws_access_key_id=AKIA5CFGSPVTHCUPCGHS
+aws_secret_access_key=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

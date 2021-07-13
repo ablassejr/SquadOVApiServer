@@ -1,0 +1,2 @@
+ALTER TABLE vod_metadata
+ALTER COLUMN bucket DROP DEFAULT;

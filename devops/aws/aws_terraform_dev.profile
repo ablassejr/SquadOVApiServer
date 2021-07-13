@@ -1,0 +1,3 @@
+[terraformdev]
+aws_access_key_id=AKIA5CFGSPVTAGN4C5CG
+aws_secret_access_key=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

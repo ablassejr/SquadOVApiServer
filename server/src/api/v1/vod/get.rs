@@ -7,7 +7,6 @@ use squadov_common::{
     VodDestination,
     VodSegmentId,
     vod::db,
-    storage::CloudStorageLocation,
 };
 use crate::api;
 use actix_web::{web, HttpResponse};
@@ -163,14 +162,16 @@ pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>,
                     // If we have a session, bucket, and > 1 part, that means we already started the upload so it's a matter
                     // of figuring out the next URL to upload parts to.
                     let manager = app.get_vod_manager(&bucket).await?;
+                    let extension = squadov_common::container_format_to_extension(&vod.raw_container_format);
                     VodDestination {
                         url: manager.get_segment_upload_uri(&VodSegmentId{
                             video_uuid: data.video_uuid.clone(),
                             quality: String::from("source"),
-                            segment_name: format!("video.{}", &vod.raw_container_format),
+                            segment_name: format!("video.{}", extension),
                         }, session, part).await?,
                         bucket: bucket.clone(),
                         session: session.clone(),
+                        loc: manager.manager_type(),
                     }
                 } else {
                     return Err(SquadOvError::BadRequest);
@@ -190,8 +191,8 @@ pub async fn get_vod_association_handler(data : web::Path<VodFindFromVideoUuid>,
 }
 
 pub async fn get_vod_track_segment_handler(data : web::Path<squadov_common::VodSegmentId>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
-    let bucket = app.vod.get_bucket_for_location(CloudStorageLocation::Global).ok_or(SquadOvError::InternalError(String::from("No global storage location configured for VOD storage.")))?;
-    let manager = app.get_vod_manager(&bucket).await?;
+    let metadata = db::get_vod_metadata(&*app.pool, &data.video_uuid, "source").await?;
+    let manager = app.get_vod_manager(&metadata.bucket).await?;
 
     // If the VOD is public (shared), then we can return the public URL instead of the signed private one.
     let redirect_uri = if data.segment_name != "preview.mp4" && db::check_if_vod_public(&*app.pool, &data.video_uuid).await? && manager.check_vod_segment_is_public(&data).await? {
