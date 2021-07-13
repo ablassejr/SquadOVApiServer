@@ -11,7 +11,6 @@ use rusoto_s3::{
     GetObjectRequest,
     PutObjectRequest
 };
-use std::io::Read;
 use md5::Digest;
 
 const PREFIX : &'static str = "s3://";
@@ -59,9 +58,11 @@ impl BlobStorageClient for AWSBlobStorage {
         let result = (*self.aws).as_ref().unwrap().s3.get_object(req).await?;
 
         if let Some(body) = result.body {
-            let mut reader = body.into_blocking_read();
+            let mut reader = body.into_async_read();
+
             let mut bytes: Vec<u8> = Vec::new();
-            reader.read_to_end(&mut bytes)?;
+            tokio::io::copy(&mut reader, &mut bytes).await?;
+
             Ok(bytes)
         } else {
             Ok(vec![])

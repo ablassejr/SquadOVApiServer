@@ -100,7 +100,7 @@ impl BlobManagementClient {
         }
 
         let data = data.unwrap();
-        let compressed_bytes = self.storage.download_object(&data.bucket, &data.local_path).await?;
+        let compressed_bytes = self.storage.download_object(&self.storage.strip_bucket_prefix(&data.bucket), &data.local_path).await?;
 
         if is_compressed {
             let mut uncompressed_bytes: Vec<u8> = Vec::new();
@@ -116,12 +116,6 @@ impl BlobManagementClient {
 
     pub async fn store_new_json_blob(&self, tx : &mut Transaction<'_, Postgres>, val: &serde_json::Value) -> Result<Uuid, SquadOvError> {
         self.store_new_blob(tx, &serde_json::to_vec(val)?).await
-    }
-
-    pub async fn get_json_blob(&self, blob_uuid: &Uuid, is_compressed: bool) -> Result<serde_json::Value, SquadOvError> {
-        let blob = self.get_blob(blob_uuid, is_compressed).await?;
-        let value = serde_json::from_slice(&blob)?;
-        Ok(value)
     }
 }
 
