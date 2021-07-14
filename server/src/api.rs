@@ -377,10 +377,14 @@ impl ApiApplication {
         };
 
         app.create_vod_manager(&config.storage.vods.global).await.unwrap();
-        app.create_vod_manager(&config.storage.vods.legacy).await.unwrap();
+        if config.storage.vods.global != config.storage.vods.legacy {
+            app.create_vod_manager(&config.storage.vods.legacy).await.unwrap();
+        }
 
         app.create_blob_manager(&config.storage.blobs.global).await.unwrap();
-        app.create_blob_manager(&config.storage.blobs.legacy).await.unwrap();
+        if config.storage.blobs.global != config.storage.blobs.legacy {
+            app.create_blob_manager(&config.storage.blobs.legacy).await.unwrap();
+        }
 
         app
     }
