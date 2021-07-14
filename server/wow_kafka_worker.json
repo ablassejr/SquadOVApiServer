@@ -1919,6 +1919,20 @@
       "nullable": []
     }
   },
+  "4a6228eceba9b7d3b33bf510395734d8a9ab10556ca956d43e370ed87afda0f4": {
+    "query": "\n            UPDATE squadov.vod_metadata\n            SET session_id = $3\n            WHERE video_uuid = $1\n                AND id = $2\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "4c8d614e3ffba4ee3de3814d6d3076bea6f5ce2205046407286fe97b3c520bed": {
     "query": "\n            UPDATE squadov.squads\n            SET squad_name = $2\n            WHERE id = $1\n            ",
     "describe": {
@@ -5574,6 +5588,16 @@
           "ordinal": 9,
           "name": "has_preview",
           "type_info": "Bool"
+        },
+        {
+          "ordinal": 10,
+          "name": "bucket",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 11,
+          "name": "session_id",
+          "type_info": "Varchar"
         }
       ],
       "parameters": {
@@ -5591,7 +5615,9 @@
         false,
         false,
         false,
-        false
+        false,
+        false,
+        true
       ]
     }
   },
