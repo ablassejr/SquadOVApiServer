@@ -167,6 +167,7 @@ impl VodManager for GCSVodManager {
             .post(&start_resumable_url)
             .header("x-goog-resumable", "start")
             .header("content-type", "application/octet-stream")
+            .header("content-length", "0")
             .send()
             .await?;
         
