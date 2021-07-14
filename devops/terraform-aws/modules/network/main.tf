@@ -17,13 +17,6 @@ resource "aws_subnet" "database_subnet_a" {
     map_public_ip_on_launch = true
 }
 
-resource "aws_subnet" "database_subnet_b" {
-    vpc_id = aws_vpc.primary.id
-    availability_zone = "us-east-2b"
-    cidr_block = "10.0.0.16/28"
-    map_public_ip_on_launch = true
-}
-
 resource "aws_subnet" "database_subnet_c" {
     vpc_id = aws_vpc.primary.id
     availability_zone = "us-east-2c"
@@ -60,12 +53,6 @@ resource "aws_subnet" "k8s_subnet_private_a" {
     cidr_block = "10.0.1.0/28"
 }
 
-resource "aws_subnet" "k8s_subnet_private_b" {
-    vpc_id = aws_vpc.primary.id
-    availability_zone = "us-east-2b"
-    cidr_block = "10.0.1.16/28"
-}
-
 resource "aws_subnet" "k8s_subnet_private_c" {
     vpc_id = aws_vpc.primary.id
     availability_zone = "us-east-2c"
@@ -78,32 +65,41 @@ resource "aws_subnet" "k8s_subnet_public_a" {
     cidr_block = "10.0.2.0/28"
 }
 
-resource "aws_subnet" "k8s_subnet_public_b" {
-    vpc_id = aws_vpc.primary.id
-    availability_zone = "us-east-2b"
-    cidr_block = "10.0.2.16/28"
-}
-
 resource "aws_subnet" "k8s_subnet_public_c" {
     vpc_id = aws_vpc.primary.id
     availability_zone = "us-east-2c"
     cidr_block = "10.0.2.32/28"
 }
 
+
+resource "aws_eip" "primary_nat_eip_a" {
+    vpc = true
+}
+
+resource "aws_nat_gateway" "primary_nat_a" {
+    allocation_id = aws_eip.primary_nat_eip_a.id
+    connectivity_type = "public"
+    subnet_id = aws_subnet.k8s_subnet_public_a.id
+
+    depends_on = [ aws_internet_gateway.primary_gateway ]
+}
+
+resource "aws_eip" "primary_nat_eip_c" {
+    vpc = true
+}
+
+resource "aws_nat_gateway" "primary_nat_c" {
+    allocation_id = aws_eip.primary_nat_eip_c.id
+    connectivity_type = "public"
+    subnet_id = aws_subnet.k8s_subnet_public_c.id
+
+    depends_on = [ aws_internet_gateway.primary_gateway ]
+}
+
 resource "aws_subnet" "fargate_subnet_private_a" {
     vpc_id = aws_vpc.primary.id
     availability_zone = "us-east-2a"
     cidr_block = "10.0.16.0/24"
-
-    tags = {
-        "kubernetes.io/cluster/primary-eks-cluster" = "shared"
-    }
-}
-
-resource "aws_subnet" "fargate_subnet_private_b" {
-    vpc_id = aws_vpc.primary.id
-    availability_zone = "us-east-2b"
-    cidr_block = "10.0.32.0/24"
 
     tags = {
         "kubernetes.io/cluster/primary-eks-cluster" = "shared"
@@ -134,11 +130,6 @@ resource "aws_route_table_association" "database_rt_subnet_a" {
     subnet_id = aws_subnet.database_subnet_a.id
 }
 
-resource "aws_route_table_association" "database_rt_subnet_b" {
-    route_table_id = aws_route_table.public_route_table.id
-    subnet_id = aws_subnet.database_subnet_b.id
-}
-
 resource "aws_route_table_association" "database_rt_subnet_c" {
     route_table_id = aws_route_table.public_route_table.id
     subnet_id = aws_subnet.database_subnet_c.id
@@ -149,52 +140,51 @@ resource "aws_route_table_association" "k8s_public_rt_subnet_a" {
     subnet_id = aws_subnet.k8s_subnet_public_a.id
 }
 
-resource "aws_route_table_association" "k8s_public_rt_subnet_b" {
-    route_table_id = aws_route_table.public_route_table.id
-    subnet_id = aws_subnet.k8s_subnet_public_b.id
-}
-
 resource "aws_route_table_association" "k8s_public_rt_subnet_c" {
     route_table_id = aws_route_table.public_route_table.id
     subnet_id = aws_subnet.k8s_subnet_public_c.id
 }
 
-resource "aws_route_table" "private_route_table" {
+resource "aws_route_table" "private_route_table_a" {
     vpc_id = aws_vpc.primary.id
+
+    route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_nat_gateway.primary_nat_a.id
+    }
+}
+
+resource "aws_route_table" "private_route_table_c" {
+    vpc_id = aws_vpc.primary.id
+
+    route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_nat_gateway.primary_nat_c.id
+    }
 }
 
 resource "aws_route_table_association" "k8s_private_rt_subnet_a" {
-    route_table_id = aws_route_table.private_route_table.id
+    route_table_id = aws_route_table.private_route_table_a.id
     subnet_id = aws_subnet.k8s_subnet_private_a.id
 }
 
-resource "aws_route_table_association" "k8s_private_rt_subnet_b" {
-    route_table_id = aws_route_table.private_route_table.id
-    subnet_id = aws_subnet.k8s_subnet_private_b.id
-}
-
 resource "aws_route_table_association" "k8s_private_rt_subnet_c" {
-    route_table_id = aws_route_table.private_route_table.id
+    route_table_id = aws_route_table.private_route_table_c.id
     subnet_id = aws_subnet.k8s_subnet_private_c.id
 }
 
 resource "aws_route_table_association" "fargate_private_rt_subnet_a" {
-    route_table_id = aws_route_table.private_route_table.id
+    route_table_id = aws_route_table.private_route_table_a.id
     subnet_id = aws_subnet.fargate_subnet_private_a.id
 }
 
-resource "aws_route_table_association" "fargate_private_rt_subnet_b" {
-    route_table_id = aws_route_table.private_route_table.id
-    subnet_id = aws_subnet.fargate_subnet_private_b.id
-}
-
 resource "aws_route_table_association" "fargate_private_rt_subnet_c" {
-    route_table_id = aws_route_table.private_route_table.id
+    route_table_id = aws_route_table.private_route_table_c.id
     subnet_id = aws_subnet.fargate_subnet_private_c.id
 }
 
 output "database_subnets" {
-    value = [aws_subnet.database_subnet_a.id, aws_subnet.database_subnet_b.id, aws_subnet.database_subnet_c.id]
+    value = [aws_subnet.database_subnet_a.id, aws_subnet.database_subnet_c.id]
 }
 
 output "database_security_groups" {
@@ -204,10 +194,8 @@ output "database_security_groups" {
 output "k8s_subnets" {
     value = [
         aws_subnet.k8s_subnet_public_a.id,
-        aws_subnet.k8s_subnet_public_b.id,
         aws_subnet.k8s_subnet_public_c.id,
         aws_subnet.k8s_subnet_private_a.id,
-        aws_subnet.k8s_subnet_private_b.id,
         aws_subnet.k8s_subnet_private_c.id
     ]
 }
@@ -215,7 +203,6 @@ output "k8s_subnets" {
 output "default_fargate_subnets" {
     value = [
         aws_subnet.fargate_subnet_private_a.id,
-        aws_subnet.fargate_subnet_private_b.id,
         aws_subnet.fargate_subnet_private_c.id
     ]
 }

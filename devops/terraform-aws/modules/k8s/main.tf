@@ -1,5 +1,7 @@
 resource "aws_iam_role" "eks_role" {
     name = "eks-cluster-role"
+    force_detach_policies = true
+
     assume_role_policy = <<POLICY
 {
     "Version": "2012-10-17",
@@ -7,7 +9,10 @@ resource "aws_iam_role" "eks_role" {
         {
             "Effect": "Allow",
             "Principal": {
-                "Service": "eks.amazonaws.com"
+                "Service": [
+                    "eks.amazonaws.com",
+                    "eks-fargate-pods.amazonaws.com"
+                ]
             },
             "Action": "sts:AssumeRole"
         }
@@ -28,6 +33,11 @@ resource "aws_iam_role_policy_attachment" "eks_role_AmazonEKSVPCResourceControll
     role       = aws_iam_role.eks_role.name
 }
 
+resource "aws_iam_role_policy_attachment" "eks_role_AmazonEKSFargatePodExecutionRolePolicy" {
+    policy_arn = "arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy"
+    role       = aws_iam_role.eks_role.name
+}
+
 resource "aws_kms_key" "primary_eks_kms_key" {
     description = "KMS Key: Primary EKS Cluster"
     customer_master_key_spec = "SYMMETRIC_DEFAULT"
@@ -41,7 +51,7 @@ resource "aws_eks_cluster" "primary_eks_cluster" {
         subnet_ids = var.k8s_subnets
     }
 
-    enabled_cluster_log_types = ["api", "audit"]
+    enabled_cluster_log_types = ["api", "audit", "scheduler"]
     encryption_config {
         provider {
             key_arn = aws_kms_key.primary_eks_kms_key.arn
@@ -74,33 +84,11 @@ resource "aws_iam_openid_connect_provider" "primary_eks_iam_provider" {
     ]
 }
 
-resource "aws_iam_role" "fargate_role" {
-    name = "fargate-exe-role"
-    assume_role_policy = <<POLICY
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Principal": {
-                "Service": "eks-fargate-pods.amazonaws.com"
-            },
-            "Action": "sts:AssumeRole"
-        }
-    ]
-}
-POLICY
-}
-
-resource "aws_iam_role_policy_attachment" "fargate_role_AmazonEKSFargatePodExecutionRolePolicy" {
-    policy_arn = "arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy"
-    role       = aws_iam_role.fargate_role.name
-}
 
 resource "aws_eks_fargate_profile" "primary_eks_default_fargate_profile" {
     cluster_name = aws_eks_cluster.primary_eks_cluster.name
     fargate_profile_name = "default-fargate-profile"
-    pod_execution_role_arn = aws_iam_role.fargate_role.arn
+    pod_execution_role_arn = aws_iam_role.eks_role.arn
     subnet_ids = var.default_fargate_subnets
 
     selector {
@@ -111,7 +99,7 @@ resource "aws_eks_fargate_profile" "primary_eks_default_fargate_profile" {
 resource "aws_eks_fargate_profile" "primary_eks_coredns_fargate_profile" {
     cluster_name = aws_eks_cluster.primary_eks_cluster.name
     fargate_profile_name = "coredns-fargate-profile"
-    pod_execution_role_arn = aws_iam_role.fargate_role.arn
+    pod_execution_role_arn = aws_iam_role.eks_role.arn
     subnet_ids = var.default_fargate_subnets
 
     selector {
