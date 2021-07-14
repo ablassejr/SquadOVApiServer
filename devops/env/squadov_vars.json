@@ -46,8 +46,8 @@
 	"STEAM_API_KEY": "ENC[AES256_GCM,data:Mr/REdXPUJIfeH7ww9qnMNSMYIrBf3ybd0ZkqwGb67Y=,iv:YEuQOFVaNViiwFVfb6iv7FKc9OWHiB5JidN3J2osuz4=,tag:ZZay+ibfrjrZXKItPhj2Zg==,type:str]",
 	"TWITCH_CLIENT_ID": "ENC[AES256_GCM,data:l909F5agDq91WeXsvc2vo+AYrL4C3/tsBkOEY7AB,iv:RAbKpd2xyJzIJHWSLa6SBdIIadzOlxNjToa1Qg9RqpE=,tag:zdCng6BBraVin5EFElGsWA==,type:str]",
 	"TWITCH_CLIENT_SECRET": "ENC[AES256_GCM,data:U3gavoFXCw+X/usa6BqiE6M5OEAXUW62ZSvWk7xR,iv:3AjaxnqB5CNJjW5uAhhAIPVyzOWamvXEKetZxwad9CE=,tag:WMAx/VVvX2jokSxUpU2iJA==,type:str]",
-	"DEFAULT_VOD_STORAGE_BUCKET": "ENC[AES256_GCM,data:BWwfd5Q1MsXZ2Duqf69C8Btk2OrPef79K9k=,iv:lnjSc17ojJsHuX9VIdfs8ZATT1CZuL2vkzF/JzEVhXo=,tag:ypNnuplhfqxs1shdV32sDQ==,type:str]",
-	"DEFAULT_BLOB_STORAGE_BUCKET": "ENC[AES256_GCM,data:HG0MHf9ouv4VDY3bSz9FfSu6O3ybvRYfBAuZ,iv:JfdUdJGP08siVNzfwjKTrPDlycWOX029yKv1iGWINU8=,tag:BRre0FWwi0KG2Yec+/gAvQ==,type:str]",
+	"DEFAULT_VOD_STORAGE_BUCKET": "ENC[AES256_GCM,data:xr2no9OdTeZX+No0LCXqQ/7lCktJ2YQ=,iv:8fdrfYK4DTz+2ShK0qbTMS0pOaudhnE3crmyv0gLeuo=,tag:0RxjCs4w6DlcGmmI1DpApQ==,type:str]",
+	"DEFAULT_BLOB_STORAGE_BUCKET": "ENC[AES256_GCM,data:88UW2+N/lhjo2N5rtFuI/fJuAvlx7yKn,iv:CCMmVIXpuwaGwxKDRDNvlNisO5RM6JteZS6brqKGqYk=,tag:f+qjBkZEi7gXS8eNppi9LA==,type:str]",
 	"LEGACY_VOD_STORAGE_BUCKET": "ENC[AES256_GCM,data:YGCv3hxQHgh+sj1mUxWEqk/0nwv22R4=,iv:tyNXOr1J3XFypJ5+Ro8vSwnfMo7pxhjDa6ZSZ82C4Bw=,tag:3/rbXXzF9P1pC1qg04g5EQ==,type:str]",
 	"LEGACY_BLOB_STORAGE_BUCKET": "ENC[AES256_GCM,data:HjDVU1F9j3RPMkif+2qzm0ETIXz8ukXl,iv:vSmz87d26+nV5F4zBpG8OQal6YT1I9Rk0T9siYsunuQ=,tag:HwoqsrDAPxGfwhr4pxZDvg==,type:str]",
 	"sops": {
@@ -61,8 +61,8 @@
 		],
 		"azure_kv": null,
 		"hc_vault": null,
-		"lastmodified": "2021-07-13T00:36:18Z",
-		"mac": "ENC[AES256_GCM,data:5UlnYTMuwx+CMZHW6Zxl0r4iFjvXOBEkD7U2LEGYFa4CHxInULIArjJsock6R8y5QpWNZatSHRANcmhJrP5XyH1STxylfdqHtAzlWyi+dqMqo3UesXhQdACfdPrUMKdaq9mumpkUvHgwfQo1fTfR6xHFPKdyOuxyovsYW/pXwWI=,iv:UN7/7FQ1TvjrdIw2A+6io/kWhRNWZ+Sc841pD9d5Wjo=,tag:CTPdcNY1hJ8x4+sxlKySnw==,type:str]",
+		"lastmodified": "2021-07-14T00:13:36Z",
+		"mac": "ENC[AES256_GCM,data:vfKTvFXUZX+Cq/zfMBtWkdLma/eUz6Q7PNElgQD+dWbPozC9psofX+Z9DCjf1Av2xlGomw7lPolvIx8ZnN1FQL/YPRCLEhOufAogA7x/jwExDziwwhGMbbGHct/x0rQkP9Q/k9u8mNxF2+Bbme12lBplYJIlt8Y+HEjPKlhEusw=,iv:ub9Wbm0pXGVOgi1seYV4mA2rE+n+2ZySeQqC6OCUI9M=,tag:ZW2QCWhxY8MBg2JDfhYBsA==,type:str]",
 		"pgp": null,
 		"unencrypted_suffix": "_unencrypted",
 		"version": "3.6.1"
