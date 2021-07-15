@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: external-squadov-ingress
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/certificate-arn: {{ .Values.certificate }}
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+spec:
+    rules:
+        - host: "auth.{{ .Values.domainPrefix }}squadov.gg"
+          http:
+            paths:
+            - path: /
+              pathType: Prefix
+              backend:
+                service:
+                    name: internal-fusionauth-service
+                    port:
+                        number: 9011
+    tls:
+        - hosts:
+            - "auth.{{ .Values.domainPrefix }}squadov.gg"

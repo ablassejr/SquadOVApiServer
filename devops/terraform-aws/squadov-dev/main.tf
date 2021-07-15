@@ -24,6 +24,8 @@ provider "aws" {
 
 module "network" {
     source = "../modules/network"
+
+    domain_prefix = "staging."
 }
 
 module "iam" {
@@ -52,6 +54,7 @@ module "storage" {
 module "k8s" {
     source = "../modules/k8s"
 
-    k8s_subnets = module.network.k8s_subnets
+    public_k8s_subnets = module.network.public_k8s_subnets
+    private_k8s_subnets = module.network.private_k8s_subnets
     default_fargate_subnets = module.network.default_fargate_subnets
 }

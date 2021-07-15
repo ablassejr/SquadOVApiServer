@@ -63,12 +63,22 @@ resource "aws_subnet" "k8s_subnet_public_a" {
     vpc_id = aws_vpc.primary.id
     availability_zone = "us-east-2a"
     cidr_block = "10.0.2.0/28"
+    
+    tags = {
+        "kubernetes.io/cluster/primary-eks-cluster" = "shared"
+        "kubernetes.io/role/elb" = "1"
+    }
 }
 
 resource "aws_subnet" "k8s_subnet_public_c" {
     vpc_id = aws_vpc.primary.id
     availability_zone = "us-east-2c"
     cidr_block = "10.0.2.32/28"
+    
+    tags = {
+        "kubernetes.io/cluster/primary-eks-cluster" = "shared"
+        "kubernetes.io/role/elb" = "1"
+    }
 }
 
 
@@ -100,20 +110,12 @@ resource "aws_subnet" "fargate_subnet_private_a" {
     vpc_id = aws_vpc.primary.id
     availability_zone = "us-east-2a"
     cidr_block = "10.0.16.0/24"
-
-    tags = {
-        "kubernetes.io/cluster/primary-eks-cluster" = "shared"
-    }
 }
 
 resource "aws_subnet" "fargate_subnet_private_c" {
     vpc_id = aws_vpc.primary.id
     availability_zone = "us-east-2c"
     cidr_block = "10.0.48.0/24"
-
-    tags = {
-        "kubernetes.io/cluster/primary-eks-cluster" = "shared"
-    }
 }
 
 resource "aws_route_table" "public_route_table" {
@@ -150,7 +152,7 @@ resource "aws_route_table" "private_route_table_a" {
 
     route {
         cidr_block = "0.0.0.0/0"
-        gateway_id = aws_nat_gateway.primary_nat_a.id
+        nat_gateway_id = aws_nat_gateway.primary_nat_a.id
     }
 }
 
@@ -159,7 +161,7 @@ resource "aws_route_table" "private_route_table_c" {
 
     route {
         cidr_block = "0.0.0.0/0"
-        gateway_id = aws_nat_gateway.primary_nat_c.id
+        nat_gateway_id = aws_nat_gateway.primary_nat_c.id
     }
 }
 
@@ -191,10 +193,15 @@ output "database_security_groups" {
     value = [aws_security_group.database_security_group.id]
 }
 
-output "k8s_subnets" {
+output "public_k8s_subnets" {
     value = [
         aws_subnet.k8s_subnet_public_a.id,
-        aws_subnet.k8s_subnet_public_c.id,
+        aws_subnet.k8s_subnet_public_c.id
+    ]
+}
+
+output "private_k8s_subnets" {
+    value = [
         aws_subnet.k8s_subnet_private_a.id,
         aws_subnet.k8s_subnet_private_c.id
     ]
@@ -205,4 +212,10 @@ output "default_fargate_subnets" {
         aws_subnet.fargate_subnet_private_a.id,
         aws_subnet.fargate_subnet_private_c.id
     ]
+}
+
+resource "aws_acm_certificate" "domain_certificates" {
+    domain_name = "${var.domain_prefix}squadov.gg"
+    subject_alternative_names = [ "*.${var.domain_prefix}squadov.gg" ]
+    validation_method = "DNS"
 }

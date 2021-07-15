@@ -6,6 +6,6 @@ kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.2
 helm install \
   cert-manager jetstack/cert-manager \
   --namespace cert-manager \
-  --version v1.2.0 \
+  --version v1.4.0 \
   --create-namespace \
-  --set nodeSelector.task=infra
+  --set webhook.securePort=10260

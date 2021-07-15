@@ -1,0 +1,5 @@
+domainPrefix: "staging."
+clusterName: "primary-eks-cluster"
+vpcId: "vpc-09852ef711d5c551c"
+awsRegion: "us-east-2"
+certificate: "arn:aws:acm:us-east-2:897997503846:certificate/02e6087d-ba57-48bd-afcd-86f82bd239cd"

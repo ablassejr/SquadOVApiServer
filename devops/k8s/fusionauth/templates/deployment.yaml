@@ -14,31 +14,18 @@ spec:
             labels:
                 task: fusionauth
         spec:
-            nodeSelector:
-                task: infra
             containers:
                 - name: fusionauth
                   image: fusionauth/fusionauth-app:1.27.2
                   ports:
                     - containerPort: 9011
-                  livenessProbe:
-                    httpGet:
-                        path: /api/status
-                        port: 9011
-                    initialDelaySeconds: 10
-                    periodSeconds: 5
-                  readinessProbe:
-                    httpGet:
-                        path: /api/status
-                        port: 9011
                   resources:
                     requests:
-                        cpu: "400m"
-                    limits:
-                        cpu: "2000m"
+                        cpu: "500m"
+                        memory: "2Gi"
                   env:
                     - name: DATABASE_URL
-                      value: "jdbc:postgresql://127.0.0.1:5432/fusionauth?timezone=UTC"
+                      value: "jdbc:postgresql://{{ .Values.dbUrl }}:5432/fusionauth?timezone=UTC"
                     - name: FUSIONAUTH_APP_MEMORY
                       value: 768M
                     - name: FUSIONAUTH_SEARCH_MEMORY
@@ -69,26 +56,3 @@ spec:
                         secretKeyRef:
                             name: fusionauth-db-secret
                             key: password
-                - name: cloudsql-proxy
-                  image: gcr.io/cloudsql-docker/gce-proxy:1.16
-                  ports:
-                    - containerPort: 5432
-                  command: ["/cloud_sql_proxy",
-                             "-instances=squadov:us-central1:squadov-postgres=tcp:5432",
-                             "-credential_file=/secrets/gke/gcloud-service-account.json"]
-                  securityContext:
-                      runAsUser: 2  # non-root user
-                      allowPrivilegeEscalation: false
-                  volumeMounts:
-                      - name: gke-service-account
-                        mountPath: /secrets/gke
-                        readOnly: true
-                  resources:
-                    requests:
-                        cpu: "10m"
-                    limits:
-                        cpu: "100m"
-            volumes:
-                - name: gke-service-account
-                  secret:
-                    secretName: gke-service-account
