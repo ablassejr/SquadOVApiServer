@@ -18,8 +18,6 @@ struct Options {
     db: u32,
     #[structopt(short, long)]
     kafka: i32,
-    #[structopt(short, long)]
-    pg: String,
 }
 
 #[tokio::main]
@@ -33,7 +31,6 @@ pub async fn main() -> Result<(), SquadOvError> {
     let raw_cfg = fs::read_to_string(opts.config).unwrap();
     let mut config : api::ApiConfig = toml::from_str(&raw_cfg).unwrap();
     config.kafka.wow_combat_log_threads = opts.kafka;
-    config.database.url = opts.pg;
     config.database.connections = opts.db;
     config.database.heavy_connections = opts.db;
 

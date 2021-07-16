@@ -16,8 +16,6 @@ spec:
             labels:
                 task: wowkafka
         spec:
-            nodeSelector:
-                task: wowkafka
             containers:
                 - name: wow-processor
                   image: registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/wow_kafka_worker:{{ .Values.commitHash }}

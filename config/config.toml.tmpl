@@ -6,7 +6,7 @@ tenant_id = "${FUSIONAUTH_TENANT_ID}"
 application_id = "${FUSIONAUTH_CLIENT_ID}"
 
 [database]
-url = "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1/squadov"
+url = "${DATABASE_URL}"
 connections = 32
 heavy_connections = 32
 
@@ -15,7 +15,7 @@ domain = "https://app.${DEPLOYMENT_DOMAIN}"
 
 [gcp]
 enabled = true
-service_account_key = "gcp/${GCP_PROJECT}.json"
+service_account_key = "gcp/squadov.json"
 
 [server]
 domain = "api.${DEPLOYMENT_DOMAIN}"
