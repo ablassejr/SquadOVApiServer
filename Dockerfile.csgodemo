@@ -1,5 +1,4 @@
 FROM debian:buster-20200908-slim AS builder
-ARG GCP_PROJECT
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     ca-certificates \
     build-essential \
@@ -11,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 RUN mkdir -p /squadov/config
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
+RUN rustup toolchain install 1.51.0 && rustup default 1.51.0
 
 COPY lib /squadov/lib
 COPY server /squadov/server
@@ -20,7 +20,6 @@ COPY msa /squadov/msa
 COPY config/csgo_demo_handler_config.toml /squadov/config/config.toml
 COPY Cargo.toml /squadov/
 COPY Cargo.lock /squadov/
-COPY devops/gcp /squadov/gcp
 
 WORKDIR /squadov
 RUN cargo build --release -p csgo_demo_handler

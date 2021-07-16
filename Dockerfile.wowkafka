@@ -1,5 +1,5 @@
 FROM debian:buster-20200908-slim AS builder
-ARG GCP_PROJECT
+ARG DEPLOYMENT_ENVIRONMENT
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     ca-certificates \
     build-essential \
@@ -11,13 +11,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 RUN mkdir -p /squadov/config
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
+RUN rustup toolchain install 1.51.0 && rustup default 1.51.0
 
 COPY lib /squadov/lib
 COPY server /squadov/server
 COPY tools /squadov/tools
 COPY deps /squadov/deps
 COPY msa /squadov/msa
-COPY config/$GCP_PROJECT.toml /squadov/config/config.toml
+COPY config/squadov_$DEPLOYMENT_ENVIRONMENT.toml /squadov/config/config.toml
 COPY Cargo.toml /squadov/
 COPY Cargo.lock /squadov/
 COPY devops/gcp /squadov/gcp
@@ -26,6 +27,7 @@ WORKDIR /squadov
 RUN cargo build --release --bin wow_kafka_worker
 
 FROM debian:buster-20200908-slim
+ARG DEPLOYMENT_ENVIRONMENT
 RUN mkdir -p /squadov/config
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -34,5 +36,8 @@ WORKDIR /squadov
 COPY --from=builder /squadov/target/release/wow_kafka_worker .
 COPY --from=builder /squadov/config/config.toml ./config 
 COPY --from=builder /squadov/gcp ./gcp
+
+RUN mkdir -p /squadov/aws
+COPY devops/aws/$DEPLOYMENT_ENVIRONMENT.profile ./aws/api.profile
 COPY run_wow_kafkaworker.sh ./
 ENTRYPOINT ["./run_wow_kafkaworker.sh"]

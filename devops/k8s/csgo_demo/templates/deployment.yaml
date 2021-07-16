@@ -16,7 +16,7 @@ spec:
         spec:
             containers:
                 - name: parser
-                  image: "registry.gitlab.com/squadov/squadovapiserver/squadov/csgo_demo_handler:{{ .Values.commitHash }}"
+                  image: "registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/csgo_demo_handler:{{ .Values.commitHash }}"
                   resources:
                     requests:
                         cpu: "500m"

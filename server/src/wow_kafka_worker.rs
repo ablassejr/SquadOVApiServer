@@ -36,6 +36,14 @@ pub async fn main() -> Result<(), SquadOvError> {
     config.database.url = opts.pg;
     config.database.connections = opts.db;
     config.database.heavy_connections = opts.db;
+    config.rabbitmq.enable_rso = false;
+    config.rabbitmq.enable_lol = false;
+    config.rabbitmq.enable_tft = false;
+    config.rabbitmq.enable_valorant = false;
+    config.rabbitmq.enable_vod = false;
+    config.rabbitmq.enable_csgo = false;
+    config.rabbitmq.enable_steam = false;
+    config.rabbitmq.prefetch_count = 1;
 
     // Only use the provided config to connect to things.
     let app = Arc::new(api::ApiApplication::new(&config).await);
