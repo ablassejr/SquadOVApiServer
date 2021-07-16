@@ -19,13 +19,13 @@ spec:
             nodeSelector:
                 task: wowkafka
             containers:
-                - name: webserver-container
-                  image: registry.gitlab.com/squadov/squadovapiserver/squadov/wow_kafka_worker:{{ .Values.commitHash }}
+                - name: wow-processor
+                  image: registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/wow_kafka_worker:{{ .Values.commitHash }}
                   env:
                     - name: DB_CONNS
-                      value: "16"
+                      value: "{{ .Values.threads }}"
                     - name: KAFKA_THREADS
-                      value: "16"
+                      value: "{{ .Values.threads }}"
                     - name: "DISABLE_RABBITMQ"
                       value: "1"
                     - name: POSTGRES_USER
@@ -43,28 +43,5 @@ spec:
                         cpu: "1000m"
                     limits:
                         cpu: "2000m"
-                - name: cloudsql-proxy
-                  image: gcr.io/cloudsql-docker/gce-proxy:1.16
-                  ports:
-                    - containerPort: 5432
-                  command: ["/cloud_sql_proxy",
-                             "-instances=squadov:us-central1:squadov-postgres=tcp:5432",
-                             "-credential_file=/secrets/gke/gcloud-service-account.json"]
-                  securityContext:
-                      runAsUser: 2  # non-root user
-                      allowPrivilegeEscalation: false
-                  volumeMounts:
-                      - name: gke-service-account
-                        mountPath: /secrets/gke
-                        readOnly: true
-                  resources:
-                    requests:
-                        cpu: "100m"
-                    limits:
-                        cpu: "2000m"
-            volumes:
-                - name: gke-service-account
-                  secret:
-                    secretName: gke-service-account
             imagePullSecrets:
                 - name: regcred
