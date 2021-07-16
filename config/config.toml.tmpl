@@ -138,14 +138,14 @@ requests = 100000
 seconds = 86400
 
 [storage.vods]
-global = "${LEGACY_VOD_STORAGE_BUCKET}"
+global = "${DEFAULT_VOD_STORAGE_BUCKET}"
 legacy = "${LEGACY_VOD_STORAGE_BUCKET}"
 
 [storage.blobs]
-global = "${LEGACY_VOD_STORAGE_BUCKET}"
-legacy = "${LEGACY_VOD_STORAGE_BUCKET}"
+global = "${DEFAULT_BLOB_STORAGE_BUCKET}"
+legacy = "${LEGACY_BLOB_STORAGE_BUCKET}"
 
 [aws]
-enabled = false
+enabled = true
 credential_path = "aws/api.profile"
 profile = "api"
