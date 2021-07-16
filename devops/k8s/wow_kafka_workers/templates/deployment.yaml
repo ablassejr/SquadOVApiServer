@@ -40,8 +40,7 @@ spec:
                             key: password
                   resources:
                     requests:
-                        cpu: "1000m"
-                    limits:
                         cpu: "2000m"
+                        memory: "3Gi"
             imagePullSecrets:
                 - name: regcred
