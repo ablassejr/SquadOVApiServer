@@ -19,7 +19,7 @@ resource "aws_db_subnet_group" "primary_db_subnet" {
 
 resource "aws_db_instance" "primary_db" {
     allocated_storage = var.postgres_db_size
-    apply_immediately = true
+    apply_immediately = false
     max_allocated_storage = var.postgres_max_db_size
     backup_retention_period = 14
     backup_window = "02:00-02:30"

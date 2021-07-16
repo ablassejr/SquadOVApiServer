@@ -14,6 +14,8 @@ spec:
             labels:
                 task: fusionauth
         spec:
+            nodeSelector:
+                eks.amazonaws.com/compute-type: fargate
             containers:
                 - name: fusionauth
                   image: fusionauth/fusionauth-app:1.27.2

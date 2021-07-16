@@ -16,6 +16,8 @@ spec:
             labels:
                 task: wowkafka
         spec:
+            nodeSelector:
+                eks.amazonaws.com/compute-type: fargate
             containers:
                 - name: wow-processor
                   image: registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/wow_kafka_worker:{{ .Values.commitHash }}

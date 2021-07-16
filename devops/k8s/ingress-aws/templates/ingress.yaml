@@ -14,7 +14,8 @@ spec:
         - host: "auth.{{ .Values.domainPrefix }}squadov.gg"
           http:
             paths:
-            - path: /*
+            - path: /
+              pathType: Prefix
               backend:
                 service:
                     name: ssl-redirect

@@ -10,8 +10,32 @@ resource "aws_iam_role" "eks_role" {
             "Effect": "Allow",
             "Principal": {
                 "Service": [
+                    "eks-fargate-pods.amazonaws.com",
                     "eks.amazonaws.com",
-                    "eks-fargate-pods.amazonaws.com"
+                    "ec2.amazonaws.com"
+                ]
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
+POLICY
+}
+
+resource "aws_iam_role" "eks_managed_role" {
+    name = "eks-managed-role"
+    force_detach_policies = true
+
+    assume_role_policy = <<POLICY
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": [
+                    "eks.amazonaws.com",
+                    "ec2.amazonaws.com"
                 ]
             },
             "Action": "sts:AssumeRole"
@@ -282,6 +306,20 @@ resource "aws_iam_role_policy_attachment" "eks_role_AmazonEKS_CNI_Policy" {
     role       = aws_iam_role.eks_role.name
 }
 
+resource "aws_iam_role_policy_attachment" "eks_managed_AmazonEKS_CNI_Policy" {
+    policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+    role       = aws_iam_role.eks_managed_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "eks_managed_AmazonEKSWorkerNodePolicy" {
+    policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+    role       = aws_iam_role.eks_managed_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "eks_managed_AmazonEC2ContainerRegistryReadOnly" {
+    policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+    role       = aws_iam_role.eks_managed_role.name
+}
 
 resource "aws_kms_key" "primary_eks_kms_key" {
     description = "KMS Key: Primary EKS Cluster"
@@ -382,4 +420,123 @@ resource "aws_eks_fargate_profile" "primary_eks_alb_fargate_profile" {
             "app.kubernetes.io/name" = "alb-ingress-controller"
         }
     }
+}
+
+resource "aws_eks_node_group" "system_nodes" {
+    cluster_name = aws_eks_cluster.primary_eks_cluster.name
+    node_group_name = "primary-eks-system-nodes"
+    node_role_arn = aws_iam_role.eks_managed_role.arn
+    subnet_ids = var.default_fargate_subnets
+
+    capacity_type = "ON_DEMAND"
+    instance_types = [ "t3.micro" ]
+
+    labels = {
+        "task" = "system"
+    }
+
+    scaling_config {
+        desired_size = 1
+        min_size = 1
+        max_size = 1
+    }
+
+    depends_on = [
+        aws_iam_role_policy_attachment.eks_managed_AmazonEKSWorkerNodePolicy,
+        aws_iam_role_policy_attachment.eks_managed_AmazonEKS_CNI_Policy,
+        aws_iam_role_policy_attachment.eks_managed_AmazonEC2ContainerRegistryReadOnly
+    ]
+
+    lifecycle {
+        ignore_changes = [scaling_config[0].desired_size]
+    }
+}
+
+resource "aws_eks_node_group" "vod_nodes_core" {
+    cluster_name = aws_eks_cluster.primary_eks_cluster.name
+    node_group_name = "primary-eks-vod-nodes-core"
+    node_role_arn = aws_iam_role.eks_managed_role.arn
+    subnet_ids = var.default_fargate_subnets
+
+    capacity_type = "ON_DEMAND"
+    disk_size = 50
+    instance_types = [ "m5.xlarge" ]
+
+    labels = {
+        "task" = "vod"
+        "capacity" = "demand"
+    }
+
+    scaling_config {
+        desired_size = 1
+        min_size = 1
+        max_size = 5
+    }
+
+    depends_on = [
+        aws_iam_role_policy_attachment.eks_managed_AmazonEKSWorkerNodePolicy,
+        aws_iam_role_policy_attachment.eks_managed_AmazonEKS_CNI_Policy,
+        aws_iam_role_policy_attachment.eks_managed_AmazonEC2ContainerRegistryReadOnly
+    ]
+
+    lifecycle {
+        ignore_changes = [scaling_config[0].desired_size]
+    }
+}
+
+resource "aws_eks_node_group" "vod_nodes_secondary" {
+    cluster_name = aws_eks_cluster.primary_eks_cluster.name
+    node_group_name = "primary-eks-vod-nodes-secondary"
+    node_role_arn = aws_iam_role.eks_managed_role.arn
+    subnet_ids = var.default_fargate_subnets
+
+    capacity_type = "SPOT"
+    disk_size = 50
+    instance_types = [ "m5.xlarge" ]
+
+    labels = {
+        "task" = "vod"
+        "capacity" = "spot"
+    }
+
+    scaling_config {
+        desired_size = 1
+        min_size = 1
+        max_size = 24
+    }
+
+    depends_on = [
+        aws_iam_role_policy_attachment.eks_managed_AmazonEKSWorkerNodePolicy,
+        aws_iam_role_policy_attachment.eks_managed_AmazonEKS_CNI_Policy,
+        aws_iam_role_policy_attachment.eks_managed_AmazonEC2ContainerRegistryReadOnly
+    ]
+
+    lifecycle {
+        ignore_changes = [scaling_config[0].desired_size]
+    }
+}
+
+resource "aws_iam_policy" "eks_policy_autoscaler" {
+    name = "eks-policy-autoscaler"
+    description = "EKS Policy for Cluster Autoscaler"
+    policy = <<POLICY
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Action": [
+                "autoscaling:DescribeAutoScalingGroups",
+                "autoscaling:DescribeAutoScalingInstances",
+                "autoscaling:DescribeLaunchConfigurations",
+                "autoscaling:DescribeTags",
+                "autoscaling:SetDesiredCapacity",
+                "autoscaling:TerminateInstanceInAutoScalingGroup",
+                "ec2:DescribeLaunchTemplateVersions"
+            ],
+            "Resource": "*",
+            "Effect": "Allow"
+        }
+    ]
+}
+POLICY
 }

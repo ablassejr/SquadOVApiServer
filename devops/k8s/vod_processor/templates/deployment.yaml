@@ -1,11 +1,17 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: vod
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
     name: vod-processor
     labels:
         task: vod
+    namespace: vod
 spec:
-    replicas: 96
+    replicas: {{ .Values.replicas }}
     selector:
         matchLabels:
             task: vod
@@ -14,11 +20,26 @@ spec:
             labels:
                 task: vod
         spec:
-            nodeSelector:
-                task: vod
+            affinity:
+                nodeAffinity:
+                    requiredDuringSchedulingIgnoredDuringExecution:
+                        nodeSelectorTerms:
+                            - matchExpressions:
+                                - key: task
+                                  operator: In
+                                  values:
+                                    - vod
+                    preferredDuringSchedulingIgnoredDuringExecution:
+                        - weight: 1
+                          preference:
+                            matchExpressions:
+                                - key: capacity
+                                  operator: In
+                                  values:
+                                    - demand
             containers:
                 - name: processor
-                  image: "registry.gitlab.com/squadov/squadovapiserver/squadov/vod_processor:{{ .Values.commitHash }}"
+                  image: "registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/vod_processor:{{ .Values.commitHash }}"
                   env:
                     - name: DB_CONNS
                       value: "2"
@@ -39,30 +60,8 @@ spec:
                   resources:
                     requests:
                         cpu: "490m"
+                        memory: "3Gi"
                     limits:
                         cpu: "1000m"
-                - name: cloudsql-proxy
-                  image: gcr.io/cloudsql-docker/gce-proxy:1.16
-                  ports:
-                    - containerPort: 5432
-                  command: ["/cloud_sql_proxy",
-                             "-instances=squadov:us-central1:squadov-postgres=tcp:5432",
-                             "-credential_file=/secrets/gke/gcloud-service-account.json"]
-                  securityContext:
-                      runAsUser: 2  # non-root user
-                      allowPrivilegeEscalation: false
-                  volumeMounts:
-                      - name: gke-service-account
-                        mountPath: /secrets/gke
-                        readOnly: true
-                  resources:
-                    requests:
-                        cpu: "10m"
-                    limits:
-                        cpu: "100m"
-            volumes:
-                - name: gke-service-account
-                  secret:
-                    secretName: gke-service-account
             imagePullSecrets:
                 - name: regcred

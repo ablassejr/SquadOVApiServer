@@ -15,8 +15,6 @@ struct Options {
     #[structopt(short, long)]
     db: u32,
     #[structopt(short, long)]
-    pg: String,
-    #[structopt(short, long)]
     threads: i32,
     #[structopt(short, long)]
     vod: Option<Uuid>,
@@ -33,7 +31,6 @@ pub async fn main() -> Result<(), SquadOvError> {
     let raw_cfg = fs::read_to_string(opts.config.clone()).unwrap();
     let mut config : api::ApiConfig = toml::from_str(&raw_cfg).unwrap();
     config.vod.fastify_threads = opts.threads;
-    config.database.url = opts.pg.clone();
     config.database.connections = opts.db;
     config.database.heavy_connections = opts.db;
     config.rabbitmq.enable_rso = false;
