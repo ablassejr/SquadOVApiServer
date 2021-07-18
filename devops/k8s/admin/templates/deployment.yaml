@@ -14,11 +14,9 @@ spec:
             labels:
                 task: admin
         spec:
-            nodeSelector:
-                task: infra
             containers:
                 - name: admin
-                  image: registry.gitlab.com/squadov/squadovapiserver/squadov/squadov_admin:{{ .Values.commitHash }}
+                  image: registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/squadov_admin:{{ .Values.commitHash }}
                   ports:
                     - containerPort: 3000
                   livenessProbe:
@@ -33,31 +31,7 @@ spec:
                         port: 3000
                   resources:
                     requests:
-                        cpu: "10m"
-                    limits:
-                        cpu: "1000m"
-                - name: cloudsql-proxy
-                  image: gcr.io/cloudsql-docker/gce-proxy:1.16
-                  ports:
-                    - containerPort: 5432
-                  command: ["/cloud_sql_proxy",
-                             "-instances=squadov:us-central1:squadov-postgres=tcp:5432",
-                             "-credential_file=/secrets/gke/gcloud-service-account.json"]
-                  securityContext:
-                      runAsUser: 2  # non-root user
-                      allowPrivilegeEscalation: false
-                  volumeMounts:
-                      - name: gke-service-account
-                        mountPath: /secrets/gke
-                        readOnly: true
-                  resources:
-                    requests:
-                        cpu: "10m"
-                    limits:
-                        cpu: "100m"
-            volumes:
-                - name: gke-service-account
-                  secret:
-                    secretName: gke-service-account
+                        cpu: "250m"
+                        memory: "0.5Gi"
             imagePullSecrets:
                 - name: regcred

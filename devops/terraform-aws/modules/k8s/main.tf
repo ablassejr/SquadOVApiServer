@@ -57,7 +57,8 @@ resource "aws_iam_policy" "eks_policy_cloudwatch_logs" {
 			"logs:CreateLogStream",
 			"logs:CreateLogGroup",
 			"logs:DescribeLogStreams",
-			"logs:PutLogEvents"
+			"logs:PutLogEvents",
+            "ec2:DescribeVolumes"
 		],
 		"Resource": "*"
 	}]
@@ -321,6 +322,16 @@ resource "aws_iam_role_policy_attachment" "eks_managed_AmazonEC2ContainerRegistr
     role       = aws_iam_role.eks_managed_role.name
 }
 
+resource "aws_iam_role_policy_attachment" "eks_managed_cloudwatch_policy" {
+    policy_arn = aws_iam_policy.eks_policy_cloudwatch_logs.arn
+    role       = aws_iam_role.eks_managed_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "eks_managed_CloudWatchAgentServerPolicy" {
+    policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+    role       = aws_iam_role.eks_managed_role.name
+}
+
 resource "aws_kms_key" "primary_eks_kms_key" {
     description = "KMS Key: Primary EKS Cluster"
     customer_master_key_spec = "SYMMETRIC_DEFAULT"
@@ -429,10 +440,11 @@ resource "aws_eks_node_group" "system_nodes" {
     subnet_ids = var.default_fargate_subnets
 
     capacity_type = "ON_DEMAND"
-    instance_types = [ "t3.micro" ]
+    instance_types = [ "t3.small" ]
 
     labels = {
         "task" = "system"
+        "provision" = "manual"
     }
 
     scaling_config {
@@ -465,6 +477,7 @@ resource "aws_eks_node_group" "vod_nodes_core" {
     labels = {
         "task" = "vod"
         "capacity" = "demand"
+        "provision" = "manual"
     }
 
     scaling_config {
@@ -497,6 +510,7 @@ resource "aws_eks_node_group" "vod_nodes_secondary" {
     labels = {
         "task" = "vod"
         "capacity" = "spot"
+        "provision" = "manual"
     }
 
     scaling_config {

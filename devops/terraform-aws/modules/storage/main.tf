@@ -18,6 +18,10 @@ resource "aws_s3_bucket" "vod_storage_bucket" {
             }
         }
     }
+
+    tags = {
+        "s3" = "vods"
+    }
 }
 
 resource "aws_s3_bucket" "blob_storage_bucket" {
@@ -39,5 +43,9 @@ resource "aws_s3_bucket" "blob_storage_bucket" {
                 sse_algorithm = "AES256"
             }
         }
+    }
+
+    tags = {
+        "s3" = "blobs"
     }
 }

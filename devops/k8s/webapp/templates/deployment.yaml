@@ -14,11 +14,9 @@ spec:
             labels:
                 task: app
         spec:
-            nodeSelector:
-                task: infra
             containers:
                 - name: app
-                  image: registry.gitlab.com/squadov/squadovapiserver/squadov/squadov_webapp:{{ .Values.commitHash }}
+                  image: registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/squadov_webapp:{{ .Values.commitHash }}
                   ports:
                     - containerPort: 3000
                   livenessProbe:
@@ -33,8 +31,7 @@ spec:
                         port: 3000
                   resources:
                     requests:
-                        cpu: "500m"
-                    limits:
-                        cpu: "1000m"
+                        cpu: "250m"
+                        memory: "0.5Gi"
             imagePullSecrets:
                 - name: regcred

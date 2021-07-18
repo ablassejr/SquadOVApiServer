@@ -14,38 +14,12 @@ spec:
             labels:
                 task: rabbitmq-delay
         spec:
-            nodeSelector:
-                task: infra
             containers:
                 - name: delay
-                  image: "registry.gitlab.com/squadov/squadovapiserver/squadov/rabbitmq_delay_handler:{{ .Values.commitHash }}"
+                  image: "registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/rabbitmq_delay_handler:{{ .Values.commitHash }}"
                   resources:
                     requests:
-                        cpu: "90m"
-                    limits:
-                        cpu: "1000m"
-                - name: cloudsql-proxy
-                  image: gcr.io/cloudsql-docker/gce-proxy:1.16
-                  ports:
-                    - containerPort: 5432
-                  command: ["/cloud_sql_proxy",
-                             "-instances=squadov:us-central1:squadov-postgres=tcp:5432",
-                             "-credential_file=/secrets/gke/gcloud-service-account.json"]
-                  securityContext:
-                      runAsUser: 2  # non-root user
-                      allowPrivilegeEscalation: false
-                  volumeMounts:
-                      - name: gke-service-account
-                        mountPath: /secrets/gke
-                        readOnly: true
-                  resources:
-                    requests:
-                        cpu: "10m"
-                    limits:
-                        cpu: "100m"
-            volumes:
-                - name: gke-service-account
-                  secret:
-                    secretName: gke-service-account
+                        cpu: "250m"
+                        memory: "0.5Gi"
             imagePullSecrets:
                 - name: regcred

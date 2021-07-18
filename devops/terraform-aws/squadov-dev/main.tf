@@ -38,7 +38,7 @@ module "db" {
     postgres_instance_name = var.postgres_instance_name
     postgres_user = var.postgres_user
     postgres_password = var.postgres_password
-    postgres_db_size = 3072
+    postgres_db_size = 1024
     postgres_max_db_size = 4048
     postgres_instance_type = "db.m6g.2xlarge"
     postgres_db_subnets = module.network.database_subnets
