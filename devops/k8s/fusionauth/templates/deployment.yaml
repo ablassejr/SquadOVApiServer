@@ -21,6 +21,16 @@ spec:
                   image: fusionauth/fusionauth-app:1.27.2
                   ports:
                     - containerPort: 9011
+                  livenessProbe:
+                    httpGet:
+                        path: /api/status
+                        port: 9011
+                    initialDelaySeconds: 30
+                    periodSeconds: 5
+                  readinessProbe:
+                    httpGet:
+                        path: /api/status
+                        port: 9011
                   resources:
                     requests:
                         cpu: "500m"
