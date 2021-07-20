@@ -5,3 +5,5 @@ creation_rules:
     gcp_kms: projects/squadov/locations/global/keyRings/sops/cryptoKeys/sops-key
   - path_regex: squadov_aws_dev_vars\.json$
     gcp_kms: projects/squadov/locations/global/keyRings/sops/cryptoKeys/sops-key
+  - path_regex: squadov_aws_prod_vars\.json$
+    gcp_kms: projects/squadov/locations/global/keyRings/sops/cryptoKeys/sops-key

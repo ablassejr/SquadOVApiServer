@@ -1,0 +1,3 @@
+[terraform]
+aws_access_key_id=AKIATD6XXTVPJZYGUYV7
+aws_secret_access_key=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
