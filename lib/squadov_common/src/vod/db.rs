@@ -1,5 +1,5 @@
 use crate::SquadOvError;
-use crate::vod::{VodAssociation, VodMetadata};
+use crate::vod::{VodAssociation, VodMetadata, VodSegmentId, VodThumbnail};
 use sqlx::{Executor, Transaction, Postgres};
 use uuid::Uuid;
 use std::collections::HashMap;
@@ -130,4 +130,51 @@ pub async fn mark_vod_with_preview(tx : &mut Transaction<'_, Postgres>, vod_uuid
         .execute(tx)
         .await?;
     Ok(())
+}
+
+pub async fn add_vod_thumbnail(tx: &mut Transaction<'_, Postgres>, vod_uuid: &Uuid, bucket: &str, segment: &VodSegmentId, width: i32, height: i32) -> Result<(), SquadOvError> {
+    sqlx::query!(
+        "
+        INSERT INTO squadov.vod_thumbnails (
+            video_uuid,
+            bucket,
+            filepath,
+            width,
+            height
+        ) VALUES (
+            $1,
+            $2,
+            $3,
+            $4,
+            $5
+        )
+        ",
+        vod_uuid,
+        bucket,
+        segment.get_fname(),
+        width,
+        height
+    )
+        .execute(tx)
+        .await?;
+    Ok(())
+}
+
+pub async fn get_vod_thumbnail<'a, T>(ex: T, video_uuid: &Uuid) -> Result<Option<VodThumbnail>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            VodThumbnail,
+            "
+            SELECT *
+            FROM squadov.vod_thumbnails
+            WHERE video_uuid = $1
+            ",
+            video_uuid,
+        )
+            .fetch_optional(ex)
+            .await?
+    )
 }

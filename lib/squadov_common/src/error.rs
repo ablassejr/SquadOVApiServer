@@ -266,3 +266,9 @@ impl From<CredentialsError> for SquadOvError {
         return Self::InternalError(format!("Rusoto (AWS, Creds) {:?}", err))
     }
 }
+
+impl From<image::ImageError> for SquadOvError {
+    fn from(err: image::ImageError) -> Self {
+        return Self::InternalError(format!("Image Error {:?}", err))
+    }
+}

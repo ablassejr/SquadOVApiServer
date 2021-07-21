@@ -21,6 +21,7 @@ use crate::{
     storage::StorageManager,
 };
 use std::sync::{Arc};
+use std::io::BufReader;
 use tempfile::NamedTempFile;
 use chrono::{DateTime, Utc};
 
@@ -32,6 +33,15 @@ pub struct VodDestination {
     pub bucket: String,
     pub session: String,
     pub loc: manager::VodManagerType,
+}
+
+#[derive(Serialize,Deserialize, Clone)]
+pub struct VodThumbnail {
+    pub video_uuid: Uuid,
+    pub bucket: String,
+    pub filepath: String,
+    pub width: i32,
+    pub height: i32,
 }
 
 #[derive(Serialize,Deserialize, Clone)]
@@ -282,12 +292,16 @@ impl VodProcessingInterface {
 
         let fastify_filename = NamedTempFile::new()?.into_temp_path();
         let preview_filename = NamedTempFile::new()?.into_temp_path();
+        let thumbnail_filename = NamedTempFile::new()?.into_temp_path();
 
         log::info!("Fastify Mp4 - {}", vod_uuid);
         fastify::fastify_mp4(input_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &vod.raw_container_format, &fastify_filename).await?;
 
         log::info!("Generate Preview Mp4 - {}", vod_uuid);
         preview::generate_vod_preview(fastify_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &preview_filename).await?;
+
+        log::info!("Generate Thumbnail - {}", vod_uuid);
+        preview::generate_vod_thumbnail(fastify_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &thumbnail_filename).await?;
 
         log::info!("Upload Fastify VOD - {}", vod_uuid);
         let fastify_segment = VodSegmentId{
@@ -304,12 +318,28 @@ impl VodProcessingInterface {
             segment_name: String::from("preview.mp4"),
         }, &preview_filename).await?;
 
+        log::info!("Upload Thumbnail - {}", vod_uuid);
+        let thumbnail_id = VodSegmentId{
+            video_uuid: vod_uuid.clone(),
+            quality: String::from("source"),
+            segment_name: String::from("thumbnail.jpg"),
+        };
+        manager.upload_vod_from_file(&thumbnail_id, &thumbnail_filename).await?;
+
         log::info!("Process VOD TX (Begin) - {}", vod_uuid);
         let mut tx = self.db.begin().await?;
         log::info!("Mark DB Fastify (Query) - {}", vod_uuid);
         db::mark_vod_as_fastify(&mut tx, vod_uuid).await?;
         log::info!("Mark DB Preview (Query) - {}", vod_uuid);
         db::mark_vod_with_preview(&mut tx, vod_uuid).await?;
+        log::info!("Add DB Thumbnail (Query) - {}", vod_uuid);
+        {
+            let file = std::fs::File::open(&thumbnail_filename)?;
+            let image = image::io::Reader::with_format(BufReader::new(file), image::ImageFormat::Jpeg);
+            let thumbnail_dims = image.into_dimensions()?;
+            db::add_vod_thumbnail(&mut tx, vod_uuid, &metadata.bucket, &thumbnail_id, thumbnail_dims.0 as i32, thumbnail_dims.1 as i32).await?;
+        }
+
         log::info!("Process VOD TX (Commit) - {}", vod_uuid);
         tx.commit().await?;
         log::info!("Delete Source VOD - {}", vod_uuid);
@@ -322,6 +352,9 @@ impl VodProcessingInterface {
         if db::check_if_vod_public(&*self.db, vod_uuid).await? {
             log::info!("Setting Fastify as Public - {}", vod_uuid);
             manager.make_segment_public(&fastify_segment).await?;
+
+            log::info!("Setting Thumbnail as Public - {}", vod_uuid);
+            manager.make_segment_public(&thumbnail_id).await?;
         }
 
         log::info!("Finish Fastifying {:?}", vod_uuid);

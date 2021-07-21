@@ -208,6 +208,18 @@ impl api::ApiApplication {
                 }
             }
         }
+        
+        if let Some(thumbnail) = db::get_vod_thumbnail(&*self.pool, video_uuid).await? {
+            // We expect the filepatht to be
+            // UUID/QUALITY/SEGMENT NAME.
+            let parts = thumbnail.filepath.split("/").collect::<Vec<&str>>();
+
+            manager.make_segment_public(&squadov_common::VodSegmentId{
+                video_uuid: video_uuid.clone(),
+                quality: parts[1].to_string(),
+                segment_name: parts[2].to_string(),
+            }).await?; 
+        }
 
         Ok(())
     }

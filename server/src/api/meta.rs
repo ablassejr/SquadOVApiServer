@@ -7,6 +7,7 @@ use squadov_common::{
     },
     access::AccessTokenRequest,
     VodSegmentId,
+    vod::db as vod_db
 };
 use crate::api::v1::RecentMatchHandle;
 use actix_web::{web, HttpResponse};
@@ -173,6 +174,8 @@ impl api::ApiApplication {
             let vod_metadata_map = self.get_vod_quality_options(&[video_uuid.clone()]).await?;
             if let Some(vmm) = vod_metadata_map.get(&video_uuid) {
                 if let Some(vod_metadata) = vmm.first() {
+                    let manager = self.get_vod_manager(&vod_metadata.bucket).await?;
+
                     if vod_metadata.has_fastify {
                         metadata.meta_has_video = true;
                         metadata.oembed_type = String::from("video");
@@ -194,7 +197,6 @@ impl api::ApiApplication {
                         metadata.meta_video_height = Some(video_height);
 
                         // A shared video is by definition public.
-                        let manager = self.get_vod_manager(&vod_metadata.bucket).await?;
                         metadata.meta_video = Some(manager.get_public_segment_redirect_uri(&VodSegmentId{
                             video_uuid: video_uuid.clone(),
                             quality: String::from("source"),
@@ -209,6 +211,19 @@ impl api::ApiApplication {
                             ),
                         );
                         metadata.meta_video_type = Some(String::from("video/mp4"));
+
+                        if let Some(thumbnail) = vod_db::get_vod_thumbnail(&*self.pool, video_uuid).await? {
+                            metadata.meta_has_thumbnail = true;
+            
+                            let parts = thumbnail.filepath.split("/").collect::<Vec<&str>>();
+                            metadata.meta_thumbnail = Some(manager.get_public_segment_redirect_uri(&VodSegmentId{
+                                video_uuid: video_uuid.clone(),
+                                quality: parts[1].to_string(),
+                                segment_name: parts[2].to_string(),
+                            }).await?);
+                            metadata.meta_thumbnail_width = Some(thumbnail.width);
+                            metadata.meta_thumbnail_height = Some(thumbnail.height);
+                        }
                     }
                 }
             }
