@@ -10,6 +10,8 @@ use squadov_common::{
     vod::{
         VodAssociation,
         VodDestination,
+        VodSegmentId,
+        container_format_to_extension,
     },
     storage::CloudStorageLocation,
 };
@@ -201,6 +203,7 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
     app.associate_vod(&mut tx, &data.association).await?;
 
     let metadata_id = data.metadata.id.clone();
+    let bucket = data.metadata.bucket.clone();
     if !data.association.is_local {
         app.bulk_add_video_metadata(&mut tx, &data.association.video_uuid, &[data.metadata]).await?;
     }
@@ -216,7 +219,23 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
     // because it does take a significant amount of memory/disk space to do so.
     // So we toss it to the local job queue so we can better limit the amount of resources we end up using.
     if !data.association.is_local {
-        app.vod_itf.request_vod_processing(&data.association.video_uuid, &metadata_id, data.session_uri.clone(), data.parts, true).await?;
+
+        if let Some(session_uri) = data.session_uri.as_ref() {
+            let manager = app.get_vod_manager(&bucket).await?;
+            let raw_extension = container_format_to_extension(&data.association.raw_container_format);
+            // Need to finish the VOD upload here as well, while this could theoretically take a bit, I think in practice
+            // it generally finishes pretty fast. We can't do the 'finish' in the VOD processing because there's certain
+            // situations where we'll need to VOD to be uploaded BEFORE it gets to the VOD processing. This is the case
+            // in VOD clipping where we'll request public access on the raw uploaded clip before it hits the VOD processing
+            // which would result in a 403 since the multi-part uploaded clip doesn't exist yet.
+            manager.finish_segment_upload(&VodSegmentId{
+                video_uuid: data.association.video_uuid.clone(),
+                quality: String::from("source"),
+                segment_name: format!("video.{}", &raw_extension),
+            }, session_uri, &data.parts.unwrap_or(vec![])).await?;
+        }
+
+        app.vod_itf.request_vod_processing(&data.association.video_uuid, &metadata_id, data.session_uri.clone(), true).await?;
     }
     return Ok(HttpResponse::Ok().finish());
 }

@@ -194,7 +194,6 @@ pub enum VodProcessingTask {
         vod_uuid: Uuid,
         session_id: Option<String>,
         id: Option<String>,
-        parts: Option<Vec<String>>,
     }
 }
 
@@ -203,11 +202,10 @@ impl RabbitMqListener for VodProcessingInterface {
     async fn handle(&self, data: &[u8]) -> Result<(), SquadOvError> {
         let task: VodProcessingTask = serde_json::from_slice(data)?;
         match task {
-            VodProcessingTask::Process{vod_uuid, id, session_id, parts} => self.process_vod(
+            VodProcessingTask::Process{vod_uuid, id, session_id} => self.process_vod(
                 &vod_uuid,
                 &id.unwrap_or(String::from("source")),
                 session_id.as_ref(),
-                &parts.unwrap_or(vec![]),
             ).await?, 
         };
         Ok(())
@@ -224,17 +222,16 @@ impl VodProcessingInterface {
         }
     }
 
-    pub async fn request_vod_processing(&self, vod_uuid: &Uuid, id: &str, session_id: Option<String>, parts: Option<Vec<String>>, high_priority: bool) -> Result<(), SquadOvError> {
+    pub async fn request_vod_processing(&self, vod_uuid: &Uuid, id: &str, session_id: Option<String>, high_priority: bool) -> Result<(), SquadOvError> {
         self.rmq.publish(&self.queue, serde_json::to_vec(&VodProcessingTask::Process{
             vod_uuid: vod_uuid.clone(),
             session_id,
             id: Some(id.to_string()),
-            parts,
         })?, if high_priority { RABBITMQ_HIGH_PRIORITY } else { RABBITMQ_DEFAULT_PRIORITY }, VOD_MAX_AGE_SECONDS).await;
         Ok(())
     }
 
-    pub async fn process_vod(&self, vod_uuid: &Uuid, id: &str, session_id: Option<&String>, parts: &[String]) -> Result<(), SquadOvError> {
+    pub async fn process_vod(&self, vod_uuid: &Uuid, id: &str, session_id: Option<&String>) -> Result<(), SquadOvError> {
         log::info!("Start Processing VOD {} [{:?}]", vod_uuid, session_id);
 
         log::info!("Get VOD Association");
@@ -261,9 +258,6 @@ impl VodProcessingInterface {
         // we assume that the file has already been fully uploaded. If the file hasn't been fully uploaded
         // then we want to defer taking care of this task until later.
         if let Some(session) = session_id {
-            log::info!("Finishing Segment Upload");
-            manager.finish_segment_upload(&source_segment_id, session, parts).await?;
-
             log::info!("Checking Segment Upload Finished");
             if !manager.is_vod_session_finished(&session).await? {
                 log::info!("Defer Fastifying {:?}", vod_uuid);

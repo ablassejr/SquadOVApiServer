@@ -27,10 +27,13 @@ spec:
                         port: 9011
                     initialDelaySeconds: 60
                     periodSeconds: 10
+                    timeoutSeconds: 10
                   readinessProbe:
                     httpGet:
                         path: /api/status
                         port: 9011
+                    initialDelaySeconds: 60
+                    timeoutSeconds: 10
                   resources:
                     requests:
                         cpu: "500m"

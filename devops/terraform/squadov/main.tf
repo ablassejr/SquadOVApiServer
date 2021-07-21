@@ -27,10 +27,6 @@ module "database" {
     postgres_user = var.postgres_user
     postgres_password = var.postgres_password
     postgres_instance_name = var.postgres_instance_name
-
-    mysql_user = var.mysql_user
-    mysql_password = var.mysql_password
-    mysql_instance_name = var.mysql_instance_name
 }
 
 module "vm" {
@@ -39,8 +35,4 @@ module "vm" {
     service_account_key_filename = "../../gcp/squadov.json"
     vod_storage_bucket = var.vod_storage_bucket
     blob_storage_bucket = var.blob_storage_bucket
-}
-
-module "k8s" {
-    source = "../modules/k8s"
 }

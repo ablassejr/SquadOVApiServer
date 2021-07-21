@@ -11,13 +11,12 @@ resource "aws_db_parameter_group" "primary_db_parameters" {
         value = "1"
     }
 
-/*
     parameter {
         name = "maintenance_work_mem"
         value = "1048576"
     }
-*/
 
+/*
     parameter {
         name = "maintenance_work_mem"
         value = "2097152"
@@ -49,7 +48,7 @@ resource "aws_db_parameter_group" "primary_db_parameters" {
         name = "max_wal_size"
         value = "8192"
     }
-
+*/
 }
 
 resource "aws_db_subnet_group" "primary_db_subnet" {
