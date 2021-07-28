@@ -48,6 +48,7 @@ rdkafka = { version = "0.24", features = ["cmake-build", "ssl", "libz-static", "
 num_enum = "0.5.1"
 serde_qs = { version = "0.8", features = ["actix"] }
 lru = "0.6.5"
+harsh = "0.2.1"
 
 [[bin]]
 name = "squadov_api_server"

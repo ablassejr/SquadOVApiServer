@@ -101,6 +101,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                     web::scope("/community/slug/{community_slug}")
                         .route("", web::get().to(v1::get_community_slug_handler))
                 )
+                .service(
+                    web::scope("/link/{link_id}")
+                        .route("", web::get().to(v1::get_public_invite_link_data_handler))
+                )
         )
         .service(
             web::scope("/v1")
@@ -108,6 +112,16 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                     Box::new(access::ShareTokenAccessRestricter{}),
                 ))
                 .wrap(auth::ApiSessionValidator{})
+                .service(
+                    web::scope("/link")
+                        .wrap(access::ApiAccess::new(
+                            Box::new(access::DenyShareTokenAccess{}),
+                        ))
+                        .service(
+                            web::scope("/{link_id}")
+                                .route("/accept", web::post().to(v1::use_link_to_join_squad_handler))
+                        )
+                )
                 .service(
                     web::scope("/bug")
                         .wrap(access::ApiAccess::new(
@@ -224,6 +238,27 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         ))
                                         .route("", web::get().to(v1::get_user_squads_handler))
                                         .route("/invites", web::get().to(v1::get_user_squad_invites_handler))
+                                        .service(
+                                            web::scope("/{squad_id}")
+                                                .wrap(access::ApiAccess::new(
+                                                    Box::new(access::SquadAccessChecker{
+                                                        requires_owner: false,
+                                                        obtainer: access::SquadIdPathSetObtainer{
+                                                            key: "squad_id"
+                                                        },
+                                                    }),
+                                                ))
+                                                .service(
+                                                    web::scope("/links")
+                                                        .route("", web::get().to(v1::get_user_squad_invite_links_handler))
+                                                        .route("", web::post().to(v1::create_user_squad_invite_link_handler))
+                                                        .service(
+                                                            web::scope("/{link_id}")
+                                                                .route("", web::put().to(v1::edit_user_squad_invite_link_handler))
+                                                                .route("", web::delete().to(v1::delete_user_squad_invite_link_handler))
+                                                        )
+                                                )
+                                        )
                                 )
                                 .service(
                                     web::scope("/oauth")
@@ -1028,7 +1063,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                 .route("", web::delete().to(v1::delete_community_invite_handler))
                                         )
                                 )
-                        )
+                        )                        
                 )
         );
 

@@ -42,6 +42,7 @@
 	"DEFAULT_BLOB_STORAGE_BUCKET": "ENC[AES256_GCM,data:oc6LTa2NgGP86EUZUZb2XElR+nBlltW2CnJERQj68jg=,iv:lg5Fp93CL6ggVYC8BTaGO+WMiUBzTqAd28tYT0tUJqc=,tag:gdoXGZ8hhzbfPwRQiA1xNw==,type:str]",
 	"LEGACY_VOD_STORAGE_BUCKET": "ENC[AES256_GCM,data:GQDyfK8ij8JBTKPLc+zEAvHP7yxgyhg=,iv:hRrNZSQNc47FyIIyx3VWHGXWav9zzVcXSIrbVt5i2y4=,tag:5qsiK5y6B5P7844Y/VAKCw==,type:str]",
 	"LEGACY_BLOB_STORAGE_BUCKET": "ENC[AES256_GCM,data:HjDVU1F9j3RPMkif+2qzm0ETIXz8ukXl,iv:vSmz87d26+nV5F4zBpG8OQal6YT1I9Rk0T9siYsunuQ=,tag:HwoqsrDAPxGfwhr4pxZDvg==,type:str]",
+	"HASHID_SALT": "ENC[AES256_GCM,data:S6XFP0CYt1QbNVbCufZJfp3rFeg=,iv:dOX7pyrVVpt0iZzOmFNGVeSzjkXgu03+2qiH4aicmkI=,tag:QyUJ2UDjsgM4nCK1GUkb0w==,type:str]",
 	"sops": {
 		"kms": null,
 		"gcp_kms": [
@@ -53,8 +54,8 @@
 		],
 		"azure_kv": null,
 		"hc_vault": null,
-		"lastmodified": "2021-07-20T18:33:57Z",
-		"mac": "ENC[AES256_GCM,data:rF79W95uNp+pSKGebu+ECXdcPFrH5rv321LvnCJc15AZ3TGcgyra+fC0cwhUIG3d7GXXiMC/F84HkC4JzocU09cX6QD1Ary8YskocRQtAmrUTWPhVFlTO5TOGqVfeaFunvCw6rLb1A8Hi/IqrhzkdEfKZj3UsB6l6i8upQFK8Y4=,iv:r+ro/X4O8/lLYCZbSQLBCxWh1fgsY99glsuzfHZYkOY=,tag:EEVuAdVR3uBeiuMV11yl6A==,type:str]",
+		"lastmodified": "2021-07-28T16:01:57Z",
+		"mac": "ENC[AES256_GCM,data:Vg4oHL22SdOJNZilUQn46TVE2uSS+N2H6aU6Mh8WwNhgYpBIFjb7eTboZ0stop6lWRNdnL33x2R3V5XvZWnokGiuORvXLZ1PsBX9e2skgmL1mAOeXQSU8Wx/3y7QE46KPFitYf3q6dT7QCmmRyHSndJbzhPmhnKR+i7ut4d2+Eo=,iv:JVB3BomS9WXEOQp+I0/KtBnfrAmkReFmGBsoJXyasRc=,tag:ZzRnbbA5pi4MiOmIRmFBWQ==,type:str]",
 		"pgp": null,
 		"unencrypted_suffix": "_unencrypted",
 		"version": "3.6.1"

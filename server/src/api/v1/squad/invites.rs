@@ -2,13 +2,22 @@ use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
 use crate::api::v1::UserResourcePath;
 use crate::api::auth::SquadOVSession;
+use crate::api::auth::SquadOVUserHandle;
 use std::sync::Arc;
 use squadov_common::{
     SquadOvError, SquadInvite,
+    SquadOvSquad,
     EmailTemplate, EmailUser,
+    squad::{
+        links,
+        links::{
+            SquadInviteLink,
+            PublicSquadInviteLink,
+        }
+    }
 };
 use sqlx::{Transaction, Postgres, Row};
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use chrono::Utc;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -158,7 +167,6 @@ impl api::ApiApplication {
         Ok(())
     }
 
-    /*
     pub async fn force_add_user_to_squad(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, user_id: i64) -> Result<(), SquadOvError> {
         sqlx::query!(
             "
@@ -180,7 +188,6 @@ impl api::ApiApplication {
             .await?;
         Ok(())
     }
-    */
 
     pub async fn add_user_to_squad_from_invite(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, invite_uuid: &Uuid) -> Result<(), SquadOvError> {
         sqlx::query!(
@@ -369,6 +376,41 @@ impl api::ApiApplication {
         tx.commit().await?;
         Ok(())
     }
+
+    pub fn private_squad_link_to_public(&self, x: SquadInviteLink) -> PublicSquadInviteLink {
+        let id = self.hashid.encode(&[x.id as u64, x.squad_id as u64, x.user_id as u64]);
+        let link = format!(
+            "{}/link/{}",
+            &self.config.squadov.app_url,
+            id
+        );
+
+        PublicSquadInviteLink {
+            id,
+            squad_id: x.squad_id,
+            user_id: x.user_id,
+            create_time: x.create_time,
+            expire_time: x.expire_time,
+            use_count: x.use_count,
+            max_uses: x.max_uses,
+            link,
+        }
+    }
+
+    pub fn public_squad_link_to_private(&self, x: PublicSquadInviteLink) -> Result<SquadInviteLink, SquadOvError> {
+        // [id, squad id, user id]
+        let data = self.hashid.decode(&x.id)?;
+
+        Ok(SquadInviteLink {
+            id: data[0] as i64,
+            squad_id: data[1] as i64,
+            user_id: data[2] as i64,
+            create_time: x.create_time,
+            expire_time: x.expire_time,
+            use_count: x.use_count,
+            max_uses: x.max_uses,
+        })
+    }
 }
 
 pub async fn create_squad_invite_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadSelectionInput>, data: web::Json<CreateSquadInviteInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
@@ -471,4 +513,84 @@ pub async fn revoke_squad_invite_handler(app : web::Data<Arc<api::ApiApplication
     app.delete_squad_invite(&mut tx, path.squad_id, &path.invite_uuid).await?;
     tx.commit().await?;
     Ok(HttpResponse::Ok().finish())
+}
+
+pub async fn get_user_squad_invite_links_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadMembershipPathInput>) -> Result<HttpResponse, SquadOvError> {
+    let squad_links = links::get_squad_invite_links_for_user(&*app.pool, path.squad_id, path.user_id).await?;
+    Ok(HttpResponse::Ok().json(
+        squad_links
+            .into_iter()
+            .map(|x| {
+                app.private_squad_link_to_public(x)
+            })
+            .collect::<Vec<PublicSquadInviteLink>>()
+    ))
+}
+
+pub async fn create_user_squad_invite_link_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadMembershipPathInput>) -> Result<HttpResponse, SquadOvError> {
+    let squad_link = links::create_default_squad_invite_link_for_user(&*app.pool, path.squad_id, path.user_id).await?;
+    Ok(HttpResponse::Ok().json(
+        app.private_squad_link_to_public(squad_link)
+    ))
+}
+
+pub async fn edit_user_squad_invite_link_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadLinkPathInput>, data: web::Json<PublicSquadInviteLink>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    if path.link_id != data.id {
+        return Err(SquadOvError::BadRequest);
+    }
+
+    let squad_link = app.public_squad_link_to_private(data.into_inner())?;
+
+    // Need an error check that the current user is modifying an invite that they own.
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    if squad_link.user_id != session.user.id || 
+        path.squad_id != squad_link.squad_id ||
+        path.user_id != squad_link.user_id {
+        return Err(SquadOvError::Unauthorized);
+    }
+
+    let mut tx = app.pool.begin().await?;
+    links::modify_squad_invite(&mut tx, squad_link).await?;
+    tx.commit().await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn delete_user_squad_invite_link_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadLinkPathInput>) -> Result<HttpResponse, SquadOvError> {
+    let mut tx = app.pool.begin().await?;
+    links::delete_squad_invite(&mut tx, app.hashid.decode(&path.link_id)?[0] as i64, path.squad_id, path.user_id).await?;
+    tx.commit().await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+#[derive(Serialize)]
+pub struct SquadInviteLinkData {
+    squad: SquadOvSquad,
+    inviter: SquadOVUserHandle
+}
+
+pub async fn get_public_invite_link_data_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadPublicLinkPathInput>) -> Result<HttpResponse, SquadOvError> {
+    let id = app.hashid.decode(&path.link_id)?[0] as i64;
+    let invite = links::get_squad_invite_link_from_id(&*app.pool, id).await?;
+    let squad = app.get_squad(invite.squad_id).await?;
+    let inviter = app.get_user_handles(&[invite.user_id]).await?.pop().ok_or(SquadOvError::BadRequest)?;
+
+    Ok(HttpResponse::Ok().json(SquadInviteLinkData{
+        squad,
+        inviter,
+    }))
+}
+
+pub async fn use_link_to_join_squad_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::SquadPublicLinkPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    let id = app.hashid.decode(&path.link_id)?[0] as i64;
+    let invite = links::get_squad_invite_link_from_id(&*app.pool, id).await?;
+
+    let mut tx = app.pool.begin().await?;
+    app.force_add_user_to_squad(&mut tx, invite.squad_id, session.user.id).await?;
+    links::mark_squad_invite_link_used(&mut tx, id, session.user.id).await?;
+    tx.commit().await?;
+
+    Ok(HttpResponse::NoContent().finish())
 }

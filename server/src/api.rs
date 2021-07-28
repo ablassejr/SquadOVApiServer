@@ -173,6 +173,7 @@ pub struct SquadOvConfig {
     pub landing_url: String,
     pub invite_key: String,
     pub share_key: String,
+    pub hashid_salt: String,
 }
 
 #[derive(Deserialize,Debug,Clone)]
@@ -225,6 +226,7 @@ pub struct ApiApplication {
     pub steam_itf: Arc<SteamApiRabbitmqInterface>,
     gcp: Arc<Option<GCPClient>>,
     aws: Arc<Option<AWSClient>>,
+    pub hashid: Arc<harsh::Harsh>,
 }
 
 impl ApiApplication {
@@ -374,6 +376,7 @@ impl ApiApplication {
             steam_itf,
             gcp,
             aws,
+            hashid: Arc::new(harsh::Harsh::builder().salt(config.squadov.hashid_salt.as_str()).length(6).build().unwrap()),
         };
 
         app.create_vod_manager(&config.storage.vods.global).await.unwrap();

@@ -29,3 +29,16 @@ pub struct SquadMembershipPathInput {
     squad_id: i64,
     user_id: i64
 }
+
+#[derive(Deserialize)]
+pub struct SquadLinkPathInput {
+    squad_id: i64,
+    user_id: i64,
+    link_id: String,
+}
+
+
+#[derive(Deserialize)]
+pub struct SquadPublicLinkPathInput {
+    link_id: String,
+}

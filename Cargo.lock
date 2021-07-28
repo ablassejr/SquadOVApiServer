@@ -1755,6 +1755,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "harsh"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84cb861429b0d399a7620c0086ba47c035ba209fb1aae314380ebd9e95d8d459"
+
+[[package]]
 name = "hashbrown"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3811,6 +3817,7 @@ dependencies = [
  "flate2",
  "futures",
  "futures-util",
+ "harsh",
  "hex",
  "ipnetwork",
  "jsonwebtoken",
@@ -3866,6 +3873,7 @@ dependencies = [
  "funty",
  "futures",
  "futures-util",
+ "harsh",
  "hex",
  "image",
  "ipnetwork",

@@ -1,4 +1,5 @@
 pub mod status;
+pub mod links;
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;

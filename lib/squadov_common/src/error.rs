@@ -272,3 +272,9 @@ impl From<image::ImageError> for SquadOvError {
         return Self::InternalError(format!("Image Error {:?}", err))
     }
 }
+
+impl From<harsh::Error> for SquadOvError {
+    fn from(err: harsh::Error) -> Self {
+        return Self::InternalError(format!("HashId Error {:?}", err))
+    }
+}

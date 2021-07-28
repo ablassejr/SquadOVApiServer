@@ -5,7 +5,7 @@ use std::sync::Arc;
 use squadov_common::{SquadOvError, SquadOvSquad, SquadRole, SquadOvSquadMembership};
 
 impl api::ApiApplication {
-    async fn get_squad(&self, squad_id: i64) -> Result<SquadOvSquad, SquadOvError> {
+    pub async fn get_squad(&self, squad_id: i64) -> Result<SquadOvSquad, SquadOvError> {
         let squad = sqlx::query_as!(
             SquadOvSquad,
             r#"
