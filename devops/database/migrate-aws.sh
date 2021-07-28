@@ -1,11 +1,10 @@
 #!/bin/bash
 OP=$1
-DB=$2
 
 flyway \
     -user="$POSTGRES_USER" \
     -password="$POSTGRES_PASSWORD" \
-    -url="jdbc:postgresql://$DB/squadov"  \
+    -url="jdbc:postgresql://$DATABASE_HOST/squadov"  \
     -locations="filesystem:$PWD/sql,filesystem:$PWD/prod" \
     -schemas="squadov" \
     $OP

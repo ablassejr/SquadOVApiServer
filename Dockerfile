@@ -40,4 +40,5 @@ COPY --from=builder /squadov/gcp ./gcp
 
 RUN mkdir -p /squadov/aws
 COPY devops/aws/$DEPLOYMENT_ENVIRONMENT.profile ./aws/api.profile
-ENTRYPOINT ["./squadov_api_server", "--config", "./config/config.toml"]
+COPY run_api_server.sh ./
+ENTRYPOINT ["./run_api_server.sh"]

@@ -4166,6 +4166,22 @@
       ]
     }
   },
+  "a6d60dd763b4c2a37f73d2671e15b6210fb74c6a5e446809f6bae7eb26c8dd52": {
+    "query": "\n        INSERT INTO squadov.vod_thumbnails (\n            video_uuid,\n            bucket,\n            filepath,\n            width,\n            height\n        ) VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            $5\n        )\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Varchar",
+          "Varchar",
+          "Int4",
+          "Int4"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "a7fc8aab324c2890a7b215d86f33865169cde56cb43f87f88d47b5f1f3d603b0": {
     "query": "\n        SELECT *\n        FROM squadov.csgo_event_container_round_damage\n        WHERE container_id = $1\n        ORDER BY tm ASC\n        ",
     "describe": {
@@ -4447,6 +4463,50 @@
         ]
       },
       "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "b4804cdffb6c57dca815cee1ca4e59445600a134c5223485f31f5bee57084494": {
+    "query": "\n            SELECT *\n            FROM squadov.vod_thumbnails\n            WHERE video_uuid = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "bucket",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "filepath",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "width",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "height",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
         false,
         false
       ]

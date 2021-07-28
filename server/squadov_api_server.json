@@ -7377,6 +7377,26 @@
       "nullable": []
     }
   },
+  "97238f7c0e5f7081dbe80a63ca7a1c0714fed70f08b9b603978ccc7928b3770a": {
+    "query": "\n            SELECT bucket\n            FROM squadov.blob_link_storage\n            WHERE uuid = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "bucket",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "988b7f29e275a40b7ee9b0ccb1face5efe4c8e73f93deee5e1ce7ee7d1730b4c": {
     "query": "\n        SELECT EXISTS (\n            SELECT 1\n            FROM squadov.riot_account_links AS ral\n            WHERE ral.user_id = $1\n                AND ral.puuid = $2\n        ) AS \"exists!\"\n        ",
     "describe": {
@@ -8182,6 +8202,22 @@
       ]
     }
   },
+  "a6d60dd763b4c2a37f73d2671e15b6210fb74c6a5e446809f6bae7eb26c8dd52": {
+    "query": "\n        INSERT INTO squadov.vod_thumbnails (\n            video_uuid,\n            bucket,\n            filepath,\n            width,\n            height\n        ) VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            $5\n        )\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Varchar",
+          "Varchar",
+          "Int4",
+          "Int4"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "a7c959a1afac6d2ef008963261ebbfc9c8a5b42e2d837e45b656ba6a6d9dc0cd": {
     "query": "\n                INSERT INTO squadov.aimlab_tasks (\n                    id,\n                    user_id,\n                    klutch_id,\n                    match_uuid,\n                    task_name,\n                    mode,\n                    score,\n                    version,\n                    create_date,\n                    raw_data\n                )\n                VALUES (\n                    $1,\n                    $2,\n                    $3,\n                    $4,\n                    $5,\n                    $6,\n                    $7,\n                    $8,\n                    $9,\n                    $10\n                )\n                ON CONFLICT DO NOTHING\n                ",
     "describe": {
@@ -8557,6 +8593,50 @@
         ]
       },
       "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "b4804cdffb6c57dca815cee1ca4e59445600a134c5223485f31f5bee57084494": {
+    "query": "\n            SELECT *\n            FROM squadov.vod_thumbnails\n            WHERE video_uuid = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "bucket",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "filepath",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "width",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "height",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
         false,
         false
       ]
@@ -10943,6 +11023,93 @@
       ]
     }
   },
+  "ebef975a3372090ded562cb3ec38a245cf79fe6660f540a09f683cf482d829f3": {
+    "query": "\n            SELECT vm.*\n            FROM UNNEST($1::UUID[], $2::VARCHAR[]) AS inp(uuid, id)\n            INNER JOIN squadov.vod_metadata AS vm\n                ON vm.video_uuid = inp.uuid\n                    AND vm.id = inp.id\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "res_x",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "res_y",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "min_bitrate",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "avg_bitrate",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "max_bitrate",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "fps",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 8,
+          "name": "has_fastify",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 9,
+          "name": "has_preview",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 10,
+          "name": "bucket",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 11,
+          "name": "session_id",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "VarcharArray"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ]
+    }
+  },
   "ec1f23a70e13b700b32944520ed3384298bd28615e20cb29379a8e8a928014db": {
     "query": "\n            DELETE FROM squadov.user_favorite_vods\n            WHERE video_uuid = $1 AND user_id = $2\n            ",
     "describe": {
@@ -11387,6 +11554,93 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "f7f3bf2290c8ff1aa3e75b2258fae5ab4b68d8b8ea3a64c4e776fb1b4c534dc3": {
+    "query": "\n            SELECT *\n            FROM squadov.vod_metadata\n            WHERE video_uuid = $1\n                AND id = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "res_x",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "res_y",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "min_bitrate",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "avg_bitrate",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "max_bitrate",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "fps",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 8,
+          "name": "has_fastify",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 9,
+          "name": "has_preview",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 10,
+          "name": "bucket",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 11,
+          "name": "session_id",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
       ]
     }
   },
