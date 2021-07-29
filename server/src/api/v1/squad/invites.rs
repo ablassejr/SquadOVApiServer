@@ -520,6 +520,9 @@ pub async fn get_user_squad_invite_links_handler(app : web::Data<Arc<api::ApiApp
     Ok(HttpResponse::Ok().json(
         squad_links
             .into_iter()
+            .filter(|x| {
+                !x.is_invalid()
+            })
             .map(|x| {
                 app.private_squad_link_to_public(x)
             })
@@ -586,6 +589,9 @@ pub async fn use_link_to_join_squad_handler(app : web::Data<Arc<api::ApiApplicat
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
     let id = app.hashid.decode(&path.link_id)?[0] as i64;
     let invite = links::get_squad_invite_link_from_id(&*app.pool, id).await?;
+    if invite.is_invalid() {
+        return Err(SquadOvError::BadRequest);
+    }
 
     let mut tx = app.pool.begin().await?;
     app.force_add_user_to_squad(&mut tx, invite.squad_id, session.user.id).await?;

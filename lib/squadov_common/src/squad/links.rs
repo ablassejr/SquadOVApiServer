@@ -14,6 +14,24 @@ pub struct SquadInviteLink {
     pub max_uses: Option<i32>,
 }
 
+impl SquadInviteLink {
+    pub fn is_invalid(&self) -> bool {
+        if let Some(max_uses) = self.max_uses {
+            if self.use_count >= max_uses {
+                return true;
+            }
+        }
+
+        if let Some(expire_time) = self.expire_time {
+            if self.create_time >= expire_time {
+                return true;
+            }
+        }
+
+        false
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct PublicSquadInviteLink {
