@@ -147,6 +147,12 @@ resource "aws_route_table_association" "k8s_public_rt_subnet_c" {
     subnet_id = aws_subnet.k8s_subnet_public_c.id
 }
 
+resource "aws_vpc_endpoint" "s3_endpoint_us_east_2" {
+    vpc_id = aws_vpc.primary.id
+    service_name = "com.amazonaws.us-east-2.s3"
+    vpc_endpoint_type = "Gateway"
+}
+
 resource "aws_route_table" "private_route_table_a" {
     vpc_id = aws_vpc.primary.id
 
@@ -163,6 +169,16 @@ resource "aws_route_table" "private_route_table_c" {
         cidr_block = "0.0.0.0/0"
         nat_gateway_id = aws_nat_gateway.primary_nat_c.id
     }
+}
+
+resource "aws_vpc_endpoint_route_table_association" "s3_private_rt_a" {
+    route_table_id = aws_route_table.private_route_table_a.id
+    vpc_endpoint_id = aws_vpc_endpoint.s3_endpoint_us_east_2.id
+}
+
+resource "aws_vpc_endpoint_route_table_association" "s3_private_rt_c" {
+    route_table_id = aws_route_table.private_route_table_c.id
+    vpc_endpoint_id = aws_vpc_endpoint.s3_endpoint_us_east_2.id
 }
 
 resource "aws_route_table_association" "k8s_private_rt_subnet_a" {
