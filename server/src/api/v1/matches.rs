@@ -198,7 +198,7 @@ impl api::ApiApplication {
                 INNER JOIN squadov.vods AS v
                     ON v.video_uuid = vi.video_uuid
                 LEFT JOIN squadov.squad_role_assignments AS sra
-                    ON sra.user_id = vi.user_id
+                    ON sra.user_id = vi.source_user_id
                 WHERE vi.user_id = u.id
                     AND (CARDINALITY($5::BIGINT[]) = 0 OR sra.squad_id = ANY($5))
             ) AS v
