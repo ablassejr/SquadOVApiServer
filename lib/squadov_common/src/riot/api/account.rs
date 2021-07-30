@@ -70,7 +70,15 @@ impl super::RiotApiHandler {
             return Err(SquadOvError::InternalError(format!("Failed to get Riot account using RSO {} - {}", resp.status().as_u16(), resp.text().await?)));
         }
 
-        Ok(resp.json::<RiotAccount>().await?)
+        let mut account = resp.json::<RiotAccount>().await?;
+
+        // There's a possibility that's the account name that we get back might have whitespace near the end?
+        // Honestly it barely happens to maybe not an issue but it happened once and that's all that matters...
+        account.game_name = account.game_name.map(|x| {
+            x.trim().to_string()
+        });
+
+        Ok(account)
     }
 
     pub async fn get_summoner_me(&self, access_token: &str, region: &str) -> Result<Option<RiotSummoner>, SquadOvError> {
