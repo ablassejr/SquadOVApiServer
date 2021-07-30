@@ -41,6 +41,7 @@ pub mod accounts;
 pub mod twitch;
 pub mod storage;
 pub mod aws;
+pub mod words;
 
 pub use error::*;
 pub use parse::*;

@@ -2,11 +2,13 @@ use crate::{
     SquadOvError,
     encrypt::AESEncryptToken,
     stats::StatPermission,
+    words,
 };
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use sqlx::{Transaction, Executor, Postgres};
 use convert_case::{Case, Casing};
+use rand::Rng;
 
 #[derive(Serialize,Deserialize,Debug,Clone)]
 #[serde(rename_all="camelCase")]
@@ -166,17 +168,24 @@ pub async fn generate_friendly_share_token(tx: &mut Transaction<'_, Postgres>, i
     // Try to generate a friendly share token within a few iterations.
     // If it doesn't work then say fuck it and move on. This is for
     // aesthetics and doesn't matter that much.
-    let w1 = eff_wordlist::large::random_word();
-    let w2 = eff_wordlist::large::random_word();
-    let w3 = eff_wordlist::short::random_word();
-    let id_str = String::from(id.to_hyphenated().to_string().split("-").collect::<Vec<&str>>()[0]);
+    let mut rng = rand::thread_rng();
 
     for _i in 0i32..5 {
-        let nm = format!(
-            "{}-{}",
-            format!("{}-{}-{}", w1, w2, w3).to_case(Case::Pascal),
-            id_str
-        );
+        let w1: &'static str;
+        let w2: &'static str;
+        let w3: &'static str;
+
+        if rng.gen::<f64>() < 0.5 {
+            w1 = words::random_adjective();
+            w2 = words::random_adjective();
+            w3 = words::random_noun();
+        } else {
+            w1 = words::random_noun();
+            w2 = words::random_verb();
+            w3 = words::random_noun();
+        }
+
+        let nm = format!("{}-{}-{}", w1, w2, w3).to_case(Case::Pascal);
         match sqlx::query!(
             "
             UPDATE squadov.share_tokens
