@@ -91,7 +91,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 .service(
                     web::scope("/landing")
                         .route("/visit", web::get().to(v1::public_landing_visit_handler))
-                        .route("/download", web::get().to(v1::public_landing_download_handler))
                 )
                 .service(
                     web::scope("/flags")
@@ -187,6 +186,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route(web::get().to(v1::get_current_user_notifications_handler))
                                 )
                                 .route("/active", web::post().to(v1::mark_user_active_endpoint_handler))
+                                .route("/download", web::post().to(v1::mark_user_download_handler))
                                 .route("/playtime", web::get().to(v1::get_user_recorded_playtime_handler))
                                 .route("/recent", web::get().to(v1::get_recent_matches_for_me_handler))
                                 .route("/referral", web::get().to(v1::get_user_me_referral_link_handler))

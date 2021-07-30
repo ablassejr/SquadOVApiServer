@@ -126,13 +126,18 @@ pub async fn public_landing_visit_handler(app : web::Data<Arc<api::ApiApplicatio
     Ok(HttpResponse::NoContent().finish())
 }
 
-pub async fn public_landing_download_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<ReferralQuery>) -> Result<HttpResponse, SquadOvError> {
-    if query.referral_code.is_some() {
-        match app.mark_referral_download(query.referral_code.as_ref().unwrap()).await {
+pub async fn mark_user_download_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
+    let opt_code = app.get_referral_code_associated_to_user(session.user.id).await?;
+    if let Some(code) = opt_code {
+        match app.mark_referral_download(&code).await {
             Ok(_) => (),
             Err(err) => log::warn!("Failed to mark referral download: {:?}", err)
         };
     }
+
     Ok(HttpResponse::NoContent().finish())
 }
 

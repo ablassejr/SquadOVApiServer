@@ -1,5 +1,6 @@
 use actix_web::{web, HttpRequest, HttpResponse};
 use serde::{Deserialize};
+use sqlx::{Transaction, Postgres};
 use crate::api;
 use crate::api::fusionauth;
 use squadov_common::SquadOvError;
@@ -11,6 +12,7 @@ pub struct RegisterData {
     username: String,
     email: String,
     password: String,
+    r#ref: Option<String>
 }
 
 #[derive(Deserialize)]
@@ -29,6 +31,50 @@ async fn register(fa: &fusionauth::FusionAuthClient, data: RegisterData) -> Resu
     )).await?;
 
     Ok(())
+}
+
+impl api::ApiApplication {
+    async fn associate_user_to_referral_code(&self, tx: &mut Transaction<'_, Postgres>, email: &str, referral_code: &str) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            "
+            INSERT INTO squadov.user_referral_code_usage (
+                email,
+                code_id,
+                tm
+            )
+            SELECT $1, id, NOW()
+            FROM squadov.referral_codes
+            WHERE code = $2
+            ",
+            email,
+            referral_code
+        )
+            .execute(tx)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_referral_code_associated_to_user(&self, user_id: i64) -> Result<Option<String>, SquadOvError> {
+        Ok(
+            sqlx::query!(
+                "
+                SELECT rc.code
+                FROM squadov.user_referral_code_usage AS ucu
+                INNER JOIN squadov.referral_codes AS rc
+                    ON rc.id = ucu.code_id
+                INNER JOIN squadov.users AS u
+                    ON u.email = ucu.email
+                WHERE u.id = $1
+                ",
+                user_id
+            )
+                .fetch_optional(&*self.pool)
+                .await?
+                .map(|x| {
+                    x.code
+                })
+        )
+    }
 }
 
 /// Handles collecting the user data and passing it to FusionAuth for registration.
@@ -51,7 +97,14 @@ pub async fn register_handler(data : web::Json<RegisterData>, app : web::Data<Ar
     }
 
     let email = data.email.clone();
+    let referral = data.r#ref.clone();
     register(&app.clients.fusionauth, data.into_inner()).await?;
+
+    let mut tx = app.pool.begin().await?;
+    if let Some(referral_code) = &referral {
+        app.associate_user_to_referral_code(&mut tx, &email, referral_code).await?;
+    }
+
     if aux.invite_uuid.is_some() && aux.squad_id.is_some() && aux.sig.is_some() {
         let squad_id = aux.squad_id.unwrap();
         let invite_uuid = aux.invite_uuid.unwrap();
@@ -61,8 +114,7 @@ pub async fn register_handler(data : web::Json<RegisterData>, app : web::Data<Ar
         if sig != test_sig {
             return Err(SquadOvError::Unauthorized);
         }
-
-        let mut tx = app.pool.begin().await?;
+        
         // Reassociate this invite with whatever email the user just used to register (this allows
         // an invite to be used for another email if the inviter didn't use the user's desired email address).
         app.reassociate_invite_email(&mut tx, &invite_uuid, &email).await?;
@@ -72,9 +124,8 @@ pub async fn register_handler(data : web::Json<RegisterData>, app : web::Data<Ar
 
         // Accept invite (consumes the invite so it can't be re-used)
         app.accept_reject_invite(&mut tx, squad_id, &invite_uuid, true).await?;
-
-        tx.commit().await?;
     }
 
+    tx.commit().await?;
     Ok(HttpResponse::NoContent().finish())
 }
