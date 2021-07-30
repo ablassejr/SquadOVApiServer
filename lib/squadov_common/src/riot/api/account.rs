@@ -142,7 +142,7 @@ impl super::RiotApiApplicationInterface {
         Ok(())
     }
 
-    pub async fn obtain_riot_account_from_access_token(&self, access_token: &str, refresh_token: &str, expiration: &DateTime<Utc>, user_id: i64) -> Result<(), SquadOvError> {
+    pub async fn obtain_riot_account_from_access_token(&self, access_token: &str, refresh_token: &str, expiration: &DateTime<Utc>, user_id: i64) -> Result<RiotAccount, SquadOvError> {
         log::info!("Obtain Riot Account from Access Token for User: {}", user_id);
         // Check for the expiration of the access token using the passed in expiration date. If it is expired, use the refresh token to obtain a new access token.
         // Note that we use a 1 minute buffer here to guard against potential cases where the access token is valid when we check but no longer valid when we send the request.
@@ -180,7 +180,7 @@ impl super::RiotApiApplicationInterface {
         db::link_riot_account_to_user(&mut tx, &account.puuid, user_id).await?;
         db::store_rso_for_riot_account(&mut tx, &account.puuid, user_id, &access_token, &refresh_token, &expiration).await?;
         tx.commit().await?;
-        Ok(())
+        Ok(account)
     }
     
     pub async fn request_riot_account_from_access_token(&self, access_token: &str, refresh_token: &str, expiration: DateTime<Utc>, user_id: i64) -> Result<(), SquadOvError> {

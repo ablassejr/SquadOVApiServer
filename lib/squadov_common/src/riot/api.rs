@@ -216,7 +216,7 @@ impl RabbitMqListener for RiotApiApplicationInterface {
         log::info!("Handle Riot RabbitMQ Task: {}", std::str::from_utf8(data).unwrap_or("failure"));
         let task: RiotApiTask = serde_json::from_slice(data)?;
         match task {
-            RiotApiTask::AccountMe{access_token, refresh_token, expiration, user_id} => self.obtain_riot_account_from_access_token(&access_token, &refresh_token, &expiration, user_id).await?,
+            RiotApiTask::AccountMe{access_token, refresh_token, expiration, user_id} => self.obtain_riot_account_from_access_token(&access_token, &refresh_token, &expiration, user_id).await.and(Ok(()))?,
             RiotApiTask::Account{puuid} => self.obtain_riot_account_from_puuid(&puuid).await?,
             RiotApiTask::ValorantBackfill{puuid} => self.backfill_user_valorant_matches(&puuid).await?,
             RiotApiTask::ValorantMatch{match_id, shard} => match self.obtain_valorant_match_info(&match_id, &shard).await {
