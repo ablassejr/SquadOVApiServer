@@ -120,7 +120,7 @@ where
                             ON lmpi.match_uuid = lmp.match_uuid
                                 AND lmpi.participant_id = lmp.participant_id
                         INNER JOIN squadov.riot_accounts AS ra
-                            ON ra.account_id = lmpi.account_id
+                            ON ra.summoner_id = lmpi.summoner_id
                         INNER JOIN squadov.riot_account_links AS ral
                             ON ral.puuid = ra.puuid
                         WHERE ral.user_id = $1 AND lmp.match_uuid = $2
