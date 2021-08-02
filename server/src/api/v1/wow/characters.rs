@@ -249,6 +249,37 @@ impl api::ApiApplication {
         )
     }
 
+    async fn get_wow_realm_slug(&self, realm_id: i64, name: &str) -> Result<String, SquadOvError> {
+        Ok(
+            sqlx::query!(
+                r#"
+                WITH realms AS (
+                    SELECT *
+                    FROM squadov.wow_realms
+                    WHERE id = $1
+                    UNION
+                    SELECT wr.*
+                    FROM squadov.wow_connected_realms AS wcr
+                    INNER JOIN squadov.wow_connected_realm_members AS crm
+                        ON crm.connected_realm_id = wcr.id
+                    INNER JOIN squadov.wow_realms AS wr
+                        ON wr.id = crm.realm_id
+                    WHERE wcr.id = $1
+                )
+                SELECT slug AS "slug!"
+                FROM realms
+                ORDER BY LEVENSHTEIN(name, $2) ASC
+                LIMIT 1
+                "#,
+                realm_id,
+                name,
+            )
+                .fetch_one(&*self.pool)
+                .await?
+                .slug
+        )
+    }
+
     async fn get_wow_character_covenant(&self, view_uuid: &Uuid, guid: &str) -> Result<Option<WowCovenant>, SquadOvError> {
         Ok(
             sqlx::query!(
@@ -370,18 +401,18 @@ pub async fn get_wow_armory_link_for_character_handler(app : web::Data<Arc<api::
     let region_id = guid_parts[1].parse::<i64>()?;
     let region = app.get_wow_realm_region(region_id).await?;
 
+    // The realm ID in the GUID can be a connected realm or an actual realm and the server name that's passed
+    // to us from the user IS NOT THE RIGHT SLUG. What we need to do is to find the realm whose name is most similar
+    // to the passed in server name and use that to generate the armory link.
+    let slug = app.get_wow_realm_slug(region_id, &server_name).await?;
+
     // Finally compose the WoW armory link: 
     // https://worldofwarcraft.com/en-us/character/REGION/SERVER NAME/CHARACTER NAME
     Ok(HttpResponse::Ok().json(
         format!(
             "https://worldofwarcraft.com/en-us/character/{region}/{server}/{character}",
             region=region,
-            server=server_name
-                // Certain server names get dumped out into the log differently...we might need to fix this at some point in 
-                // a way that uses info from the DB.
-                .replace("Area52", "Area 52")
-                .replace("'", "")
-                .replace(" ","-"),
+            server=slug,
             character=char_name,
         )
     ))

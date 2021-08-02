@@ -25,24 +25,26 @@ def upsert(stmt, idx, cols):
         set_=update
     )
 
+regions = ['us', 'eu', 'kr', 'tw']
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--realms', required=True)
-    parser.add_argument('--region', required=True)
     parser.add_argument('--jdbc', required=True)
     args = parser.parse_args()
 
-    with open(args.realms, encoding='utf-8') as f:
-        realms = json.load(f)
-
     allRealms = []
-    for r in realms["realms"]:
-        allRealms.append({
-            'id': r["id"],
-            'name': r["name"],
-            'slug': r["slug"],
-            'region': args.region
-        })
+    for reg in regions:
+        with open(os.path.join(args.realms, '{}.json'.format(reg)), encoding='utf-8') as f:
+            realms = json.load(f)
+
+        for r in realms["realms"]:
+            allRealms.append({
+                'id': r["id"],
+                'name': r["name"],
+                'slug': r["slug"],
+                'region': reg
+            })
 
     engine = create_engine(args.jdbc)
     metadata.create_all(engine)
