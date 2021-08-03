@@ -70,10 +70,6 @@ pub struct RabbitMqPacket {
 pub struct RabbitMqInterface {
     pub config: RabbitMqConfig,
     publish_queue: Arc<RwLock<VecDeque<RabbitMqPacket>>>,
-    // Each queue gets its own vector of consumers so that we allocate 1 thread
-    // per connection bundle and we allow having multiple threads all receiving
-    // work from a single queue.
-    consumers: RwLock<HashMap<String, Vec<Arc<RabbitMqConnectionBundle>>>>,
     db: Arc<PgPool>,
 }
 
@@ -223,98 +219,105 @@ impl RabbitMqConnectionBundle {
         Ok(())
     }
 
-    fn start_consumer(&self, queue: &str, mut consumer: Consumer, itf: Arc<RabbitMqInterface>, requeue_callback: RequeueCallbackFn) {
+    async fn start_consumer(&self, queue: &str, mut consumer: Consumer, itf: Arc<RabbitMqInterface>, requeue_callback: RequeueCallbackFn) -> Result<(), SquadOvError> {
         let queue = String::from(queue);
         let listeners = self.listeners.clone();
-        tokio::task::spawn(async move {
-            while let Some(msg) = consumer.next().await {
-                if msg.is_err() {
-                    log::warn!("Failed to consume from RabbitMQ: {:?}", msg.err().unwrap());
-                    continue;
+
+        while let Some(msg) = consumer.next().await {
+            if msg.is_err() {
+                return Err(SquadOvError::InternalError(format!("Failed to consume from RabbitMQ: {:?}", msg.err().unwrap())));
+            }
+
+            let msg = msg.unwrap();
+
+            // Check the application defined max age. If we're past the max age of this particular message then
+            // we'd want to discard the message.
+            let current_timestamp = Utc::now().timestamp() as u64;
+            let og_timestamp = msg.properties.timestamp().unwrap_or(current_timestamp);
+            let max_age_seconds = match msg.properties.headers() {
+                Some(h) => h.inner().get(&ShortString::from(SQUADOV_MESSAGE_MAX_AGE_HEADER)),
+                None => None,
+            }.map(|x| {
+                match x {
+                    AMQPValue::LongLongInt(y) => *y,
+                    _ => {
+                        log::warn!("Max age header in an unexpected format: {:?}", x);
+                        DEFAULT_MAX_AGE_SECONDS
+                    },
                 }
+            }).unwrap_or(DEFAULT_MAX_AGE_SECONDS);
 
-                let msg = msg.unwrap();
+            let expired = (current_timestamp - og_timestamp) > (max_age_seconds as u64) && max_age_seconds != INFITE_MAX_AGE;
+            let mut requeue_ms: Option<i64> = None;
 
-                // Check the application defined max age. If we're past the max age of this particular message then
-                // we'd want to discard the message.
-                let current_timestamp = Utc::now().timestamp() as u64;
-                let og_timestamp = msg.properties.timestamp().unwrap_or(current_timestamp);
-                let max_age_seconds = match msg.properties.headers() {
-                    Some(h) => h.inner().get(&ShortString::from(SQUADOV_MESSAGE_MAX_AGE_HEADER)),
+            if !expired {
+                let current_listeners = listeners.read().await.clone();
+                let topic_listeners = current_listeners.get(&queue);
+                if topic_listeners.is_some() {
+                    let topic_listeners = topic_listeners.unwrap();
+                    for l in topic_listeners {
+                        match l.handle(&msg.data).await {
+                            Ok(_) => (),
+                            Err(err) => {
+                                log::warn!("Failure in processing RabbitMQ message: {:?}", err);
+                                match err {
+                                    SquadOvError::Defer(ms) => { requeue_ms = Some(ms); },
+                                    SquadOvError::RateLimit => { requeue_ms = Some(100); },
+                                    _ => (),
+                                }
+                            },
+                        };
+                    }    
+                }
+            } else {
+                log::warn!("Ignoring message because it expired: {:?}", &msg);
+            }
+
+            match msg.acker.ack(BasicAckOptions::default()).await {
+                Ok(_) => (),
+                Err(err) => {
+                    return Err(SquadOvError::InternalError(format!("Failed to ack RabbitMQ message: {:?}", err)));
+                }
+            };
+
+            if requeue_ms.is_some() {
+                let retry_count = match msg.properties.headers() {
+                    Some(h) => h.inner().get(&ShortString::from(SQUADOV_RETRY_COUNT_HEADER)),
                     None => None,
                 }.map(|x| {
                     match x {
-                        AMQPValue::LongLongInt(y) => *y,
+                        AMQPValue::LongUInt(y) => *y,
                         _ => {
-                            log::warn!("Max age header in an unexpected format: {:?}", x);
-                            DEFAULT_MAX_AGE_SECONDS
+                            log::warn!("Retry header in an unexpected format: {:?}", x);
+                            0
                         },
                     }
-                }).unwrap_or(DEFAULT_MAX_AGE_SECONDS);
+                }).unwrap_or(0);
 
-                let expired = (current_timestamp - og_timestamp) > (max_age_seconds as u64) && max_age_seconds != INFITE_MAX_AGE;
-                let mut requeue_ms: Option<i64> = None;
-
-                if !expired {
-                    let current_listeners = listeners.read().await.clone();
-                    let topic_listeners = current_listeners.get(&queue);
-                    if topic_listeners.is_some() {
-                        let topic_listeners = topic_listeners.unwrap();
-                        for l in topic_listeners {
-                            match l.handle(&msg.data).await {
-                                Ok(_) => (),
-                                Err(err) => {
-                                    log::warn!("Failure in processing RabbitMQ message: {:?}", err);
-                                    match err {
-                                        SquadOvError::Defer(ms) => { requeue_ms = Some(ms); },
-                                        SquadOvError::RateLimit => { requeue_ms = Some(100); },
-                                        _ => {},
-                                    }
-                                },
-                            };
-                        }    
-                    }
-                } else {
-                    log::warn!("Ignoring message because it expired: {:?}", &msg);
-                }
-
-                match msg.acker.ack(BasicAckOptions::default()).await {
-                    Ok(_) => (),
-                    Err(err) => log::warn!("Failed to ack RabbitMQ message: {:?}", err)
-                };
-
-                if requeue_ms.is_some() {
-                    let retry_count = match msg.properties.headers() {
-                        Some(h) => h.inner().get(&ShortString::from(SQUADOV_RETRY_COUNT_HEADER)),
-                        None => None,
-                    }.map(|x| {
-                        match x {
-                            AMQPValue::LongUInt(y) => *y,
-                            _ => {
-                                log::warn!("Retry header in an unexpected format: {:?}", x);
-                                0
-                            },
-                        }
-                    }).unwrap_or(0);
-
-                    requeue_callback(&*itf, RabbitMqPacket{
-                        queue: queue.clone(),
-                        data: msg.data.clone(),
-                        priority: msg.properties.priority().unwrap_or(RABBITMQ_DEFAULT_PRIORITY),
-                        timestamp: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(og_timestamp as i64, 0), Utc),
-                        retry_count: retry_count + 1,
-                        base_delay_ms: requeue_ms,
-                        max_age_seconds,
-                    });
-                }
+                requeue_callback(&*itf, RabbitMqPacket{
+                    queue: queue.clone(),
+                    data: msg.data.clone(),
+                    priority: msg.properties.priority().unwrap_or(RABBITMQ_DEFAULT_PRIORITY),
+                    timestamp: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(og_timestamp as i64, 0), Utc),
+                    retry_count: retry_count + 1,
+                    base_delay_ms: requeue_ms,
+                    max_age_seconds,
+                });
             }
-        });
+        }
+
+        Ok(())
     }
 
     pub async fn begin_consuming(&self, itf: Arc<RabbitMqInterface>, queue: &str, requeue_callback: RequeueCallbackFn, prefetch_count: u16) -> Result<(), SquadOvError> {
         // Each channel gets its own thread to start consuming from every channel.
         // I think we should probably only limit ourselves to having 1 consumer channel anyway.
-        for ch in &self.channels {
+        if self.channels.len() != 1 {
+            log::warn!("WE SHOULD ONLY BE USING A SINGLE CHANNEL FOR CONSUMERS.");
+            return Err(SquadOvError::BadRequest);
+        }
+
+        if let Some(ch) = self.channels.first() {
             ch.basic_qos(prefetch_count, BasicQosOptions::default()).await?;
 
             let consumer = ch.basic_consume(
@@ -322,9 +325,9 @@ impl RabbitMqConnectionBundle {
                 "",
                 BasicConsumeOptions::default(),
                 FieldTable::default(),
-
             ).await?;
-            self.start_consumer(queue, consumer, itf.clone(), requeue_callback);
+
+            self.start_consumer(queue, consumer, itf.clone(), requeue_callback).await?;
         }
 
         Ok(())
@@ -334,40 +337,60 @@ impl RabbitMqConnectionBundle {
 impl RabbitMqInterface {
     pub async fn new(config: &RabbitMqConfig, db: Arc<PgPool>, enabled: bool) -> Result<Arc<Self>, SquadOvError> {
         log::info!("Connecting to RabbitMQ...");
-        let publisher = Arc::new(RabbitMqConnectionBundle::connect(&config, db.clone(), if enabled { 4 } else { 0 }).await?);
         let publish_queue = Arc::new(RwLock::new(VecDeque::new()));
 
         if enabled {
             log::info!("\tStart Publishing (RabbitMQ)...");
             {
-                let publisher = publisher.clone();
                 let publish_queue = publish_queue.clone();
+                let config = config.clone();
+                let db = db.clone();
                 tokio::task::spawn(async move {
-                    let mut publish_idx: usize = 0;
                     loop {
-                        let mut queue_clone = {
-                            let mut queue_lock = publish_queue.write().await;
-                            let ret = queue_lock.clone();
-                            queue_lock.clear();
-                            ret
+                        log::info!("Connecting to RabbitMQ publisher...");
+                        // We need to automatically reconnect if we lose the connection to RabbitMQ.
+                        let publisher = match RabbitMqConnectionBundle::connect(&config, db.clone(), if enabled { 4 } else { 0 }).await {
+                            Ok(bundle) => Arc::new(bundle),
+                            Err(err) => {
+                                log::warn!("Failed to connect to RabbitMQ publisher: {:?}", err);
+                                async_std::task::sleep(std::time::Duration::from_millis(16)).await;
+                                continue;
+                            }
                         };
 
-                        if !queue_clone.is_empty() {
-                            log::info!("RabbitMQ Publishing {} messages", queue_clone.len());
-                        }
+                        log::info!("...Connected to RabbitMQ publisher.");
 
-                        while !queue_clone.is_empty() {
-                            let next_msg = queue_clone.pop_front();
-                            if next_msg.is_some() {
-                                let next_msg = next_msg.unwrap();
-                                match publisher.publish(next_msg, publish_idx).await {
-                                    Ok(_) => (),
-                                    Err(err) => log::warn!("Failed to publish RabbitMQ message: {:?}", err)
-                                }
-                                publish_idx = (publish_idx + 1) % publisher.num_channels();
+                        let mut publish_idx: usize = 0;
+                        let mut is_valid: bool = true;
+                        while is_valid {
+                            let mut queue_clone = {
+                                let mut queue_lock = publish_queue.write().await;
+                                let ret = queue_lock.clone();
+                                queue_lock.clear();
+                                ret
+                            };
+
+                            if !queue_clone.is_empty() {
+                                log::info!("RabbitMQ Publishing {} messages", queue_clone.len());
                             }
+
+                            while !queue_clone.is_empty() {
+                                let next_msg = queue_clone.pop_front();
+                                if next_msg.is_some() {
+                                    let next_msg = next_msg.unwrap();
+                                    match publisher.publish(next_msg, publish_idx).await {
+                                        Ok(_) => (),
+                                        Err(err) => {
+                                            is_valid = false;
+                                            log::warn!("Failed to publish RabbitMQ message: {:?}", err);
+                                            break;
+                                        }
+                                    }
+                                    publish_idx = (publish_idx + 1) % publisher.num_channels();
+                                }
+                            }
+                            async_std::task::sleep(std::time::Duration::from_millis(1)).await;
                         }
-                        async_std::task::sleep(std::time::Duration::from_millis(1)).await;
                     }
                 });
             }
@@ -377,7 +400,6 @@ impl RabbitMqInterface {
             config: config.clone(),
             publish_queue,
             db,
-            consumers: RwLock::new(HashMap::new()),
         });
         log::info!("RabbitMQ Successfully Connected");
         Ok(itf)
@@ -391,29 +413,43 @@ impl RabbitMqInterface {
     }
 
     pub async fn add_listener(itf: Arc<RabbitMqInterface>, queue: String, listener: Arc<dyn RabbitMqListener>, prefetch_count: u16) -> Result<(), SquadOvError> {
-        let mut consumers = itf.consumers.write().await;
-        if !consumers.contains_key(&queue) {
-            consumers.insert(queue.clone(), Vec::new());
-        }
+        // Need to spawn a management thread - if the connection fails for whatever reason, the connection
+        // needs to be remade.
+        tokio::task::spawn(async move {
+            loop {
+                log::info!("Start Consuming (RabbitMQ) on Queue {}...", &queue);
+                let consumer = match RabbitMqConnectionBundle::connect(&itf.config, itf.db.clone(), 1).await {
+                    Ok(bundle) => Arc::new(bundle),
+                    Err(err) => {
+                        log::warn!("Failed to connect to RabbitMQ consumer: {:?}", err);
+                        async_std::task::sleep(std::time::Duration::from_millis(16)).await;
+                        continue;
+                    }
+                };
+                
+                {
+                    let mut all_listeners = consumer.listeners.write().await;
+                    if !all_listeners.contains_key(&queue) {
+                        all_listeners.insert(queue.clone(), Vec::new());
+                    }
 
-        let consumer_array = consumers.get_mut(&queue).unwrap();
-        log::info!("Start Consuming (RabbitMQ) on Queue {} [{}]...", &queue, consumer_array.len());
+                    let arr = all_listeners.get_mut(&queue).unwrap();
+                    arr.push(listener.clone());
+                }
 
-        let consumer = Arc::new(RabbitMqConnectionBundle::connect(&itf.config, itf.db.clone(), 1).await?);
-        
-        {
-            let mut all_listeners = consumer.listeners.write().await;
-            if !all_listeners.contains_key(&queue) {
-                all_listeners.insert(queue.clone(), Vec::new());
+                log::info!("\t...Successful start of RabbitMQ consumption.");
+
+                match consumer.begin_consuming(itf.clone(), &queue, RabbitMqInterface::publish_direct, prefetch_count).await {
+                    Ok(_) => (),
+                    Err(err) => {
+                        log::warn!("Failed while RabbitMQ consuming: {:?}", err);
+                        async_std::task::sleep(std::time::Duration::from_millis(16)).await;
+                        continue;
+                    }
+                };
             }
+        });
 
-            let arr = all_listeners.get_mut(&queue).unwrap();
-            arr.push(listener);
-        }
-
-        consumer_array.push(consumer.clone());
-        consumer.begin_consuming(itf.clone(), &queue, RabbitMqInterface::publish_direct, prefetch_count).await?;
-        log::info!("\t...Success.");
         Ok(())
     }
 
