@@ -62,6 +62,7 @@ pub async fn refresh_user_session_handler(app : web::Data<Arc<api::ApiApplicatio
         session_id: session.session_id.clone(),
         expiration,
         expires_in: time_to_expire.num_seconds(),
+        server_time: Utc::now(),
     }))
 }
 

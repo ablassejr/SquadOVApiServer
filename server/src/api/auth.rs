@@ -97,7 +97,6 @@ where
                     user: app.users.get_stored_user_from_uuid(&share_token.user_uuid, &*app.pool).await?.ok_or(SquadOvError::NotFound)?,
                     access_token: String::new(),
                     refresh_token: String::new(),
-                    old_session_id: None,
                     is_temp: true,
                     share_token: Some(share_token),
                 }

@@ -1,5 +1,6 @@
 use sqlx;
 use sqlx::postgres::PgPool;
+use sqlx::{Executor, Postgres};
 use actix_web::{ HttpRequest, FromRequest, dev, Error };
 use actix_web::error::ErrorUnauthorized;
 use futures_util::future::{ok, err, Ready};
@@ -21,7 +22,6 @@ pub struct SquadOVSession {
     pub user: super::SquadOVUser,
     pub access_token: String,
     pub refresh_token: String,
-    pub old_session_id: Option<String>,
     pub is_temp: bool,
     pub share_token: Option<AccessTokenRequest>,
 }
@@ -56,7 +56,7 @@ impl SessionManager {
         sqlx::query!(
             "
             DELETE FROM squadov.user_sessions
-            WHERE id = $1 OR old_id = $1
+            WHERE id = $1
             ",
             id,
         )
@@ -86,7 +86,7 @@ impl SessionManager {
             FROM squadov.user_sessions AS us
             INNER JOIN squadov.users AS u
                 ON u.id = us.user_id
-            WHERE us.id = $1 OR us.old_id = $1
+            WHERE us.id = $1
             ",
             id,
         ).fetch_optional(pool).await?;
@@ -107,7 +107,6 @@ impl SessionManager {
                 },
                 access_token: x.access_token,
                 refresh_token: x.refresh_token,
-                old_session_id: None,
                 is_temp: x.is_temp,
                 share_token: None,
             })),
@@ -132,7 +131,10 @@ impl SessionManager {
         Ok(Some(serde_json::from_slice::<AccessTokenRequest>(&decrypted_token.data)?))
     }
 
-    pub async fn store_session(&self, session: &SquadOVSession, pool: &PgPool) -> Result<(), sqlx::Error> {
+    pub async fn store_session<'a, T>(&self, ex: T, session: &SquadOVSession) -> Result<(), sqlx::Error>
+    where
+        T: Executor<'a, Database = Postgres>
+    {
         // Store in database
         sqlx::query!(
             "
@@ -141,14 +143,16 @@ impl SessionManager {
                 access_token,
                 refresh_token,
                 user_id,
-                is_temp
+                is_temp,
+                issue_tm
             )
             VALUES (
                 $1,
                 $2,
                 $3,
                 $4,
-                $5
+                $5,
+                NOW()
             )
             ",
             session.session_id,
@@ -157,31 +161,70 @@ impl SessionManager {
             session.user.id,
             session.is_temp,
         )
-            .execute(pool)
+            .execute(ex)
             .await?;
         
-        return Ok(())
+        Ok(())
     }
 
-    pub async fn refresh_session(&self, old_id: &str, session: &SquadOVSession, pool: &PgPool) -> Result<(), sqlx::Error> {
+    pub async fn get_transition_session_id<'a, T>(&self, ex: T, id: &str) -> Result<Option<String>, SquadOvError>
+    where
+        T: Executor<'a, Database = Postgres>
+    {
+        Ok(
+            sqlx::query!(
+                "
+                SELECT transition_id
+                FROM squadov.user_sessions
+                WHERE id = $1
+                ",
+                id
+            )
+                .fetch_optional(ex)
+                .await?
+                .map(|x| {
+                    x.transition_id
+                })
+                .unwrap_or(None)
+        )
+    }
+
+    pub async fn transition_session_to_new_id<'a, T>(&self, ex: T, old_id: &str, new_id: &str) -> Result<(), sqlx::Error>
+    where
+        T: Executor<'a, Database = Postgres>
+    {
         sqlx::query!(
             "
             UPDATE squadov.user_sessions
-            SET id = $1,
-                access_token = $2,
-                refresh_token = $3,
-                old_id = $4
-            WHERE id = $4
+            SET transition_id = $2,
+                expiration_tm = NOW() + INTERVAL '3 hour'
+            WHERE id = $1
             ",
-            session.session_id,
-            &session.access_token,
-            &session.refresh_token,
             old_id,
+            new_id,
         )
-            .execute(pool)
+            .execute(ex)
             .await?;
-        
         return Ok(())
+    }
+
+    pub async fn clean_expired_sessions_for_user<'a, T>(&self, ex: T, user_id: i64) -> Result<(), SquadOvError>
+    where
+        T: Executor<'a, Database = Postgres>
+    {
+        sqlx::query!(
+            "
+            DELETE FROM squadov.user_sessions
+            WHERE user_id = $1
+                AND is_temp = FALSE
+                AND expiration_tm IS NOT NULL
+                AND expiration_tm <= NOW()
+            ",
+            user_id
+        )
+            .execute(ex)
+            .await?;
+        Ok(())
     }
 }
 
@@ -209,6 +252,10 @@ impl crate::api::ApiApplication {
         let expired = !self.is_session_valid(&session).await?;
 
         if expired || force {
+            if let Some(transition_id) = self.session.get_transition_session_id(&*self.pool, &session.session_id).await? {
+                return Ok(self.session.get_session_from_id(&transition_id, &*self.pool).await?.ok_or(SquadOvError::NotFound)?);
+            }
+
             let new_token = match self.clients.fusionauth.refresh_jwt(&session.refresh_token).await {
                 Ok(t) => t,
                 Err(err) => {
@@ -224,10 +271,19 @@ impl crate::api::ApiApplication {
 
             let mut tx = self.pool.begin().await?;
             squadov_common::analytics::mark_active_user_session(&mut tx, session.user.id).await?;
-            tx.commit().await?;
 
-            self.session.refresh_session(&old_id, &session, &self.pool).await?;
-            session.old_session_id = Some(old_id);
+            // We want to make sure a valid user has a valid session at all times; however, we also
+            // want to make sure the user's session expires after a reasonable amount of time to prevent
+            // a third-party from hijacking that session value. So what we need to do is
+            //  1) Create a new session to pass back to the user.
+            //  2) Set an expiration on the old session where it's still valid but any attempts to refresh that session
+            //     will always return the session returned in #1.
+            //  3) After the expiration, delete the old session and prevent it from being used.
+            self.session.store_session(&mut tx, &session).await?;
+            self.session.transition_session_to_new_id(&mut tx, &old_id, &session.session_id).await?;
+            self.session.clean_expired_sessions_for_user(&mut tx, session.user.id).await?;
+
+            tx.commit().await?;
         }
 
         Ok(session)

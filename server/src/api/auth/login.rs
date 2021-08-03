@@ -54,7 +54,6 @@ impl api::ApiApplication {
                 },
                 access_token: result.token,
                 refresh_token: result.refresh_token,
-                old_session_id: None,
                 is_temp: false,
                 share_token: None,
             },
@@ -91,7 +90,7 @@ impl api::ApiApplication {
         // Store this session in our database and ensure the user is made aware of which session they should
         // be echoing back to us so we can verify their session. It's the client's responsibility to store
         // the session ID and echo it back to us (since we're kinda assuming the lack of cookies because of Electron).
-        self.session.store_session(&session, &self.pool).await?;
+        self.session.store_session(&*self.pool, &session).await?;
         Ok(session)
     }
 }

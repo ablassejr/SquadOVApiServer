@@ -12,6 +12,8 @@ pub struct SerializedUserSession {
     // Number of seconds to expiration
     #[serde(rename="expiresIn")]
     pub expires_in: i64,
+    #[serde(rename="serverTime")]
+    pub server_time: DateTime<Utc>,
 }
 
 #[derive(Deserialize)]

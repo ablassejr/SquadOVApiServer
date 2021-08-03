@@ -28,11 +28,10 @@ pub async fn get_user_rso_auth_url_handler(app : web::Data<Arc<api::ApiApplicati
         user: app.users.get_stored_user_from_id(path.user_id, &*app.pool).await?.ok_or(SquadOvError::NotFound)?,
         access_token: String::new(),
         refresh_token: String::new(),
-        old_session_id: None,
         is_temp: true,
         share_token: None,
     };
-    app.session.store_session(&session, &*app.pool).await?;
+    app.session.store_session(&*app.pool, &session).await?;
 
     let state = squadov_common::generate_csrf_user_oauth_state(&*app.pool, &session.user.uuid, &session.session_id).await?;
     let rso_url = format!(
@@ -52,11 +51,10 @@ pub async fn get_twitch_login_url_handler(app : web::Data<Arc<api::ApiApplicatio
         user: session.user.clone(),
         access_token: String::new(),
         refresh_token: String::new(),
-        old_session_id: None,
         is_temp: true,
         share_token: None,
     };
-    app.session.store_session(&session, &*app.pool).await?;
+    app.session.store_session(&*app.pool, &session).await?;
 
     let state = squadov_common::generate_csrf_user_oauth_state(&*app.pool, &session.user.uuid, &session.session_id).await?;
     let url = format!(
