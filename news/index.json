@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.9.1",
+        "description": "Some QOL changes for our post AWS migration patch!",
+        "timestamp": 1628564284000,
+        "data": "data/update-v0.9.1.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.8.10",
         "description": "Overlays, overlays, overlays!",
         "timestamp": 1625170295000,

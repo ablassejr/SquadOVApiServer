@@ -261,6 +261,7 @@ impl ApiApplication {
             WHERE v.is_clip = FALSE
                 AND v.end_time IS NOT NULL
                 AND u.id = $1
+                AND m.game IS NOT NULL
             GROUP BY m.game
             "#,
             user.id,
