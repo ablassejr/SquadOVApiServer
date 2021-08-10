@@ -102,35 +102,44 @@ impl VodManager for S3VodManager {
     }
 
     async fn upload_vod_from_file(&self, segment: &VodSegmentId, path: &std::path::Path) -> Result<(), SquadOvError> {
-        let md5_hash = {
-            let mut file = std::fs::File::open(path)?;
-            let mut hasher = md5::Md5::new();
-            std::io::copy(&mut file, &mut hasher)?;
-            let hash = hasher.finalize();
-            base64::encode(hash)
-        };
+        for _i in 0..5 {
+            let md5_hash = {
+                let mut file = std::fs::File::open(path)?;
+                let mut hasher = md5::Md5::new();
+                std::io::copy(&mut file, &mut hasher)?;
+                let hash = hasher.finalize();
+                base64::encode(hash)
+            };
+    
+            let file_byte_size = {
+                let file = std::fs::File::open(path)?;
+                file.metadata()?.len()
+            };
 
-        let file_byte_size = {
-            let file = std::fs::File::open(path)?;
-            file.metadata()?.len()
-        };
+            let file = TFile::open(path).await?;
+            let framed_read = FramedRead::new(file, BytesCodec::new()).map_ok(BytesMut::freeze);
+            let req = PutObjectRequest{
+                bucket: self.bucket.clone(),
+                body: Some(
+                    StreamingBody::new(framed_read)
+                ),
+                content_md5: Some(md5_hash),
+                content_length: Some(file_byte_size as i64),
+                content_type: Some(String::from("application/octet-stream")),
+                key: segment.get_fname(),
+                ..PutObjectRequest::default()
+            };
 
-        let file = TFile::open(path).await?;
-        let framed_read = FramedRead::new(file, BytesCodec::new()).map_ok(BytesMut::freeze);
+            match (*self.aws).as_ref().unwrap().s3.put_object(req).await {
+                Ok(_) => return Ok(()),
+                Err(err) => {
+                    log::warn!("Failed to do AWS S3 PUT {:?} - RETRYING", err);
+                    continue;
+                }
+            };
+        }
         
-        let req = PutObjectRequest{
-            bucket: self.bucket.clone(),
-            body: Some(
-                StreamingBody::new(framed_read)
-            ),
-            content_md5: Some(md5_hash),
-            content_length: Some(file_byte_size as i64),
-            content_type: Some(String::from("application/octet-stream")),
-            key: segment.get_fname(),
-            ..PutObjectRequest::default()
-        };
-        (*self.aws).as_ref().unwrap().s3.put_object(req).await?;
-        Ok(())
+        Err(SquadOvError::InternalError(String::from("Failed to Upload VOD - Exceeded retry limit")))
     }
 
     async fn is_vod_session_finished(&self, _session: &str) -> Result<bool, SquadOvError> {
