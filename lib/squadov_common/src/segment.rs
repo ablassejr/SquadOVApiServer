@@ -71,6 +71,13 @@ pub struct IdentifyRequest {
     traits: ServerUserIdentifyTraits,
 }
 
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all="camelCase")]
+pub struct TrackRequest {
+    user_id: String,
+    event: String,
+}
+
 impl SegmentClient {
     pub fn new(config: SegmentConfig) -> Self {
         Self {
@@ -87,6 +94,25 @@ impl SegmentClient {
             .timeout(std::time::Duration::from_secs(120))
             .connect_timeout(std::time::Duration::from_secs(60))
             .build()?)
+    }
+
+    pub async fn track(&self, user_id: &str, event: &str) -> Result<(), SquadOvError> {
+        let req = TrackRequest{
+            user_id: user_id.to_string(),
+            event: event.to_string(),
+        };
+        
+        let client = self.create_http_client()?;
+        let resp = client.post("https://api.segment.io/v1/track")
+            .json(&req)
+            .send()
+            .await?;
+
+        if resp.status() != StatusCode::OK {
+            return Err(SquadOvError::BadRequest);
+        }
+
+        Ok(())
     }
 
     pub async fn identify(&self, user_id: &str, anonymous_id: &str, ip: &str, traits: &ServerUserIdentifyTraits) -> Result<(), SquadOvError> {

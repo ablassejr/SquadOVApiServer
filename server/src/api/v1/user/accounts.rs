@@ -9,7 +9,6 @@ use crate::api;
 use crate::api::auth::{SquadOVUser, SquadOVUserHandle, SquadOVSession};
 use squadov_common::{
     SquadOvError,
-    EmailTemplate, EmailUser,
     accounts::{
         twitch as twitch_acc,
         TwitchAccount,
@@ -91,19 +90,8 @@ impl api::ApiApplication {
     }
 
     pub async fn send_welcome_email_to_user(&self, user: &SquadOVUser) -> Result<(), SquadOvError> {
-        self.email.send_bulk_templated_email(&self.config.email.welcome_template, vec![
-            EmailTemplate{
-                to: EmailUser{
-                    email: user.email.clone(),
-                    name: Some(user.username.clone()),
-                },
-                params: vec![
-                    (String::from("product_url"), String::from("https://www.squadov.gg")),
-                    (String::from("product_name"), String::from("SquadOV")),
-                    (String::from("username"), user.username.clone()),
-                ].into_iter().collect()
-            }
-        ]).await?;
+        // Keeping this for legacy. But note that the welcome email is now sent based on
+        // user analytics (Segment + Vero) based off the registered event.
         sqlx::query!(
             "
             UPDATE squadov.users

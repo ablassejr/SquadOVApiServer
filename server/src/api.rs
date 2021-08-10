@@ -63,6 +63,7 @@ use url::Url;
 use std::vec::Vec;
 use std::sync::{Arc};
 use sqlx::postgres::{PgPoolOptions};
+use uuid::Uuid;
 
 // TODO: REMOVE THIS.
 #[macro_export]
@@ -242,6 +243,54 @@ pub struct ApiApplication {
 }
 
 impl ApiApplication {
+    async fn mark_users_inactive(&self) -> Result<(), SquadOvError> {
+        let inactive_users = sqlx::query!(
+            "
+            SELECT u.uuid
+            FROM squadov.users AS u
+            LEFT JOIN squadov.daily_active_sessions AS das
+                ON das.user_id = u.id
+                    AND das.tm >= (NOW() - INTERVAL '14 day')
+            LEFT JOIN squadov.user_event_record AS uer
+                ON uer.user_id = u.id
+                    AND uer.event_name = 'inactive_14'
+            WHERE uer.user_id IS NULL
+                AND das.user_id IS NULL
+            GROUP BY u.uuid
+            ",
+        )
+            .fetch_all(&*self.pool)
+            .await?
+            .into_iter()
+            .map(|x| { x.uuid })
+            .collect::<Vec<Uuid>>();
+
+        // Mark these users as being inactive via Segment. TODO this should probably be done in bulk
+        for u in &inactive_users {
+            self.segment.track(&u.to_string(), "inactive_14").await?;
+        }
+
+        // Then mark them as being inactive in the database.
+        sqlx::query!(
+            "
+            INSERT INTO squadov.user_event_record (
+                user_id,
+                event_name,
+                tm
+            )
+            SELECT u.id, 'inactive_14', NOW()
+            FROM UNNEST($1::UUID[]) AS inp(uuid)
+            INNER JOIN squadov.users AS u
+                ON u.uuid = inp.uuid
+            ",
+            &inactive_users
+        )
+            .execute(&*self.pool)
+            .await?;
+        
+        Ok(())
+    }
+
     pub async fn get_vod_manager(&self, bucket: &str) -> Result<Arc<dyn VodManager + Send + Sync>, SquadOvError> {
         self.vod.get_bucket(bucket).await.ok_or(SquadOvError::NotFound)
     }
@@ -405,4 +454,21 @@ impl ApiApplication {
 
         app
     }
+}
+
+pub fn start_event_loop(app: Arc<ApiApplication>) {
+    tokio::task::spawn(async move {
+        loop {
+            log::info!("Ticking Event Loop...");
+
+            log::info!("...Checking for inactive users.");
+            match app.mark_users_inactive().await {
+                Ok(()) => (),
+                Err(err) => log::warn!("...Failed to mark inactive users: {:?}", err),
+            };
+
+            // Doing this once per day should be sufficient...
+            tokio::time::delay_for(tokio::time::Duration::from_secs(86400)).await;
+        }
+    });
 }

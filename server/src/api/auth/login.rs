@@ -62,10 +62,12 @@ impl api::ApiApplication {
 
         // Ensure that the user is also being tracked by our own database.
         // If not, create a new user.
+        let mut did_create_user = false;
         let stored_user = match self.users.get_stored_user_from_email(&session.user.email, &self.pool).await {
             Ok(x) => match x {
                 Some(y) => y,
                 None => {
+                    did_create_user = true;
                     let user = match self.users.create_user(&session.user, &self.pool).await {
                         Ok(z) => z,
                         Err(err) => return Err(SquadOvError::InternalError(format!("Create User {}", err))),
@@ -85,6 +87,15 @@ impl api::ApiApplication {
             },
             Err(err) => return Err(SquadOvError::InternalError(format!("Get User {}", err))),
         };
+
+        // Need to do a preliminary identify on login. Empty IP/Anonymous ID so that we only
+        // fill out some basic information (email, primarily, for Vero).
+        self.analytics_identify_user(&stored_user, "", "").await?;
+
+        // If we just created the user, then we also need to mark the user as just having done the "register" event.
+        if did_create_user {
+            self.segment.track(&stored_user.uuid.to_string(), "registered").await?;
+        }
 
         session.user = stored_user;
         // Store this session in our database and ensure the user is made aware of which session they should

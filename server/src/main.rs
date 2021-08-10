@@ -59,6 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         kafka_config.set("enable.auto.offset.store", "false");
 
         let app = Arc::new(api::ApiApplication::new(&config).await);
+        api::start_event_loop(app.clone());
 
         // A hacky way of doing things related to api::ApiApplication...
         if opts.mode.is_some() {

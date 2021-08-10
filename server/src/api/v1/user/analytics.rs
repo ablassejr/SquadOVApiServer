@@ -155,7 +155,7 @@ impl ApiApplication {
     }
 
     pub async fn analytics_identify_user(&self, user: &SquadOVUser, ip_addr: &str, anon_id: &str) -> Result<(), SquadOvError> {
-        let loc_data: Option<LocationData> = {
+        let loc_data: Option<LocationData> = if !ip_addr.is_empty() {
             let parsed_ip = IpAddr::from_str(ip_addr)?;
 
             if parsed_ip.is_loopback() {
@@ -173,6 +173,8 @@ impl ApiApplication {
                     self.retrieve_ip_location_data(&parsed_ip, false).await?
                 }
             }
+        } else {
+            None
         };
 
         // Get user hardware information.
