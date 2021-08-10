@@ -278,3 +278,15 @@ impl From<harsh::Error> for SquadOvError {
         return Self::InternalError(format!("HashId Error {:?}", err))
     }
 }
+
+impl From<std::net::AddrParseError> for SquadOvError {
+    fn from(err: std::net::AddrParseError) -> Self {
+        return Self::InternalError(format!("IP Parse Error {:?}", err))
+    }
+}
+
+impl From<ipnetwork::IpNetworkError> for SquadOvError {
+    fn from(err: ipnetwork::IpNetworkError) -> Self {
+        return Self::InternalError(format!("IP Network Error {:?}", err))
+    }
+}

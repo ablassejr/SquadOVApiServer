@@ -42,6 +42,9 @@ pub mod twitch;
 pub mod storage;
 pub mod aws;
 pub mod words;
+pub mod hardware;
+pub mod ipstack;
+pub mod segment;
 
 pub use error::*;
 pub use parse::*;

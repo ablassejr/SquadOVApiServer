@@ -50,6 +50,14 @@ use squadov_common::{
         AWSClient,
         AWSConfig,
     },
+    ipstack::{
+        IpstackConfig,
+        IpstackClient,
+    },
+    segment::{
+        SegmentConfig,
+        SegmentClient,
+    }
 };
 use url::Url;
 use std::vec::Vec;
@@ -200,6 +208,8 @@ pub struct ApiConfig {
     pub steam: SteamApiConfig,
     pub twitch: TwitchConfig,
     pub storage: SquadOvStorageConfig,
+    pub ipstack: IpstackConfig,
+    pub segment: SegmentConfig,
 }
 
 pub struct ApiClients {
@@ -227,6 +237,8 @@ pub struct ApiApplication {
     gcp: Arc<Option<GCPClient>>,
     aws: Arc<Option<AWSClient>>,
     pub hashid: Arc<harsh::Harsh>,
+    pub ip: Arc<IpstackClient>,
+    pub segment: Arc<SegmentClient>,
 }
 
 impl ApiApplication {
@@ -377,6 +389,8 @@ impl ApiApplication {
             gcp,
             aws,
             hashid: Arc::new(harsh::Harsh::builder().salt(config.squadov.hashid_salt.as_str()).length(6).build().unwrap()),
+            ip: Arc::new(IpstackClient::new(config.ipstack.clone())),
+            segment: Arc::new(SegmentClient::new(config.segment.clone())),
         };
 
         app.create_vod_manager(&config.storage.vods.global).await.unwrap();

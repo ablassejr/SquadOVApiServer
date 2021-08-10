@@ -193,6 +193,8 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .route("/squadmates", web::get().to(v1::get_user_squadmates_handler))
                                 .route("/changepw", web::post().to(auth::change_pw_handler))
                                 .route("/pw/verify", web::post().to(auth::verify_pw_handler))
+                                .route("/hw", web::post().to(v1::sync_user_hardware_handler))
+                                .route("/identify", web::post().to(v1::perform_user_analytics_identify_handler))
                                 .service(
                                     web::scope("/2fa")
                                         .route("/qr", web::get().to(auth::get_2fa_qr_code_handler))
