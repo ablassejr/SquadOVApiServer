@@ -3,7 +3,7 @@ INSERT INTO squadov.user_event_record (
     event_name,
     tm
 )
-SELECT u.id, 'inactive_14', NOW()
+SELECT DISTINCT ON (u.id) u.id, 'inactive_14', NOW()
 FROM squadov.users AS u
 LEFT JOIN squadov.daily_active_sessions AS das
     ON das.user_id = u.id
