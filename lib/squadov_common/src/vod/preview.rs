@@ -2,7 +2,7 @@ use crate::SquadOvError;
 use tokio::process::Command;
 
 // Generate a thumbnail
-pub async fn generate_vod_thumbnail(input_fname: &str, output_fname: &std::path::Path) -> Result<(), SquadOvError> {
+pub async fn generate_vod_thumbnail(input_fname: &str, output_fname: &std::path::Path, length_seconds: i64) -> Result<(), SquadOvError> {
     let ffmpeg_path = std::env::var("FFMPEG_BINARY_PATH")?;
     let ffmpeg_output = Command::new(&ffmpeg_path)
         // Single threaded so that we can split our CPU bandwidth among multiple videos.
@@ -13,8 +13,8 @@ pub async fn generate_vod_thumbnail(input_fname: &str, output_fname: &std::path:
         // Need to auto accept overwriting existing files to prevent blocking.
         .arg("-y")
         // TODO: smarter choosing of the clip timing
-        .arg("-sseof")
-        .arg("-20")
+        .arg("-ss")
+        .arg(format!("{}", std::cmp::max(length_seconds - 30, 0)))
         .arg("-f")
         .arg("mp4")
         .arg("-i")
@@ -40,7 +40,7 @@ pub async fn generate_vod_thumbnail(input_fname: &str, output_fname: &std::path:
 }
 
 // Generate a (hopefully) relevant clip for use as the VOD's preview.
-pub async fn generate_vod_preview(input_fname: &str, output_fname: &std::path::Path) -> Result<(), SquadOvError> {
+pub async fn generate_vod_preview(input_fname: &str, output_fname: &std::path::Path, length_seconds: i64) -> Result<(), SquadOvError> {
     // HARD CODING OF MP4 HERE IS FINE FOR NOW.
     let ffmpeg_path = std::env::var("FFMPEG_BINARY_PATH")?;
     let ffmpeg_output = if cfg!(unix) {
@@ -50,8 +50,8 @@ pub async fn generate_vod_preview(input_fname: &str, output_fname: &std::path::P
             // Need to auto accept overwriting existing files to prevent blocking.
             .arg("-y")
             // TODO: smarter choosing of the clip timing
-            .arg("-sseof")
-            .arg("-30")
+            .arg("-ss")
+            .arg(format!("{}", std::cmp::max(length_seconds - 30, 0)))
             .arg("-t")
             .arg("25")
             .arg("-f")
@@ -84,8 +84,8 @@ pub async fn generate_vod_preview(input_fname: &str, output_fname: &std::path::P
             // Need to auto accept overwriting existing files to prevent blocking.
             .arg("-y")
             // TODO: smarter choosing of the clip timing
-            .arg("-sseof")
-            .arg("-30")
+            .arg("-ss")
+            .arg(format!("{}",  std::cmp::max(length_seconds - 30, 0)))
             .arg("-t")
             .arg("25")
             .arg("-f")

@@ -297,11 +297,14 @@ impl VodProcessingInterface {
         log::info!("Fastify Mp4 - {}", vod_uuid);
         fastify::fastify_mp4(input_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &vod.raw_container_format, &fastify_filename).await?;
 
+        // Get VOD length in seconds - we use this to manually determine where to clip.
+        let length_seconds = vod.end_time.unwrap_or(Utc::now()).signed_duration_since(vod.start_time.unwrap_or(Utc::now())).num_seconds();
+
         log::info!("Generate Preview Mp4 - {}", vod_uuid);
-        preview::generate_vod_preview(fastify_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &preview_filename).await?;
+        preview::generate_vod_preview(fastify_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &preview_filename, length_seconds).await?;
 
         log::info!("Generate Thumbnail - {}", vod_uuid);
-        preview::generate_vod_thumbnail(fastify_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &thumbnail_filename).await?;
+        preview::generate_vod_thumbnail(fastify_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &thumbnail_filename, length_seconds).await?;
 
         log::info!("Upload Fastify VOD - {}", vod_uuid);
         let fastify_segment = VodSegmentId{
