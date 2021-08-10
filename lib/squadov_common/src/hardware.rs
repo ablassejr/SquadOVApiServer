@@ -101,6 +101,11 @@ where
             $4,
             $5
         )
+        ON CONFLICT (user_id) DO UPDATE SET
+            os=EXCLUDED.os,
+            cpu=EXCLUDED.cpu,
+            display=EXCLUDED.display,
+            ram_kb=EXCLUDED.ram_kb
         ",
         user_id,
         serde_json::to_value(hw.os)?,
