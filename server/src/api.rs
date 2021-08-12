@@ -57,7 +57,8 @@ use squadov_common::{
     segment::{
         SegmentConfig,
         SegmentClient,
-    }
+    },
+    user::SquadOVUser,
 };
 use url::Url;
 use std::vec::Vec;
@@ -244,9 +245,19 @@ pub struct ApiApplication {
 
 impl ApiApplication {
     async fn mark_users_inactive(&self) -> Result<(), SquadOvError> {
-        let inactive_users = sqlx::query!(
+        let inactive_users = sqlx::query_as!(
+            SquadOVUser,
             "
-            SELECT u.uuid
+            SELECT DISTINCT
+                u.id,
+                u.username,
+                u.email,
+                u.verified,
+                u.uuid,
+                u.is_test,
+                u.is_admin,
+                u.welcome_sent,
+                u.registration_time
             FROM squadov.users AS u
             LEFT JOIN squadov.daily_active_sessions AS das
                 ON das.user_id = u.id
@@ -256,18 +267,17 @@ impl ApiApplication {
                     AND uer.event_name = 'inactive_14'
             WHERE uer.user_id IS NULL
                 AND das.user_id IS NULL
-            GROUP BY u.uuid
             ",
         )
             .fetch_all(&*self.pool)
-            .await?
-            .into_iter()
-            .map(|x| { x.uuid })
-            .collect::<Vec<Uuid>>();
+            .await?;
 
         // Mark these users as being inactive via Segment. TODO this should probably be done in bulk
         for u in &inactive_users {
-            self.segment.track(&u.to_string(), "inactive_14").await?;
+            // Do one more identify just in case the user was active before we started doing these identifies so Vero
+            // doesn't have the info on them.
+            self.analytics_identify_user(u, "", "").await?;
+            self.segment.track(&u.uuid.to_string(), "inactive_14").await?;
         }
 
         // Then mark them as being inactive in the database.
@@ -283,7 +293,9 @@ impl ApiApplication {
             INNER JOIN squadov.users AS u
                 ON u.uuid = inp.uuid
             ",
-            &inactive_users
+            &inactive_users.iter().map(|x| {
+                x.uuid.clone()
+            }).collect::<Vec<Uuid>>()
         )
             .execute(&*self.pool)
             .await?;

@@ -101,10 +101,27 @@ impl SegmentClient {
             user_id: user_id.to_string(),
             event: event.to_string(),
         };
+
+        // Manually create the integrations object as a string because it's a pain in the ass to do in a type safe way.
+        // We only want to send these events to Vero currently - if we ever get to the point where we want to send it to
+        // GA & Mixpanel we'd need to pass in parameters that would let us differentiate.
+        let integrations = String::from(
+            r#"{{
+                "Google Analytics": false,
+                "Vero": true,
+                "Mixpanel": false
+            }}"#
+        );
+
+        let mut raw_value = serde_json::to_value(req)?;
+        if let serde_json::Value::Object(m) = &mut raw_value {
+            let value = serde_json::from_str(&integrations)?;
+            m.insert(String::from("integrations"), value);
+        }
         
         let client = self.create_http_client()?;
         let resp = client.post("https://api.segment.io/v1/track")
-            .json(&req)
+            .json(&raw_value)
             .send()
             .await?;
 
