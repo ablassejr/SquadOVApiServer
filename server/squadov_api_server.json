@@ -2815,6 +2815,72 @@
       ]
     }
   },
+  "378a3b827c5fbd60be6b2711ab87f3cef81d2b96dd48281f09510470b9f28efb": {
+    "query": "\n            SELECT DISTINCT\n                u.id,\n                u.username,\n                u.email,\n                u.verified,\n                u.uuid,\n                u.is_test,\n                u.is_admin,\n                u.welcome_sent,\n                u.registration_time\n            FROM squadov.users AS u\n            LEFT JOIN squadov.daily_active_sessions AS das\n                ON das.user_id = u.id\n                    AND das.tm >= (NOW() - INTERVAL '14 day')\n            LEFT JOIN squadov.user_event_record AS uer\n                ON uer.user_id = u.id\n                    AND uer.event_name = 'inactive_14'\n            WHERE uer.user_id IS NULL\n                AND das.user_id IS NULL\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "username",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "email",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "verified",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 5,
+          "name": "is_test",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "is_admin",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "welcome_sent",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "registration_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ]
+    }
+  },
   "37eed04e62ceca045f96edfc7fd5f9ede137c60038bad255a67108d4230df8aa": {
     "query": "\n            SELECT\n                id,\n                username,\n                email,\n                verified,\n                uuid,\n                is_test,\n                is_admin,\n                welcome_sent,\n                registration_time\n            FROM squadov.users\n            WHERE email = $1\n            ",
     "describe": {
@@ -5431,22 +5497,6 @@
       "nullable": []
     }
   },
-  "6079e9f3085294c54a438243e212b160ee3299b405bcf7f958c5b90059079519": {
-    "query": "\n        INSERT INTO squadov.user_hardware_specs (\n            user_id,\n            os,\n            cpu,\n            display,\n            ram_kb\n        )\n        VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            $5\n        )\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Jsonb",
-          "Jsonb",
-          "Jsonb",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "61392061af743e6ce12c197fadea87fd5cce6fda3720406384c3093c09d4d080": {
     "query": "\n                SELECT v.*\n                FROM squadov.vods AS v\n                WHERE v.video_uuid = ANY($1)\n                ",
     "describe": {
@@ -5974,6 +6024,22 @@
       ]
     }
   },
+  "6e3f7e5e7b8377009dcf5cba8260ac43c3b6a4d94aeb168a7ef6c2d26c7ff514": {
+    "query": "\n        INSERT INTO squadov.user_hardware_specs (\n            user_id,\n            os,\n            cpu,\n            display,\n            ram_kb\n        )\n        VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            $5\n        )\n        ON CONFLICT (user_id) DO UPDATE SET\n            os=EXCLUDED.os,\n            cpu=EXCLUDED.cpu,\n            display=EXCLUDED.display,\n            ram_kb=EXCLUDED.ram_kb\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Jsonb",
+          "Jsonb",
+          "Jsonb",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "6f742f9c8964f7a49c411c68808af454e4978c0f9d381dd3c4f14cd09853a04a": {
     "query": "\n            INSERT INTO squadov.match_to_match_collection (\n                match_uuid,\n                collection_uuid\n            )\n            VALUES (\n                $1,\n                $2\n            )\n            ",
     "describe": {
@@ -6030,6 +6096,26 @@
         false,
         true,
         null
+      ]
+    }
+  },
+  "71eb6b6ff82f6c9abb78940578e04fbf47cce62a3a5b71be803a95b967def0c2": {
+    "query": "\n                DELETE FROM squadov.deferred_rabbitmq_messages\n                WHERE id = $1\n                RETURNING message                \n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "message",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
       ]
     }
   },
@@ -6950,32 +7036,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "8566daac964acadcd166a9ed7f4b0cf4e95adb79c1a7075c3a4e03868a620ea4": {
-    "query": "\n            SELECT m.game AS \"game!\", COUNT(DISTINCT v.video_uuid) AS \"count!\"\n            FROM squadov.vods AS v\n            INNER JOIN squadov.users AS u\n                ON u.uuid = v.user_uuid\n            INNER JOIN squadov.matches AS m\n                ON m.uuid = v.match_uuid\n            WHERE v.is_clip = FALSE\n                AND v.end_time IS NOT NULL\n                AND u.id = $1\n            GROUP BY m.game\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "game!",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "count!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        true,
-        null
-      ]
     }
   },
   "859af184e95bded1db98a5f6f12ccde35c3c0459277724421d2ffd8476f60192": {
@@ -8191,6 +8251,30 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "9d7d297df223530a42b05e92f19b8b3d30edac88ccae9070127f9839e4f0a929": {
+    "query": "\n            SELECT id, execute_time\n            FROM squadov.deferred_rabbitmq_messages\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "execute_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false
+      ]
     }
   },
   "9dc60fd5e5d07f7f412e64c0f46ff549f0349b1a7407a6185ef8ef994151e2db": {

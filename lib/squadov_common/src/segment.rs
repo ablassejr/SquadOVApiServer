@@ -106,11 +106,11 @@ impl SegmentClient {
         // We only want to send these events to Vero currently - if we ever get to the point where we want to send it to
         // GA & Mixpanel we'd need to pass in parameters that would let us differentiate.
         let integrations = String::from(
-            r#"{{
+            r#"{
                 "Google Analytics": false,
                 "Vero": true,
                 "Mixpanel": false
-            }}"#
+            }"#
         );
 
         let mut raw_value = serde_json::to_value(req)?;

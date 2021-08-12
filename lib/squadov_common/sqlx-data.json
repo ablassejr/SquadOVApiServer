@@ -2341,24 +2341,6 @@
       ]
     }
   },
-  "301eb974cca14d28c922ce4e59f1d7d8533261b00dceede6e0ba759504652373": {
-    "query": "\n            SELECT u.uuid\n            FROM squadov.users AS u\n            LEFT JOIN squadov.daily_active_sessions AS das\n                ON das.user_id = u.id\n                    AND das.tm >= (NOW() - INTERVAL '14 day')\n            LEFT JOIN squadov.user_event_record AS uer\n                ON uer.user_id = u.id\n                    AND uer.event_name = 'inactive_14'\n            WHERE uer.user_id IS NULL\n                AND das.user_id IS NULL\n            GROUP BY u.uuid\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
   "3089c7722b7ec3db389026e8d59e40efd79574a2d5583d5c28773036471109c1": {
     "query": "\n                SELECT match_uuid\n                FROM squadov.new_wow_challenges AS wc\n                CROSS JOIN (\n                    SELECT wmv.start_tm, wcv.instance_id, wcv.keystone_level\n                    FROM squadov.wow_match_view AS wmv\n                    INNER JOIN squadov.wow_challenge_view AS wcv\n                        ON wcv.view_id = wmv.id\n                    WHERE wmv.id = $2\n                ) AS wmv(start_tm, instance_id, keystone_level)\n                WHERE wc.tr && tstzrange(wmv.start_tm, $3, '[]')\n                    AND wc.combatants_key = $1\n                    AND wc.instance_id = wmv.instance_id\n                    AND wc.keystone_level = wmv.keystone_level\n                ",
     "describe": {
@@ -2812,6 +2794,72 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "378a3b827c5fbd60be6b2711ab87f3cef81d2b96dd48281f09510470b9f28efb": {
+    "query": "\n            SELECT DISTINCT\n                u.id,\n                u.username,\n                u.email,\n                u.verified,\n                u.uuid,\n                u.is_test,\n                u.is_admin,\n                u.welcome_sent,\n                u.registration_time\n            FROM squadov.users AS u\n            LEFT JOIN squadov.daily_active_sessions AS das\n                ON das.user_id = u.id\n                    AND das.tm >= (NOW() - INTERVAL '14 day')\n            LEFT JOIN squadov.user_event_record AS uer\n                ON uer.user_id = u.id\n                    AND uer.event_name = 'inactive_14'\n            WHERE uer.user_id IS NULL\n                AND das.user_id IS NULL\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "username",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "email",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "verified",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 5,
+          "name": "is_test",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "is_admin",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "welcome_sent",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "registration_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
       ]
     }
   },
@@ -5431,22 +5479,6 @@
       "nullable": []
     }
   },
-  "6079e9f3085294c54a438243e212b160ee3299b405bcf7f958c5b90059079519": {
-    "query": "\n        INSERT INTO squadov.user_hardware_specs (\n            user_id,\n            os,\n            cpu,\n            display,\n            ram_kb\n        )\n        VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            $5\n        )\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Jsonb",
-          "Jsonb",
-          "Jsonb",
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "61392061af743e6ce12c197fadea87fd5cce6fda3720406384c3093c09d4d080": {
     "query": "\n                SELECT v.*\n                FROM squadov.vods AS v\n                WHERE v.video_uuid = ANY($1)\n                ",
     "describe": {
@@ -5972,6 +6004,22 @@
         false,
         false
       ]
+    }
+  },
+  "6e3f7e5e7b8377009dcf5cba8260ac43c3b6a4d94aeb168a7ef6c2d26c7ff514": {
+    "query": "\n        INSERT INTO squadov.user_hardware_specs (\n            user_id,\n            os,\n            cpu,\n            display,\n            ram_kb\n        )\n        VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            $5\n        )\n        ON CONFLICT (user_id) DO UPDATE SET\n            os=EXCLUDED.os,\n            cpu=EXCLUDED.cpu,\n            display=EXCLUDED.display,\n            ram_kb=EXCLUDED.ram_kb\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Jsonb",
+          "Jsonb",
+          "Jsonb",
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "6f742f9c8964f7a49c411c68808af454e4978c0f9d381dd3c4f14cd09853a04a": {
@@ -6970,32 +7018,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "8566daac964acadcd166a9ed7f4b0cf4e95adb79c1a7075c3a4e03868a620ea4": {
-    "query": "\n            SELECT m.game AS \"game!\", COUNT(DISTINCT v.video_uuid) AS \"count!\"\n            FROM squadov.vods AS v\n            INNER JOIN squadov.users AS u\n                ON u.uuid = v.user_uuid\n            INNER JOIN squadov.matches AS m\n                ON m.uuid = v.match_uuid\n            WHERE v.is_clip = FALSE\n                AND v.end_time IS NOT NULL\n                AND u.id = $1\n            GROUP BY m.game\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "game!",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "count!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        true,
-        null
-      ]
     }
   },
   "859af184e95bded1db98a5f6f12ccde35c3c0459277724421d2ffd8476f60192": {
@@ -8958,6 +8980,32 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "ac212a509f126131bc5e5ab233db38457a2e8a63cc90b3f1692b6a58697d71ce": {
+    "query": "\n            SELECT m.game AS \"game!\", COUNT(DISTINCT v.video_uuid) AS \"count!\"\n            FROM squadov.vods AS v\n            INNER JOIN squadov.users AS u\n                ON u.uuid = v.user_uuid\n            INNER JOIN squadov.matches AS m\n                ON m.uuid = v.match_uuid\n            WHERE v.is_clip = FALSE\n                AND v.end_time IS NOT NULL\n                AND u.id = $1\n                AND m.game IS NOT NULL\n            GROUP BY m.game\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "game!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        true,
+        null
+      ]
     }
   },
   "ad398b4c34b4cbff9b8a10151d3ae1fe681e9b5f2b103b1b3c361f768b591828": {

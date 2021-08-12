@@ -50,6 +50,5 @@ if __name__ == '__main__':
     with open(args.csv) as classes:
         reader = csv.DictReader(classes)
         for row in reader:
-            print(row['Client Id'])
-            delete_users(row['Client Id'])
+            res = delete_users(row['Client Id'])
             time.sleep(0.05)
