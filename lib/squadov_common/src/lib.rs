@@ -41,7 +41,7 @@ pub mod accounts;
 pub mod twitch;
 pub mod storage;
 pub mod aws;
-pub mod words;
+//pub mod words;
 pub mod hardware;
 pub mod ipstack;
 pub mod segment;

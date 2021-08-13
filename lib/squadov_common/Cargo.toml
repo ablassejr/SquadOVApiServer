@@ -61,7 +61,7 @@ rusoto_s3 = "0.45.0"
 rusoto_credential = "0.45.0"
 image = "0.23.14"
 harsh = "0.2.1"
-
+eff-wordlist = "1.0.2"
 
 [build-dependencies]
 prost-build = "0.7.0"

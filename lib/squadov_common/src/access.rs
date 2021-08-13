@@ -2,13 +2,11 @@ use crate::{
     SquadOvError,
     encrypt::AESEncryptToken,
     stats::StatPermission,
-    words,
 };
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use sqlx::{Transaction, Executor, Postgres};
 use convert_case::{Case, Casing};
-use rand::Rng;
 
 #[derive(Serialize,Deserialize,Debug,Clone)]
 #[serde(rename_all="camelCase")]
@@ -168,13 +166,14 @@ pub async fn generate_friendly_share_token(tx: &mut Transaction<'_, Postgres>, i
     // Try to generate a friendly share token within a few iterations.
     // If it doesn't work then say fuck it and move on. This is for
     // aesthetics and doesn't matter that much.
-    let mut rng = rand::thread_rng();
+    //let mut rng = rand::thread_rng();
 
     for _i in 0i32..5 {
-        let w1: &'static str;
-        let w2: &'static str;
-        let w3: &'static str;
+        let w1: &'static str = eff_wordlist::large::random_word();
+        let w2: &'static str = eff_wordlist::large::random_word();
+        let w3: &'static str = eff_wordlist::large::random_word();
 
+        /*
         if rng.gen::<f64>() < 0.5 {
             w1 = words::random_adjective();
             w2 = words::random_adjective();
@@ -184,6 +183,7 @@ pub async fn generate_friendly_share_token(tx: &mut Transaction<'_, Postgres>, i
             w2 = words::random_verb();
             w3 = words::random_noun();
         }
+        */
 
         let nm = format!("{}-{}-{}", w1, w2, w3).to_case(Case::Pascal);
         match sqlx::query!(
