@@ -1,0 +1,2 @@
+ALTER TABLE referral_downloads
+ADD COLUMN user_id BIGINT REFERENCES users(id) ON DELETE SET NULL;
