@@ -23,6 +23,7 @@ pub struct ServerUserAddressTraits {
 pub struct ServerUserIdentifyTraits {
     pub email: String,
     pub username: String,
+    pub referral_code: Option<String>,
     pub address: Option<ServerUserAddressTraits>,
     pub city: Option<String>,
     pub country: Option<String>,

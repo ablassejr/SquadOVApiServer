@@ -290,6 +290,21 @@ impl ApiApplication {
         match self.segment.identify(&user.uuid.to_string(), anon_id, ip_addr, &ServerUserIdentifyTraits{
             email: user.email.clone(),
             username: user.username.clone(),
+            referral_code: sqlx::query!(
+                r#"
+                SELECT rc.code AS "code!"
+                FROM squadov.user_referral_code_usage AS rcu
+                INNER JOIN squadov.referral_codes AS rc
+                    ON rc.id = rcu.code_id
+                INNER JOIN squadov.users AS u
+                    ON u.email = rcu.email
+                WHERE u.id = $1
+                "#,
+                user.id,
+            )
+                .fetch_optional(&*self.pool)
+                .await?
+                .map(|x| { x.code }),
             address: if let Some(loc) = &loc_data {
                 Some(ServerUserAddressTraits{
                     city: loc.city.clone(),
