@@ -166,26 +166,8 @@ pub async fn generate_friendly_share_token(tx: &mut Transaction<'_, Postgres>, i
     // Try to generate a friendly share token within a few iterations.
     // If it doesn't work then say fuck it and move on. This is for
     // aesthetics and doesn't matter that much.
-    //let mut rng = rand::thread_rng();
-
     for _i in 0i32..5 {
-        let w1: &'static str = eff_wordlist::large::random_word();
-        let w2: &'static str = eff_wordlist::large::random_word();
-        let w3: &'static str = eff_wordlist::large::random_word();
-
-        /*
-        if rng.gen::<f64>() < 0.5 {
-            w1 = words::random_adjective();
-            w2 = words::random_adjective();
-            w3 = words::random_noun();
-        } else {
-            w1 = words::random_noun();
-            w2 = words::random_verb();
-            w3 = words::random_noun();
-        }
-        */
-
-        let nm = format!("{}-{}-{}", w1, w2, w3).to_case(Case::Pascal);
+        let nm = petname::Petnames::large().generate_one(3, "-").to_case(Case::Pascal);
         match sqlx::query!(
             "
             UPDATE squadov.share_tokens
