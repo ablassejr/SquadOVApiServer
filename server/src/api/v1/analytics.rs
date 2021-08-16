@@ -114,6 +114,25 @@ impl api::ApiApplication {
             .await?;
         Ok(())
     }
+
+    pub async fn mark_user_download(&self, user_id: i64) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            "
+            INSERT INTO squadov.user_downloads (
+                user_id,
+                tm
+            )
+            VALUES (
+                $1,
+                NOW()
+            )
+            ",
+            user_id
+        )
+            .execute(&*self.pool)
+            .await?;
+        Ok(())
+    }
 }
 
 pub async fn public_landing_visit_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<ReferralQuery>) -> Result<HttpResponse, SquadOvError> {
@@ -137,6 +156,11 @@ pub async fn mark_user_download_handler(app : web::Data<Arc<api::ApiApplication>
             Err(err) => log::warn!("Failed to mark referral download: {:?}", err)
         };
     }
+
+    match app.mark_user_download(session.user.id).await {
+        Ok(_) => (),
+        Err(err) => log::warn!("Failed to mark user download: {:?}", err)
+    };
 
     Ok(HttpResponse::NoContent().finish())
 }
