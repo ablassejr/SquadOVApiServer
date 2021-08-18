@@ -71,7 +71,7 @@ async fn main() -> Result<(), SquadOvError> {
             SELECT *
             FROM squadov.new_wow_arenas
             WHERE transferred = FALSE
-            LIMIT 1
+            LIMIT 1000
             ",
         )
             .fetch_all(&*src_pool)
@@ -129,7 +129,6 @@ async fn main() -> Result<(), SquadOvError> {
             .await.unwrap();
         tx.commit().await.unwrap();
         count += tasks.len() as i64;
-        break;
     }
 
     log::info!("Transfer WoW Encounter Matches.");
@@ -141,7 +140,7 @@ async fn main() -> Result<(), SquadOvError> {
             SELECT *
             FROM squadov.new_wow_encounters
             WHERE transferred = FALSE
-            LIMIT 1
+            LIMIT 1000
             ",
         )
             .fetch_all(&*src_pool)
@@ -202,7 +201,6 @@ async fn main() -> Result<(), SquadOvError> {
             .await.unwrap();
         tx.commit().await.unwrap();
         count += tasks.len() as i64;
-        break;
     }
 
     log::info!("Finish migration.");
