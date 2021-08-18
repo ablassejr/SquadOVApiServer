@@ -71,63 +71,76 @@ async fn main() -> Result<(), SquadOvError> {
             SELECT *
             FROM squadov.new_wow_arenas
             WHERE transferred = FALSE
+            ORDER BY tr ASC
             LIMIT 1000
             ",
         )
             .fetch_all(&*src_pool)
             .await.unwrap();
+        log::info!("\tpost select.");
 
         if tasks.is_empty() {
             break;
         }
 
-        let match_ids: Vec<Uuid> = tasks.iter().map(|x| {
-            x.get::<Uuid, &str>("match_uuid")
-        }).collect();
         let mut tx = dst_pool.begin().await.unwrap();
+
+        let mut task_sql: Vec<String> = Vec::new();
+        task_sql.push(String::from("
+            INSERT INTO squadov.new_wow_arenas (
+                match_uuid,
+                tr,
+                combatants_key,
+                instance_id,
+                arena_type
+            )
+            VALUES 
+        "));
+
         for t in &tasks {
             let rng = t.get::<PgRange<DateTime<Utc>>, &str>("tr");
-            sqlx::query!(
-                "
-                INSERT INTO squadov.new_wow_arenas (
-                    match_uuid,
-                    tr,
-                    combatants_key,
-                    instance_id,
-                    arena_type
-                )
-                VALUES (
-                    $1,
-                    tstzrange($2::TIMESTAMPTZ, $3::TIMESTAMPTZ, '[]'),
-                    $4,
-                    $5,
-                    $6
-                )
-                ",
-                t.get::<Uuid, &str>("match_uuid"),
-                get_bound(&rng.start),
-                get_bound(&rng.end),
-                t.get::<String, &str>("combatants_key"),
-                t.get::<i32, &str>("instance_id"),
-                t.get::<String, &str>("arena_type"),
-            )
-                .execute(&mut tx)
-                .await.unwrap();
+            task_sql.push(format!("(
+                {match_uuid},
+                tstzrange({start}::TIMESTAMPTZ, {end}::TIMESTAMPTZ, '[]'),
+                {combatants_key},
+                {instance_id},
+                {arena_type}
+            )",
+                match_uuid=squadov_common::sql_format_string(&t.get::<Uuid, &str>("match_uuid").to_string()),
+                start=squadov_common::sql_format_time(&get_bound(&rng.start)),
+                end=squadov_common::sql_format_time(&get_bound(&rng.end)),
+                combatants_key=squadov_common::sql_format_string(&t.get::<String, &str>("combatants_key")),
+                instance_id=t.get::<i32, &str>("instance_id"),
+                arena_type=squadov_common::sql_format_string(&t.get::<String, &str>("arena_type")),
+            ));
+            task_sql.push(String::from(","));
         }
+
+        task_sql.truncate(task_sql.len() - 1);
+        task_sql.push(String::from(" ON CONFLICT DO NOTHING"));
+        sqlx::query(&task_sql.join("")).execute(&mut tx).await?;
         tx.commit().await.unwrap();
+        log::info!("\tpost insert.");
 
         let mut tx = src_pool.begin().await.unwrap();
         sqlx::query(
             "
-            UPDATE squadov.new_wow_arenas
+            UPDATE squadov.new_wow_arenas AS wa
             SET transferred = TRUE
-            WHERE match_uuid = ANY($1)
+            FROM (
+                SELECT match_uuid
+                FROM squadov.new_wow_arenas
+                WHERE transferred = FALSE
+                ORDER BY tr ASC
+                LIMIT 1000
+            ) AS sub
+            WHERE wa.match_uuid=sub.match_uuid
             "
         )
-            .bind(&match_ids)
             .execute(&mut tx)
             .await.unwrap();
         tx.commit().await.unwrap();
+        log::info!("\tpost update.");
         count += tasks.len() as i64;
     }
 
@@ -140,66 +153,80 @@ async fn main() -> Result<(), SquadOvError> {
             SELECT *
             FROM squadov.new_wow_encounters
             WHERE transferred = FALSE
+            ORDER BY tr ASC
             LIMIT 1000
             ",
         )
             .fetch_all(&*src_pool)
             .await.unwrap();
+        log::info!("\tpost select.");
 
         if tasks.is_empty() {
             break;
         }
 
-        let match_ids: Vec<Uuid> = tasks.iter().map(|x| {
-            x.get::<Uuid, &str>("match_uuid")
-        }).collect();
         let mut tx = dst_pool.begin().await.unwrap();
+
+        let mut task_sql: Vec<String> = Vec::new();
+        task_sql.push(String::from("
+            INSERT INTO squadov.new_wow_encounters (
+                match_uuid,
+                tr,
+                combatants_key,
+                encounter_id,
+                difficulty,
+                instance_id
+            )
+            VALUES
+        "));
+
         for t in &tasks {
             let rng = t.get::<PgRange<DateTime<Utc>>, &str>("tr");
-            sqlx::query!(
-                "
-                INSERT INTO squadov.new_wow_encounters (
-                    match_uuid,
-                    tr,
-                    combatants_key,
-                    encounter_id,
-                    difficulty,
-                    instance_id
-                )
-                VALUES (
-                    $1,
-                    tstzrange($2::TIMESTAMPTZ, $3::TIMESTAMPTZ, '[]'),
-                    $4,
-                    $5,
-                    $6,
-                    $7
-                )
-                ",
-                t.get::<Uuid, &str>("match_uuid"),
-                get_bound(&rng.start),
-                get_bound(&rng.end),
-                t.get::<String, &str>("combatants_key"),
-                t.get::<i32, &str>("encounter_id"),
-                t.get::<i32, &str>("difficulty"),
-                t.get::<i32, &str>("instance_id"),
-            )
-                .execute(&mut tx)
-                .await.unwrap();
+            task_sql.push(format!("(
+                {match_uuid},
+                tstzrange({start}::TIMESTAMPTZ, {end}::TIMESTAMPTZ, '[]'),
+                {combatants_key},
+                {encounter_id},
+                {difficulty},
+                {instance_id}
+            )",
+                match_uuid=squadov_common::sql_format_string(&t.get::<Uuid, &str>("match_uuid").to_string()),
+                start=squadov_common::sql_format_time(&get_bound(&rng.start)),
+                end=squadov_common::sql_format_time(&get_bound(&rng.end)),
+                combatants_key=squadov_common::sql_format_string(&t.get::<String, &str>("combatants_key")),
+                encounter_id=t.get::<i32, &str>("encounter_id"),
+                difficulty=t.get::<i32, &str>("difficulty"),
+                instance_id=t.get::<i32, &str>("instance_id"),
+            ));
+            task_sql.push(String::from(","));
         }
+
+        task_sql.truncate(task_sql.len() - 1);
+        task_sql.push(String::from(" ON CONFLICT DO NOTHING"));
+        sqlx::query(&task_sql.join("")).execute(&mut tx).await?;
+
         tx.commit().await.unwrap();
+        log::info!("\tpost insert.");
 
         let mut tx = src_pool.begin().await.unwrap();
         sqlx::query(
             "
-            UPDATE squadov.new_wow_encounters
+            UPDATE squadov.new_wow_encounters AS we
             SET transferred = TRUE
-            WHERE match_uuid = ANY($1)
+            FROM (
+                SELECT match_uuid
+                FROM squadov.new_wow_encounters
+                WHERE transferred = FALSE
+                ORDER BY tr ASC
+                LIMIT 1000
+            ) AS sub
+            WHERE we.match_uuid=sub.match_uuid
             "
         )
-            .bind(&match_ids)
             .execute(&mut tx)
             .await.unwrap();
         tx.commit().await.unwrap();
+        log::info!("\tpost update.");
         count += tasks.len() as i64;
     }
 
