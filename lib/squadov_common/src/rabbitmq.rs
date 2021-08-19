@@ -43,6 +43,7 @@ pub struct RabbitMqConfig {
     pub csgo_queue: String,
     pub enable_steam: bool,
     pub steam_queue: String,
+    pub additional_queues: Option<Vec<String>>,
 }
 
 #[async_trait]
@@ -101,47 +102,71 @@ impl RabbitMqConnectionBundle {
         for _i in 0..num_channels {
             let ch = connection.create_channel().await?;
 
-            ch.queue_declare(
-                &config.rso_queue,
-                queue_opts.clone(),
-                default_table.clone(),
-            ).await?;
+            if !config.rso_queue.is_empty() {
+                ch.queue_declare(
+                    &config.rso_queue,
+                    queue_opts.clone(),
+                    default_table.clone(),
+                ).await?;
+            }
 
-            ch.queue_declare(
-                &config.valorant_queue,
-                queue_opts.clone(),
-                default_table.clone(),
-            ).await?;
+            if !config.valorant_queue.is_empty() {
+                ch.queue_declare(
+                    &config.valorant_queue,
+                    queue_opts.clone(),
+                    default_table.clone(),
+                ).await?;
+            }
 
-            ch.queue_declare(
-                &config.lol_queue,
-                queue_opts.clone(),
-                default_table.clone(),
-            ).await?;
+            if !config.lol_queue.is_empty() {
+                ch.queue_declare(
+                    &config.lol_queue,
+                    queue_opts.clone(),
+                    default_table.clone(),
+                ).await?;
+            }
 
-            ch.queue_declare(
-                &config.tft_queue,
-                queue_opts.clone(),
-                default_table.clone(),
-            ).await?;
+            if !config.tft_queue.is_empty() {
+                ch.queue_declare(
+                    &config.tft_queue,
+                    queue_opts.clone(),
+                    default_table.clone(),
+                ).await?;
+            }
 
-            ch.queue_declare(
-                &config.vod_queue,
-                queue_opts.clone(),
-                default_table.clone(),
-            ).await?;
+            if !config.vod_queue.is_empty() {
+                ch.queue_declare(
+                    &config.vod_queue,
+                    queue_opts.clone(),
+                    default_table.clone(),
+                ).await?;
+            }
 
-            ch.queue_declare(
-                &config.csgo_queue,
-                queue_opts.clone(),
-                default_table.clone(),
-            ).await?;
+            if !config.csgo_queue.is_empty() {
+                ch.queue_declare(
+                    &config.csgo_queue,
+                    queue_opts.clone(),
+                    default_table.clone(),
+                ).await?;
+            }
 
-            ch.queue_declare(
-                &config.steam_queue,
-                queue_opts.clone(),
-                default_table.clone(),
-            ).await?;
+            if !config.steam_queue.is_empty() {
+                ch.queue_declare(
+                    &config.steam_queue,
+                    queue_opts.clone(),
+                    default_table.clone(),
+                ).await?;
+            }
+
+            if let Some(addtl) = &config.additional_queues {
+                for q in addtl {
+                    ch.queue_declare(
+                        q,
+                        queue_opts.clone(),
+                        default_table.clone(),
+                    ).await?;
+                }
+            }
 
             channels.push(ch);
         }

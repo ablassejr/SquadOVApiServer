@@ -4597,6 +4597,7 @@ name = "wow_match_transfer"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "async-trait",
  "chrono",
  "env_logger 0.7.1",
  "log",
