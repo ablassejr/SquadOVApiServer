@@ -4,10 +4,19 @@ use rusoto_credential::ProfileProvider;
 use serde::{Deserialize};
 
 #[derive(Deserialize,Debug,Clone)]
+pub struct AWSCDNConfig {
+    pub public_cdn_domain: String,
+    pub private_cdn_domain: String,
+    pub public_key_id: String,
+    pub private_key_fname: String,
+}
+
+#[derive(Deserialize,Debug,Clone)]
 pub struct AWSConfig {
     pub enabled: bool,
     pub credential_path: String,
     pub profile: String,
+    pub cdn: AWSCDNConfig,
 }
 
 pub struct AWSClient {

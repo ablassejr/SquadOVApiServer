@@ -9,18 +9,20 @@ if __name__ == '__main__':
     parser.add_argument('--queue', required=True)
     parser.add_argument('--username', required=True)
     parser.add_argument('--password', required=True)
+    parser.add_argument('--key', required=True)
+    parser.add_argument('--size', type=int, required=True)
     args = parser.parse_args()
 
     data = []
     with open(args.csv) as classes:
         reader = csv.DictReader(classes)
         for row in reader:
-            if 'match_uuid' not in row:
+            if args.key not in row:
                 continue
-            data.append(row['match_uuid'])
+            data.append(row[args.key])
 
-    for i in range(0, len(data), 100):
-        subset = data[i:i+100]
+    for i in range(0, len(data), args.size):
+        subset = data[i:i+args.size]
         cmd = [
             'rabbitmqadmin',
             '--host=advanced-green-bird-01.rmq2.cloudamqp.com',
@@ -39,3 +41,4 @@ if __name__ == '__main__':
 
         print(cmd)
         subprocess.call(cmd)
+        break

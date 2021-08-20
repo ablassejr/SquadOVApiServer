@@ -310,7 +310,7 @@ impl ApiApplication {
     async fn create_vod_manager(&mut self, bucket: &str) -> Result<(), SquadOvError> {
         let vod_manager = match vod::manager::get_vod_manager_type(bucket) {
             VodManagerType::GCS => Arc::new(GCSVodManager::new(bucket, self.gcp.clone()).await?) as Arc<dyn VodManager + Send + Sync>,
-            VodManagerType::S3 => Arc::new(S3VodManager::new(bucket, self.aws.clone()).await?) as Arc<dyn VodManager + Send + Sync>,
+            VodManagerType::S3 => Arc::new(S3VodManager::new(bucket, self.aws.clone(), self.config.aws.cdn.clone()).await?) as Arc<dyn VodManager + Send + Sync>,
             VodManagerType::FileSystem => Arc::new(FilesystemVodManager::new(bucket)?) as Arc<dyn VodManager + Send + Sync>
         };
         self.vod.new_bucket(bucket, vod_manager).await;

@@ -2,7 +2,10 @@ use crate::{
     SquadOvError,
     VodSegmentId,
     vod::manager::VodManager,
-    aws::AWSClient,
+    aws::{
+        AWSClient,
+        AWSCDNConfig,
+    },
 };
 use std::sync::Arc;
 use futures_util::TryStreamExt;
@@ -31,6 +34,13 @@ use tokio::fs::{
 use tokio_util::codec::{BytesCodec, FramedRead};
 use rusoto_credential::ProvideAwsCredentials;
 use md5::Digest;
+use chrono::{Utc, Duration};
+use rsa::{
+    RsaPrivateKey,
+    pkcs1::FromRsaPrivateKey,
+    padding::PaddingScheme,
+    hash::Hash
+};
 
 use async_trait::async_trait;
 use actix_web::web::{BytesMut};
@@ -40,11 +50,13 @@ const S3_ALL_USERS_GROUP: &'static str = "http://acs.amazonaws.com/groups/global
 
 pub struct S3VodManager {
     bucket: String,
-    aws: Arc<Option<AWSClient>>
+    aws: Arc<Option<AWSClient>>,
+    cdn_private_key: RsaPrivateKey,
+    cdn: AWSCDNConfig,
 }
 
 impl S3VodManager {
-    pub async fn new(full_bucket: &str, client: Arc<Option<AWSClient>>) -> Result<S3VodManager, SquadOvError> {
+    pub async fn new(full_bucket: &str, client: Arc<Option<AWSClient>>, cdn: AWSCDNConfig) -> Result<S3VodManager, SquadOvError> {
         if client.is_none() {
             return Err(SquadOvError::InternalError(String::from("AWS Client not found.")));
         }
@@ -54,6 +66,8 @@ impl S3VodManager {
         Ok(S3VodManager{
             bucket: bucket.clone(),
             aws: client,
+            cdn_private_key: RsaPrivateKey::read_pkcs1_pem_file(std::path::Path::new(&cdn.private_key_fname))?,
+            cdn,
         })
     }
 
@@ -69,18 +83,62 @@ impl VodManager for S3VodManager {
     }
 
     async fn get_segment_redirect_uri(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
-        let req = GetObjectRequest{
-            bucket: self.bucket.clone(),
-            key: segment.get_fname(),
-            ..GetObjectRequest::default()
-        };
+        Ok(
+            if !self.cdn.private_cdn_domain.is_empty() {
+                // We need to manually sign the CloudFront URL here using the trusted private key
+                let base_url = format!(
+                    "{base}/{fname}",
+                    base=&self.cdn.private_cdn_domain,
+                    fname=segment.get_fname(),
+                );
 
-        let creds = self.client().provider.credentials().await?;
-        let region = self.client().region.clone();
+                let expires = Utc::now() + Duration::seconds(43200);
+                let signature = {
+                    let policy = format!(
+                        r#"{{"Statement":[{{"Resource":"{base}","Condition":{{"DateLessThan":{{"AWS:EpochTime":{expires}}}}}}}]}}"#,
+                        base=&base_url,
+                        expires=expires.timestamp(),
+                    );
 
-        Ok(req.get_presigned_url(&region, &creds, &PreSignedRequestOption{
-            expires_in: std::time::Duration::from_secs(43200)
-        }))
+                    // Steps are from copying AWS's reference code:
+                    // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/CreateSignatureInCSharp.html
+                    // 1) Create a SHA-1 hash of the actual policy string.
+                    // 2) Compute an RSA PKCS1v15 Signature (with SHA-1 hasing) using our private key.
+                    // 3) Encode in URL-safe Base 64
+                    let policy_hash = {
+                        let mut hasher = sha1::Sha1::new();
+                        hasher.update(policy.as_bytes());
+                        hasher.finalize()
+                    };
+                    let policy_signature = self.cdn_private_key.sign(PaddingScheme::PKCS1v15Sign{
+                        hash: Some(Hash::SHA1)
+                    }, &policy_hash)?;
+                    base64::encode_config(&policy_signature, base64::URL_SAFE)
+                };
+                let key_pair_id = self.cdn.public_key_id.clone();
+
+                format!(
+                    "{base}?Expires={expires}&Signature={signature}&Key-Pair-Id={keypair}",
+                    base=base_url,
+                    expires=expires.timestamp(),
+                    signature=signature,
+                    keypair=key_pair_id
+                )
+            } else {
+                let req = GetObjectRequest{
+                    bucket: self.bucket.clone(),
+                    key: segment.get_fname(),
+                    ..GetObjectRequest::default()
+                };
+
+                let creds = self.client().provider.credentials().await?;
+                let region = self.client().region.clone();
+
+                req.get_presigned_url(&region, &creds, &PreSignedRequestOption{
+                    expires_in: std::time::Duration::from_secs(43200)
+                })
+            }
+        )
     }
 
     async fn download_vod_to_path(&self, segment: &VodSegmentId, path: &std::path::Path) -> Result<(), SquadOvError> {

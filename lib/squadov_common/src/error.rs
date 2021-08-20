@@ -290,3 +290,15 @@ impl From<ipnetwork::IpNetworkError> for SquadOvError {
         return Self::InternalError(format!("IP Network Error {:?}", err))
     }
 }
+
+impl From<rsa::pkcs1::Error> for SquadOvError {
+    fn from(err: rsa::pkcs1::Error) -> Self {
+        return Self::InternalError(format!("PKCS1 Error {:?}", err))
+    }
+}
+
+impl From<rsa::errors::Error> for SquadOvError {
+    fn from(err: rsa::errors::Error) -> Self {
+        return Self::InternalError(format!("RSA Error {:?}", err))
+    }
+}
