@@ -12,11 +12,14 @@ use rusoto_s3::{
     GetObjectRequest,
     GetObjectAclRequest,
     PutObjectAclRequest,
+    PutObjectTaggingRequest,
     PutObjectRequest,
     DeleteObjectRequest,
     CreateMultipartUploadRequest,
     UploadPartRequest,
     CompleteMultipartUploadRequest, CompletedMultipartUpload, CompletedPart,
+    Tagging,
+    Tag,
     util::{
         PreSignedRequest,
         PreSignedRequestOption,
@@ -222,14 +225,36 @@ impl VodManager for S3VodManager {
     }
 
     async fn make_segment_public(&self, segment: &VodSegmentId) -> Result<(), SquadOvError> {
-        let req = PutObjectAclRequest{
-            bucket: self.bucket.clone(),
-            key: segment.get_fname(),
-            acl: Some(String::from("public-read")),
-            ..PutObjectAclRequest::default()
-        };
+        // Need to do both until we can move over to the CDN 100%.
+        {
+            let req = PutObjectAclRequest{
+                bucket: self.bucket.clone(),
+                key: segment.get_fname(),
+                acl: Some(String::from("public-read")),
+                ..PutObjectAclRequest::default()
+            };
+            self.client().s3.put_object_acl(req).await?;
+        }
 
-        self.client().s3.put_object_acl(req).await?;
+        {
+            let req = PutObjectTaggingRequest{
+                bucket: self.bucket.clone(),
+                key: segment.get_fname(),
+                tagging: Tagging {
+                    tag_set: vec![
+                        Tag {
+                            key: String::from("access"),
+                            value: String::from("public"),
+                        }
+                    ],
+                },
+                ..PutObjectTaggingRequest::default()
+            };
+
+            self.client().s3.put_object_tagging(req).await?;
+        }
+
+        
         Ok(())
     }
 
