@@ -236,8 +236,15 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
         }
 
         app.vod_itf.request_vod_processing(&data.association.video_uuid, &metadata_id, data.session_uri.clone(), true).await?;
+
+        // If this is the user's first VOD, we want to record that in our analytics so that we can tell users about their momentous occasation.
+        if !data.association.is_clip && app.get_user_full_match_vod_count(session.user.id).await? == 1 {
+            let event = "recordfirst";
+            app.segment.track(&session.user.uuid.to_string(), event).await?;
+            app.record_user_event(&[session.user.id], event).await?;
+        }
     }
-    return Ok(HttpResponse::Ok().finish());
+    Ok(HttpResponse::Ok().finish())
 }
 
 pub async fn create_vod_destination_handler(data : web::Json<VodCreateDestinationUriInput>, app : web::Data<Arc<api::ApiApplication>>, request: HttpRequest) -> Result<HttpResponse, SquadOvError> {

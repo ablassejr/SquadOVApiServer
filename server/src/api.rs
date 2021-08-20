@@ -64,7 +64,6 @@ use url::Url;
 use std::vec::Vec;
 use std::sync::{Arc};
 use sqlx::postgres::{PgPoolOptions};
-use uuid::Uuid;
 
 // TODO: REMOVE THIS.
 #[macro_export]
@@ -281,24 +280,9 @@ impl ApiApplication {
         }
 
         // Then mark them as being inactive in the database.
-        sqlx::query!(
-            "
-            INSERT INTO squadov.user_event_record (
-                user_id,
-                event_name,
-                tm
-            )
-            SELECT u.id, 'inactive_14', NOW()
-            FROM UNNEST($1::UUID[]) AS inp(uuid)
-            INNER JOIN squadov.users AS u
-                ON u.uuid = inp.uuid
-            ",
-            &inactive_users.iter().map(|x| {
-                x.uuid.clone()
-            }).collect::<Vec<Uuid>>()
-        )
-            .execute(&*self.pool)
-            .await?;
+        self.record_user_event(&inactive_users.iter().map(|x| {
+            x.id
+        }).collect::<Vec<i64>>(), "inactive_14").await?;
         
         Ok(())
     }

@@ -13,6 +13,26 @@ pub struct ReferralQuery {
 }
 
 impl api::ApiApplication {
+    pub async fn record_user_event(&self, user_ids: &[i64], event: &str) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            "
+            INSERT INTO squadov.user_event_record (
+                user_id,
+                event_name,
+                tm
+            )
+            SELECT inp.id, $2, NOW()
+            FROM UNNEST($1::BIGINT[]) AS inp(id)
+            ON CONFLICT DO NOTHING
+            ",
+            user_ids,
+            event,
+        )
+            .execute(&*self.pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn regenerate_user_referral_code(&self, tx: &mut Transaction<'_, Postgres>, user_id: i64) -> Result<(), SquadOvError> {
         sqlx::query!(
             "
