@@ -113,7 +113,10 @@ impl VodManager for S3VodManager {
                     let policy_signature = self.cdn_private_key.sign(PaddingScheme::PKCS1v15Sign{
                         hash: Some(Hash::SHA1)
                     }, &policy_hash)?;
-                    base64::encode_config(&policy_signature, base64::URL_SAFE)
+                    base64::encode_config(&policy_signature, base64::STANDARD_NO_PAD)
+                        .replace("+", "-")
+                        .replace("=", "_")
+                        .replace("/", "~")
                 };
                 let key_pair_id = self.cdn.public_key_id.clone();
 

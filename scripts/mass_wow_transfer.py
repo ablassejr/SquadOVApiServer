@@ -41,4 +41,3 @@ if __name__ == '__main__':
 
         print(cmd)
         subprocess.call(cmd)
-        break
