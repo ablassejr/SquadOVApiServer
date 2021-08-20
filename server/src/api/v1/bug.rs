@@ -46,7 +46,7 @@ impl api::ApiApplication {
             .await?;
 
         let issue_result = gitlab_client
-            .post(&format!("https://gitlab.com/api/v4/projects/{project_id}/issues?title={title}&labels=bug&description={desc}&created_at={created}",
+            .post(&format!("https://gitlab.com/api/v4/projects/{project_id}/issues?title={title}&labels=bug,user-reported&description={desc}&created_at={created}",
                 project_id=self.config.gitlab.project_id,
                 created=&timestamp,
                 title=squadov_common::url_encode(&format!("[USER REPORTED BUG] {title}", title=title)),
