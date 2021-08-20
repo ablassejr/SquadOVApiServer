@@ -8,7 +8,7 @@ use serde::{Serialize, Deserialize};
 use sqlx::{Executor, Postgres};
 use std::collections::HashMap;
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct MatchVideoSharePermissions {
     pub id: i64,
@@ -35,6 +35,7 @@ pub struct LinkShareData {
     pub share_url: Option<String>,
 }
 
+#[derive(Debug)]
 pub struct ShareEdge {
     id: i64,
     /*

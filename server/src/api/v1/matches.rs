@@ -48,7 +48,6 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc, TimeZone};
 use std::collections::{HashMap};
 use serde::{Serialize, Deserialize};
-use url::Url;
 use serde_qs::actix::QsQuery;
 use crate::api::v1::FavoriteResponse;
 use std::convert::TryFrom;
@@ -560,33 +559,6 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
         }
     }
     
-    // Next we need to generate the share URL for this match. This is dependent on
-    // 1) The app domain
-    // 2) The game of the match being requested.
-    // 3) The user's POV that's being requested.
-    // #1 is something the API server should know while #2 is something more along the lines of what
-    // the client (user) should know. HOWEVER, we shouldn't fully trust them so we need to examine the
-    // URL that they sent to do further verification. Generally the only two things we need to verify are
-    // 1) The user ID (should match the session user id)
-    // 2) The Riot PUUID (only in certain cases).
-    let base_url = format!(
-        "{}{}",
-        &app.config.cors.domain,
-        &data.full_path,
-    );
-    let parsed_url = Url::parse(&base_url)?;
-    for qp in parsed_url.query_pairs() {
-        if qp.0 == "userId" {
-            if qp.1.parse::<i64>()? != session.user.id {
-                return Err(SquadOvError::Unauthorized);
-            }
-        } else if qp.0 == "puuid" {
-            if !riot_db::is_riot_puuid_linked_to_user(&*app.pool, session.user.id, &qp.1).await? {
-                return Err(SquadOvError::Unauthorized);
-            }
-        }
-    }
-
     // If the user already shared this match, reuse that token so we don't fill up our databases with a bunch of useless tokens.
     let mut token = squadov_common::access::find_encrypted_access_token_for_match_user(&*app.pool, &path.match_uuid, session.user.id).await?;
     let video_uuid = app.find_vod_from_match_user_id(path.match_uuid.clone(), session.user.id).await?.map(|x| {
