@@ -70,10 +70,31 @@ impl super::AccessChecker<ShareTokenMetadata> for ShareTokenAccessRestricter {
         }
         
         if let Some(video_uuid) = data.path.get("video_uuid") {
-            if share_token.video_uuid.is_none() || &video_uuid.parse::<Uuid>()? != share_token.video_uuid.as_ref().unwrap() {
-                return Ok(false);
+            // The video UUID must be in either the singular video uuid or the bulk video uuid (LEGACY BABYYY).
+            // In the case where it's singular, then we assume that's the ONLY one set and it must match exactly.
+            // Otherwise, we use the bulk option and it just must be in the array.
+            let path_video_uuid = video_uuid.parse::<Uuid>()?;
+            if let Some(share_uuid) = share_token.video_uuid.as_ref() {
+                if &path_video_uuid != share_uuid {
+                    return Ok(false);
+                }
+
+                granted_access = true;
+            } else {
+                let mut found = false;
+                for share_uuid in &share_token.bulk_video_uuids {
+                    if &path_video_uuid == share_uuid {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if !found {
+                    return Ok(false);
+                }
+
+                granted_access = true;
             }
-            granted_access = true;
         }
 
         if let Some(clip_uuid) = data.path.get("clip_uuid") {

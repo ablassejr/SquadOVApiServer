@@ -561,9 +561,21 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
     
     // If the user already shared this match, reuse that token so we don't fill up our databases with a bunch of useless tokens.
     let mut token = squadov_common::access::find_encrypted_access_token_for_match_user(&*app.pool, &path.match_uuid, session.user.id).await?;
-    let video_uuid = app.find_vod_from_match_user_id(path.match_uuid.clone(), session.user.id).await?.map(|x| {
+
+    // We want to share all the VODs we have access to.
+    let temp_uuids: Vec<Uuid> = app.find_accessible_vods_in_match_for_user(&path.match_uuid.clone(), session.user.id, false).await?.into_iter().map(|x| {
         x.video_uuid
-    });
+    }).collect();
+    
+    let mut video_uuids: Vec<Uuid> = vec![];
+    for x in temp_uuids {
+        // Sanity check to make sure user has permission to share the VOD itself - otherwise we don't include in the list of VODs the user has access to
+        // and don't bother trying to make it public.
+        let permissions = share::get_match_vod_share_permissions_for_user(&*app.pool, None, Some(&x), session.user.id).await?;
+        if permissions.can_share {
+            video_uuids.push(x);
+        }
+    }
 
     if token.is_none() {
         // Now that we've verified all these things we can go ahead and return to the user a fully fleshed out
@@ -573,7 +585,8 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
             full_path: data.full_path.clone(),
             user_uuid: session.user.uuid.clone(),
             match_uuid: Some(path.match_uuid.clone()),
-            video_uuid: video_uuid.clone(),
+            video_uuid: None,
+            bulk_video_uuids: video_uuids.clone(),
             clip_uuid: None,
             graphql_stats: data.graphql_stats.clone(),
         };
@@ -588,7 +601,7 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
         // Store the encrypted token in our database and return to the user a URL with the unique ID and the IV.
         // This way we get a (relatively) shorter URL instead of a giant encrypted blob.
         let mut tx = app.pool.begin().await?;
-        let token_id = squadov_common::access::store_encrypted_access_token_for_match_user(&mut tx, &path.match_uuid, session.user.id, &encryption_token).await?;
+        let token_id = squadov_common::access::store_encrypted_access_token_for_match_user(&mut tx, &path.match_uuid, &video_uuids, session.user.id, &encryption_token).await?;
         squadov_common::access::generate_friendly_share_token(&mut tx, &token_id).await?;
         tx.commit().await?;
 
@@ -597,7 +610,7 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
 
     // Make the VOD public - we need to keep track of its public setting in our database as well as configure the backend
     // to enable it to be served publically.
-    if let Some(uuid) = video_uuid.as_ref() {
+    for uuid in &video_uuids {
         app.make_vod_public(&uuid).await?;
     }
 

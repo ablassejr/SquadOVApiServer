@@ -119,6 +119,7 @@ pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApp
             match_uuid: None,
             video_uuid: Some(path.clip_uuid.clone()),
             clip_uuid: Some(path.clip_uuid.clone()),
+            bulk_video_uuids: vec![],
             graphql_stats: None,
         };
 

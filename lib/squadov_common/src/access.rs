@@ -15,6 +15,8 @@ pub struct AccessTokenRequest {
     pub user_uuid: Uuid,
     pub match_uuid: Option<Uuid>,
     pub video_uuid: Option<Uuid>,
+    #[serde(default)]
+    pub bulk_video_uuids: Vec<Uuid>,
     pub clip_uuid: Option<Uuid>,
     pub graphql_stats: Option<Vec<StatPermission>>,
 }
@@ -191,7 +193,7 @@ pub async fn generate_friendly_share_token(tx: &mut Transaction<'_, Postgres>, i
     Ok(None)
 }
 
-pub async fn store_encrypted_access_token_for_match_user<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64, token: &AESEncryptToken) -> Result<Uuid, SquadOvError>
+pub async fn store_encrypted_access_token_for_match_user<'a, T>(ex: T, match_uuid: &Uuid, video_uuids: &[Uuid], user_id: i64, token: &AESEncryptToken) -> Result<Uuid, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
 {
@@ -205,7 +207,8 @@ where
                 encrypted_token,
                 iv,
                 aad,
-                tag
+                tag,
+                bulk_video_uuids
             ) VALUES (
                 gen_random_uuid(),
                 $1,
@@ -213,7 +216,8 @@ where
                 $3,
                 $4,
                 $5,
-                $6
+                $6,
+                $7
             )
             RETURNING id
             ",
@@ -222,7 +226,8 @@ where
             token.data,
             token.iv,
             token.aad,
-            token.tag
+            token.tag,
+            video_uuids
         )
             .fetch_one(ex)
             .await?

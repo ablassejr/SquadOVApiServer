@@ -1,0 +1,1 @@
+CREATE INDEX ON share_tokens USING GIN(bulk_video_uuids);

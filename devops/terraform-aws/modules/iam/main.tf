@@ -20,7 +20,8 @@ resource "aws_iam_policy" "s3_policy" {
                 "s3:AbortMultipartUpload",
                 "s3:DeleteObject",
                 "s3:PutObjectAcl",
-                "s3:PutObjectTagging"
+                "s3:PutObjectTagging",
+                "s3:GetObjectTagging"
             ],
             "Resource": "*"
         }

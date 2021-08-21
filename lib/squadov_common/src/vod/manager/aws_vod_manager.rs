@@ -14,6 +14,7 @@ use rusoto_s3::{
     StreamingBody,
     GetObjectRequest,
     GetObjectAclRequest,
+    GetObjectTaggingRequest,
     PutObjectAclRequest,
     PutObjectTaggingRequest,
     PutObjectRequest,
@@ -277,9 +278,8 @@ impl VodManager for S3VodManager {
     async fn get_public_segment_redirect_uri(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
         Ok(
             format!(
-                "https://{bucket}.s3.{region}.amazonaws.com/{key}",
-                bucket=&self.bucket,
-                region=self.client().region.name(),
+                "{base}/{key}",
+                base=&self.cdn.public_cdn_domain,
                 key=segment.get_fname(),
             )
         )
@@ -320,6 +320,21 @@ impl VodManager for S3VodManager {
     }
 
     async fn check_vod_segment_is_public(&self, segment: &VodSegmentId) -> Result<bool, SquadOvError> {
+        // First check the tags and then fall back to the legacy ACL check.
+        {
+            let req = GetObjectTaggingRequest{
+                bucket: self.bucket.clone(),
+                key: segment.get_fname(),
+                ..GetObjectTaggingRequest::default()
+            };
+            let tags = self.client().s3.get_object_tagging(req).await?;
+            for t in tags.tag_set {
+                if t.key == "access" && t.value == "public" {
+                    return Ok(true);
+                }
+            }
+        }
+
         let req = GetObjectAclRequest{
             bucket: self.bucket.clone(),
             key: segment.get_fname(),

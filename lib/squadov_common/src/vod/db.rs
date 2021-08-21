@@ -24,6 +24,10 @@ where
                     ON v.match_uuid = st.match_uuid
                         AND v.user_uuid = u.uuid
                 WHERE v.video_uuid = $1
+                UNION
+                SELECT 1
+                FROM squadov.share_tokens AS st
+                WHERE st.bulk_video_uuids @> ARRAY[$1]
             ) AS "exists!"
             "#,
             video_uuid
