@@ -151,6 +151,12 @@ enabled = true
 credential_path = "aws/api.profile"
 profile = "api"
 
+[aws.cdn]
+public_cdn_domain = "https://d1goqoukzs4rbo.cloudfront.net"
+private_cdn_domain = "https://d2chagikgdm7bl.cloudfront.net"
+public_key_id = "K1JG8A4WKH1W0X"
+private_key_fname = "aws/private_s3_vod_cloudfront.pem"
+
 [ipstack]
 api_key = "${IPSTACK_API_KEY}"
 

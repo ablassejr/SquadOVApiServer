@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.9.5",
+        "description": "Small patch but we're now properly trusted by Microsoft Smartscreen poggers.",
+        "timestamp": 1629496753000,
+        "data": "data/update-v0.9.5.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.9.1",
         "description": "Some QOL changes for our post AWS migration patch!",
         "timestamp": 1628564284000,

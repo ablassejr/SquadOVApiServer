@@ -4727,24 +4727,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "wow_db_migrater"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "chrono",
- "env_logger 0.7.1",
- "log",
- "serde",
- "serde_json",
- "sqlx",
- "squadov_common",
- "structopt",
- "tokio",
- "toml",
- "uuid",
-]
-
-[[package]]
 name = "wow_match_transfer"
 version = "0.1.0"
 dependencies = [

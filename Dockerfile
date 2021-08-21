@@ -24,7 +24,7 @@ COPY Cargo.lock /squadov/
 COPY devops/gcp /squadov/gcp
 
 WORKDIR /squadov
-RUN cargo build --release
+RUN cargo build --release --bin squadov_api_server
 
 FROM debian:buster-20200908-slim
 ARG DEPLOYMENT_ENVIRONMENT
@@ -40,5 +40,6 @@ COPY --from=builder /squadov/gcp ./gcp
 
 RUN mkdir -p /squadov/aws
 COPY devops/aws/$DEPLOYMENT_ENVIRONMENT.profile ./aws/api.profile
+COPY devops/aws/keys/private_s3_vod_cloudfront.pem ./aws/private_s3_vod_cloudfront.pem
 COPY run_api_server.sh ./
 ENTRYPOINT ["./run_api_server.sh"]

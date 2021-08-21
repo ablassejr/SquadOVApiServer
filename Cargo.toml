@@ -4,7 +4,6 @@ members = [
     "lib/squadov_common",
     "tools/hearthstone_power_parser",
     "tools/csgo_demo_parser",
-    "tools/wow_db_migrater",
     "tools/wow_match_transfer",
     "msa/rabbitmq_delay_handler",
     "msa/csgo_demo_handler"
@@ -14,7 +13,6 @@ default-members = [
     "lib/squadov_common",
     "tools/hearthstone_power_parser",
     "tools/csgo_demo_parser",
-    "tools/wow_db_migrater",
     "tools/wow_match_transfer",
     "msa/rabbitmq_delay_handler",
     "msa/csgo_demo_handler"
