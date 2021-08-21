@@ -2990,24 +2990,6 @@
       "nullable": []
     }
   },
-  "38ccd6a7cb59a449658d39be44ffd44c3ecf74b2f2fa661079e84440489dca46": {
-    "query": "\n                INSERT INTO squadov.new_wow_encounters (\n                    match_uuid,\n                    tr,\n                    combatants_key,\n                    encounter_id,\n                    difficulty,\n                    instance_id\n                )\n                VALUES (\n                    $1,\n                    tstzrange($2::TIMESTAMPTZ, $3::TIMESTAMPTZ, '[]'),\n                    $4,\n                    $5,\n                    $6,\n                    $7\n                )\n                ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Timestamptz",
-          "Timestamptz",
-          "Varchar",
-          "Int4",
-          "Int4",
-          "Int4"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "3b7ac82dedfe913e40b48142952cfc7c50bf66d536b853bb88f0272d19052df6": {
     "query": "\n            SELECT mmc.match_uuid\n            FROM squadov.match_to_match_collection AS mmc\n            INNER JOIN squadov.hearthstone_duels AS had\n                ON had.collection_uuid = mmc.collection_uuid AND had.user_id = $2\n            INNER JOIN squadov.hearthstone_matches AS hm\n                ON hm.match_uuid = mmc.match_uuid\n            CROSS JOIN (\n                SELECT *\n                FROM squadov.users\n                WHERE id = $2\n            ) AS u\n            LEFT JOIN squadov.vods AS v\n                ON v.match_uuid = mmc.match_uuid\n                    AND v.user_uuid = u.uuid\n                    AND v.is_clip = FALSE\n            WHERE mmc.collection_uuid = $1\n                AND (NOT $3::BOOLEAN OR v.video_uuid IS NOT NULL)\n            ORDER BY hm.match_time DESC\n            ",
     "describe": {
@@ -4639,23 +4621,6 @@
         true,
         true
       ]
-    }
-  },
-  "514e72a8cc0aed6945ea67754fc23c828b64a0080419e78fc61eb4a93a6d60a2": {
-    "query": "\n                INSERT INTO squadov.new_wow_arenas (\n                    match_uuid,\n                    tr,\n                    combatants_key,\n                    instance_id,\n                    arena_type\n                )\n                VALUES (\n                    $1,\n                    tstzrange($2::TIMESTAMPTZ, $3::TIMESTAMPTZ, '[]'),\n                    $4,\n                    $5,\n                    $6\n                )\n                ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Timestamptz",
-          "Timestamptz",
-          "Varchar",
-          "Int4",
-          "Varchar"
-        ]
-      },
-      "nullable": []
     }
   },
   "5165595d8ed23a9f090d1c6b8f891f107d782ebb4a435f231883a971da78cc8d": {
@@ -7594,6 +7559,26 @@
         true,
         true,
         false
+      ]
+    }
+  },
+  "90de97450c94fb41670b290f2791123ffd19773a6166d22a1ce28c34d1239676": {
+    "query": "\n            SELECT EXISTS (\n                SELECT 1\n                FROM squadov.share_tokens AS st\n                WHERE st.clip_uuid = $1\n                UNION\n                SELECT 1\n                FROM squadov.share_tokens AS st\n                INNER JOIN squadov.users AS u\n                    ON u.id = st.user_id\n                INNER JOIN squadov.vods AS v\n                    ON v.match_uuid = st.match_uuid\n                        AND v.user_uuid = u.uuid\n                WHERE v.video_uuid = $1\n                UNION\n                SELECT 1\n                FROM squadov.share_tokens AS st\n                WHERE st.bulk_video_uuids @> ARRAY[$1]\n            ) AS \"exists!\"\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "exists!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },
@@ -11369,19 +11354,6 @@
       ]
     }
   },
-  "e5e6d88328943b352ea82ad35951eb7fec319e68c9ba66f00a5d76e28e3cab16": {
-    "query": "\n            INSERT INTO squadov.user_event_record (\n                user_id,\n                event_name,\n                tm\n            )\n            SELECT inp.id, $2, NOW()\n            FROM UNNEST($1::BIGINT[]) AS inp(id)\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8Array",
-          "Varchar"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "e60b00bf6030721a8701024c37c8c42fb3b71ee063ff18b12e723c65c73eafe7": {
     "query": "\n            SELECT draft_deck_id, creation_time\n            FROM squadov.hearthstone_arena_drafts\n            WHERE collection_uuid = $1 AND user_id = $2\n            ",
     "describe": {
@@ -12263,18 +12235,6 @@
       ]
     }
   },
-  "f5cf7581a1eeff23d733ea27737a4c245af01d2e190f15e1f969fdec1bab0152": {
-    "query": "\n            INSERT INTO squadov.user_event_record (\n                user_id,\n                event_name,\n                tm\n            )\n            SELECT u.id, 'inactive_14', NOW()\n            FROM UNNEST($1::UUID[]) AS inp(uuid)\n            INNER JOIN squadov.users AS u\n                ON u.uuid = inp.uuid\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "UuidArray"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "f68e6b594e8d91b116c3f8b1cc521bd28e888140596c9011ce0f113a0b28da4c": {
     "query": "\n                    WITH user_squads AS (\n                        SELECT squad_id\n                        FROM squadov.squad_role_assignments\n                        WHERE user_id = any($1)\n                    )\n                    SELECT DISTINCT sra.user_id AS \"user_id\"\n                    FROM squadov.squad_role_assignments AS sra\n                    INNER JOIN user_squads AS us\n                        ON us.squad_id = sra.squad_id\n                    ",
     "describe": {
@@ -12484,6 +12444,32 @@
         false,
         false,
         false,
+        false
+      ]
+    }
+  },
+  "f961c46c1ed5f4989eccb33dc9e220c582b0003ba02d64b003ed179a632b64a8": {
+    "query": "\n            INSERT INTO squadov.share_tokens (\n                id,\n                match_uuid,\n                user_id,\n                encrypted_token,\n                iv,\n                aad,\n                tag,\n                bulk_video_uuids\n            ) VALUES (\n                gen_random_uuid(),\n                $1,\n                $2,\n                $3,\n                $4,\n                $5,\n                $6,\n                $7\n            )\n            RETURNING id\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8",
+          "Bytea",
+          "Bytea",
+          "Bytea",
+          "Bytea",
+          "UuidArray"
+        ]
+      },
+      "nullable": [
         false
       ]
     }
