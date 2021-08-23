@@ -563,17 +563,24 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
     let mut token = squadov_common::access::find_encrypted_access_token_for_match_user(&*app.pool, &path.match_uuid, session.user.id).await?;
 
     // We want to share all the VODs we have access to.
-    let temp_uuids: Vec<Uuid> = app.find_accessible_vods_in_match_for_user(&path.match_uuid.clone(), session.user.id, false).await?.into_iter().map(|x| {
-        x.video_uuid
-    }).collect();
+    let vods = app.find_accessible_vods_in_match_for_user(&path.match_uuid.clone(), session.user.id, false).await?;
     
     let mut video_uuids: Vec<Uuid> = vec![];
-    for x in temp_uuids {
+    for v in vods {
+        let can_share = {
+            if let Some(user_uuid) = &v.user_uuid {
+                user_uuid == &session.user.uuid
+            } else {
+                false
+            }
+        } || {
+            let permissions = share::get_match_vod_share_permissions_for_user(&*app.pool, None, Some(&v.video_uuid), session.user.id).await?;
+            permissions.can_share
+        };
         // Sanity check to make sure user has permission to share the VOD itself - otherwise we don't include in the list of VODs the user has access to
         // and don't bother trying to make it public.
-        let permissions = share::get_match_vod_share_permissions_for_user(&*app.pool, None, Some(&x), session.user.id).await?;
-        if permissions.can_share {
-            video_uuids.push(x);
+        if can_share {
+            video_uuids.push(v.video_uuid);
         }
     }
 
