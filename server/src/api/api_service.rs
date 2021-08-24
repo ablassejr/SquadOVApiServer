@@ -28,7 +28,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 .wrap(access::ApiAccess::new(
                     Box::new(access::AdminAccessChecker{}),
                 ))
-                .wrap(auth::ApiSessionValidator{})
+                .wrap(auth::ApiSessionValidator{required: true})
                 .service(
                     web::scope("/analytics")
                         .route("/daily", web::get().to(admin::get_daily_analytics_handler))
@@ -61,7 +61,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .wrap(access::ApiAccess::new(
                             Box::new(access::DenyShareTokenAccess{}),
                         ))
-                        .wrap(auth::ApiSessionValidator{})
+                        .wrap(auth::ApiSessionValidator{required: true})
                         .route("/verify", web::get().to(auth::check_verify_email_handler))
                         .route("/verify/resend", web::post().to(auth::resend_verify_email_handler))
                 )
@@ -106,11 +106,16 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 )
         )
         .service(
+            web::scope("/profile")
+                .wrap(auth::ApiSessionValidator{required: false})
+                .route("", web::get().to(v1::get_basic_profile_handler))
+        )
+        .service(
             web::scope("/v1")
                 .wrap(access::ApiAccess::new(
                     Box::new(access::ShareTokenAccessRestricter{}),
                 ))
-                .wrap(auth::ApiSessionValidator{})
+                .wrap(auth::ApiSessionValidator{required: true})
                 .service(
                     web::scope("/link")
                         .wrap(access::ApiAccess::new(
@@ -1072,14 +1077,14 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
     if graphql_debug {
         scope = scope.service(
             web::resource("/graphql")
-                .wrap(auth::ApiSessionValidator{})
+                .wrap(auth::ApiSessionValidator{required: true})
                 .route(web::post().to(graphql::graphql_handler))
                 .route(web::get().to(graphql::graphiql_handler))
         );
     } else {
         scope = scope.service(
             web::resource("/graphql")
-                .wrap(auth::ApiSessionValidator{})
+                .wrap(auth::ApiSessionValidator{required: true})
                 .route(web::post().to(graphql::graphql_handler))
         );
     }

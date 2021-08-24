@@ -1,9 +1,11 @@
 pub mod status;
 pub mod links;
 
+use crate::SquadOvError;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use unicode_segmentation::UnicodeSegmentation;
+use sqlx::{Executor, Postgres};
 
 #[derive(Serialize)]
 pub struct SquadOvSquad {
@@ -85,4 +87,29 @@ impl SquadInvite {
         }
         self
     }
+}
+
+pub async fn check_users_same_squad<'a, T>(ex: T, user_1: i64, user_2: i64) -> Result<bool, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM squadov.squad_role_assignments AS sra
+                INNER JOIN squadov.squad_role_assignments AS ora
+                    ON ora.squad_id = sra.squad_id
+                WHERE sra.user_id = $1
+                    AND ora.user_id = $2
+            ) as "exists!"
+            "#,
+            user_1,
+            user_2,
+        )
+            .fetch_one(ex)
+            .await?
+            .exists
+    )
 }
