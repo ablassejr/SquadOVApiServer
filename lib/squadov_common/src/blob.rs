@@ -29,6 +29,7 @@ pub trait BlobStorageClient {
     async fn upload_object(&self, bucket_id: &str, path_parts: &Vec<String>, data: &[u8]) -> Result<(), SquadOvError>;
     async fn download_object(&self, bucket_id: &str, path: &str) -> Result<Vec<u8>, SquadOvError>;
     fn strip_bucket_prefix(&self, bucket: &str) -> String;
+    fn get_public_url(&self, bucket: &str, path: &str) -> Result<String, SquadOvError>;
 }
 
 pub struct BlobManagementClient {
@@ -48,10 +49,10 @@ impl BlobManagementClient {
         }
     }
 
-    pub async fn store_new_blob(&self, tx : &mut Transaction<'_, Postgres>, bytes: &[u8]) -> Result<Uuid, SquadOvError> {
+    pub async fn store_new_blob(&self, tx : &mut Transaction<'_, Postgres>, bytes: &[u8], compress: bool) -> Result<Uuid, SquadOvError> {
         // Let's assume that blobs are large enough for compresssion to make a difference.
         let mut compressed_bytes: Vec<u8> = Vec::new();
-        {
+        if compress {
             // A quality of 6 seems to be a good balanace between size and speed.
             let mut compressor = brotli2::read::BrotliEncoder::new(bytes, 6);
             compressor.read_to_end(&mut compressed_bytes)?;
@@ -79,7 +80,7 @@ impl BlobManagementClient {
             .execute(tx)
             .await?;
 
-        self.storage.upload_object(&self.bucket, &vec![local_path.clone()], &compressed_bytes).await?;
+        self.storage.upload_object(&self.bucket, &vec![local_path.clone()], if compress { &compressed_bytes } else { bytes }).await?;
         Ok(uuid)
     }
 
@@ -115,7 +116,22 @@ impl BlobManagementClient {
     }
 
     pub async fn store_new_json_blob(&self, tx : &mut Transaction<'_, Postgres>, val: &serde_json::Value) -> Result<Uuid, SquadOvError> {
-        self.store_new_blob(tx, &serde_json::to_vec(val)?).await
+        self.store_new_blob(tx, &serde_json::to_vec(val)?, true).await
+    }
+
+    pub async fn get_blob_url(&self, blob_uuid: &Uuid) -> Result<String, SquadOvError> {
+        let data = sqlx::query!(
+            "
+            SELECT bucket, local_path
+            FROM squadov.blob_link_storage
+            WHERE uuid = $1
+            ",
+            blob_uuid
+        )
+            .fetch_one(&*self.db)
+            .await?;
+        
+        self.storage.get_public_url(&self.storage.strip_bucket_prefix(&data.bucket), &data.local_path)
     }
 }
 

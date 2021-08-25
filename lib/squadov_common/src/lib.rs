@@ -45,6 +45,7 @@ pub mod hardware;
 pub mod ipstack;
 pub mod segment;
 pub mod profile;
+pub mod image;
 
 pub use error::*;
 pub use parse::*;

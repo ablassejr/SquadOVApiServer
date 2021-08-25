@@ -1,7 +1,10 @@
 use crate::{
     SquadOvError,
     blob::BlobStorageClient,
-    aws::AWSClient,
+    aws::{
+        AWSClient,
+        AWSCDNConfig,
+    },
 };
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -17,16 +20,18 @@ const PREFIX : &'static str = "s3://";
 
 pub struct AWSBlobStorage {
     aws: Arc<Option<AWSClient>>,
+    cdn: AWSCDNConfig,
 }
 
 impl AWSBlobStorage {
-    pub fn new(aws: Arc<Option<AWSClient>>) -> Self {
+    pub fn new(aws: Arc<Option<AWSClient>>, cdn: AWSCDNConfig) -> Self {
         if aws.is_none() {
             panic!("Must supply a AWS client.")
         }
 
         Self {
             aws: aws.clone(),
+            cdn,
         }
     }
 }
@@ -71,5 +76,15 @@ impl BlobStorageClient for AWSBlobStorage {
 
     fn strip_bucket_prefix(&self, bucket: &str) -> String {
         bucket[PREFIX.len()..].to_string()
+    }
+
+    fn get_public_url(&self, _bucket: &str, path: &str) -> Result<String, SquadOvError> {
+        let base_url = format!(
+            "{base}/{path}",
+            base=&self.cdn.blob_cdn_domain,
+            path=path,
+        );
+
+        (*self.aws).as_ref().unwrap().sign_cloudfront_url(&base_url)
     }
 }

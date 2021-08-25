@@ -37,4 +37,8 @@ impl BlobStorageClient for GCPBlobStorage {
     fn strip_bucket_prefix(&self, bucket: &str) -> String {
         bucket[PREFIX.len()..].to_string()
     }
+
+    fn get_public_url(&self, _bucket: &str, _path: &str) -> Result<String, SquadOvError> {
+        Err(SquadOvError::InternalError(String::from("Not Implemented Yet")))
+    }
 }

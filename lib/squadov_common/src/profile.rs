@@ -1,7 +1,9 @@
 pub mod access;
+pub mod data;
 
 use crate::{
     SquadOvError,
+    blob::BlobManagementClient,
 };
 use serde::Serialize;
 use sqlx::{
@@ -10,6 +12,8 @@ use sqlx::{
     postgres::PgPool,
 };
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
+use std::sync::Arc;
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -57,8 +61,8 @@ pub struct UserProfileBasicRaw {
     pub description: String,
     pub achievement_access: i32,
     pub match_access: i32,
-    pub profile_picture_url: Option<String>,
-    pub cover_picture_url: Option<String>,
+    pub profile_picture_blob: Option<Uuid>,
+    pub cover_picture_blob: Option<Uuid>,
     pub facebook: Option<String>,
     pub instagram: Option<String>,
     pub twitch: Option<String>,
@@ -107,7 +111,7 @@ where
     )
 }
 
-pub async fn get_user_profile_basic_serialized_with_requester(ex: &PgPool, profile: UserProfileBasicRaw, requester: Option<i64>) -> Result<UserProfileBasicSerialized, SquadOvError> {
+pub async fn get_user_profile_basic_serialized_with_requester(ex: &PgPool, profile: UserProfileBasicRaw, requester: Option<i64>, blob_client: Arc<BlobManagementClient>) -> Result<UserProfileBasicSerialized, SquadOvError> {
     // The main thing here is to do some access checks to determine whether or not to let certain data get passed back to the caller.
     let profile_access = access::get_user_profile_access(&*ex, &profile, requester).await?;
     let user_data = sqlx::query!(
@@ -131,8 +135,16 @@ pub async fn get_user_profile_basic_serialized_with_requester(ex: &PgPool, profi
             misc: if profile_access.misc {
                 Some(UserProfileMiscDataSerialized {
                     description: profile.description,
-                    profile_picture_url: profile.profile_picture_url,
-                    cover_picture_url: profile.cover_picture_url,
+                    profile_picture_url: if let Some(b) = profile.profile_picture_blob {
+                        Some(blob_client.get_blob_url(&b).await?)
+                    } else {
+                        None
+                    },
+                    cover_picture_url: if let Some(b) = profile.cover_picture_blob {
+                        Some(blob_client.get_blob_url(&b).await?)
+                    } else {
+                        None
+                    },
                     links: UserProfileSocialLinksSerialized{
                         facebook: profile.facebook,
                         instagram: profile.instagram,

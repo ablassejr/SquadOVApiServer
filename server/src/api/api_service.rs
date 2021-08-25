@@ -185,6 +185,13 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route("", web::get().to(v1::get_current_user_profile_handler))
                                         .route("/username", web::post().to(v1::edit_current_user_username_handler))
                                         .route("/email", web::post().to(v1::edit_current_user_email_handler))
+                                        .route("/data", web::post().to(v1::edit_current_user_profile_basic_data_handler))
+                                            .data(web::Payload::configure(|cfg| {
+                                                // Technically only need 6MB (5MB cover, 1MB profile)
+                                                // but giving us some wiggle room.
+                                                cfg.limit(10 * 1024 * 1024)
+                                            }))
+                                        .route("/access", web::post().to(v1::edit_current_user_profile_basic_access_handler))
                                 )
                                 .service(
                                     web::resource("/notifications")

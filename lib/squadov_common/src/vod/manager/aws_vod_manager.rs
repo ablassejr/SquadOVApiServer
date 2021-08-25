@@ -35,14 +35,6 @@ use tokio::fs::{
 use tokio_util::codec::{BytesCodec, FramedRead};
 use rusoto_credential::ProvideAwsCredentials;
 use md5::Digest;
-use chrono::{Utc, Duration};
-use rsa::{
-    RsaPrivateKey,
-    pkcs1::FromRsaPrivateKey,
-    padding::PaddingScheme,
-    hash::Hash
-};
-
 use async_trait::async_trait;
 use actix_web::web::{BytesMut};
 
@@ -52,7 +44,6 @@ const S3_ALL_USERS_GROUP: &'static str = "http://acs.amazonaws.com/groups/global
 pub struct S3VodManager {
     bucket: String,
     aws: Arc<Option<AWSClient>>,
-    cdn_private_key: RsaPrivateKey,
     cdn: AWSCDNConfig,
 }
 
@@ -67,7 +58,6 @@ impl S3VodManager {
         Ok(S3VodManager{
             bucket: bucket.clone(),
             aws: client,
-            cdn_private_key: RsaPrivateKey::read_pkcs1_pem_file(std::path::Path::new(&cdn.private_key_fname))?,
             cdn,
         })
     }
@@ -93,41 +83,7 @@ impl VodManager for S3VodManager {
                     fname=segment.get_fname(),
                 );
 
-                let expires = Utc::now() + Duration::seconds(43200);
-                let signature = {
-                    let policy = format!(
-                        r#"{{"Statement":[{{"Resource":"{base}","Condition":{{"DateLessThan":{{"AWS:EpochTime":{expires}}}}}}}]}}"#,
-                        base=&base_url,
-                        expires=expires.timestamp(),
-                    );
-
-                    // Steps are from copying AWS's reference code:
-                    // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/CreateSignatureInCSharp.html
-                    // 1) Create a SHA-1 hash of the actual policy string.
-                    // 2) Compute an RSA PKCS1v15 Signature (with SHA-1 hasing) using our private key.
-                    // 3) Encode in URL-safe Base 64
-                    let policy_hash = {
-                        let mut hasher = sha1::Sha1::new();
-                        hasher.update(policy.as_bytes());
-                        hasher.finalize()
-                    };
-                    let policy_signature = self.cdn_private_key.sign(PaddingScheme::PKCS1v15Sign{
-                        hash: Some(Hash::SHA1)
-                    }, &policy_hash)?;
-                    base64::encode_config(&policy_signature, base64::STANDARD_NO_PAD)
-                        .replace("+", "-")
-                        .replace("=", "_")
-                        .replace("/", "~")
-                };
-                let key_pair_id = self.cdn.public_key_id.clone();
-
-                format!(
-                    "{base}?Expires={expires}&Signature={signature}&Key-Pair-Id={keypair}",
-                    base=base_url,
-                    expires=expires.timestamp(),
-                    signature=signature,
-                    keypair=key_pair_id
-                )
+                (*self.aws).as_ref().unwrap().sign_cloudfront_url(&base_url)?
             } else {
                 let req = GetObjectRequest{
                     bucket: self.bucket.clone(),

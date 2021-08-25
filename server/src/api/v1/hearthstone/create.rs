@@ -243,7 +243,7 @@ impl api::ApiApplication {
         let bucket = self.blob.get_bucket_for_location(CloudStorageLocation::Global).ok_or(SquadOvError::InternalError(String::from("No global location for blob storage.")))?;
         let manager = self.get_blob_manager(&bucket).await?;
 
-        let blob_uuid = manager.store_new_blob(tx, data).await?;
+        let blob_uuid = manager.store_new_blob(tx, data, true).await?;
         tx.execute(
             sqlx::query!(
                 "

@@ -308,7 +308,7 @@ impl ApiApplication {
     async fn create_blob_manager(&mut self, bucket: &str) -> Result<(), SquadOvError> {
         let storage = match blob::get_blob_manager_type(bucket) {
             BlobManagerType::GCS => Arc::new(GCPBlobStorage::new(self.gcp.clone())) as Arc<dyn BlobStorageClient + Send + Sync>,
-            BlobManagerType::S3 => Arc::new(AWSBlobStorage::new(self.aws.clone())) as Arc<dyn BlobStorageClient + Send + Sync>,
+            BlobManagerType::S3 => Arc::new(AWSBlobStorage::new(self.aws.clone(), self.config.aws.cdn.clone())) as Arc<dyn BlobStorageClient + Send + Sync>,
         };
         self.blob.new_bucket(bucket, Arc::new(BlobManagementClient::new(bucket, self.pool.clone(), storage))).await;
         Ok(())

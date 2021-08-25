@@ -4,7 +4,12 @@ use crate::{
     squad,
     profile::UserProfileBasicRaw,
 };
-use sqlx::{postgres::PgPool};
+use sqlx::{
+    Executor,
+    Postgres,
+    postgres::PgPool,
+};
+use serde::Deserialize;
 
 pub const USER_PROFILE_ACCESS_SELF: i32 = 0;
 pub const USER_PROFILE_ACCESS_PRIVATE_SQUADS: i32 = 1;
@@ -60,4 +65,36 @@ pub async fn get_user_profile_access(ex: &PgPool, profile: &UserProfileBasicRaw,
         achievements: req.check_access(profile.achievement_access),
         matches: req.check_access(profile.match_access),
     })
+}
+
+#[derive(Deserialize)]
+pub struct UserProfileBasicUpdateAccess {
+    slug: String,
+    misc: i32,
+    achievements: i32,
+    matches: i32,
+}
+
+pub async fn update_user_profile_basic_access<'a, T>(ex: T, user_id: i64, data: &UserProfileBasicUpdateAccess) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        UPDATE squadov.user_profiles
+        SET link_slug = $2,
+            match_access = $3,
+            achievement_access = $4,
+            misc_access = $5
+        WHERE user_id = $1
+        ",
+        user_id,
+        &data.slug,
+        data.matches,
+        data.achievements,
+        data.misc,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
 }
