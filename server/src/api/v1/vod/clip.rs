@@ -415,6 +415,7 @@ impl api::ApiApplication {
                 methods: Some(vec![String::from("GET")]),
                 paths: Some(vec![
                     format!("/v1/vod/{}", id),
+                    format!("/v1/clip/{}", id),
                 ]),
                 user_id,
             }.encrypt(&self.config.squadov.access_key)?
