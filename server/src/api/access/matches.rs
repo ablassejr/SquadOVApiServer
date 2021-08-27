@@ -61,7 +61,8 @@ impl super::AccessChecker<MatchVodBasicData> for MatchVodAccessChecker<MatchVodP
         Ok(self.obtainer.obtain(req)?)
     }
 
-    async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: MatchVodBasicData) -> Result<bool, SquadOvError> {
+    async fn check(&self, app: Arc<ApiApplication>, session: Option<&SquadOVSession>, data: MatchVodBasicData) -> Result<bool, SquadOvError> {
+        let session = session.unwrap();
         Ok(check_user_has_access_to_match_vod_from_user(
             &*app.pool,
             session.user.id,
@@ -79,7 +80,7 @@ impl super::AccessChecker<MatchVodBasicData> for MatchVodAccessChecker<MatchVodP
         ).await?)
     }
 
-    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: MatchVodBasicData) -> Result<bool, SquadOvError> {
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: MatchVodBasicData) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 }

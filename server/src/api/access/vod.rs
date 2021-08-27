@@ -32,7 +32,8 @@ impl super::AccessChecker<VodAccessBasicData> for VodAccessChecker {
         })
     }
 
-    async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: VodAccessBasicData) -> Result<bool, SquadOvError> {
+    async fn check(&self, app: Arc<ApiApplication>, session: Option<&SquadOVSession>, data: VodAccessBasicData) -> Result<bool, SquadOvError> {
+        let session = session.unwrap();
         // The only users who should be able to access the VOD are those who are in the same squad as the owner of the VOD.
         // Ideally this would just use the SameSquadAccessChecker somehow?
         let owner_user_id = app.get_vod_owner(&data.video_uuid).await?.unwrap_or(-1);
@@ -45,7 +46,7 @@ impl super::AccessChecker<VodAccessBasicData> for VodAccessChecker {
         }
     }
 
-    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: VodAccessBasicData) -> Result<bool, SquadOvError> {
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: VodAccessBasicData) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 }

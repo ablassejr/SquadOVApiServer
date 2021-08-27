@@ -109,9 +109,22 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
             web::scope("/profile")
                 .wrap(auth::ApiSessionValidator{required: false})
                 .route("", web::get().to(v1::get_basic_profile_handler))
+                .service(
+                    web::scope("/{profile_id}")
+                        .wrap(access::ApiAccessToken::new())
+                        .service(
+                            web::scope("/matches")
+                                .route("", web::get().to(v1::get_profile_matches_handler))
+                        )
+                        .service(
+                            web::scope("/clips")
+                                .route("", web::get().to(v1::get_profile_clips_handler))
+                        )
+                )
         )
         .service(
             web::scope("/v1")
+                .wrap(access::ApiAccessToken::new().make_optional())
                 .wrap(access::ApiAccess::new(
                     Box::new(access::ShareTokenAccessRestricter{}),
                 ))
@@ -604,7 +617,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                     web::scope("/wow")
                         .service(
                             web::scope("/characters")
-                                .route("/armory", web::post().to(v1::get_wow_armory_link_for_character_handler))
+                                .route("/armory", web::get().to(v1::get_wow_armory_link_for_character_handler))
                         )
                         .service(
                             web::scope("/match")

@@ -26,6 +26,7 @@ use actix_service::{Service, Transform};
 use actix_web::{dev::ServiceRequest, dev::ServiceResponse, Error, web};
 use futures::future::{ok, Ready};
 use futures::Future;
+use chrono::Utc;
 
 /// Session validation middleware.
 /// 
@@ -93,10 +94,34 @@ where
                 None => return Err(actix_web::error::ErrorInternalServerError("Bad App Data")),
             };
 
-            // First check for the presence of a valid share key. This takes precendence over everything else.
+            // We need to check if there's an access token also attached to the request.
+            // In the case that there is one and it's not expired (!) then we want to augment
+            // the use the access token as the session. If no access token exists, then we use the
+            // share token, otherwise it's the logged in user session.
             let share_token = app.session.get_share_token_from_request(&request, &app.config.squadov.share_key).await?;
-            let some_session = if share_token.is_some() {
-                let share_token = share_token.unwrap();
+            let access_token = app.session.get_access_token_from_request(&request, &app.config.squadov.access_key).await?;
+            let some_session = if let Some(access_token) = access_token {
+                let is_expired = if let Some(expires) = access_token.expires {
+                    Utc::now() > expires
+                } else {
+                    false
+                };
+
+                if !is_expired {
+                    Some(SquadOVSession{
+                        session_id: String::new(),
+                        // We do want this to fail if the access token's user id is not set. It's legacy behavior what can you do.
+                        user: app.users.get_stored_user_from_id(access_token.user_id.unwrap_or(-1), &*app.pool).await?.ok_or(SquadOvError::NotFound)?,
+                        access_token: String::new(),
+                        refresh_token: String::new(),
+                        is_temp: true,
+                        share_token: None,
+                        sqv_access_token: Some(access_token),
+                    })
+                } else {
+                    return Err(actix_web::error::ErrorUnauthorized("Expired access token"));
+                }
+            } else if let Some(share_token) = share_token {
                 Some(SquadOVSession{
                     session_id: String::new(),
                     user: app.users.get_stored_user_from_uuid(&share_token.user_uuid, &*app.pool).await?.ok_or(SquadOvError::NotFound)?,
@@ -104,6 +129,7 @@ where
                     refresh_token: String::new(),
                     is_temp: true,
                     share_token: Some(share_token),
+                    sqv_access_token: None,
                 })
             } else {
                 match app.session.get_session_from_request(&request, &app.pool).await {

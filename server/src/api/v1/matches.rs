@@ -21,7 +21,10 @@ use squadov_common::{
         WoWChallenge,
         WoWArena,
     },
-    access::AccessTokenRequest,
+    access::{
+        AccessTokenRequest,
+        AccessToken,
+    },
     encrypt::{
         AESEncryptRequest,
         squadov_encrypt,
@@ -45,11 +48,14 @@ use squadov_common::{
     },
 };
 use std::sync::Arc;
-use chrono::{DateTime, Utc, TimeZone};
+use chrono::{DateTime, Utc, TimeZone, Duration};
 use std::collections::{HashMap};
 use serde::{Serialize, Deserialize};
 use serde_qs::actix::QsQuery;
-use crate::api::v1::FavoriteResponse;
+use crate::api::v1::{
+    FavoriteResponse,
+    UserProfilePath,
+};
 use std::convert::TryFrom;
 
 pub struct Match {
@@ -182,7 +188,7 @@ impl api::ApiApplication {
         )
     }
 
-    async fn get_recent_base_matches_for_user(&self, user_id: i64, start: i64, end: i64, filter: &RecentMatchQuery) -> Result<Vec<RawRecentMatchData>, SquadOvError> {
+    async fn get_recent_base_matches_for_user(&self, user_id: i64, start: i64, end: i64, filter: &RecentMatchQuery, needs_profile: bool) -> Result<Vec<RawRecentMatchData>, SquadOvError> {
         let handles: Vec<RecentMatchHandle> = sqlx::query!(
             r#"
             SELECT DISTINCT v.match_uuid AS "match_uuid!", v.user_uuid AS "uuid!", v.end_time
@@ -211,6 +217,9 @@ impl api::ApiApplication {
             LEFT JOIN squadov.user_watchlist_vods AS uwv
                 ON uwv.video_uuid = v.video_uuid
                     AND uwv.user_id = $1
+            LEFT JOIN squadov.user_profile_vods AS upv
+                ON upv.video_uuid = v.video_uuid
+                    AND upv.user_id = u.id
             WHERE u.id = $1
                 AND v.match_uuid IS NOT NULL
                 AND v.user_uuid IS NOT NULL
@@ -224,6 +233,7 @@ impl api::ApiApplication {
                 AND (NOT $10::BOOLEAN OR uwv.video_uuid IS NOT NULL)
                 AND v.is_clip = FALSE
                 AND (CARDINALITY($11::UUID[]) = 0 OR v.video_uuid = ANY($11))
+                AND (NOT $12::BOOLEAN OR upv.video_uuid IS NOT NULL)
             ORDER BY v.end_time DESC
             LIMIT $2 OFFSET $3
             "#,
@@ -244,6 +254,7 @@ impl api::ApiApplication {
             filter.only_favorite,
             filter.only_watchlist,
             &filter.vods.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<Uuid>>(),
+            needs_profile,
         )
             .fetch_all(&*self.pool)
             .await?
@@ -440,6 +451,7 @@ impl api::ApiApplication {
                         favorite_reason: x.favorite_reason.clone(),
                         is_watchlist: x.is_watchlist,
                         is_local: x.is_local,
+                        access_token: None,
                     },
                     aimlab_task: aimlab_task.cloned(),
                     lol_match,
@@ -451,6 +463,67 @@ impl api::ApiApplication {
                     csgo_match,
                 })
             }).collect::<Result<Vec<RecentMatch>, SquadOvError>>()?
+        )
+    }
+
+    fn generate_access_token_for_recent_match(&self, m: &RecentMatch) -> Result<String, SquadOvError> {
+        let mut paths: Vec<String> = vec![
+            format!("/v1/vod/{}", &m.base.vod.video_tracks[0].metadata.video_uuid),
+            format!("/v1/vod/match/{}/user/id/{}", &m.base.match_uuid, m.base.user_id),
+        ];
+
+        match m.base.game {
+            SquadOvGames::AimLab => {
+                paths.append(&mut vec![
+                    format!("v1/aimlab/user/{}/match/{}/task", m.base.user_id, &m.base.match_uuid),
+                ]);
+            },
+            SquadOvGames::Csgo => {
+                paths.append(&mut vec![
+                    format!("v1/csgo/user/{}/match/{}", m.base.user_id, &m.base.match_uuid),
+                    format!("v1/csgo/match/{}/vods", &m.base.match_uuid),
+                ]);
+            },
+            SquadOvGames::Hearthstone => {
+                paths.append(&mut vec![
+                    format!("v1/hearthstone/user/{}/match/{}", m.base.user_id, &m.base.match_uuid),
+                    format!("v1/hearthstone/match/{}/vods", &m.base.match_uuid),
+                ]);
+            },
+            SquadOvGames::LeagueOfLegends => {
+                paths.append(&mut vec![
+                    format!("v1/lol/match/{}", &m.base.match_uuid),
+                ]);
+            },
+            SquadOvGames::TeamfightTactics => {
+                paths.append(&mut vec![
+                    format!("v1/tft/match/{}", &m.base.match_uuid),
+                ]);
+            },
+            SquadOvGames::Valorant => {
+                paths.append(&mut vec![
+                    format!("v1/valorant/match/{}", &m.base.match_uuid),
+                ]);
+            },
+            SquadOvGames::WorldOfWarcraft => {
+                paths.append(&mut vec![
+                    format!("v1/wow/users/{}/match/{}", m.base.user_id, &m.base.match_uuid),
+                    format!("v1/wow/match/{}/users/{}", &m.base.match_uuid, m.base.user_id),
+                    format!("v1/wow/match/{}/vods", &m.base.match_uuid),
+                    String::from("v1/wow/characters/armory"),
+                ]);
+            },
+            _ => (),
+        }
+
+        Ok(
+            AccessToken{
+                // Ideally we'd refresh this somehow instead of just granting access for such a large chunk of time.
+                expires: Some(Utc::now() + Duration::hours(6)),
+                methods: Some(vec![String::from("GET")]),
+                paths: Some(paths),
+                user_id: Some(m.base.user_id),
+            }.encrypt(&self.config.squadov.access_key)?
         )
     }
 }
@@ -468,7 +541,7 @@ pub async fn get_vod_recent_match_handler(app : web::Data<Arc<api::ApiApplicatio
         only_favorite: false,
         only_watchlist: false,
         vods: Some(vec![path.video_uuid.clone()]),
-    }).await?;
+    }, false).await?;
     let matches = app.get_recent_matches_from_uuids(&raw_base_matches).await?;
 
     if matches.is_empty() {
@@ -478,6 +551,27 @@ pub async fn get_vod_recent_match_handler(app : web::Data<Arc<api::ApiApplicatio
     }
 }
 
+async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiApplication>>, req: &HttpRequest, query: QsQuery<api::PaginationParameters>, mut filter: QsQuery<RecentMatchQuery>, needs_access_tokens: bool) -> Result<HttpResponse, SquadOvError> {
+    if needs_access_tokens {
+        filter.users = Some(vec![user_id]);
+    }
+
+    let raw_base_matches = app.get_recent_base_matches_for_user(user_id, query.start, query.end, &filter, needs_access_tokens).await?;
+    let mut matches = app.get_recent_matches_from_uuids(&raw_base_matches).await?;
+
+    // In this case each match needs an access token that can be used to access data for that particular match (VODs, matches, etc.).
+    if needs_access_tokens {
+        for m in &mut matches {
+            m.base.access_token = Some(app.generate_access_token_for_recent_match(&m)?);
+        }
+    }
+
+    let expected_total = query.end - query.start;
+    let got_total = raw_base_matches.len() as i64;
+    
+    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(&matches, req, &query, expected_total == got_total)?)) 
+}
+
 pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, query: QsQuery<api::PaginationParameters>, filter: QsQuery<RecentMatchQuery>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
@@ -485,13 +579,11 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    let raw_base_matches = app.get_recent_base_matches_for_user(session.user.id, query.start, query.end, &filter).await?;
-    let matches = app.get_recent_matches_from_uuids(&raw_base_matches).await?;
+    get_recent_matches_for_user(session.user.id, app, &req, query, filter, false).await
+}
 
-    let expected_total = query.end - query.start;
-    let got_total = raw_base_matches.len() as i64;
-    
-    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(&matches, &req, &query, expected_total == got_total)?)) 
+pub async fn get_profile_matches_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<UserProfilePath>, req: HttpRequest, query: QsQuery<api::PaginationParameters>, filter: QsQuery<RecentMatchQuery>) -> Result<HttpResponse, SquadOvError> {
+    get_recent_matches_for_user(path.profile_id, app, &req, query, filter, true).await
 }
 
 #[derive(Deserialize,Debug)]

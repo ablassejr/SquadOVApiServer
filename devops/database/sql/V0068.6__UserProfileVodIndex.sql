@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX ON user_profile_vods(user_id, video_uuid);

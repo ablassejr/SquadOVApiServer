@@ -50,11 +50,12 @@ impl super::AccessChecker<UserAccessSetBasicData> for UserSpecificAccessChecker<
         })
     }
 
-    async fn check(&self, _app: Arc<ApiApplication>, session: &SquadOVSession, data: UserAccessSetBasicData) -> Result<bool, squadov_common::SquadOvError> {
+    async fn check(&self, _app: Arc<ApiApplication>, session: Option<&SquadOVSession>, data: UserAccessSetBasicData) -> Result<bool, squadov_common::SquadOvError> {
+        let session = session.unwrap();
         return Ok(data.access_set.contains(&session.user.id));
     }
 
-    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: UserAccessSetBasicData) -> Result<bool, SquadOvError> {
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: UserAccessSetBasicData) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 }
@@ -68,11 +69,12 @@ impl super::AccessChecker<()> for AdminAccessChecker {
         Ok(())
     }
 
-    async fn check(&self, _app: Arc<ApiApplication>, session: &SquadOVSession, _data: ()) -> Result<bool, squadov_common::SquadOvError> {
+    async fn check(&self, _app: Arc<ApiApplication>, session: Option<&SquadOVSession>, _data: ()) -> Result<bool, squadov_common::SquadOvError> {
+        let session = session.unwrap();
         Ok(session.user.is_admin)
     }
 
-    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: ()) -> Result<bool, SquadOvError> {
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: ()) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 }

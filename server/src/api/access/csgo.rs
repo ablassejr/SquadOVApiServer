@@ -38,11 +38,11 @@ impl super::AccessChecker<CsgoMatchUserMatchupBasicData> for CsgoMatchUserMatchu
         })
     }
 
-    async fn check(&self, app: Arc<ApiApplication>, _session: &SquadOVSession, data: CsgoMatchUserMatchupBasicData) -> Result<bool, SquadOvError> {
+    async fn check(&self, app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, data: CsgoMatchUserMatchupBasicData) -> Result<bool, SquadOvError> {
         Ok(csgo::is_user_in_csgo_match(&*app.pool, data.user_id, &data.match_uuid).await?)
     }
 
-    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: CsgoMatchUserMatchupBasicData) -> Result<bool, SquadOvError> {
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: CsgoMatchUserMatchupBasicData) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 }

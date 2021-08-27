@@ -29,11 +29,12 @@ impl super::AccessChecker<ShareTokenMetadata> for ShareTokenAccessRestricter {
         })
     }
 
-    async fn check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: ShareTokenMetadata) -> Result<bool, SquadOvError> {
+    async fn check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: ShareTokenMetadata) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 
-    async fn post_check(&self, _app: Arc<ApiApplication>, session: &SquadOVSession, data: ShareTokenMetadata) -> Result<bool, SquadOvError> {
+    async fn post_check(&self, _app: Arc<ApiApplication>, session: Option<&SquadOVSession>, data: ShareTokenMetadata) -> Result<bool, SquadOvError> {
+        let session = session.unwrap();
         // If the session doesn't have a share token then this checker isn't relevant.
         if session.share_token.is_none() {
             return Ok(true);
@@ -125,11 +126,12 @@ impl super::AccessChecker<()> for DenyShareTokenAccess {
         Ok(())
     }
 
-    async fn check(&self, _app: Arc<ApiApplication>, session: &SquadOVSession, _data: ()) -> Result<bool, SquadOvError> {
-        Ok(session.share_token.is_none())
+    async fn check(&self, _app: Arc<ApiApplication>, session: Option<&SquadOVSession>, _data: ()) -> Result<bool, SquadOvError> {
+        let session = session.unwrap();
+        Ok(session.share_token.is_none() && session.sqv_access_token.is_none())
     }
 
-    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: ()) -> Result<bool, SquadOvError> {
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: ()) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 }

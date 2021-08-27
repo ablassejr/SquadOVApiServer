@@ -56,6 +56,7 @@ impl api::ApiApplication {
                 refresh_token: result.refresh_token,
                 is_temp: false,
                 share_token: None,
+                sqv_access_token: None,
             },
             None => return Err(SquadOvError::InternalError(String::from("Could not find user auth registration with the current app."))),
         };

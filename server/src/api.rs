@@ -182,6 +182,7 @@ pub struct SquadOvConfig {
     pub landing_url: String,
     pub invite_key: String,
     pub share_key: String,
+    pub access_key: String,
     pub hashid_salt: String,
 }
 

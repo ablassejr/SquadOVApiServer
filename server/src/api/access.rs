@@ -11,6 +11,7 @@ mod aimlab;
 mod hearthstone;
 mod csgo;
 mod community;
+mod token;
 
 pub use user_specific::*;
 pub use squad::*;
@@ -25,6 +26,7 @@ pub use aimlab::*;
 pub use hearthstone::*;
 pub use csgo::*;
 pub use community::*;
+pub use token::*;
 
 use squadov_common;
 use actix_web::{web, HttpRequest};
@@ -56,8 +58,8 @@ pub trait AccessChecker<T: Send + Sync> {
     /// instance can be made by the user to hold parameters specific
     /// to that path (e.g. checking whether the user has access to some
     /// resource specifically).
-    async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: T) -> Result<bool, squadov_common::SquadOvError>;
-    async fn post_check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: T) -> Result<bool, squadov_common::SquadOvError>;
+    async fn check(&self, app: Arc<ApiApplication>, session: Option<&SquadOVSession>, data: T) -> Result<bool, squadov_common::SquadOvError>;
+    async fn post_check(&self, app: Arc<ApiApplication>, session: Option<&SquadOVSession>, data: T) -> Result<bool, squadov_common::SquadOvError>;
     fn generate_aux_metadata(&self, req: &HttpRequest) -> Result<T, squadov_common::SquadOvError>;
 }
 
@@ -65,14 +67,17 @@ pub struct ApiAccess<T : Send + Sync> {
     // Default checker when no other matches exist.
     pub checker: TChecker<T>,
     // Checker to use for specific HTTP verbs
-    pub verb_checkers: HashMap<String, TChecker<T>>
+    pub verb_checkers: HashMap<String, TChecker<T>>,
+    // Whether or not the session is mandatory
+    pub mandatory_session: bool,
 }
 
 impl<T: Send + Sync> ApiAccess<T> {
     pub fn new(input: Box<dyn AccessChecker<T>>) -> Self {
         Self {
             checker: Rc::new(RefCell::new(input)),
-            verb_checkers: HashMap::new()
+            verb_checkers: HashMap::new(),
+            mandatory_session: true,
         }
     }
 
@@ -101,6 +106,7 @@ where
             service: Rc::new(RefCell::new(service)),
             checker: self.checker.clone(),
             verb_checkers: self.verb_checkers.clone(),
+            mandatory_session: self.mandatory_session,
         })
     }
 }
@@ -108,7 +114,8 @@ where
 pub struct ApiAccessMiddleware<S, T : Send + Sync> {
     service: Rc<RefCell<S>>,
     checker: TChecker<T>,
-    verb_checkers: HashMap<String, TChecker<T>>
+    verb_checkers: HashMap<String, TChecker<T>>,
+    mandatory_session: bool,
 }
 
 impl<S, B, T> Service for ApiAccessMiddleware<S, T>
@@ -135,6 +142,7 @@ where
         } else {
             self.checker.clone()
         };
+        let mandatory_session = self.mandatory_session;
 
         Box::pin(async move {
             let (request, payload) = req.into_parts();
@@ -143,9 +151,10 @@ where
                 // We assume that this middleware is used in conjunction with the api::auth::ApiSessionValidatorMiddleware
                 // middleware so given that they're logged in, we can obtain their session.
                 let extensions = request.extensions();
-                let session = match extensions.get::<SquadOVSession>() {
-                    Some(x) => x,
-                    None => return Err(actix_web::error::ErrorUnauthorized("No session"))
+                let session = extensions.get::<SquadOVSession>();
+
+                if mandatory_session && session.is_none() {
+                    return Err(actix_web::error::ErrorUnauthorized("No session"));
                 };
 
                 let app = request.app_data::<web::Data<Arc<ApiApplication>>>();
@@ -175,10 +184,7 @@ where
                 // We assume that this middleware is used in conjunction with the api::auth::ApiSessionValidatorMiddleware
                 // middleware so given that they're logged in, we can obtain their session.
                 let extensions = resp.request().extensions();
-                let session = match extensions.get::<SquadOVSession>() {
-                    Some(x) => x,
-                    None => return Err(actix_web::error::ErrorUnauthorized("No session"))
-                };
+                let session = extensions.get::<SquadOVSession>();
 
                 let app = resp.request().app_data::<web::Data<Arc<ApiApplication>>>();
                 if app.is_none() {

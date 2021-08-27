@@ -38,11 +38,11 @@ impl super::AccessChecker<AimlabMatchUserMatchupBasicData> for AimlabMatchUserMa
         })
     }
 
-    async fn check(&self, app: Arc<ApiApplication>, _session: &SquadOVSession, data: AimlabMatchUserMatchupBasicData) -> Result<bool, SquadOvError> {
+    async fn check(&self, app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, data: AimlabMatchUserMatchupBasicData) -> Result<bool, SquadOvError> {
         Ok(aimlab::is_user_aimlab_task_owner(&*app.pool, data.user_id, &data.match_uuid).await?)
     }
 
-    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: AimlabMatchUserMatchupBasicData) -> Result<bool, SquadOvError> {
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: AimlabMatchUserMatchupBasicData) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 }

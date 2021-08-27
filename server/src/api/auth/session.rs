@@ -8,7 +8,10 @@ use squadov_common;
 use squadov_common::{
     SquadOvError,
     encrypt::{AESEncryptToken, squadov_decrypt},
-    access::AccessTokenRequest,
+    access::{
+        AccessTokenRequest,
+        AccessToken,
+    },
 };
 use crate::api::fusionauth;
 use uuid::Uuid;
@@ -24,6 +27,7 @@ pub struct SquadOVSession {
     pub refresh_token: String,
     pub is_temp: bool,
     pub share_token: Option<AccessTokenRequest>,
+    pub sqv_access_token: Option<AccessToken>,
 }
 
 impl FromRequest for SquadOVSession {
@@ -45,6 +49,7 @@ pub struct SessionManager {
 
 const SESSION_ID_HEADER_KEY : &str = "x-squadov-session-id";
 const SHARE_KEY_HEADER_KEY: &str = "x-squadov-share-id";
+const ACCESS_KEY_HEADER_KEY: &str = "x-squadov-access-token";
 
 impl SessionManager {
     pub fn new() -> SessionManager {
@@ -109,6 +114,7 @@ impl SessionManager {
                 refresh_token: x.refresh_token,
                 is_temp: x.is_temp,
                 share_token: None,
+                sqv_access_token: None,
             })),
             None => Ok(None),
         }
@@ -129,6 +135,16 @@ impl SessionManager {
         let access_token = AESEncryptToken::from_string(&access_token.unwrap().to_str()?)?;
         let decrypted_token = squadov_decrypt(access_token, encryption_key)?;
         Ok(Some(serde_json::from_slice::<AccessTokenRequest>(&decrypted_token.data)?))
+    }
+
+    pub async fn get_access_token_from_request(&self, req: &HttpRequest, encryption_key: &str) -> Result<Option<AccessToken>, SquadOvError> {
+        if let Some(access_token) = req.headers().get(ACCESS_KEY_HEADER_KEY) {
+            let access_token = AESEncryptToken::from_string(&access_token.to_str()?)?;
+            let decrypted_token = squadov_decrypt(access_token, encryption_key)?;
+            Ok(Some(serde_json::from_slice::<AccessToken>(&decrypted_token.data)?))
+        } else {
+            Ok(None)
+        }
     }
 
     pub async fn store_session<'a, T>(&self, ex: T, session: &SquadOVSession) -> Result<(), sqlx::Error>

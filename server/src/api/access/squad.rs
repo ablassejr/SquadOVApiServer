@@ -52,7 +52,8 @@ impl<T: SquadIdSetObtainer + Send + Sync> super::AccessChecker<SquadAccessBasicD
         })
     }
 
-    async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: SquadAccessBasicData) -> Result<bool, squadov_common::SquadOvError> {
+    async fn check(&self, app: Arc<ApiApplication>, session: Option<&SquadOVSession>, data: SquadAccessBasicData) -> Result<bool, squadov_common::SquadOvError> {
+        let session = session.unwrap();
         let role = app.get_squad_user_role(data.squad_id, session.user.id).await?;
         if role.is_none() {
             return Ok(false);
@@ -66,7 +67,7 @@ impl<T: SquadIdSetObtainer + Send + Sync> super::AccessChecker<SquadAccessBasicD
         }
     }
 
-    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: SquadAccessBasicData) -> Result<bool, SquadOvError> {
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: SquadAccessBasicData) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 }
@@ -83,7 +84,8 @@ impl super::AccessChecker<super::UserAccessSetBasicData> for SameSquadAccessChec
         })
     }
 
-    async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: super::UserAccessSetBasicData) -> Result<bool, squadov_common::SquadOvError> {
+    async fn check(&self, app: Arc<ApiApplication>, session: Option<&SquadOVSession>, data: super::UserAccessSetBasicData) -> Result<bool, squadov_common::SquadOvError> {
+        let session = session.unwrap();
         let user_ids: Vec<i64> = data.access_set.into_iter().collect();
         let mut same_squad_user_ids: HashSet<i64> = HashSet::from_iter(app.get_user_ids_in_same_squad_as_users(&user_ids, None).await?.into_iter());
 
@@ -94,7 +96,7 @@ impl super::AccessChecker<super::UserAccessSetBasicData> for SameSquadAccessChec
         Ok(same_squad_user_ids.contains(&session.user.id))
     }
 
-    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: super::UserAccessSetBasicData) -> Result<bool, SquadOvError> {
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: super::UserAccessSetBasicData) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 }

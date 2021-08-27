@@ -33,6 +33,11 @@ pub struct UserProfileQuery {
     slug: Option<String>,
 }
 
+#[derive(Deserialize)]
+pub struct UserProfilePath {
+    pub profile_id: i64,
+}
+
 impl ApiApplication {
     // Processes and stores the image and returns the blob UUID that we can retrieve the image from.
     async fn process_and_store_profile_image(&self, data: &[u8]) -> Result<Uuid, SquadOvError> {
@@ -66,7 +71,7 @@ pub async fn get_basic_profile_handler(app : web::Data<Arc<ApiApplication>>, que
     let bucket = app.blob.get_bucket_for_location(CloudStorageLocation::Global).ok_or(SquadOvError::InternalError(String::from("No global location for blob storage.")))?;
     let manager = app.get_blob_manager(&bucket).await?;
     Ok(HttpResponse::Ok().json(
-        profile::get_user_profile_basic_serialized_with_requester(&*app.pool, raw_profile, request_user_id, manager).await?
+        profile::get_user_profile_basic_serialized_with_requester(&*app.pool, raw_profile, request_user_id, manager, &app.config.squadov.access_key).await?
     ))
 }
 

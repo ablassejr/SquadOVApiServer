@@ -35,7 +35,8 @@ impl AccessChecker<ValorantMatchUuidData> for ValorantMatchAccessChecker {
         })
     }
 
-    async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: ValorantMatchUuidData) -> Result<bool, SquadOvError> {
+    async fn check(&self, app: Arc<ApiApplication>, session: Option<&SquadOVSession>, data: ValorantMatchUuidData) -> Result<bool, SquadOvError> {
+        let session = session.unwrap();
         // The user must be either in the match or a squad member of a user in that match.        
         let base_access_set: HashSet<i64> = HashSet::from_iter(app.list_squadov_accounts_in_valorant_match(&data.match_uuid).await?);
         if base_access_set.contains(&session.user.id) {
@@ -45,7 +46,7 @@ impl AccessChecker<ValorantMatchUuidData> for ValorantMatchAccessChecker {
         }
     }
 
-    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: ValorantMatchUuidData) -> Result<bool, SquadOvError> {
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: ValorantMatchUuidData) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 }

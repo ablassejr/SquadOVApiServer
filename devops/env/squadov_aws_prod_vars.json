@@ -45,6 +45,7 @@
 	"HASHID_SALT": "ENC[AES256_GCM,data:S6XFP0CYt1QbNVbCufZJfp3rFeg=,iv:dOX7pyrVVpt0iZzOmFNGVeSzjkXgu03+2qiH4aicmkI=,tag:QyUJ2UDjsgM4nCK1GUkb0w==,type:str]",
 	"IPSTACK_API_KEY": "ENC[AES256_GCM,data:zaiJFd4o33jcvwI5OHIHKLgK3Kn10br5TFipCsRCcCM=,iv:YMp7rnR8ypER/11jjbfy13pR668ri7fwDfrel6ggDZw=,tag:tvNcnjOUCG0ZsZqkkjQHOw==,type:str]",
 	"SEGMENT_WRITE_KEY": "ENC[AES256_GCM,data:PUOGRP2VGGm9mzQR8GZ0VcmjK4LqMGDmUBMfeXWyqzQ=,iv:Uq7KjvyhURAAgTMNViuPbgCopSLYqWJIxlMo1d0xNds=,tag:/T12oLEzAZ/Pxvjz9o8xNg==,type:str]",
+	"ACCESS_ENCRYPTION_KEY": "ENC[AES256_GCM,data:yJ/O2lwAMDWgEnTtt5rRRlP2ec1fpufWq97nutQxFblf81PK/XwdVg8LNJFo8WTLirFJv3sWFKA/sAIFU7jSWA==,iv:pKfboGslklb5OSwSf4sbsLER1hvv5cAr8uu5IKlWaw8=,tag:CvkcnPQuCbOk10o7lRRMuA==,type:str]",
 	"sops": {
 		"kms": null,
 		"gcp_kms": [
@@ -56,8 +57,8 @@
 		],
 		"azure_kv": null,
 		"hc_vault": null,
-		"lastmodified": "2021-08-09T21:34:16Z",
-		"mac": "ENC[AES256_GCM,data:MlS5oiY7NZsTqNXj5CksUP2d3NO4OHpE7WjbSMNQm/n/McH+m3UzySbQaR9ev5w3/RChokfFCNyVYy1UnojiSXNT9RRs5MkXJDi8nZlrCYRyF6pE/BTTr6QGJTaJmey/BmJyoCk7KLD1RDPQPgpGsmNUdW/yx4INyOjaQ8pDTU0=,iv:ee2T99ix2FDMe1wW5a6pHCNaOSD3W09V+VS5Vt/ZhVA=,tag:RfVzF5DUtypIAsb3X6DHaQ==,type:str]",
+		"lastmodified": "2021-08-26T00:24:34Z",
+		"mac": "ENC[AES256_GCM,data:Ge3guasxW43pHbub82CffvlvV4nA7qgdUa3qAF8/hOCM6yJA7nZg6hr4k96VQuN7/TPQJb61ABn/Ij3u16/9/kfv2tdSMJUQ1BvB6yiQVV+Y8e2E00pCqS8FR5vURpCF9ey/HKRX+M4UoTGdj/KUg2U+/9b+KrMxFc5gysT8m1k=,iv:PrQuseumL7LjKN6CMzJTcUbtd2+uZJlSzwGJX6Df8jI=,tag:uvT/qz0lcgwyd+br6gzw8g==,type:str]",
 		"pgp": null,
 		"unencrypted_suffix": "_unencrypted",
 		"version": "3.6.1"

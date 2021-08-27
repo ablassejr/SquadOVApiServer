@@ -47,7 +47,8 @@ impl super::AccessChecker<CommunityAccessBasicData> for CommunityAccessChecker {
         })
     }
 
-    async fn check(&self, app: Arc<ApiApplication>, session: &SquadOVSession, data: CommunityAccessBasicData) -> Result<bool, SquadOvError> {
+    async fn check(&self, app: Arc<ApiApplication>, session: Option<&SquadOVSession>, data: CommunityAccessBasicData) -> Result<bool, SquadOvError> {
+        let session = session.unwrap();
         if self.is_owner{
             let community = db::get_community_from_id(&*app.pool, data.community_id).await?;
             if community.creator_user_id != session.user.id {
@@ -96,7 +97,7 @@ impl super::AccessChecker<CommunityAccessBasicData> for CommunityAccessChecker {
         Ok(true)
     }
 
-    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: CommunityAccessBasicData) -> Result<bool, SquadOvError> {
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: CommunityAccessBasicData) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 }

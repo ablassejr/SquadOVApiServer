@@ -2,12 +2,66 @@ use crate::{
     SquadOvError,
     encrypt::AESEncryptToken,
     stats::StatPermission,
+    encrypt::{
+        AESEncryptRequest,
+        squadov_encrypt,
+    },
 };
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use sqlx::{Transaction, Executor, Postgres};
 use convert_case::{Case, Casing};
+use chrono::{DateTime, Utc};
 
+// A full-blown access token system where the access token is self contained
+// in the information we need to verify what permissions it has and when it expires.
+#[derive(Serialize,Deserialize,Debug,Clone)]
+#[serde(rename_all="camelCase")]
+pub struct AccessToken {
+    pub expires: Option<DateTime<Utc>>,
+    // HTTP Methods that we allow this access token to perform. None = all methods. Empty vec = no methods.
+    pub methods: Option<Vec<String>>,
+    // API Paths that we allow this access token to access. None = all paths. Empty vec = no methods.
+    pub paths: Option<Vec<String>>,
+    // Who we're using the app as.
+    pub user_id: Option<i64>,
+}
+
+impl AccessToken {
+    pub fn encrypt(&self, key: &str) -> Result<String, SquadOvError> {
+        let encryption_request = AESEncryptRequest{
+            data: serde_json::to_vec(self)?,
+            aad: vec![],
+        };
+
+        let encryption_token = squadov_encrypt(encryption_request, key)?;
+        Ok(encryption_token.to_string())
+    }
+
+    pub fn check_method(&self, method: &str) -> bool {
+        if let Some(methods) = self.methods.as_ref() {
+            methods.contains(&String::from(method))
+        } else {
+            true
+        }
+    }
+
+    pub fn check_path(&self, path: &str) -> bool {
+        if let Some(paths) = self.paths.as_ref() {
+            for p in paths {
+                if path.contains(p) {
+                    return true;
+                }
+            }
+
+            false
+        } else {
+            true
+        }
+    }
+}
+
+// Some janky system where we can request access to certain aspects of the app using an access token.
 #[derive(Serialize,Deserialize,Debug,Clone)]
 #[serde(rename_all="camelCase")]
 pub struct AccessTokenRequest {

@@ -383,7 +383,7 @@ pub async fn list_wow_characters_association_for_squad_in_match_handler(app : we
     Ok(HttpResponse::Ok().json(chars))
 }
 
-pub async fn get_wow_armory_link_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<WowCharacterDataInput>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_wow_armory_link_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Query<WowCharacterDataInput>) -> Result<HttpResponse, SquadOvError> {
     // Get character name for this GUID which is composed of the CHARACTER NAME-SERVER NAME.
     // Next, obtain the region for the extracted server name.
     let name_parts: Vec<&str> = data.character_name.split("-").into_iter().collect();

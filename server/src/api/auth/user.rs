@@ -52,8 +52,8 @@ impl UserManager {
         ).fetch_optional(pool).await;
     }
 
-    pub async fn get_stored_user_from_id(&self, id : i64, pool: &PgPool) -> Result<Option<SquadOVUser>, sqlx::Error> {
-        return sqlx::query_as!(
+    pub async fn get_stored_user_from_id(&self, id : i64, pool: &PgPool) -> Result<Option<SquadOVUser>, SquadOvError> {
+        Ok(sqlx::query_as!(
             SquadOVUser,
             "
             SELECT
@@ -70,7 +70,7 @@ impl UserManager {
             WHERE id = $1
             ",
             id
-        ).fetch_optional(pool).await;
+        ).fetch_optional(pool).await?)
     }
 
     pub async fn get_stored_user_from_uuid(&self, uuid: &Uuid, pool: &PgPool) -> Result<Option<SquadOVUser>, SquadOvError> {

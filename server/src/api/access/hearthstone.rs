@@ -38,11 +38,11 @@ impl super::AccessChecker<HearthstoneMatchUserMatchupBasicData> for HearthstoneM
         })
     }
 
-    async fn check(&self, app: Arc<ApiApplication>, _session: &SquadOVSession, data: HearthstoneMatchUserMatchupBasicData) -> Result<bool, SquadOvError> {
+    async fn check(&self, app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, data: HearthstoneMatchUserMatchupBasicData) -> Result<bool, SquadOvError> {
         Ok(hearthstone::is_user_in_hearthstone_match(&*app.pool, data.user_id, &data.match_uuid).await?)
     }
 
-    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: HearthstoneMatchUserMatchupBasicData) -> Result<bool, SquadOvError> {
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: HearthstoneMatchUserMatchupBasicData) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 }

@@ -57,6 +57,7 @@ pub struct BaseRecentMatch {
     pub favorite_reason: Option<String>,
     pub is_watchlist: bool,
     pub is_local: bool,
+    pub access_token: Option<String>,
 }
 
 #[derive(Serialize, Debug)]

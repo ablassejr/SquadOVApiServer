@@ -17,11 +17,11 @@ impl super::AccessChecker<super::UserAccessSetBasicData> for NullUserSetAccessCh
         })
     }
 
-    async fn check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: super::UserAccessSetBasicData) -> Result<bool, SquadOvError> {
+    async fn check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: super::UserAccessSetBasicData) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 
-    async fn post_check(&self, _app: Arc<ApiApplication>, _session: &SquadOVSession, _data: super::UserAccessSetBasicData) -> Result<bool, SquadOvError> {
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: super::UserAccessSetBasicData) -> Result<bool, SquadOvError> {
         Ok(true)
     }
 }

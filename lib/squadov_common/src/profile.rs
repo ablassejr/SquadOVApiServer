@@ -4,6 +4,9 @@ pub mod data;
 use crate::{
     SquadOvError,
     blob::BlobManagementClient,
+    access::{
+        AccessToken,
+    },
 };
 use serde::Serialize;
 use sqlx::{
@@ -11,7 +14,7 @@ use sqlx::{
     Postgres,
     postgres::PgPool,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
 use std::sync::Arc;
 
@@ -50,6 +53,8 @@ pub struct UserProfileBasicSerialized {
     pub achievement_access: i32,
     pub match_access: i32,
     pub misc_access: i32,
+    pub twitch_channel_for_sub: Option<String>,
+    pub access_token: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -111,19 +116,22 @@ where
     )
 }
 
-pub async fn get_user_profile_basic_serialized_with_requester(ex: &PgPool, profile: UserProfileBasicRaw, requester: Option<i64>, blob_client: Arc<BlobManagementClient>) -> Result<UserProfileBasicSerialized, SquadOvError> {
+pub async fn get_user_profile_basic_serialized_with_requester(ex: &PgPool, profile: UserProfileBasicRaw, requester: Option<i64>, blob_client: Arc<BlobManagementClient>, token_key: &str) -> Result<UserProfileBasicSerialized, SquadOvError> {
     // The main thing here is to do some access checks to determine whether or not to let certain data get passed back to the caller.
     let profile_access = access::get_user_profile_access(&*ex, &profile, requester).await?;
     let user_data = sqlx::query!(
-        "
-        SELECT username, registration_time
-        FROM squadov.users
-        WHERE id = $1
-        ",
+        r#"
+        SELECT u.username, u.registration_time, lta.twitch_name AS "twitch_name?"
+        FROM squadov.users AS u
+        LEFT JOIN squadov.linked_twitch_accounts AS lta
+            ON lta.user_id = u.id
+        WHERE u.id = $1
+        "#,
         profile.user_id,
     )
         .fetch_one(ex)
         .await?;
+
     Ok(
         UserProfileBasicSerialized {
             user_id: profile.user_id,
@@ -162,6 +170,18 @@ pub async fn get_user_profile_basic_serialized_with_requester(ex: &PgPool, profi
             achievement_access: profile.achievement_access,
             match_access: profile.match_access,
             misc_access: profile.misc_access,
+            twitch_channel_for_sub: user_data.twitch_name,
+            // This access token is PURELY for the API calls that'll need to be performed on the profile page.
+            access_token: Some(AccessToken{
+                // Ideally we'd refresh this somehow instead of just granting access for such a large chunk of time.
+                expires: Some(Utc::now() + Duration::hours(6)),
+                methods: Some(vec![String::from("GET")]),
+                paths: Some(vec![
+                    format!("/profile/{}/matches", profile.user_id),
+                    format!("/profile/{}/clips", profile.user_id),
+                ]),
+                user_id: Some(profile.user_id),
+            }.encrypt(token_key)?),
         }
     )
 }
