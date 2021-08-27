@@ -154,6 +154,14 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("/info", web::get().to(v1::get_kafka_info_handler))
                 )
                 .service(
+                    web::scope("/sentry")
+                        .wrap(access::ApiAccess::new(
+                            Box::new(access::DenyShareTokenAccess{}),
+                        ))
+                        .route("/desktop", web::get().to(v1::get_desktop_sentry_info_handler))
+                        .route("/web", web::get().to(v1::get_web_sentry_info_handler))
+                )
+                .service(
                     web::scope("/share")
                         .route("", web::post().to(v1::create_new_share_connection_handler))
                         .route("/permissions", web::post().to(v1::get_share_permissions_handler))

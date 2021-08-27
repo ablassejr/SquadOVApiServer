@@ -177,6 +177,12 @@ pub struct TwitchConfig {
 }
 
 #[derive(Deserialize,Debug,Clone)]
+pub struct SentryConfig {
+    pub client_service_dsn: String,
+    pub web_dsn: String,
+}
+
+#[derive(Deserialize,Debug,Clone)]
 pub struct SquadOvConfig {
     pub app_url: String,
     pub landing_url: String,
@@ -212,6 +218,7 @@ pub struct ApiConfig {
     pub storage: SquadOvStorageConfig,
     pub ipstack: IpstackConfig,
     pub segment: SegmentConfig,
+    pub sentry: SentryConfig,
 }
 
 pub struct ApiClients {
