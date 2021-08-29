@@ -57,7 +57,10 @@ impl SessionManager {
         }
     }
 
-    pub async fn delete_session(&self, id : &str, pool: &PgPool) -> Result<(), sqlx::Error> {
+    pub async fn delete_session<'a, T>(&self, id : &str, ex: T) -> Result<(), sqlx::Error>
+    where
+        T: Executor<'a, Database = Postgres>
+    {
         sqlx::query!(
             "
             DELETE FROM squadov.user_sessions
@@ -65,7 +68,7 @@ impl SessionManager {
             ",
             id,
         )
-            .execute(pool)
+            .execute(ex)
             .await?;
         
         return Ok(())
@@ -333,7 +336,7 @@ impl crate::api::ApiApplication {
         // Logout from FusionAuth AND delete the session from our database.
         // Both operations should be done regardless of whether the other one is successful.
         let fa_result = self.clients.fusionauth.logout(&session.refresh_token).await;
-        let db_result = self.session.delete_session(&session.session_id, &self.pool).await;
+        let db_result = self.session.delete_session(&session.session_id, &*self.pool).await;
 
         match fa_result {
             Ok(_) => (),

@@ -1,0 +1,1 @@
+CREATE INDEX ON twitch_accounts(access_token);

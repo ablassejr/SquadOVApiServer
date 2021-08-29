@@ -102,6 +102,7 @@ enabled = true
 base_url = "https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=hnu9lcnjjz2ymiok1f2okkf06x95d0&redirect_uri=https://app.squadov.gg/twitch/oauth-callback&scope=channel:read:subscriptions+user:read:subscriptions+openid"
 client_id = "${TWITCH_CLIENT_ID}"
 client_secret = "${TWITCH_CLIENT_SECRET}"
+eventsub_hostname = "https://api.${DEPLOYMENT_DOMAIN}"
 
 [rabbitmq]
 amqp_url = "${RABBITMQ_AMQP_URL}"
@@ -120,6 +121,8 @@ enable_csgo = false
 csgo_queue = "csgo_rmq"
 enable_steam = true
 steam_queue = "steam_api"
+enable_twitch = true
+twitch_queue = "twitch_api"
 
 [email]
 postmark_api_key = "${POSTMARK_API_KEY}"

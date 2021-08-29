@@ -121,10 +121,12 @@ pub async fn get_user_profile_basic_serialized_with_requester(ex: &PgPool, profi
     let profile_access = access::get_user_profile_access(&*ex, &profile, requester).await?;
     let user_data = sqlx::query!(
         r#"
-        SELECT u.username, u.registration_time, lta.twitch_name AS "twitch_name?"
+        SELECT u.username, u.registration_time, ta.twitch_name AS "twitch_name?"
         FROM squadov.users AS u
         LEFT JOIN squadov.linked_twitch_accounts AS lta
             ON lta.user_id = u.id
+        LEFT JOIN squadov.twitch_accounts AS ta
+            ON ta.twitch_user_id = lta.twitch_user_id
         WHERE u.id = $1
         "#,
         profile.user_id,

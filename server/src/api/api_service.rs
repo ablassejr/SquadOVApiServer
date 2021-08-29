@@ -21,6 +21,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
         .route("/meta", web::get().to(meta::meta_handler))
         .route("/healthz", web::get().to(health_check))
         .service(
+            web::scope("/twitch")
+                .route("/eventsub", web::post().to(v1::on_twitch_eventsub_handler))
+        )
+        .service(
             web::scope("/admin")
                 .wrap(access::ApiAccess::new(
                     Box::new(access::ShareTokenAccessRestricter{}),

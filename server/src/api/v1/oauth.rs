@@ -5,7 +5,21 @@ use crate::api::{
     auth::SquadOVSession,
 };
 use std::sync::Arc;
-use squadov_common::{SquadOvError};
+use squadov_common::{
+    SquadOvError,
+    accounts::twitch,
+    twitch::{
+        api::{
+            EventSubCondition,
+            EventSubTransport,
+            TwitchTokenType,
+        },
+        eventsub::{
+            TWITCH_CHANNEL_SUBSCRIBE,
+            TWITCH_CHANNEL_UNSUB,
+        },
+    },
+};
 use uuid::Uuid;
 use serde::Deserialize;
 use chrono::{Utc, Duration};
@@ -101,14 +115,47 @@ pub async fn handle_twitch_oauth_callback_handler(app : web::Data<Arc<api::ApiAp
         &redirect_url.as_str(),
         &data.code
     ).await?;
-    let api = squadov_common::twitch::api::TwitchApiClient::new(&app.config.twitch.client_id, &token.access_token);
+    let api = squadov_common::twitch::api::TwitchApiClient::new(app.config.twitch.clone(), token.clone(), TwitchTokenType::User, app.pool.clone());
 
     // Parse the ID token to get the user ID.
-    let twitch_user_id = squadov_common::twitch::oauth::extract_twitch_user_id_from_id_token(&token.id_token)?;
+    if token.id_token.is_none() {
+        return Err(SquadOvError::BadRequest);
+    }
 
-    let account = api.get_basic_account_info(twitch_user_id).await?;
-    squadov_common::accounts::twitch::link_twitch_account_to_user(&*app.pool, session.user.id, &account, &token).await?;
+    let id = token.id_token.clone().unwrap();
+    let twitch_user_id = squadov_common::twitch::oauth::extract_twitch_user_id_from_id_token(&id)?;
 
+    let account = api.get_basic_account_info(&twitch_user_id).await?;
+
+    // If the account already exists then we shouldn't create an EventSub subscription.
+    if twitch::find_twitch_account_id(&*app.pool, &account.twitch_user_id).await?.is_none() {
+        // We do this immediately and not in the transaction because we're passing off to RabbitMQ
+        // and we don't want there to be some weird thing where we haven't stored the Twitch account
+        // into our database yet.
+        twitch::create_twitch_account(&*app.pool, &account, &token).await?;
+
+        let condition = EventSubCondition{
+            broadcaster_user_id: account.twitch_user_id.clone(),
+        };
+
+        let transport = EventSubTransport{
+            method: String::from("webhook"),
+            callback: format!("{}/twitch/eventsub", &app.config.twitch.eventsub_hostname),
+            // because i'm too lazy to add another secret into the app atm lmao.
+            secret: app.config.squadov.hashid_salt.clone(),
+        };
+
+        // These EventSub lets us detect changes automatically to who's actually subscribed to the Twitch channel (one on sub and one on unsub).
+        app.twitch_api.register_eventsub_subscription(TWITCH_CHANNEL_SUBSCRIBE, condition.clone(), transport.clone()).await?;
+        app.twitch_api.register_eventsub_subscription(TWITCH_CHANNEL_UNSUB, condition.clone(), transport.clone()).await?;
+        
+        // We also need to do an initial subscriber sync. This should be fairly quick as long as Pokimane's not joining
+        // SquadOV. To be safe we can just throw it onto RabbitMQ to make sure this process is reliable as well.
+        app.twitch_itf.request_sync_subscriber(&account.twitch_user_id, None).await?;
+    }
+
+    twitch::link_twitch_account_to_user(&*app.pool, session.user.id, &account.twitch_user_id).await?;
+    
     app.session.delete_session(&session_id, &*app.pool).await?;
     Ok(HttpResponse::NoContent().finish())
 }

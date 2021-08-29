@@ -445,6 +445,8 @@ async fn main() -> Result<(), SquadOvError> {
         csgo_queue: String::new(),
         enable_steam: false,
         steam_queue: String::new(),
+        enable_twitch: false,
+        twitch_queue: String::new(),
         additional_queues: Some(vec![
             opts.queue.clone(),
         ])

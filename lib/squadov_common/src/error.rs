@@ -37,6 +37,8 @@ pub enum SquadOvError {
     RateLimit,
     #[display(fmt = "[SquadovError] Two Factor Request")]
     TwoFactor(String),
+    #[display(fmt = "[SquadovError] Forbidden")]
+    Forbidden,
 }
 
 impl error::ResponseError for SquadOvError {
@@ -59,6 +61,7 @@ impl error::ResponseError for SquadOvError {
             SquadOvError::Defer(_) => StatusCode::SERVICE_UNAVAILABLE,
             SquadOvError::RateLimit => StatusCode::TOO_MANY_REQUESTS,
             SquadOvError::TwoFactor(_) => StatusCode::ACCEPTED,
+            SquadOvError::Forbidden => StatusCode::FORBIDDEN,
         }
     }
 }
@@ -300,5 +303,11 @@ impl From<rsa::pkcs1::Error> for SquadOvError {
 impl From<rsa::errors::Error> for SquadOvError {
     fn from(err: rsa::errors::Error) -> Self {
         return Self::InternalError(format!("RSA Error {:?}", err))
+    }
+}
+
+impl From<hmac::crypto_mac::InvalidKeyLength> for SquadOvError {
+    fn from(err: hmac::crypto_mac::InvalidKeyLength) -> Self {
+        return Self::InternalError(format!("HMAC Error {:?}", err))
     }
 }

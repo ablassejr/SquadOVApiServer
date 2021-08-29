@@ -59,6 +59,15 @@ use squadov_common::{
         SegmentClient,
     },
     user::SquadOVUser,
+    twitch::{
+        TwitchConfig,
+        rabbitmq::TwitchApiRabbitmqInterface,
+        api::{
+            TwitchApiClient,
+            TwitchTokenType,
+        },
+        oauth,
+    },
 };
 use url::Url;
 use std::vec::Vec;
@@ -170,13 +179,6 @@ pub struct KafkaConfig {
 }
 
 #[derive(Deserialize,Debug,Clone)]
-pub struct TwitchConfig {
-    pub base_url: String,
-    pub client_id: String,
-    pub client_secret: String,
-}
-
-#[derive(Deserialize,Debug,Clone)]
 pub struct SentryConfig {
     pub client_service_dsn: String,
     pub web_dsn: String,
@@ -243,11 +245,13 @@ pub struct ApiApplication {
     pub vod_itf: Arc<VodProcessingInterface>,
     pub csgo_itf: Arc<CsgoRabbitmqInterface>,
     pub steam_itf: Arc<SteamApiRabbitmqInterface>,
+    pub twitch_itf: Arc<TwitchApiRabbitmqInterface>,
     gcp: Arc<Option<GCPClient>>,
     aws: Arc<Option<AWSClient>>,
     pub hashid: Arc<harsh::Harsh>,
     pub ip: Arc<IpstackClient>,
     pub segment: Arc<SegmentClient>,
+    pub twitch_api: Arc<TwitchApiClient>,
 }
 
 impl ApiApplication {
@@ -375,6 +379,7 @@ impl ApiApplication {
         let tft_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, tft_api.clone(), rabbitmq.clone(), pool.clone()));
         let steam_itf = Arc::new(SteamApiRabbitmqInterface::new(steam_api.clone(), &config.rabbitmq, rabbitmq.clone(), pool.clone()));
         let csgo_itf = Arc::new(CsgoRabbitmqInterface::new(steam_itf.clone(), &config.rabbitmq, rabbitmq.clone(), pool.clone()));
+        let twitch_itf = Arc::new(TwitchApiRabbitmqInterface::new(config.twitch.clone(), config.rabbitmq.clone(), rabbitmq.clone(), pool.clone()));
 
         if !disable_rabbitmq {
             if config.rabbitmq.enable_rso {
@@ -399,6 +404,10 @@ impl ApiApplication {
 
             if config.rabbitmq.enable_csgo {
                 RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.csgo_queue.clone(), csgo_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
+            }
+
+            if config.rabbitmq.enable_twitch {
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.twitch_queue.clone(), twitch_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
             }
         }
 
@@ -427,7 +436,7 @@ impl ApiApplication {
             users: auth::UserManager{},
             session: auth::SessionManager::new(),
             vod: vod_manager,
-            pool,
+            pool: pool.clone(),
             heavy_pool,
             schema: Arc::new(graphql::create_schema()),
             blob: blob,
@@ -439,11 +448,18 @@ impl ApiApplication {
             vod_itf,
             csgo_itf,
             steam_itf,
+            twitch_itf,
             gcp,
             aws,
             hashid: Arc::new(harsh::Harsh::builder().salt(config.squadov.hashid_salt.as_str()).length(6).build().unwrap()),
             ip: Arc::new(IpstackClient::new(config.ipstack.clone())),
             segment: Arc::new(SegmentClient::new(config.segment.clone())),
+            twitch_api: Arc::new(TwitchApiClient::new(
+                config.twitch.clone(),
+                oauth::get_oauth_client_credentials_token(&config.twitch.client_id, &config.twitch.client_secret).await.unwrap(),
+                TwitchTokenType::App,
+                pool.clone(),
+            )),
         };
 
         app.create_vod_manager(&config.storage.vods.global).await.unwrap();
@@ -469,6 +485,12 @@ pub fn start_event_loop(app: Arc<ApiApplication>) {
             match app.mark_users_inactive().await {
                 Ok(()) => (),
                 Err(err) => log::warn!("...Failed to mark inactive users: {:?}", err),
+            };
+
+            log::info!("...Reverifying Twitch accounts.");
+            match app.reverify_twitch_account_access_tokens().await {
+                Ok(()) => (),
+                Err(err) => log::warn!("...Failed to reverify twitch accounts: {:?}", err),
             };
 
             // Doing this once per day should be sufficient...
