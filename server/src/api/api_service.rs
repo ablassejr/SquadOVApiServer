@@ -208,6 +208,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .service(
                                     web::scope("/profile")
                                         .route("", web::get().to(v1::get_current_user_profile_handler))
+                                        .route("", web::post().to(v1::create_user_profile_handler))
                                         .route("/username", web::post().to(v1::edit_current_user_username_handler))
                                         .route("/email", web::post().to(v1::edit_current_user_email_handler))
                                         .route("/data", web::post().to(v1::edit_current_user_profile_basic_data_handler))

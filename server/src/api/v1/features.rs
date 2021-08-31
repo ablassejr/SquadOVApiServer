@@ -12,6 +12,7 @@ pub struct FeatureFlags {
     max_record_fps: i32,
     allow_record_upload: bool,
     allow_wow_combat_log_upload: bool,
+    enable_user_profiles: bool,
 }
 
 impl Default for FeatureFlags {
@@ -22,6 +23,7 @@ impl Default for FeatureFlags {
             max_record_fps: 60,
             allow_record_upload: true,
             allow_wow_combat_log_upload: true,
+            enable_user_profiles: false,
         }
     }
 }

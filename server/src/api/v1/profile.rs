@@ -16,6 +16,7 @@ use squadov_common::{
         self,
         data::UserProfileBasicUpdateData,
         access::UserProfileBasicUpdateAccess,
+        UserProfileBasicSerialized,
     },
     image,
     storage::CloudStorageLocation,
@@ -38,6 +39,11 @@ pub struct UserProfilePath {
     pub profile_id: i64,
 }
 
+#[derive(Deserialize)]
+pub struct UserProfileSlugInput {
+    pub slug: String,
+}
+
 impl ApiApplication {
     // Processes and stores the image and returns the blob UUID that we can retrieve the image from.
     async fn process_and_store_profile_image(&self, data: &[u8]) -> Result<Uuid, SquadOvError> {
@@ -52,6 +58,23 @@ impl ApiApplication {
         Ok(uuid)
     }
 
+    async fn get_user_profile_from_query(&self, request_user_id: Option<i64>, query: UserProfileQuery) -> Result<Option<UserProfileBasicSerialized>, SquadOvError> {
+        let raw_profile = if let Some(id) = query.id {
+            profile::get_user_profile_from_id(&*self.pool, id).await?
+        } else if let Some(slug) = &query.slug {
+            profile::get_user_profile_from_slug(&*self.pool, &slug).await?
+        } else {
+            return Err(SquadOvError::BadRequest);
+        };
+    
+        Ok(if let Some(raw_profile) = raw_profile {
+            let bucket = self.blob.get_bucket_for_location(CloudStorageLocation::Global).ok_or(SquadOvError::InternalError(String::from("No global location for blob storage.")))?;
+            let manager = self.get_blob_manager(&bucket).await?;
+            Some(profile::get_user_profile_basic_serialized_with_requester(&*self.pool, raw_profile, request_user_id, manager, &self.config.squadov.access_key).await?)
+        } else {
+            None
+        })
+    }
 }
 
 pub async fn get_basic_profile_handler(app : web::Data<Arc<ApiApplication>>, query: QsQuery<UserProfileQuery>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
@@ -59,20 +82,7 @@ pub async fn get_basic_profile_handler(app : web::Data<Arc<ApiApplication>>, que
     // Is it public? Or is there an actual session behind this.
     let extensions = req.extensions();
     let request_user_id = extensions.get::<SquadOVSession>().map(|x| { x.user.id });
-
-    let raw_profile = if let Some(id) = query.id {
-        profile::get_user_profile_from_id(&*app.pool, id).await?
-    } else if let Some(slug) = &query.slug {
-        profile::get_user_profile_from_slug(&*app.pool, &slug).await?
-    } else {
-        return Err(SquadOvError::BadRequest);
-    };
-
-    let bucket = app.blob.get_bucket_for_location(CloudStorageLocation::Global).ok_or(SquadOvError::InternalError(String::from("No global location for blob storage.")))?;
-    let manager = app.get_blob_manager(&bucket).await?;
-    Ok(HttpResponse::Ok().json(
-        profile::get_user_profile_basic_serialized_with_requester(&*app.pool, raw_profile, request_user_id, manager, &app.config.squadov.access_key).await?
-    ))
+    Ok(HttpResponse::Ok().json(app.get_user_profile_from_query(request_user_id, query.into_inner()).await?))
 }
 
 pub async fn edit_current_user_profile_basic_data_handler(app : web::Data<Arc<ApiApplication>>, mut payload: Multipart, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
@@ -153,4 +163,15 @@ pub async fn edit_current_user_profile_basic_access_handler(app : web::Data<Arc<
     profile::access::update_user_profile_basic_access(&mut tx, session.user.id, &data).await?;
     tx.commit().await?;
     Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn create_user_profile_handler(app : web::Data<Arc<ApiApplication>>, data: web::Json<UserProfileSlugInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    profile::create_user_profile_for_user_id(&*app.pool, session.user.id, &data.slug).await?;
+
+    Ok(HttpResponse::Ok().json(app.get_user_profile_from_query(Some(session.user.id), UserProfileQuery{
+        id: Some(session.user.id),
+        slug: None,
+    }).await?))
 }

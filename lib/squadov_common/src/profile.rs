@@ -78,7 +78,23 @@ pub struct UserProfileBasicRaw {
     pub misc_access: i32,
 }
 
-pub async fn get_user_profile_from_id<'a, T>(ex: T, id: i64) -> Result<UserProfileBasicRaw, SquadOvError>
+pub async fn create_user_profile_for_user_id<'a, T>(ex: T, id: i64, slug: &str) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        SELECT create_user_profile($1, $2)
+        ",
+        id,
+        slug.to_lowercase(),
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
+pub async fn get_user_profile_from_id<'a, T>(ex: T, id: i64) -> Result<Option<UserProfileBasicRaw>, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
 {
@@ -92,12 +108,12 @@ where
             ",
             id,
         )
-            .fetch_one(ex)
+            .fetch_optional(ex)
             .await?
     )
 }
 
-pub async fn get_user_profile_from_slug<'a, T>(ex: T, slug: &str) -> Result<UserProfileBasicRaw, SquadOvError>
+pub async fn get_user_profile_from_slug<'a, T>(ex: T, slug: &str) -> Result<Option<UserProfileBasicRaw>, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
 {
@@ -109,9 +125,9 @@ where
             FROM squadov.user_profiles
             WHERE link_slug = $1
             ",
-            slug,
+            slug.to_lowercase(),
         )
-            .fetch_one(ex)
+            .fetch_optional(ex)
             .await?
     )
 }
