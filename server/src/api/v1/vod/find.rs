@@ -63,7 +63,7 @@ impl api::ApiApplication {
             .await?)
     }
 
-    pub async fn find_accessible_vods_in_match_for_user(&self, match_uuid: &Uuid, user_id: i64, limit_to_user: bool) -> Result<Vec<VodAssociation>, SquadOvError> {
+    pub async fn find_accessible_vods_in_match_for_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<VodAssociation>, SquadOvError> {
         Ok(sqlx::query_as!(
             VodAssociation,
             "
@@ -76,13 +76,12 @@ impl api::ApiApplication {
                     AND vau.match_uuid = $1
                     AND vau.user_id = $2
             WHERE v.match_uuid = $1 
-                AND (u.id = $2 OR ($3 AND vau.video_uuid IS NOT NULL))
+                AND (u.id = $2 OR vau.video_uuid IS NOT NULL)
                 AND v.is_clip = FALSE
                 AND (v.is_local = FALSE OR u.id = $2)
             ",
             match_uuid,
             user_id,
-            !limit_to_user,
         )
             .fetch_all(&*self.pool)
             .await?)

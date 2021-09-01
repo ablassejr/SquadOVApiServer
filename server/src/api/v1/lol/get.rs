@@ -31,7 +31,7 @@ pub async fn get_lol_match_user_accessible_vod_handler(data: web::Path<GenericMa
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
-    let vods = app.find_accessible_vods_in_match_for_user(&data.match_uuid, session.user.id, session.share_token.is_some()).await?;
+    let vods = app.find_accessible_vods_in_match_for_user(&data.match_uuid, session.user.id).await?;
 
     // Note that for each VOD we also need to figure out the mapping from user uuid to participant ID.
     let user_uuids: Vec<Uuid> = vods.iter()

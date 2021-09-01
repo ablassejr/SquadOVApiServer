@@ -655,7 +655,7 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
     let mut token = squadov_common::access::find_encrypted_access_token_for_match_user(&*app.pool, &path.match_uuid, session.user.id).await?;
 
     // We want to share all the VODs we have access to.
-    let vods = app.find_accessible_vods_in_match_for_user(&path.match_uuid.clone(), session.user.id, false).await?;
+    let vods = app.find_accessible_vods_in_match_for_user(&path.match_uuid.clone(), session.user.id).await?;
     
     let mut video_uuids: Vec<Uuid> = vec![];
     for v in vods {

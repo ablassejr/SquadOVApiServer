@@ -565,7 +565,7 @@ pub async fn get_hearthstone_match_user_accessible_vod_handler(data: web::Path<G
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
-    let vods = app.find_accessible_vods_in_match_for_user(&data.match_uuid, session.user.id, session.share_token.is_some()).await?;
+    let vods = app.find_accessible_vods_in_match_for_user(&data.match_uuid, session.user.id).await?;
 
     let user_uuids: Vec<Uuid> = vods.iter()
         .filter(|x| { x.user_uuid.is_some() })

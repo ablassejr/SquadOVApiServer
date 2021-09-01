@@ -1072,7 +1072,7 @@ pub async fn list_wow_vods_for_squad_in_match_handler(app : web::Data<Arc<api::A
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
-    let vods = app.find_accessible_vods_in_match_for_user(&path.match_uuid, session.user.id, session.share_token.is_some()).await?;
+    let vods = app.find_accessible_vods_in_match_for_user(&path.match_uuid, session.user.id).await?;
 
     // Note that for each VOD we also need to figure out the mapping from user uuid to puuid.
     let user_uuids: Vec<Uuid> = vods.iter()

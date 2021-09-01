@@ -111,7 +111,7 @@ pub async fn create_new_share_connection_handler(app : web::Data<Arc<api::ApiApp
         // to obtain whether or not we can share that particular VOD since I don't believe the SQL query to do a proper
         // permission check can be created easily.
         let mut filtered_video_uuids: Vec<Uuid> = vec![];
-        let raw_vods = app.find_accessible_vods_in_match_for_user(match_uuid, session.user.id, false).await?;
+        let raw_vods = app.find_accessible_vods_in_match_for_user(match_uuid, session.user.id).await?;
 
         for vod in raw_vods {
             if vod.user_uuid.unwrap_or(Uuid::nil()) != session.user.uuid {

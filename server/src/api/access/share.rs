@@ -29,11 +29,7 @@ impl super::AccessChecker<ShareTokenMetadata> for ShareTokenAccessRestricter {
         })
     }
 
-    async fn check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: ShareTokenMetadata) -> Result<bool, SquadOvError> {
-        Ok(true)
-    }
-
-    async fn post_check(&self, _app: Arc<ApiApplication>, session: Option<&SquadOVSession>, data: ShareTokenMetadata) -> Result<bool, SquadOvError> {
+    async fn check(&self, _app: Arc<ApiApplication>, session: Option<&SquadOVSession>, data: ShareTokenMetadata) -> Result<bool, SquadOvError> {
         let session = session.unwrap();
         // If the session doesn't have a share token then this checker isn't relevant.
         if session.share_token.is_none() {
@@ -50,6 +46,17 @@ impl super::AccessChecker<ShareTokenMetadata> for ShareTokenAccessRestricter {
             return Ok(false);
         }
 
+        Ok(true)
+    }
+
+    async fn post_check(&self, _app: Arc<ApiApplication>, session: Option<&SquadOVSession>, data: ShareTokenMetadata) -> Result<bool, SquadOvError> {
+        let session = session.unwrap();
+
+        // If the session doesn't have a share token then this checker isn't relevant.
+        if session.share_token.is_none() {
+            return Ok(true);
+        }
+        
         let share_token = session.share_token.as_ref().unwrap();
 
         // There's three accesses we want to check:
@@ -103,15 +110,6 @@ impl super::AccessChecker<ShareTokenMetadata> for ShareTokenAccessRestricter {
                 return Ok(false);
             }
             granted_access = true;
-        }
-
-        if let Some(user_id) = data.path.get("user_id") {
-            let user_id = user_id.parse::<i64>()?;
-            if user_id != session.user.id {
-                return Ok(false);
-            }
-            // Do not grant access purely based on user. It's only used to do additional denying.
-            // This way we don't grant access to match listings and stuff like that.
         }
 
         Ok(granted_access)
