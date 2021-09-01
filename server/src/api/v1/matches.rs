@@ -592,6 +592,7 @@ pub struct MatchShareSignatureData {
     full_path: String,
     game: SquadOvGames,
     graphql_stats: Option<Vec<StatPermission>>,
+    user_id: i64,
 }
 
 #[derive(Deserialize,Debug)]
@@ -683,8 +684,9 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
         let access_request = AccessTokenRequest{
             full_path: data.full_path.clone(),
             user_uuid: session.user.uuid.clone(),
+            meta_user_id: Some(data.user_id),
             match_uuid: Some(path.match_uuid.clone()),
-            video_uuid: None,
+            video_uuid: video_uuids.first().cloned(),
             bulk_video_uuids: video_uuids.clone(),
             clip_uuid: None,
             graphql_stats: data.graphql_stats.clone(),
@@ -700,7 +702,7 @@ pub async fn create_match_share_signature_handler(app : web::Data<Arc<api::ApiAp
         // Store the encrypted token in our database and return to the user a URL with the unique ID and the IV.
         // This way we get a (relatively) shorter URL instead of a giant encrypted blob.
         let mut tx = app.pool.begin().await?;
-        let token_id = squadov_common::access::store_encrypted_access_token_for_match_user(&mut tx, &path.match_uuid, &video_uuids, session.user.id, &encryption_token).await?;
+        let token_id = squadov_common::access::store_encrypted_access_token_for_match_user(&mut tx, &path.match_uuid, &video_uuids, session.user.id, data.user_id, &encryption_token).await?;
         squadov_common::access::generate_friendly_share_token(&mut tx, &token_id).await?;
         tx.commit().await?;
 

@@ -116,6 +116,7 @@ pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApp
         let access_request = AccessTokenRequest{
             full_path: data.full_path.clone(),
             user_uuid: session.user.uuid.clone(),
+            meta_user_id: None,
             match_uuid: None,
             video_uuid: Some(path.clip_uuid.clone()),
             clip_uuid: Some(path.clip_uuid.clone()),

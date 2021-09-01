@@ -72,7 +72,9 @@ impl api::ApiApplication {
         let req = squadov_decrypt(token, &self.config.squadov.share_key)?;
 
         let access = serde_json::from_slice::<AccessTokenRequest>(&req.data)?;
+
         let user = self.users.get_stored_user_from_uuid(&access.user_uuid, &*self.pool).await?.ok_or(SquadOvError::NotFound)?;
+        let meta_user = self.users.get_stored_user_from_id(access.meta_user_id.unwrap_or(user.id), &*self.pool).await?.ok_or(SquadOvError::NotFound)?;
 
         // Only two possible objects can be shared at the moment: clips and matches.
         // In both cases, we only care to return video when the VOD/Clip in question
@@ -86,7 +88,7 @@ impl api::ApiApplication {
         } else if let Some(match_uuid) = &access.match_uuid {
             let base_matches = self.get_recent_base_matches(&[RecentMatchHandle{
                 match_uuid: match_uuid.clone(),
-                user_uuid: user.uuid.clone(),
+                user_uuid: meta_user.uuid.clone(),
             }], user.id).await?;
             let recent_matches = self.get_recent_matches_from_uuids(&base_matches).await?;
             let m = recent_matches.first().ok_or(SquadOvError::NotFound)?;

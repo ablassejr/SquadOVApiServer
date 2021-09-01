@@ -66,7 +66,10 @@ impl AccessToken {
 #[serde(rename_all="camelCase")]
 pub struct AccessTokenRequest {
     pub full_path: String,
+    // User UUID of the user requesting the share.
     pub user_uuid: Uuid,
+    // User ID of the primary user's content being shared (primarily for grabbing match meta data later).
+    pub meta_user_id: Option<i64>,
     pub match_uuid: Option<Uuid>,
     pub video_uuid: Option<Uuid>,
     #[serde(default)]
@@ -247,7 +250,7 @@ pub async fn generate_friendly_share_token(tx: &mut Transaction<'_, Postgres>, i
     Ok(None)
 }
 
-pub async fn store_encrypted_access_token_for_match_user<'a, T>(ex: T, match_uuid: &Uuid, video_uuids: &[Uuid], user_id: i64, token: &AESEncryptToken) -> Result<Uuid, SquadOvError>
+pub async fn store_encrypted_access_token_for_match_user<'a, T>(ex: T, match_uuid: &Uuid, video_uuids: &[Uuid], user_id: i64, meta_user_id: i64, token: &AESEncryptToken) -> Result<Uuid, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
 {
@@ -262,7 +265,8 @@ where
                 iv,
                 aad,
                 tag,
-                bulk_video_uuids
+                bulk_video_uuids,
+                meta_user_id
             ) VALUES (
                 gen_random_uuid(),
                 $1,
@@ -271,7 +275,8 @@ where
                 $4,
                 $5,
                 $6,
-                $7
+                $7,
+                $8
             )
             RETURNING id
             ",
@@ -281,7 +286,8 @@ where
             token.iv,
             token.aad,
             token.tag,
-            video_uuids
+            video_uuids,
+            meta_user_id,
         )
             .fetch_one(ex)
             .await?
