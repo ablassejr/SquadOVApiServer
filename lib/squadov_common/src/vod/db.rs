@@ -182,3 +182,56 @@ where
             .await?
     )
 }
+
+pub async fn check_user_has_recorded_vod_for_match<'a, T>(ex: T, user_id: i64, match_uuid: &Uuid) -> Result<bool, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            r#"
+            SELECT EXISTS (
+                SELECT *
+                FROM squadov.vods AS v
+                INNER JOIN squadov.users AS u
+                    ON u.uuid = v.user_uuid
+                WHERE u.id = $1
+                    AND v.match_uuid = $2
+                    AND v.is_clip = FALSE
+                    AND v.is_local = FALSE
+                    AND v.end_time IS NOT NULL
+            ) AS "exists!"
+            "#,
+            user_id,
+            match_uuid,
+        )
+            .fetch_one(ex)
+            .await?
+            .exists
+    )
+}
+
+pub async fn check_user_is_vod_owner<'a, T>(ex: T, user_id: i64, video_uuid: &Uuid) -> Result<bool, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            r#"
+            SELECT EXISTS (
+                SELECT *
+                FROM squadov.vods AS v
+                INNER JOIN squadov.users AS u
+                    ON u.uuid = v.user_uuid
+                WHERE u.id = $1
+                    AND v.video_uuid = $2
+            ) AS "exists!"
+            "#,
+            user_id,
+            video_uuid,
+        )
+            .fetch_one(ex)
+            .await?
+            .exists
+    )
+}

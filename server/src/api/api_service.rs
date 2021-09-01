@@ -184,6 +184,12 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route("", web::post().to(v1::edit_auto_share_setting_handler))
                                 )
                         )
+                        .service(
+                            web::resource("/profile")
+                                .route(web::get().to(v1::get_match_clip_profile_share_handler))
+                                .route(web::post().to(v1::create_match_clip_profile_share_handler))
+                                .route(web::delete().to(v1::delete_match_clip_profile_share_handler))
+                        )
                 )
                 .service(
                     web::scope("/match/{match_uuid}")

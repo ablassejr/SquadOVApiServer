@@ -20,8 +20,9 @@ use squadov_common::{
     },
     image,
     storage::CloudStorageLocation,
+    vod::db as vdb,
 };
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use serde_qs::actix::QsQuery;
 use std::sync::Arc;
 use actix_multipart::Multipart;
@@ -42,6 +43,13 @@ pub struct UserProfilePath {
 #[derive(Deserialize)]
 pub struct UserProfileSlugInput {
     pub slug: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ProfileMatchClipInput {
+    pub match_uuid: Option<Uuid>,
+    pub clip_uuid: Option<Uuid>,
 }
 
 impl ApiApplication {
@@ -174,4 +182,62 @@ pub async fn create_user_profile_handler(app : web::Data<Arc<ApiApplication>>, d
         id: Some(session.user.id),
         slug: None,
     }).await?))
+}
+
+pub async fn get_match_clip_profile_share_handler(app : web::Data<Arc<ApiApplication>>, data: web::Query<ProfileMatchClipInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
+    #[derive(Serialize)]
+    #[serde(rename_all="camelCase")]
+    pub struct SharedResponse {
+        can_share: bool,
+        is_shared: bool,
+    }
+
+    let response = if let Some(match_uuid) = data.match_uuid.as_ref() {
+        SharedResponse{
+            can_share: vdb::check_user_has_recorded_vod_for_match(&*app.pool, session.user.id, match_uuid).await?,
+            is_shared: profile::data::check_if_match_shared_to_profile(&*app.pool, session.user.id, match_uuid).await?,
+        }
+    } else if let Some(clip_uuid) = data.clip_uuid.as_ref() {
+        SharedResponse{
+            can_share: vdb::check_user_is_vod_owner(&*app.pool, session.user.id, clip_uuid).await?,
+            is_shared: profile::data::check_if_clip_shared_to_profile(&*app.pool, session.user.id, clip_uuid).await?,
+        }
+    } else {
+        return Err(SquadOvError::BadRequest);
+    };
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub async fn create_match_clip_profile_share_handler(app : web::Data<Arc<ApiApplication>>, data: web::Json<ProfileMatchClipInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
+    if let Some(match_uuid) = data.match_uuid.as_ref() {
+        profile::data::add_match_to_user_profile(&*app.pool, match_uuid, session.user.id).await?;
+    } else if let Some(clip_uuid) = data.clip_uuid.as_ref() {
+        profile::data::add_clip_to_user_profile(&*app.pool, clip_uuid, session.user.id).await?;
+    } else {
+        return Err(SquadOvError::BadRequest);
+    }
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn delete_match_clip_profile_share_handler(app : web::Data<Arc<ApiApplication>>, data: web::Query<ProfileMatchClipInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    
+    if let Some(match_uuid) = data.match_uuid.as_ref() {
+        profile::data::remove_match_from_user_profile(&*app.pool, match_uuid, session.user.id).await?;
+    } else if let Some(clip_uuid) = data.clip_uuid.as_ref() {
+        profile::data::remove_clip_from_user_profile(&*app.pool, clip_uuid, session.user.id).await?;
+    } else {
+        return Err(SquadOvError::BadRequest);
+    }
+
+    Ok(HttpResponse::NoContent().finish())
 }
