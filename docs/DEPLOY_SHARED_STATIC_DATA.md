@@ -33,11 +33,34 @@ This script will take awhile to run.
 After it finishes running, in each `CARD_ID` folder, you should see an additional `card.png` and possibly a `cardGold.png`.
 In each `CARD_BACK_ID` folder, you should see an additional `back.png`.
 
-## Upload to GCS
+And to upload
 
 1. Create a new bucket named `us-central1.content.squadov.gg` where `$ENV` should be the GCP project name and `us-central1` should be named appropriately for the location of the bucket.
 2. Create a GCS folder named `hearthstone`.
 3. `gsutil rsync -x ".*\.json$" -r $HSD gs://us-central1.content.squadov.gg/hearthstone`
+
+### TFT (Champions, Items, Traits)
+
+Download the latest TFT static data set from Riot Game's developer portal.
+
+1. `python .\parse_tft_champions_data.py --json A:\Git\TftAssets\set5patch1115\champions.json --assets A:\Git\TftAssets\set5patch1115\champions --output A:\Git\TftAssets\Organized_Sets\set5.5\champions`
+2. `python .\parse_tft_item_data.py --json A:\Git\TftAssets\set5patch1115\items.json --assets A:\Git\TftAssets\set5patch1115\items --output A:\Git\TftAssets\Organized_Sets\set5.5\items`
+3. `python .\parse_tft_traits_data.py --json A:\Git\TftAssets\set5patch1115\traits.json --assets A:\Git\TftAssets\set5patch1115\traits --output A:\Git\TftAssets\Organized_Sets\set5.5\traits`
+
+And to upload
+
+`gsutil -m rsync -r ./set5.5/ gs://us-central1.content.squadov.gg/tft/set5.5`
+
+### TFT (Little Legends)
+
+1. Install `https://github.com/Crauzer/Obsidian`
+2. In Obisidian, open `C:\Riot Games\League of Legends\Plugins\rcp-be-lol-game-data\default-assets.wad` 
+3. Extract `plugins/rcp-be-lol-game-data/global/default/v1/companions.json` and `plugins/rcp-be-lol-game-data/global/default/assets/{loadouts,loot}/companions/*`
+4. `python .\parse_little_legends_data.py --json "A:\Git\TftAssets\Extracted\plugins\rcp-be-lol-game-data\global\default\v1\companions.json" --assets "A:\Git\TftAssets\Extracted\plugins\rcp-be-lol-game-data\global\default\assets" --output "A:\Git\TftAssets\Organized_Companions"`
+
+And to upload:
+
+`gsutil -m rsync -r Organized_Companions gs://us-central1.content.squadov.gg/tft/companions`
 
 ## Setup GCS Load Balancer
 

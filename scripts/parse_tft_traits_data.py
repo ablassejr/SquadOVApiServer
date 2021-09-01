@@ -25,6 +25,6 @@ if __name__ == '__main__':
         with open(oJson, 'w') as f:
             json.dump(d, f)
 
-        iIcon = os.path.join(args.assets, traitName.replace(' ', '').replace('-', '').lower() + '_clipped.png')
+        iIcon = os.path.join(args.assets, traitName.replace(' ', '').replace('-', '').lower() + '.png')
         oIcon = os.path.join(oFolder, 'icon.png')
         shutil.copy(iIcon, oIcon)
