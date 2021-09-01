@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.9.9",
+        "description": "User profiles are rolling out to a subset of users!",
+        "timestamp": 1630532116000,
+        "data": "data/update-v0.9.9.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.9.5",
         "description": "Small patch but we're now properly trusted by Microsoft Smartscreen poggers.",
         "timestamp": 1629496753000,
