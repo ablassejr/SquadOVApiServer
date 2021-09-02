@@ -84,7 +84,7 @@ where
 {
     sqlx::query!(
         "
-        SELECT create_user_profile($1, $2)
+        SELECT squadov.create_user_profile($1, $2)
         ",
         id,
         slug.to_lowercase(),
