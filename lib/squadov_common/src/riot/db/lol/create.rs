@@ -493,7 +493,8 @@ pub async fn store_lol_match_info(ex: &mut Transaction<'_, Postgres>, match_uuid
         split[0],
         lol_match.info.queue_id,
         &lol_match.info.game_type,
-        lol_match.info.game_duration,
+        // Old league API used to store game duration in seconds, new API gives in milliseconds.
+        lol_match.info.game_duration / 1000,
         &lol_match.info.game_creation.ok_or(SquadOvError::BadRequest)?,
         0,
         &lol_match.info.game_version,

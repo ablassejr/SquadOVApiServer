@@ -234,7 +234,7 @@ async fn get_lol_match_participants(ex: &PgPool, match_uuid: &Uuid) -> Result<Ve
             FROM squadov.lol_match_participants AS lmp
             INNER JOIN squadov.lol_match_participant_identities AS lmpi
                 ON lmpi.match_uuid = lmp.match_uuid
-                    AND lmpi.participant_id = lmpi.participant_id
+                    AND lmpi.participant_id = lmp.participant_id
             WHERE lmp.match_uuid = $1
             ",
             match_uuid,
@@ -250,7 +250,7 @@ async fn get_lol_match_participants(ex: &PgPool, match_uuid: &Uuid) -> Result<Ve
                     damage_dealt_to_objectives: x.damage_dealt_to_objectives as i32,
                     damage_dealt_to_turrets: x.damage_dealt_to_turrets as i32,
                     damage_self_mitigated: x.damage_self_mitigated as i32,
-                    deaths: x.damage_self_mitigated as i32,
+                    deaths: x.deaths as i32,
                     double_kills: x.double_kills as i32,
                     first_blood_kill: x.first_blood_kill,
                     gold_earned: x.gold_earned as i32,
