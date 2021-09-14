@@ -510,27 +510,6 @@
       ]
     }
   },
-  "0e85888d47165d27b1a26711c281df4ab47ad857a9b804cd185571da8eee2fb4": {
-    "query": "\n        SELECT create_user_profile($1, $2)\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "create_user_profile",
-          "type_info": "Void"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Varchar"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "0ec7e256f346660a19f1620ceb5774b81f088ace7fa2cdf1e0b6bc47690cbe1c": {
     "query": "\n                SELECT *\n                FROM squadov.aimlab_tasks\n                WHERE match_uuid = ANY($1)\n                ",
     "describe": {
@@ -5632,6 +5611,18 @@
       ]
     }
   },
+  "5d6bff12a8fd2c3b88c907df8ac6c6205fcdfdc40f12c32182c8e8cbd68ee99c": {
+    "query": "\n        UPDATE squadov.riot_accounts\n        SET last_backfill_lol_time = NOW()\n        WHERE puuid = $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "5dcc3dcbffca7c3d34b1825e4ee01d9d5674f4f93475fc7f82ea2667bb01cc92": {
     "query": "\n            INSERT INTO squadov.community_invites (\n                code,\n                community_id,\n                inviter_user_id,\n                num_uses,\n                max_uses,\n                expiration,\n                created_tm\n            ) VALUES (\n                gen_random_uuid(),\n                $1,\n                $2,\n                0,\n                $3,\n                $4,\n                NOW()\n            )\n            RETURNING *\n            ",
     "describe": {
@@ -6225,6 +6216,27 @@
       "nullable": []
     }
   },
+  "6d7784e893dcc178dd7ddd570923cb2e3b2726ec1f6a4dbcb5c36447317938e0": {
+    "query": "\n        SELECT squadov.create_user_profile($1, $2)\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "create_user_profile",
+          "type_info": "Void"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Varchar"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "6d9c7c3558a8c9ff132b2be5e64b88bae6a2b49b7b24afbd10a27e7106b6c05f": {
     "query": "\n            SELECT t.id AS \"id!\"\n            FROM UNNEST($1::VARCHAR[]) AS t(id)\n            LEFT JOIN squadov.riot_accounts AS ra\n                ON ra.puuid = t.id\n            WHERE ra.game_name IS NULL\n                AND ra.tag_line IS NULL\n            ",
     "describe": {
@@ -6342,6 +6354,26 @@
         false,
         true,
         null
+      ]
+    }
+  },
+  "71eb6b6ff82f6c9abb78940578e04fbf47cce62a3a5b71be803a95b967def0c2": {
+    "query": "\n                DELETE FROM squadov.deferred_rabbitmq_messages\n                WHERE id = $1\n                RETURNING message                \n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "message",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
       ]
     }
   },
@@ -7824,6 +7856,410 @@
       ]
     }
   },
+  "8f1cd75644925e6e2871712cf2e00ab9776b04600a1301cc48646fbd6c603d91": {
+    "query": "\n            SELECT lmp.*, lmpi.*\n            FROM squadov.lol_match_participants AS lmp\n            INNER JOIN squadov.lol_match_participant_identities AS lmpi\n                ON lmpi.match_uuid = lmp.match_uuid\n                    AND lmpi.participant_id = lmpi.participant_id\n            WHERE lmp.match_uuid = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "participant_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "champion_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "team_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "spell1_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "spell2_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "champ_level",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "win",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 9,
+          "name": "deaths",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 10,
+          "name": "assists",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 11,
+          "name": "item0",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 12,
+          "name": "item1",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 13,
+          "name": "item2",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 14,
+          "name": "item3",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 15,
+          "name": "item4",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 16,
+          "name": "item5",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 17,
+          "name": "item6",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 18,
+          "name": "double_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 19,
+          "name": "triple_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 20,
+          "name": "quadra_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 21,
+          "name": "penta_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 22,
+          "name": "first_blood_kill",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 23,
+          "name": "gold_earned",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 24,
+          "name": "gold_spent",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 25,
+          "name": "neutral_minions_killed_team_jungle",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 26,
+          "name": "neutral_minions_killed_enemy_jungle",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 27,
+          "name": "wards_killed",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 28,
+          "name": "wards_placed",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 29,
+          "name": "vision_wards_bought_in_game",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 30,
+          "name": "sight_wards_bought_in_game",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 31,
+          "name": "neutral_minions_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 32,
+          "name": "total_minions_killed",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 33,
+          "name": "damage_dealt_to_objectives",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 34,
+          "name": "inhibitor_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 35,
+          "name": "turret_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 36,
+          "name": "damage_dealt_to_turrets",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 37,
+          "name": "total_player_score",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 38,
+          "name": "total_score_rank",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 39,
+          "name": "objective_player_score",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 40,
+          "name": "combat_player_score",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 41,
+          "name": "vision_score",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 42,
+          "name": "total_damage_dealt_to_champions",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 43,
+          "name": "physical_damage_dealt_to_champions",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 44,
+          "name": "magic_damage_dealt_to_champions",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 45,
+          "name": "true_damage_dealt_to_champions",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 46,
+          "name": "total_damage_dealt",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 47,
+          "name": "physical_damage_dealt",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 48,
+          "name": "magic_damage_dealt",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 49,
+          "name": "true_damage_dealt",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 50,
+          "name": "total_damage_taken",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 51,
+          "name": "physical_damage_taken",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 52,
+          "name": "magical_damage_taken",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 53,
+          "name": "true_damage_taken",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 54,
+          "name": "total_heal",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 55,
+          "name": "damage_self_mitigated",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 56,
+          "name": "lane",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 57,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 58,
+          "name": "participant_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 59,
+          "name": "account_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 60,
+          "name": "current_account_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 61,
+          "name": "current_platform_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 62,
+          "name": "summoner_name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 63,
+          "name": "summoner_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 64,
+          "name": "platform_id",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
   "8f28a33438269f29e09147f2f9f1426dedf7f909bb0b15fcf41585500d326e0f": {
     "query": "\n                SELECT DISTINCT ou.id\n                FROM squadov.tft_match_participants AS tmp\n                INNER JOIN squadov.riot_accounts AS ra\n                    ON ra.puuid = tmp.puuid\n                INNER JOIN squadov.riot_account_links AS ral\n                    ON ral.puuid = ra.puuid\n                LEFT JOIN squadov.squad_role_assignments AS sra\n                    ON sra.user_id = ral.user_id\n                LEFT JOIN squadov.squad_role_assignments AS ora\n                    ON ora.squad_id = sra.squad_id\n                INNER JOIN squadov.users AS ou\n                    ON ou.id = ora.user_id\n                        OR ou.id = ral.user_id\n                WHERE tmp.match_uuid = $1\n                ",
     "describe": {
@@ -8584,6 +9020,30 @@
       "nullable": []
     }
   },
+  "9d7d297df223530a42b05e92f19b8b3d30edac88ccae9070127f9839e4f0a929": {
+    "query": "\n            SELECT id, execute_time\n            FROM squadov.deferred_rabbitmq_messages\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "execute_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
   "9dc60fd5e5d07f7f412e64c0f46ff549f0349b1a7407a6185ef8ef994151e2db": {
     "query": "\n            SELECT lmpi.*\n            FROM squadov.lol_match_participant_identities AS lmpi\n            WHERE lmpi.match_uuid = $1\n            ",
     "describe": {
@@ -9284,6 +9744,380 @@
       "nullable": [
         false,
         false
+      ]
+    }
+  },
+  "ab190bfad846e97cc0ea302e4c46da912dcca54163b0c334f4b31171a6f02e80": {
+    "query": "\n            SELECT lmp.*, lmpi.puuid, lmpi.summoner_name, lmpi.summoner_id\n            FROM squadov.lol_match_participants AS lmp\n            INNER JOIN squadov.lol_match_participant_identities AS lmpi\n                ON lmpi.match_uuid = lmp.match_uuid\n                    AND lmpi.participant_id = lmpi.participant_id\n            WHERE lmp.match_uuid = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "participant_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "champion_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "team_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "spell1_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "spell2_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "champ_level",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "win",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 9,
+          "name": "deaths",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 10,
+          "name": "assists",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 11,
+          "name": "item0",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 12,
+          "name": "item1",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 13,
+          "name": "item2",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 14,
+          "name": "item3",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 15,
+          "name": "item4",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 16,
+          "name": "item5",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 17,
+          "name": "item6",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 18,
+          "name": "double_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 19,
+          "name": "triple_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 20,
+          "name": "quadra_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 21,
+          "name": "penta_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 22,
+          "name": "first_blood_kill",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 23,
+          "name": "gold_earned",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 24,
+          "name": "gold_spent",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 25,
+          "name": "neutral_minions_killed_team_jungle",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 26,
+          "name": "neutral_minions_killed_enemy_jungle",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 27,
+          "name": "wards_killed",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 28,
+          "name": "wards_placed",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 29,
+          "name": "vision_wards_bought_in_game",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 30,
+          "name": "sight_wards_bought_in_game",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 31,
+          "name": "neutral_minions_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 32,
+          "name": "total_minions_killed",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 33,
+          "name": "damage_dealt_to_objectives",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 34,
+          "name": "inhibitor_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 35,
+          "name": "turret_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 36,
+          "name": "damage_dealt_to_turrets",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 37,
+          "name": "total_player_score",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 38,
+          "name": "total_score_rank",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 39,
+          "name": "objective_player_score",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 40,
+          "name": "combat_player_score",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 41,
+          "name": "vision_score",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 42,
+          "name": "total_damage_dealt_to_champions",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 43,
+          "name": "physical_damage_dealt_to_champions",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 44,
+          "name": "magic_damage_dealt_to_champions",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 45,
+          "name": "true_damage_dealt_to_champions",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 46,
+          "name": "total_damage_dealt",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 47,
+          "name": "physical_damage_dealt",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 48,
+          "name": "magic_damage_dealt",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 49,
+          "name": "true_damage_dealt",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 50,
+          "name": "total_damage_taken",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 51,
+          "name": "physical_damage_taken",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 52,
+          "name": "magical_damage_taken",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 53,
+          "name": "true_damage_taken",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 54,
+          "name": "total_heal",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 55,
+          "name": "damage_self_mitigated",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 56,
+          "name": "lane",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 57,
+          "name": "puuid",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 58,
+          "name": "summoner_name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 59,
+          "name": "summoner_id",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true
       ]
     }
   },
@@ -12979,6 +13813,380 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "fa5821a5568329cea12c28a54007922421c40c0cae962031e4faa19311ec2d4e": {
+    "query": "\n            SELECT lmp.*, lmpi.puuid, lmpi.summoner_name, lmpi.summoner_id\n            FROM squadov.lol_match_participants AS lmp\n            INNER JOIN squadov.lol_match_participant_identities AS lmpi\n                ON lmpi.match_uuid = lmp.match_uuid\n                    AND lmpi.participant_id = lmp.participant_id\n            WHERE lmp.match_uuid = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "participant_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "champion_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "team_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "spell1_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "spell2_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "champ_level",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "win",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 9,
+          "name": "deaths",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 10,
+          "name": "assists",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 11,
+          "name": "item0",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 12,
+          "name": "item1",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 13,
+          "name": "item2",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 14,
+          "name": "item3",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 15,
+          "name": "item4",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 16,
+          "name": "item5",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 17,
+          "name": "item6",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 18,
+          "name": "double_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 19,
+          "name": "triple_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 20,
+          "name": "quadra_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 21,
+          "name": "penta_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 22,
+          "name": "first_blood_kill",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 23,
+          "name": "gold_earned",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 24,
+          "name": "gold_spent",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 25,
+          "name": "neutral_minions_killed_team_jungle",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 26,
+          "name": "neutral_minions_killed_enemy_jungle",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 27,
+          "name": "wards_killed",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 28,
+          "name": "wards_placed",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 29,
+          "name": "vision_wards_bought_in_game",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 30,
+          "name": "sight_wards_bought_in_game",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 31,
+          "name": "neutral_minions_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 32,
+          "name": "total_minions_killed",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 33,
+          "name": "damage_dealt_to_objectives",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 34,
+          "name": "inhibitor_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 35,
+          "name": "turret_kills",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 36,
+          "name": "damage_dealt_to_turrets",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 37,
+          "name": "total_player_score",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 38,
+          "name": "total_score_rank",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 39,
+          "name": "objective_player_score",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 40,
+          "name": "combat_player_score",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 41,
+          "name": "vision_score",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 42,
+          "name": "total_damage_dealt_to_champions",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 43,
+          "name": "physical_damage_dealt_to_champions",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 44,
+          "name": "magic_damage_dealt_to_champions",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 45,
+          "name": "true_damage_dealt_to_champions",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 46,
+          "name": "total_damage_dealt",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 47,
+          "name": "physical_damage_dealt",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 48,
+          "name": "magic_damage_dealt",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 49,
+          "name": "true_damage_dealt",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 50,
+          "name": "total_damage_taken",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 51,
+          "name": "physical_damage_taken",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 52,
+          "name": "magical_damage_taken",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 53,
+          "name": "true_damage_taken",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 54,
+          "name": "total_heal",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 55,
+          "name": "damage_self_mitigated",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 56,
+          "name": "lane",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 57,
+          "name": "puuid",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 58,
+          "name": "summoner_name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 59,
+          "name": "summoner_id",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true
+      ]
     }
   },
   "fa9934f1aceebce4f4a395e4e9cdab43b061ce0ffded088b184d3ff37ce27fc9": {
