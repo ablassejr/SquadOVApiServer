@@ -5,10 +5,10 @@ use crate::{
         db,
         games::{
             LolMatchlistDto,
-            LolMatchReferenceDto,
             LolMatchDto,
             LolMatchTimelineDto,
-        }
+        },
+        api::riot_region_to_routing,
     },
 };
 use super::RiotApiTask;
@@ -17,9 +17,9 @@ use chrono::{Utc, Duration};
 const RIOT_MAX_AGE_SECONDS: i64 = 86400; // 1 day
 
 impl super::RiotApiHandler {
-    pub async fn get_lol_matches_for_user(&self, account_id: &str, platform: &str, begin_index: i32, end_index: i32) -> Result<Vec<LolMatchReferenceDto>, SquadOvError> {
+    pub async fn get_lol_matches_for_user(&self, puuid: &str, platform: &str, begin_index: i32, end_index: i32) -> Result<LolMatchlistDto, SquadOvError> {
         let client = self.create_http_client()?;
-        let endpoint = Self::build_api_endpoint(&platform.to_lowercase(), &format!("lol/match/v4/matchlists/by-account/{}?beginIndex={}&endIndex={}", account_id, begin_index, end_index));
+        let endpoint = Self::build_api_endpoint(&riot_region_to_routing(platform)?, &format!("lol/match/v5/matches/by-puuid/{}/ids?start={}&count={}", puuid, begin_index, end_index - begin_index));
         self.tick_thresholds().await;
 
         let resp = client.get(&endpoint)
@@ -27,12 +27,12 @@ impl super::RiotApiHandler {
             .await?;
 
         let resp = self.check_for_response_error(resp, "Failed to obtain LOL matches for user").await?;
-        Ok(resp.json::<LolMatchlistDto>().await?.matches)
+        Ok(resp.json::<LolMatchlistDto>().await?)
     }
 
     pub async fn get_lol_match(&self, platform: &str, game_id: i64) -> Result<LolMatchDto, SquadOvError> {
         let client = self.create_http_client()?;
-        let endpoint = Self::build_api_endpoint(&platform.to_lowercase(), &format!("lol/match/v4/matches/{}", game_id));
+        let endpoint = Self::build_api_endpoint(&riot_region_to_routing(platform)?, &format!("lol/match/v5/matches/{}_{}", platform, game_id));
         self.tick_thresholds().await;
 
         let resp = client.get(&endpoint)
@@ -45,7 +45,7 @@ impl super::RiotApiHandler {
 
     pub async fn get_lol_match_timeline(&self, platform: &str, game_id: i64) -> Result<LolMatchTimelineDto, SquadOvError> {
         let client = self.create_http_client()?;
-        let endpoint = Self::build_api_endpoint(&platform.to_lowercase(), &format!("lol/match/v4/timelines/by-match/{}", game_id));
+        let endpoint = Self::build_api_endpoint(&riot_region_to_routing(platform)?, &format!("lol/match/v5/matches/{}_{}/timeline", platform, game_id));
         self.tick_thresholds().await;
 
         let resp = client.get(&endpoint)
@@ -118,7 +118,7 @@ impl super::RiotApiApplicationInterface {
             };
 
             if match_timeline.is_some() {
-                db::store_lol_match_timeline_info(&mut tx, &match_uuid, &match_timeline.as_ref().unwrap()).await?;
+                db::store_lol_match_timeline_info(&mut tx, &match_uuid, &match_timeline.as_ref().unwrap().info).await?;
             }
             tx.commit().await?;
             break;
@@ -136,18 +136,17 @@ impl super::RiotApiApplicationInterface {
             }
         }
 
-        let account_id = summoner.account_id.as_ref().ok_or(SquadOvError::NotFound)?.clone();
         self.rmq.publish(&self.mqconfig.lol_queue, serde_json::to_vec(&RiotApiTask::LolBackfill{
-            account_id,
+            puuid: summoner.puuid.clone(),
             platform: String::from(platform),
         })?, RABBITMQ_DEFAULT_PRIORITY, RIOT_MAX_AGE_SECONDS).await;
         Ok(())
     }
 
-    pub async fn backfill_user_lol_matches(&self, account_id: &str, platform: &str) -> Result<(), SquadOvError> {
-        log::info!("Backfill LoL Matches {} [{}]", account_id, platform);
-        let matches = self.api.get_lol_matches_for_user(account_id, platform, 0, LOL_BACKFILL_AMOUNT).await?;
-        db::tick_riot_account_lol_backfill_time(&*self.db, account_id).await?;
+    pub async fn backfill_user_lol_matches(&self, puuid: &str, platform: &str) -> Result<(), SquadOvError> {
+        log::info!("Backfill LoL Matches {} [{}]", puuid, platform);
+        let matches = self.api.get_lol_matches_for_user(puuid, platform, 0, LOL_BACKFILL_AMOUNT).await?;
+        db::tick_riot_account_lol_backfill_time(&*self.db, puuid).await?;
 
         let backfill_matches = db::get_lol_matches_that_require_backfill(&*self.db, &matches).await?;
         log::info!("\tLoL Backfill Count: {}", backfill_matches.len());

@@ -63,7 +63,7 @@ where
     Ok(())
 }
 
-pub async fn tick_riot_account_lol_backfill_time<'a, T>(ex: T, account_id: &str) -> Result<(), SquadOvError>
+pub async fn tick_riot_account_lol_backfill_time<'a, T>(ex: T, puuid: &str) -> Result<(), SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
 {
@@ -71,9 +71,9 @@ where
         "
         UPDATE squadov.riot_accounts
         SET last_backfill_lol_time = NOW()
-        WHERE account_id = $1
+        WHERE puuid = $1
         ",
-        account_id,
+        puuid,
     )
         .execute(ex)
         .await?;

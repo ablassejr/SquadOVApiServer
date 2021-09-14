@@ -4,13 +4,12 @@ use crate::{
     matches,
     riot::games::{
         LolMatchDto,
-        LolMatchTimelineDto,
-        LolParticipantIdentityDto,
-        LolTeamStatsDto,
-        LolTeamBansDto,
+        LolTeamDto,
+        LolBanDto,
+        LolMatchTimelineInfoDto,
         LolParticipantDto,
         LolMatchParticipantFrameDto,
-        LolMatchEventDto
+        LolMatchEventDto,
     }
 };
 use sqlx::{Transaction, Postgres};
@@ -72,7 +71,7 @@ pub async fn create_or_get_match_uuid_for_lol_match(ex: &mut Transaction<'_, Pos
     })
 }
 
-async fn store_lol_match_participant_identities(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, iden: &[LolParticipantIdentityDto]) -> Result<(), SquadOvError> {
+async fn store_lol_match_participant_identities(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, iden: &[LolParticipantDto]) -> Result<(), SquadOvError> {
     if iden.is_empty() {
         return Ok(());
     }
@@ -87,14 +86,14 @@ async fn store_lol_match_participant_identities(ex: &mut Transaction<'_, Postgre
                 current_platform_id,
                 summoner_name,
                 summoner_id,
-                platform_id
+                platform_id,
+                puuid
             )
             VALUES
         ".to_string()
     ];
 
     for id in iden {
-        let player_ref = id.player.as_ref();
         sql.push(
             format!("
                 (
@@ -105,17 +104,19 @@ async fn store_lol_match_participant_identities(ex: &mut Transaction<'_, Postgre
                     {current_platform_id},
                     {summoner_name},
                     {summoner_id},
-                    {platform_id}
+                    {platform_id},
+                    {puuid}
                 )
                 ",
                 match_uuid=match_uuid,
                 participant_id=id.participant_id,
-                account_id=crate::sql_format_option_string(&player_ref.and_then(|x| { Some(x.account_id.clone()) })),
-                current_account_id=crate::sql_format_option_string(&player_ref.and_then(|x| { Some(x.current_account_id.clone()) })),
-                current_platform_id=crate::sql_format_option_string(&player_ref.and_then(|x| { Some(x.current_platform_id.clone()) })),
-                summoner_name=crate::sql_format_option_string(&player_ref.and_then(|x| { Some(x.summoner_name.clone()) })),
-                summoner_id=crate::sql_format_option_string(&player_ref.and_then(|x| { x.summoner_id.as_ref().cloned() })),
-                platform_id=crate::sql_format_option_string(&player_ref.and_then(|x| { Some(x.platform_id.clone()) })),
+                account_id="NULL",
+                current_account_id="NULL",
+                current_platform_id="NULL",
+                summoner_name=crate::sql_format_string(&id.summoner_name),
+                summoner_id=crate::sql_format_string(&id.summoner_id),
+                platform_id="NULL",
+                puuid=crate::sql_format_string(&id.puuid),
             )
         );
         sql.push(",".to_string());
@@ -128,10 +129,10 @@ async fn store_lol_match_participant_identities(ex: &mut Transaction<'_, Postgre
 
 struct WrappedTeamBan<'a> {
     team_id: i32,
-    base: &'a LolTeamBansDto
+    base: &'a LolBanDto
 }
 
-async fn store_lol_match_teams(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, teams: &[LolTeamStatsDto]) -> Result<(), SquadOvError> {
+async fn store_lol_match_teams(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, teams: &[LolTeamDto]) -> Result<(), SquadOvError> {
     if teams.is_empty() {
         return Ok(());
     }
@@ -181,18 +182,18 @@ async fn store_lol_match_teams(ex: &mut Transaction<'_, Postgres>, match_uuid: &
             ",
                 match_uuid=match_uuid,
                 team_id=t.team_id,
-                tower_kills=t.tower_kills,
-                rift_herald_kills=t.rift_herald_kills,
-                first_blood=crate::sql_format_bool(t.first_blood),
-                inhibitor_kills=t.inhibitor_kills,
-                first_baron=crate::sql_format_bool(t.first_baron),
-                first_dragon=crate::sql_format_bool(t.first_dragon),
-                dragon_kills=t.dragon_kills,
-                baron_kills=t.baron_kills,
-                first_inhibitor=crate::sql_format_bool(t.first_inhibitor),
-                first_tower=crate::sql_format_bool(t.first_tower),
-                first_rift_herald=crate::sql_format_bool(t.first_rift_herald),
-                win=&t.win,
+                tower_kills=t.objectives.tower.kills,
+                rift_herald_kills=t.objectives.rift_herald.kills,
+                first_blood=crate::sql_format_bool(t.objectives.champion.first),
+                inhibitor_kills=t.objectives.inhibitor.kills,
+                first_baron=crate::sql_format_bool(t.objectives.baron.first),
+                first_dragon=crate::sql_format_bool(t.objectives.dragon.first),
+                dragon_kills=t.objectives.dragon.kills,
+                baron_kills=t.objectives.baron.kills,
+                first_inhibitor=crate::sql_format_bool(t.objectives.inhibitor.first),
+                first_tower=crate::sql_format_bool(t.objectives.tower.first),
+                first_rift_herald=crate::sql_format_bool(t.objectives.rift_herald.first),
+                win=if t.win { "Win" } else { "Fail" },
             )
         );
         sql.push(",".to_string());
@@ -390,59 +391,59 @@ async fn store_lol_match_participants(ex: &mut Transaction<'_, Postgres>, match_
                 participant_id=p.participant_id,
                 champion_id=p.champion_id,
                 team_id=p.team_id,
-                spell1_id=p.spell1_id,
-                spell2_id =p.spell2_id ,
-                champ_level=p.stats.champ_level,
-                win=p.stats.win,
-                kills=p.stats.kills,
-                deaths=p.stats.deaths,
-                assists=p.stats.assists,
-                item0=p.stats.item0,
-                item1=p.stats.item1,
-                item2=p.stats.item2,
-                item3=p.stats.item3,
-                item4=p.stats.item4,
-                item5=p.stats.item5,
-                item6=p.stats.item6,
-                double_kills=p.stats.double_kills,
-                triple_kills=p.stats.triple_kills,
-                quadra_kills=p.stats.quadra_kills,
-                penta_kills=p.stats.penta_kills,
-                first_blood_kill=p.stats.first_blood_kill,
-                gold_earned=p.stats.gold_earned,
-                gold_spent=p.stats.gold_spent,
-                neutral_minions_killed_team_jungle=p.stats.neutral_minions_killed_team_jungle,
-                neutral_minions_killed_enemy_jungle=p.stats.neutral_minions_killed_enemy_jungle,
-                wards_killed=p.stats.wards_killed,
-                wards_placed=p.stats.wards_placed,
-                vision_wards_bought_in_game=p.stats.vision_wards_bought_in_game,
-                sight_wards_bought_in_game=p.stats.sight_wards_bought_in_game,
-                neutral_minions_kills=p.stats.neutral_minions_kills,
-                total_minions_killed=p.stats.total_minions_killed,
-                damage_dealt_to_objectives=p.stats.damage_dealt_to_objectives,
-                inhibitor_kills=p.stats.inhibitor_kills,
-                turret_kills=p.stats.turret_kills,
-                damage_dealt_to_turrets=p.stats.damage_dealt_to_turrets,
-                total_player_score=p.stats.total_player_score,
-                total_score_rank=p.stats.total_score_rank,
-                objective_player_score=p.stats.objective_player_score,
-                combat_player_score=p.stats.combat_player_score,
-                vision_score=p.stats.vision_score,
-                total_damage_dealt_to_champions=p.stats.total_damage_dealt_to_champions,
-                physical_damage_dealt_to_champions=p.stats.physical_damage_dealt_to_champions,
-                magic_damage_dealt_to_champions=p.stats.magic_damage_dealt_to_champions,
-                true_damage_dealt_to_champions=p.stats.true_damage_dealt_to_champions,
-                total_damage_dealt=p.stats.total_damage_dealt,
-                physical_damage_dealt=p.stats.physical_damage_dealt,
-                magic_damage_dealt=p.stats.magic_damage_dealt ,
-                true_damage_dealt=p.stats.true_damage_dealt,
-                total_damage_taken=p.stats.total_damage_taken ,
-                physical_damage_taken=p.stats.physical_damage_taken,
-                magical_damage_taken=p.stats.magical_damage_taken,
-                true_damage_taken=p.stats.true_damage_taken,
-                total_heal=p.stats.total_heal,
-                damage_self_mitigated=p.stats.damage_self_mitigated,
-                lane=&p.timeline.lane,
+                spell1_id=p.summoner1_id,
+                spell2_id =p.summoner2_id ,
+                champ_level=p.champ_level,
+                win=p.win,
+                kills=p.kills,
+                deaths=p.deaths,
+                assists=p.assists,
+                item0=p.item0,
+                item1=p.item1,
+                item2=p.item2,
+                item3=p.item3,
+                item4=p.item4,
+                item5=p.item5,
+                item6=p.item6,
+                double_kills=p.double_kills,
+                triple_kills=p.triple_kills,
+                quadra_kills=p.quadra_kills,
+                penta_kills=p.penta_kills,
+                first_blood_kill=p.first_blood_kill,
+                gold_earned=p.gold_earned,
+                gold_spent=p.gold_spent,
+                neutral_minions_killed_team_jungle=p.neutral_minions_killed,
+                neutral_minions_killed_enemy_jungle=p.neutral_minions_killed,
+                wards_killed=p.wards_killed,
+                wards_placed=p.wards_placed,
+                vision_wards_bought_in_game=p.vision_wards_bought_in_game,
+                sight_wards_bought_in_game=p.sight_wards_bought_in_game,
+                neutral_minions_kills=p.neutral_minions_killed,
+                total_minions_killed=p.total_minions_killed,
+                damage_dealt_to_objectives=p.damage_dealt_to_objectives,
+                inhibitor_kills=p.inhibitor_kills,
+                turret_kills=p.turret_kills,
+                damage_dealt_to_turrets=p.damage_dealt_to_turrets,
+                total_player_score=0,
+                total_score_rank=0,
+                objective_player_score=0,
+                combat_player_score=0,
+                vision_score=p.vision_score,
+                total_damage_dealt_to_champions=p.total_damage_dealt_to_champions,
+                physical_damage_dealt_to_champions=p.physical_damage_dealt_to_champions,
+                magic_damage_dealt_to_champions=p.magic_damage_dealt_to_champions,
+                true_damage_dealt_to_champions=p.true_damage_dealt_to_champions,
+                total_damage_dealt=p.total_damage_dealt,
+                physical_damage_dealt=p.physical_damage_dealt,
+                magic_damage_dealt=p.magic_damage_dealt,
+                true_damage_dealt=p.true_damage_dealt,
+                total_damage_taken=p.total_damage_taken,
+                physical_damage_taken=p.physical_damage_taken,
+                magical_damage_taken=p.magic_damage_taken,
+                true_damage_taken=p.true_damage_taken,
+                total_heal=p.total_heal,
+                damage_self_mitigated=p.damage_self_mitigated,
+                lane=&p.lane,
             )
         );
         sql.push(",".to_string());
@@ -457,6 +458,7 @@ pub async fn store_lol_match_info(ex: &mut Transaction<'_, Postgres>, match_uuid
     // This must ABSOLUTELY fail when it detects a conflict as we should be able safely assume that the data we'll get from the 
     // match history endpoint is the same every time. Therefore, any duplicates here would be redundant and furthermore, the events
     // we store aren't really unique so if we continue we'd get actual duplicated data there.
+    let split: Vec<&str> = lol_match.metadata.match_id.split("_").collect();
     sqlx::query!(
         "
         INSERT INTO squadov.lol_match_info (
@@ -487,24 +489,24 @@ pub async fn store_lol_match_info(ex: &mut Transaction<'_, Postgres>, match_uuid
         )
         ",
         match_uuid,
-        lol_match.game_id,
-        &lol_match.platform_id,
-        lol_match.queue_id,
-        &lol_match.game_type,
-        lol_match.game_duration,
-        &lol_match.game_creation.ok_or(SquadOvError::BadRequest)?,
-        lol_match.season_id,
-        &lol_match.game_version,
-        lol_match.map_id,
-        &lol_match.game_mode
+        &split[1].parse::<i64>()?,
+        split[0],
+        lol_match.info.queue_id,
+        &lol_match.info.game_type,
+        lol_match.info.game_duration,
+        &lol_match.info.game_creation.ok_or(SquadOvError::BadRequest)?,
+        0,
+        &lol_match.info.game_version,
+        lol_match.info.map_id,
+        &lol_match.info.game_mode,
     )
         .execute(&mut *ex)
         .await?;
     
     // The ordering here is pretty essential as players has foreign keys pointing to both teams and identities.
-    store_lol_match_participant_identities(&mut *ex, match_uuid, &lol_match.participant_identities).await?;
-    store_lol_match_teams(&mut *ex, match_uuid, &lol_match.teams).await?;
-    store_lol_match_participants(&mut *ex, match_uuid, &lol_match.participants).await?;
+    store_lol_match_participant_identities(&mut *ex, match_uuid, &lol_match.info.participants).await?;
+    store_lol_match_teams(&mut *ex, match_uuid, &lol_match.info.teams).await?;
+    store_lol_match_participants(&mut *ex, match_uuid, &lol_match.info.participants).await?;
     Ok(())
 }
 
@@ -680,7 +682,7 @@ async fn store_lol_match_timeline_events<'a>(ex: &mut Transaction<'_, Postgres>,
     Ok(())
 }
 
-pub async fn store_lol_match_timeline_info(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, timeline: &LolMatchTimelineDto) -> Result<(), SquadOvError> {
+pub async fn store_lol_match_timeline_info(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, timeline: &LolMatchTimelineInfoDto) -> Result<(), SquadOvError> {
     sqlx::query!(
         "
         INSERT INTO squadov.lol_match_timeline (

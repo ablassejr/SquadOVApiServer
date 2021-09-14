@@ -9,10 +9,7 @@ pub struct LolMatchLink {
     pub match_id: i64
 }
 
-#[derive(Deserialize)]
-pub struct LolMatchlistDto {
-    pub matches: Vec<LolMatchReferenceDto>
-}
+pub type LolMatchlistDto = Vec<String>;
 
 #[derive(Deserialize)]
 pub struct LolMatchReferenceDto {
@@ -22,244 +19,333 @@ pub struct LolMatchReferenceDto {
     pub platform_id: String
 }
 
+#[derive(Serialize,Deserialize,Default)]
+#[serde(rename_all="camelCase")]
+pub struct LolMatchMetadataDto {
+    pub data_version: String,
+    pub match_id: String,
+    pub participants: Vec<String>,
+}
+
+#[derive(Serialize,Deserialize,Default)]
+#[serde(rename_all="camelCase")]
+pub struct LolMatchInfoDto {
+    #[serde(deserialize_with="crate::parse_utc_time_from_milliseconds")]
+    pub game_creation: Option<DateTime<Utc>>, // timestamp when champ select ended and loading screen appears
+    pub game_duration: i64, // seconds
+    pub game_id: i64,
+    pub game_mode: String,
+    pub game_name: String,
+    pub game_start_timestamp: i64,
+    pub game_type: String,
+    pub game_version: String,
+    pub map_id: i32,
+    pub participants: Vec<LolParticipantDto>,
+    pub queue_id: i32,
+    pub teams: Vec<LolTeamDto>,
+}
+
 #[derive(Serialize,Deserialize)]
 pub struct LolMatchDto {
-    #[serde(rename="gameId")]
-    pub game_id: i64,
-    #[serde(rename="queueId")]
-    pub queue_id: i32,
-    #[serde(rename="gameType")]
-    pub game_type: String,
-    #[serde(rename="gameDuration")]
-    pub game_duration: i64, // seconds
-    #[serde(rename="platformId")]
-    pub platform_id: String,
-    #[serde(rename="gameCreation", deserialize_with="crate::parse_utc_time_from_milliseconds")]
-    pub game_creation: Option<DateTime<Utc>>, // timestamp when champ select ended and loading screen appears
-    #[serde(rename="seasonId")]
-    pub season_id: i32,
-    #[serde(rename="gameVersion")]
-    pub game_version: String,
-    #[serde(rename="mapId")]
-    pub map_id: i32,
-    #[serde(rename="gameMode")]
-    pub game_mode: String,
-    #[serde(rename="participantIdentities")]
-    pub participant_identities: Vec<LolParticipantIdentityDto>,
-    pub teams: Vec<LolTeamStatsDto>,
-    pub participants: Vec<LolParticipantDto>,
+    pub metadata: LolMatchMetadataDto,
+    pub info: LolMatchInfoDto,
 }
 
-#[derive(Serialize,Deserialize)]
-pub struct LolParticipantIdentityDto {
-    #[serde(rename="participantId")]
-    pub participant_id: i32,
-    pub player: Option<LolPlayerDto>
-}
-
-#[derive(Serialize,Deserialize)]
-pub struct LolPlayerDto {
-    #[serde(rename="accountId")]
-    pub account_id: String,
-    #[serde(rename="currentAccountId")]
-    pub current_account_id: String,
-    #[serde(rename="currentPlatformId")]
-    pub current_platform_id: String,
-    #[serde(rename="summonerName")]
-    pub summoner_name: String,
-    #[serde(rename="summonerId")]
-    pub summoner_id: Option<String>,
-    #[serde(rename="platformId")]
-    pub platform_id: String,
-}
-
-#[derive(Serialize,Deserialize)]
-pub struct LolTeamStatsDto {
-    #[serde(rename="towerKills")]
-    pub tower_kills: i32,
-    #[serde(rename="riftHeraldKills")]
-    pub rift_herald_kills: i32,
-    #[serde(rename="firstBlood")]
-    pub first_blood: bool,
-    #[serde(rename="inhibitorKills")]
-    pub inhibitor_kills: i32,
-    #[serde(rename="firstBaron")]
-    pub first_baron: bool,
-    #[serde(rename="firstDragon")]
-    pub first_dragon: bool,
-    #[serde(rename="dragonKills")]
-    pub dragon_kills: i32,
-    #[serde(rename="baronKills")]
-    pub baron_kills: i32,
-    #[serde(rename="firstInhibitor")]
-    pub first_inhibitor: bool,
-    #[serde(rename="firstTower")]
-    pub first_tower: bool,
-    #[serde(rename="firstRiftHerald")]
-    pub first_rift_herald: bool,
-    #[serde(rename="teamId")]
+#[derive(Serialize,Deserialize,Default)]
+#[serde(rename_all="camelCase")]
+pub struct LolTeamDto {
     pub team_id: i32,
-    pub win: String,
-    pub bans: Vec<LolTeamBansDto>
+    pub win: bool,
+    pub bans: Vec<LolBanDto>,
+    pub objectives: LolObjectivesDto,
 }
 
-#[derive(Serialize,Deserialize)]
-pub struct LolTeamBansDto {
-    #[serde(rename="championId")]
+#[derive(Serialize,Deserialize,Default)]
+#[serde(rename_all="camelCase")]
+pub struct LolBanDto {
     pub champion_id: i32,
-    #[serde(rename="pickTurn")]
-    pub pick_turn: i32
+    pub pick_turn: i32,
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize,Default)]
+#[serde(rename_all="camelCase")]
+pub struct LolObjectivesDto {
+    pub baron: LolSingleObjectiveDto,
+    pub champion: LolSingleObjectiveDto,
+    pub dragon: LolSingleObjectiveDto,
+    pub inhibitor: LolSingleObjectiveDto,
+    pub rift_herald: LolSingleObjectiveDto,
+    pub tower: LolSingleObjectiveDto,
+}
+
+#[derive(Serialize,Deserialize,Default)]
+#[serde(rename_all="camelCase")]
+pub struct LolSingleObjectiveDto {
+    pub first: bool,
+    pub kills: i32,
+}
+
+#[derive(Serialize,Deserialize,Default)]
+#[serde(rename_all="camelCase")]
 pub struct LolParticipantDto {
-    #[serde(rename="participantId")]
-    pub participant_id: i32,
-    #[serde(rename="championId")]
-    pub champion_id: i32,
-    #[serde(rename="teamId")]
-    pub team_id: i32,
-    #[serde(rename="spell1Id")]
-    pub spell1_id: i32,
-    #[serde(rename="spell2Id")]
-    pub spell2_id: i32,
-    pub stats: LolParticipantStatsDto,
-    pub timeline: LolParticipantTimelineDto
-}
-
-#[derive(Serialize,Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LolParticipantTimelineDto {
-    pub participant_id: i32,
-    pub lane: String
-}
-
-#[derive(Serialize,Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LolParticipantStatsDto {
-    // Player Identity
-    pub participant_id: i32,
+    #[serde(default)]
+    pub assists: i32,
+    #[serde(default)]
+    pub baron_kills: i32,
+    #[serde(default)]
+    pub bounty_level: i32,
+    #[serde(default)]
+    pub champ_experience: i32,
     #[serde(default)]
     pub champ_level: i32,
     #[serde(default)]
-    pub win: bool,
-    // KDA
+    pub champion_id: i32,
     #[serde(default)]
-    pub kills: i32,
+    pub champion_name: String,
+    #[serde(default)]
+    pub champion_transform: i32,
+    #[serde(default)]
+    pub consumables_purchased: i32,
+    #[serde(default)]
+    pub damage_dealt_to_buildings: i32,
+    #[serde(default)]
+    pub damage_dealt_to_objectives: i32,
+    #[serde(default)]
+    pub damage_dealt_to_turrets: i32,
+    #[serde(default)]
+    pub damage_self_mitigated: i32,
     #[serde(default)]
     pub deaths: i32,
     #[serde(default)]
-    pub assists: i32,
-    // Items
-    #[serde(default)]
-    pub item0: i32,
-    #[serde(default)]
-    pub item1: i32,
-    #[serde(default)]
-    pub item2: i32,
-    #[serde(default)]
-    pub item3: i32,
-    #[serde(default)]
-    pub item4: i32,
-    #[serde(default)]
-    pub item5: i32,
-    #[serde(default)]
-    pub item6: i32,
-    // Notable kills
+    pub detector_wards_placed: i32,
     #[serde(default)]
     pub double_kills: i32,
     #[serde(default)]
-    pub triple_kills: i32,
+    pub dragon_kills: i32,
     #[serde(default)]
-    pub quadra_kills: i32,
-    #[serde(default)]
-    pub penta_kills: i32,
+    pub first_blood_assist: bool,
     #[serde(default)]
     pub first_blood_kill: bool,
-    // Econ Stats
+    #[serde(default)]
+    pub first_tower_assist: bool,
+    #[serde(default)]
+    pub first_tower_kill: bool,
+    #[serde(default)]
+    pub game_ended_in_early_surrender: bool,
+    #[serde(default)]
+    pub game_ended_in_surrender: bool,
     #[serde(default)]
     pub gold_earned: i32,
     #[serde(default)]
     pub gold_spent: i32,
-    // Neutral Stats
     #[serde(default)]
-    pub neutral_minions_killed_team_jungle: i32,
+    pub individual_position: String,
     #[serde(default)]
-    pub neutral_minions_killed_enemy_jungle: i32,
+    pub inhibitor_kills: i32,
+    #[serde(default)]
+    pub inhibitor_takedowns: i32,
+    #[serde(default)]
+    pub inhibitors_lost: i32,
+    #[serde(rename="item0", default)]
+    pub item0: i32,
+    #[serde(rename="item1", default)]
+    pub item1: i32,
+    #[serde(rename="item2", default)]
+    pub item2: i32,
+    #[serde(rename="item3", default)]
+    pub item3: i32,
+    #[serde(rename="item4", default)]
+    pub item4: i32,
+    #[serde(rename="item5", default)]
+    pub item5: i32,
+    #[serde(rename="item6", default)]
+    pub item6: i32,
+    #[serde(default)]
+    pub items_purchased: i32,
+    #[serde(default)]
+    pub killing_sprees: i32,
+    #[serde(default)]
+    pub kills: i32,
+    #[serde(default)]
+    pub lane: String,
+    #[serde(default)]
+    pub largest_critical_strike: i32,
+    #[serde(default)]
+    pub largest_killing_spree: i32,
+    #[serde(default)]
+    pub largest_multi_kill: i32,
+    #[serde(default)]
+    pub longest_time_spent_living: i32,
+    #[serde(default)]
+    pub magic_damage_dealt: i32,
+    #[serde(default)]
+    pub magic_damage_dealt_to_champions: i32,
+    #[serde(default)]
+    pub magic_damage_taken: i32,
+    #[serde(default)]
+    pub neutral_minions_killed: i32,
+    #[serde(default)]
+    pub nexus_kills: i32,
+    #[serde(default)]
+    pub nexus_takedowns: i32,
+    #[serde(default)]
+    pub nexus_lost: i32,
+    #[serde(default)]
+    pub objectives_stolen: i32,
+    #[serde(default)]
+    pub objectives_stolen_assists: i32,
+    #[serde(default)]
+    pub participant_id: i32,
+    #[serde(default)]
+    pub penta_kills: i32,
+    pub perks: LolPerksDto,
+    #[serde(default)]
+    pub physical_damage_dealt: i32,
+    #[serde(default)]
+    pub physical_damage_dealt_to_champions: i32,
+    #[serde(default)]
+    pub physical_damage_taken: i32,
+    #[serde(default)]
+    pub profile_icon: i32,
+    #[serde(default)]
+    pub puuid: String,
+    #[serde(default)]
+    pub quadra_kills: i32,
+    #[serde(default)]
+    pub riot_id_name: String,
+    #[serde(default)]
+    pub riot_id_tagline: String,
+    #[serde(default)]
+    pub role: String,
+    #[serde(default)]
+    pub sight_wards_bought_in_game: i32,
+    #[serde(rename="spell1Casts", default)]
+    pub spell1_casts: i32,
+    #[serde(rename="spell2Casts", default)]
+    pub spell2_casts: i32,
+    #[serde(rename="spell3Casts", default)]
+    pub spell3_casts: i32,
+    #[serde(rename="spell4Casts", default)]
+    pub spell4_casts: i32,
+    #[serde(rename="summoner1Casts", default)]
+    pub summoner1_casts: i32,
+    #[serde(rename="summoner1Id", default)]
+    pub summoner1_id: i32,
+    #[serde(rename="summoner2Casts", default)]
+    pub summoner2_casts: i32,
+    #[serde(rename="summoner2Id", default)]
+    pub summoner2_id: i32,
+    #[serde(default)]
+    pub summoner_id: String,
+    #[serde(default)]
+    pub summoner_level: i32,
+    #[serde(default)]
+    pub summoner_name: String,
+    #[serde(default)]
+    pub team_early_surrendered: bool,
+    #[serde(default)]
+    pub team_id: i32,
+    #[serde(default)]
+    pub team_position: String,
+    #[serde(rename="timeCCingOthers", default)]
+    pub time_ccing_others: i32,
+    #[serde(default)]
+    pub time_played: i32,
+    #[serde(default)]
+    pub total_damage_dealt: i32,
+    #[serde(default)]
+    pub total_damage_dealt_to_champions: i32,
+    #[serde(default)]
+    pub total_damage_shielded_on_teammates: i32,
+    #[serde(default)]
+    pub total_damage_taken: i32,
+    #[serde(default)]
+    pub total_heal: i32,
+    #[serde(default)]
+    pub total_heals_on_teammates: i32,
+    #[serde(default)]
+    pub total_minions_killed: i32,
+    #[serde(rename="totalTimeCCDealt", default)]
+    pub total_time_cc_dealt: i32,
+    #[serde(default)]
+    pub total_time_spent_dead: i32,
+    #[serde(default)]
+    pub total_units_healed: i32,
+    #[serde(default)]
+    pub triple_kills: i32,
+    #[serde(default)]
+    pub true_damage_dealt: i32,
+    #[serde(default)]
+    pub true_damage_dealt_to_champions: i32,
+    #[serde(default)]
+    pub true_damage_taken: i32,
+    #[serde(default)]
+    pub turret_kills: i32,
+    #[serde(default)]
+    pub turret_takedowns: i32,
+    #[serde(default)]
+    pub turrets_lost: i32,
+    #[serde(default)]
+    pub unreal_kills: i32,
+    #[serde(default)]
+    pub vision_score: i32,
+    #[serde(default)]
+    pub vision_wards_bought_in_game: i32,
     #[serde(default)]
     pub wards_killed: i32,
     #[serde(default)]
     pub wards_placed: i32,
     #[serde(default)]
-    pub vision_wards_bought_in_game: i32,
-    #[serde(default)]
-    pub sight_wards_bought_in_game: i32,
-    #[serde(default)]
-    pub neutral_minions_kills: i32,
-    #[serde(default)]
-    pub total_minions_killed: i32,
-    // Objective Stats
-    #[serde(default)]
-    pub damage_dealt_to_objectives: i64,
-    #[serde(default)]
-    pub inhibitor_kills: i32,
-    #[serde(default)]
-    pub turret_kills: i32,
-    #[serde(default)]
-    pub damage_dealt_to_turrets: i64,
-    // Score
-    #[serde(default)]
-    pub total_player_score: i32,
-    #[serde(default)]
-    pub total_score_rank: i32,
-    #[serde(default)]
-    pub objective_player_score: i32,
-    #[serde(default)]
-    pub combat_player_score: i32,
-    #[serde(default)]
-    pub vision_score: i64,
-    // Damage Dealt to Champions
-    #[serde(default)]
-    pub total_damage_dealt_to_champions: i64,
-    #[serde(default)]
-    pub physical_damage_dealt_to_champions: i64,
-    #[serde(default)]
-    pub magic_damage_dealt_to_champions: i64,
-    #[serde(default)]
-    pub true_damage_dealt_to_champions: i64,
-    // Damage Dealt
-    #[serde(default)]
-    pub total_damage_dealt: i64,
-    #[serde(default)]
-    pub physical_damage_dealt: i64,
-    #[serde(default)]
-    pub magic_damage_dealt: i64, 
-    #[serde(default)]
-    pub true_damage_dealt: i64,
-    // Damage Taken
-    #[serde(default)]
-    pub total_damage_taken: i64, 
-    #[serde(default)]
-    pub physical_damage_taken: i64,
-    #[serde(default)]
-    pub magical_damage_taken: i64,
-    #[serde(default)]
-    pub true_damage_taken: i64,
-    // Other Combat  
-    #[serde(default)]  
-    pub total_heal: i64,
-    #[serde(default)]
-    pub damage_self_mitigated: i64,
+    pub win: bool,
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize,Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LolPerksDto {
+    pub stat_perks: LolPerkStatsDto,
+    pub styles: Vec<LolPerkStyleDto>,
+}
+
+#[derive(Serialize,Deserialize,Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LolPerkStatsDto {
+    pub defense: i32,
+    pub flex: i32,
+    pub offense: i32,
+}
+
+#[derive(Serialize,Deserialize,Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LolPerkStyleDto {
+    pub description: String,
+    pub selections: Vec<LolPerkStyleSelectionDto>,
+    pub style: i32,
+}
+
+#[derive(Serialize,Deserialize,Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LolPerkStyleSelectionDto {
+    pub perk: i32,
+    pub var1: i32,
+    pub var2: i32,
+    pub var3: i32,
+}
+
+#[derive(Serialize,Deserialize,Default)]
 #[serde(rename_all = "camelCase")]
 pub struct LolMatchTimelineDto {
+    pub metadata: LolMatchMetadataDto,
+    pub info: LolMatchTimelineInfoDto,
+}
+
+#[derive(Serialize,Deserialize,Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LolMatchTimelineInfoDto {
     pub frames: Vec<LolMatchFrameDto>,
     pub frame_interval: i64
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize,Default)]
 #[serde(rename_all = "camelCase")]
 pub struct LolMatchFrameDto {
     pub participant_frames: HashMap<String, LolMatchParticipantFrameDto>,
@@ -267,7 +353,7 @@ pub struct LolMatchFrameDto {
     pub timestamp: i64,
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize,Default)]
 #[serde(rename_all = "camelCase")]
 pub struct LolMatchParticipantFrameDto {
     pub participant_id: i32,
@@ -280,13 +366,13 @@ pub struct LolMatchParticipantFrameDto {
     pub position: Option<LolMatchPositionDto>,
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize,Default)]
 pub struct LolMatchPositionDto {
     pub x: i32,
     pub y: i32,
 }
 
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize,Default)]
 #[serde(rename_all = "camelCase")]
 pub struct LolMatchEventDto {
     pub lane_type: Option<String>,
@@ -314,7 +400,7 @@ pub struct LolMatchEventDto {
     pub victim_id: Option<i32>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug,Default)]
 #[serde(rename_all = "camelCase")]
 pub struct LolMiniParticipantStats {
     pub participant_id: i32,

@@ -71,7 +71,7 @@ pub enum RiotApiTask {
         game_id: i64,
     },
     LolBackfill{
-        account_id: String,
+        puuid: String,
         platform: String,
     },
     LolMatch{
@@ -227,7 +227,7 @@ impl RabbitMqListener for RiotApiApplicationInterface {
                     _ => return Err(err)
                 }
             },
-            RiotApiTask::LolBackfill{account_id, platform} => self.backfill_user_lol_matches(&account_id, &platform).await?,
+            RiotApiTask::LolBackfill{puuid, platform} => self.backfill_user_lol_matches(&puuid, &platform).await?,
             RiotApiTask::LolMatch{platform, game_id} => match self.obtain_lol_match_info(&platform, game_id).await {
                 Ok(_) => (),
                 Err(err) => match err {
@@ -253,10 +253,15 @@ impl RabbitMqListener for RiotApiApplicationInterface {
 pub fn riot_region_to_routing(region: &str) -> Result<String, SquadOvError> {
     let region = region.to_uppercase();
 
-    Ok(String::from(match region.as_str() {
-        "NA" | "BR" | "LAN" | "LAS" | "OCE" => "americas",
-        "KR" | "JP" => "asia",
-        "EUNE" | "EUW" | "TR" | "RU" => "europe",
-        _ => return Err(SquadOvError::BadRequest)
-    }))
+    Ok(String::from(
+        if region.starts_with("NA") || region.starts_with("BR") || region.starts_with("LAN") || region.starts_with("LAS") || region.starts_with("OCE") {
+            "americas"
+        } else if region.starts_with("KR") || region.starts_with("JP") {
+            "asia"
+        } else if region.starts_with("NA") || region.starts_with("NA") || region.starts_with("NA") || region.starts_with("NA") {
+            "europe"
+        } else {
+            return Err(SquadOvError::BadRequest);
+        }
+    ))
 }

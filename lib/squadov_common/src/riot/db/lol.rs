@@ -10,7 +10,8 @@ use crate::{
     SquadOvError,
     riot::games::{
         LolMatchLink,
-        LolMatchReferenceDto
+        LolMatchlistDto,
+        LolMatchReferenceDto,
     },
 };
 use sqlx::{Executor, Postgres};
@@ -55,7 +56,7 @@ where
     )
 }
 
-pub async fn get_lol_matches_that_require_backfill<'a, T>(ex: T, match_ids: &[LolMatchReferenceDto]) -> Result<Vec<LolMatchReferenceDto>, SquadOvError>
+pub async fn get_lol_matches_that_require_backfill<'a, T>(ex: T, match_ids: &LolMatchlistDto) -> Result<Vec<LolMatchReferenceDto>, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
 {
@@ -63,8 +64,19 @@ where
     let mut game_ids: Vec<i64> = Vec::new();
 
     for mi in match_ids {
-        platforms.push(mi.platform_id.clone());
-        game_ids.push(mi.game_id);
+        let split = mi.split("_").collect::<Vec<&str>>();
+        if split.len() != 2 {
+            log::warn!("Invalid LoL match ID [split]: {}", mi);
+            continue;
+        }
+
+        if let Ok(id) = split[1].parse::<i64>() {
+            platforms.push(split[0].to_string());
+            game_ids.push(id);
+        } else {
+            log::warn!("Invalid LoL match ID [parse]: {}", mi);
+            continue;
+        }
     }
 
     Ok(
