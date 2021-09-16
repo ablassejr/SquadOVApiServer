@@ -26,14 +26,14 @@ spec:
                         path: /api/status
                         port: 9011
                     initialDelaySeconds: 60
-                    periodSeconds: 10
-                    timeoutSeconds: 10
+                    periodSeconds: 60
+                    timeoutSeconds: 30
                   readinessProbe:
                     httpGet:
                         path: /api/status
                         port: 9011
                     initialDelaySeconds: 60
-                    timeoutSeconds: 10
+                    timeoutSeconds: 30
                   resources:
                     requests:
                         cpu: "500m"
@@ -51,6 +51,12 @@ spec:
                       value: production
                     - name: FUSIONAUTH_APP_SILENT_MODE
                       value: "true"
+                    - name: DATABASE_MAXIMUM_POOL_SIZE
+                      value: "32"
+                    - name: DATABASE_CONNECTION_TIMEOUT
+                      value: "20000"
+                    - name: DATABASE_CONNECTION_HEALTHCHECK_99PERCENT_MS
+                      value: "5000"
                     - name: DATABASE_ROOT_USER
                       valueFrom:
                         secretKeyRef:
