@@ -1,0 +1,5 @@
+ALTER TABLE lol_match_bans
+DROP CONSTRAINT lol_match_bans_match_uuid_team_id_champion_id_key;
+
+ALTER TABLE lol_match_bans
+ADD CONSTRAINT lol_match_bans_match_uuid_team_id_champion_id_key UNIQUE(match_uuid, team_id, pick_turn);
