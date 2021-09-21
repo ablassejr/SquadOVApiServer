@@ -13,6 +13,7 @@ pub struct FeatureFlags {
     allow_record_upload: bool,
     allow_wow_combat_log_upload: bool,
     enable_user_profiles: bool,
+    disable_sentry: bool,
 }
 
 impl Default for FeatureFlags {
@@ -24,6 +25,7 @@ impl Default for FeatureFlags {
             allow_record_upload: true,
             allow_wow_combat_log_upload: true,
             enable_user_profiles: false,
+            disable_sentry: false,
         }
     }
 }

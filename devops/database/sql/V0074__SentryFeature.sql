@@ -1,0 +1,2 @@
+ALTER TABLE user_feature_flags
+ADD COLUMN disable_sentry BOOLEAN NOT NULL DEFAULT FALSE;
