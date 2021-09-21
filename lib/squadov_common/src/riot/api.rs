@@ -258,7 +258,7 @@ pub fn riot_region_to_routing(region: &str) -> Result<String, SquadOvError> {
             "americas"
         } else if region.starts_with("KR") || region.starts_with("JP") {
             "asia"
-        } else if region.starts_with("NA") || region.starts_with("NA") || region.starts_with("NA") || region.starts_with("NA") {
+        } else if region.starts_with("EU") || region.starts_with("TR") || region.starts_with("RU") {
             "europe"
         } else {
             return Err(SquadOvError::BadRequest);
