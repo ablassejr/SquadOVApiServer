@@ -92,11 +92,22 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', required=True)
     parser.add_argument('--output', required=True)
+    parser.add_argument('--vanilla', action='store_true')
+    parser.add_argument('--tbc', action='store_true')
     args = parser.parse_args()
 
-    expansions = {
-        8: 'Shadowlands',
-    }
+    if args.vanilla:
+        expansions = {
+            0: 'Vanilla',
+        }
+    elif args.tbc:
+        expansions = {
+            1: 'TBC',
+        }
+    else:
+        expansions = {
+            8: 'Shadowlands',
+        }
 
     # Arenas (output everything)
     extract_arenas(args.data, args.output)

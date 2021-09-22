@@ -1,0 +1,60 @@
+Name_lang,ID,MapID,DifficultyID,OrderIndex,Bit,CreatureDisplayID,Flags,SpellIconFileID
+Razorgore the Untamed,610,469,0,0,0,10115,4,0
+Vaelastrasz the Corrupt,611,469,0,1000,1,13992,4,0
+Broodlord Lashlayer,612,469,0,2000,2,14308,4,0
+Firemaw,613,469,0,3000,3,6377,4,0
+Ebonroc,614,469,0,4000,4,6377,4,0
+Flamegor,615,469,0,5000,5,6377,4,0
+Chromaggus,616,469,0,6000,6,14367,4,0
+Nefarian,617,469,0,7000,7,11380,4,0
+Lucifron,663,409,0,0,0,13031,4,0
+Magmadar,664,409,0,1000,1,10193,4,0
+Gehennas,665,409,0,2000,2,13030,4,0
+Garr,666,409,0,3000,3,12110,4,0
+Shazzrah,667,409,0,4000,4,13032,4,0
+Baron Geddon,668,409,0,5000,5,12129,4,0
+Sulfuron Harbinger,669,409,0,6000,6,13030,4,0
+Golemagg the Incinerator,670,409,0,7000,7,11986,4,0
+Majordomo Executus,671,409,0,8000,8,12029,4,0
+Ragnaros,672,409,0,9000,9,11121,4,0
+The Prophet Skeram,709,531,0,0,0,15345,4,0
+Silithid Royalty,710,531,0,1000,1,15656,4,0
+Battleguard Sartura,711,531,0,2000,2,15583,4,0
+Fankriss the Unyielding,712,531,0,3000,3,15743,4,0
+Viscidus,713,531,0,4000,4,15686,4,0
+Princess Huhuran,714,531,0,5000,5,15739,4,0
+Twin Emperors,715,531,0,6000,6,15761,4,0
+Ouro,716,531,0,7000,7,15509,4,0
+C'thun,717,531,0,8000,8,15787,4,0
+Kurinnaxx,718,509,0,0,0,15742,4,0
+General Rajaxx,719,509,0,1000,1,15376,4,0
+Moam,720,509,0,2000,2,15392,4,0
+Buru the Gorger,721,509,0,3000,3,15654,4,0
+Ayamiss the Hunter,722,509,0,4000,4,15431,4,0
+Ossirian the Unscarred,723,509,0,5000,5,15432,4,0
+High Priest Venoxis,784,309,0,0,0,0,4,0
+High Priestess Jeklik,785,309,0,-1000,1,0,4,0
+High Priestess Mar'li,786,309,0,2000,2,0,4,0
+Bloodlord Mandokir,787,309,0,3000,3,0,4,0
+Edge of Madness,788,309,0,4000,4,0,4,0
+High Priest Thekal,789,309,0,5000,5,0,4,0
+Gahz'ranka,790,309,0,6000,6,0,4,0
+High Priestess Arlokk,791,309,0,7000,7,0,4,0
+Jin'do the Hexxer,792,309,0,8000,8,0,4,0
+Hakkar,793,309,0,9000,9,0,4,0
+Onyxia,1084,249,0,0,0,8570,4,0
+Anub'Rekhan,1107,533,0,0,0,15931,4,0
+Gluth,1108,533,0,1000,1,16064,4,0
+Gothik the Harvester,1109,533,0,500,2,16279,4,0
+Grand Widow Faerlina,1110,533,0,250,3,15940,4,0
+Grobbulus,1111,533,0,750,4,16035,4,0
+Heigan the Unclean,1112,533,0,375,5,16309,4,0
+Instructor Razuvious,1113,533,0,437,6,16582,4,0
+Kel'Thuzad,1114,533,0,2000,7,15945,4,0
+Loatheb,1115,533,0,406,8,16110,4,0
+Maexxna,1116,533,0,312,9,15928,4,0
+Noth the Plaguebringer,1117,533,0,343,10,16590,4,0
+Patchwerk,1118,533,0,625,11,16174,4,0
+Sapphiron,1119,533,0,1500,12,16033,4,0
+Thaddius,1120,533,0,1250,13,16137,4,0
+The Four Horsemen,1121,533,0,562,14,10729,4,0

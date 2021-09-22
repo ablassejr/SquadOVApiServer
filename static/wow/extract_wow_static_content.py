@@ -14,7 +14,7 @@ def load_listfile(fname):
             mapping[parts[0]] = parts[1].strip()
     return mapping
 
-def extract_classes_to(data, interface, listfile, classOutput, specOutput):
+def extract_classes_to(data, interface, listfile, classOutput, specOutput, hasSpecs):
     if not os.path.exists(classOutput):
         os.makedirs(classOutput)
 
@@ -32,18 +32,19 @@ def extract_classes_to(data, interface, listfile, classOutput, specOutput):
                 'specs': []
             }
 
-    with open(os.path.join(data, 'chrspecialization.csv')) as specs:
-        reader = csv.DictReader(specs)
-        for row in reader:
-            if row['ClassID'] not in allClasses:
-                continue
+    if hasSpecs:
+        with open(os.path.join(data, 'chrspecialization.csv')) as specs:
+            reader = csv.DictReader(specs)
+            for row in reader:
+                if row['ClassID'] not in allClasses:
+                    continue
 
-            allClasses[row['ClassID']]['specs'].append({
-                'id': row['ID'],
-                'name': row['Name_lang'],
-                'class': row['ClassID'],
-                'icon': listfile[row['SpellIconFileID']],
-            })
+                allClasses[row['ClassID']]['specs'].append({
+                    'id': row['ID'],
+                    'name': row['Name_lang'],
+                    'class': row['ClassID'],
+                    'icon': listfile[row['SpellIconFileID']],
+                })
 
     for classId, classData in allClasses.items():
         classFolder = os.path.join(classOutput, classId)
@@ -138,7 +139,7 @@ def extract_instances_to(data, interface, listfile, output):
     with open(os.path.join(data, 'loadingscreens.csv')) as loading:
         reader = csv.DictReader(loading)
         for row in reader:
-            if row['MainImageFileDataID'] != '0' and row['MainImageFileDataID'] in listfile:
+            if 'MainImageFileDataID' in row and row['MainImageFileDataID'] != '0' and row['MainImageFileDataID'] in listfile:
                 allLoading[row['ID']] = listfile[row['MainImageFileDataID']]
             elif row['WideScreen169FileDataID'] != '0' and row['WideScreen169FileDataID'] in listfile:
                 allLoading[row['ID']] = listfile[row['WideScreen169FileDataID']]
@@ -189,7 +190,7 @@ def extract_difficulty_to(data, interface, output):
             with open(diffOutput, 'w') as f:
                 json.dump(diffData, f)
 
-def extract_items_to(data, interface, listfile, output):
+def extract_items_to(data, interface, listfile, output, hasAppearance):
     if not os.path.exists(output):
         os.makedirs(output)
 
@@ -215,26 +216,27 @@ def extract_items_to(data, interface, listfile, output):
             if row['IconFileDataID'] != '0' and row['IconFileDataID'] in listfile:
                 allItems[row['ID']]['icon'] = listfile[row['IconFileDataID']]
 
-    itemAppearance = {}
-    with open(os.path.join(data, 'itemappearance.csv')) as items:
-        reader = csv.DictReader(items)
-        for row in reader:
-            if row['DefaultIconFileDataID'] == '0' or row['DefaultIconFileDataID'] not in listfile:
-                continue
+    if hasAppearance:
+        itemAppearance = {}
+        with open(os.path.join(data, 'itemappearance.csv')) as items:
+            reader = csv.DictReader(items)
+            for row in reader:
+                if row['DefaultIconFileDataID'] == '0' or row['DefaultIconFileDataID'] not in listfile:
+                    continue
 
-            itemAppearance[row['ID']] = {
-                'icon': listfile[row['DefaultIconFileDataID']]
-            }
+                itemAppearance[row['ID']] = {
+                    'icon': listfile[row['DefaultIconFileDataID']]
+                }
 
-    with open(os.path.join(data, 'itemmodifiedappearance.csv')) as items:
-        reader = csv.DictReader(items)
-        for row in reader:
-            if not row['ItemAppearanceID'] in itemAppearance:
-                continue
+        with open(os.path.join(data, 'itemmodifiedappearance.csv')) as items:
+            reader = csv.DictReader(items)
+            for row in reader:
+                if not row['ItemAppearanceID'] in itemAppearance:
+                    continue
 
-            if not row['ItemID'] in allItems:
-                continue
-            allItems[row['ItemID']]['icon'] = itemAppearance[row['ItemAppearanceID']]['icon']
+                if not row['ItemID'] in allItems:
+                    continue
+                allItems[row['ItemID']]['icon'] = itemAppearance[row['ItemAppearanceID']]['icon']
 
     for itemId, itemData in allItems.items():
         itemFolder = os.path.join(output, itemId)
@@ -361,29 +363,33 @@ def extract_talents_to(data, interface, listfile, output):
             if not os.path.exists(iconOutput):
                 shutil.copy(iconInput, iconOutput)
 
-def extract_data_to(data, interface, output):
+def extract_data_to(data, interface, output, vanilla, tbc):
     if not os.path.exists(output):
         os.makedirs(output)
 
     listfile = load_listfile(os.path.join(data, 'listfile.csv'))
     extract_difficulty_to(data, interface, os.path.join(output, 'difficulty'))
-    extract_classes_to(data, interface, listfile, os.path.join(output, 'class'), os.path.join(output, 'specs'))
+    extract_classes_to(data, interface, listfile, os.path.join(output, 'class'), os.path.join(output, 'specs'), not tbc and not vanilla)
     extract_instances_to(data, interface, listfile, os.path.join(output, 'instances'))
     extract_spells_to(data, interface, listfile, os.path.join(output, 'spells'))
-    extract_items_to(data, interface, listfile, os.path.join(output, 'items'))
-    extract_covenants_to(data, interface, os.path.join(output, 'covenants'))
-    extract_soulbinds_to(data, interface, os.path.join(output, 'soulbinds'))
-    extract_conduits_to(data, interface, os.path.join(output, 'conduits'))
-    extract_talents_to(data, interface, listfile, os.path.join(output, 'talents'))
+    extract_items_to(data, interface, listfile, os.path.join(output, 'items'), tbc or not vanilla)
+
+    if not vanilla and not tbc:
+        extract_covenants_to(data, interface, os.path.join(output, 'covenants'))
+        extract_soulbinds_to(data, interface, os.path.join(output, 'soulbinds'))
+        extract_conduits_to(data, interface, os.path.join(output, 'conduits'))
+        extract_talents_to(data, interface, listfile, os.path.join(output, 'talents'))
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', required=True)
     parser.add_argument('--interface', required=True)
     parser.add_argument('--output', required=True)
+    parser.add_argument('--vanilla', action='store_true')
+    parser.add_argument('--tbc', action='store_true')
     args = parser.parse_args()
 
-    extract_data_to(args.data, args.interface, args.output)
+    extract_data_to(args.data, args.interface, args.output, args.vanilla, args.tbc)
 
 if __name__ == '__main__':
     main()
