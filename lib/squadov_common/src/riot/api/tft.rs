@@ -61,6 +61,7 @@ impl super::RiotApiApplicationInterface {
     pub async fn obtain_tft_match_info(&self, platform: &str, region: &str, game_id: i64) -> Result<(), SquadOvError> {
         // We should not check for existing TFT match details here as we might be updated with newer information as the match progresses.
         // TODO: Limit this to sometime after the game started?
+        let platform = platform.split("/").collect::<Vec<&str>>()[0];
         log::info!("Obtain TFT Match Info {} [{}/{}]", game_id, platform, region);
 
         let tft_match = self.api.get_tft_match(region, &format!(

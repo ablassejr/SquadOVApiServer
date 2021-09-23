@@ -76,6 +76,7 @@ impl super::RiotApiApplicationInterface {
 
     pub async fn obtain_lol_match_info(&self, platform: &str, game_id: i64) -> Result<(), SquadOvError> {
         log::info!("Obtain LoL Match Info {} [{}]", game_id, platform);
+        let platform = platform.split("/").collect::<Vec<&str>>()[0];
         if db::check_lol_match_details_exist(&*self.db, platform, game_id).await? {
             return Ok(());
         }
