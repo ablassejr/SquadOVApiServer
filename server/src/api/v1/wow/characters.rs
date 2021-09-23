@@ -8,7 +8,8 @@ use squadov_common::{
     WowFullCharacter,
     WowCovenant,
     WowItem,
-    WoWCharacterUserAssociation
+    WoWCharacterUserAssociation,
+    wow::WowRelease,
 };
 use uuid::Uuid;
 use serde::Deserialize;
@@ -155,7 +156,7 @@ impl api::ApiApplication {
 
     }
 
-    async fn list_wow_characters_for_user(&self, user_id: i64) -> Result<Vec<WoWCharacter>, SquadOvError> {
+    async fn list_wow_characters_for_user(&self, user_id: i64, release: WowRelease) -> Result<Vec<WoWCharacter>, SquadOvError> {
         // We can afford to only list combatant info-validated here as we expect the issue where combatant info doesn't show up
         // to be a rare occurence.
         Ok(
@@ -174,12 +175,20 @@ impl api::ApiApplication {
                     ON wvc.event_id = wucc.event_id
                 INNER JOIN squadov.wow_match_view_character_presence AS wcp
                     ON wcp.character_id = wvc.character_id
+                INNER JOIN squadov.wow_match_view AS wmv
+                    ON wmv.id = wcp.view_id
                 LEFT JOIN squadov.wow_match_view_combatant_items AS wci
                     ON wci.event_id = wvc.event_id
                 WHERE wucc.user_id = $1
+                    AND wmv.build_version SIMILAR TO $2::VARCHAR
                 GROUP BY wucc.unit_guid, wcp.unit_name, wvc.spec_id, wvc.team, wvc.rating, wvc.class_id
                 "#,
                 user_id,
+                match release {
+                    WowRelease::Retail => "9.%",
+                    WowRelease::Tbc => "2.%",
+                    WowRelease::Vanilla => "1.%",
+                },
             )
                 .fetch_all(&*self.heavy_pool)
                 .await?
@@ -367,8 +376,13 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn list_wow_characters_for_user_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserPath>) -> Result<HttpResponse, SquadOvError> {
-    let chars = app.list_wow_characters_for_user(path.user_id).await?;
+#[derive(Deserialize)]
+pub struct CharactersForUserQuery {
+    release: WowRelease
+}
+
+pub async fn list_wow_characters_for_user_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserPath>, query: web::Query<CharactersForUserQuery>) -> Result<HttpResponse, SquadOvError> {
+    let chars = app.list_wow_characters_for_user(path.user_id, query.release).await?;
     Ok(HttpResponse::Ok().json(chars))
 }
 
