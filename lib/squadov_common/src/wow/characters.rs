@@ -9,6 +9,8 @@ pub struct WoWCharacter {
     pub spec_id: i32,
     pub team: i32,
     pub rating: i32,
+    #[serde(rename="classId")]
+    pub class_id: Option<i64>,
 }
 
 #[derive(Serialize)]

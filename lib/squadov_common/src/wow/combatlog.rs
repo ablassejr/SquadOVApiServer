@@ -362,6 +362,10 @@ pub enum WoWCombatLogEventType {
         keystone: i32,
         time_ms: i64
     },
+    ClassUpdateFromSpell{
+        player_guid: String,
+        spell_id: i64,
+    },
     Unknown
 }
 
@@ -422,18 +426,20 @@ pub struct WoWCombatLogAdvancedCVars {
 }
 
 impl WoWCombatLogAdvancedCVars {
-    fn new(data: &[String; 17], use_ilvl: bool) -> Result<Self, crate::SquadOvError> {
-        let level: i32 = data[16].parse()?;
-        let resource_type: Vec<i32> = data[8].split('|').map(|x| {
+    fn new(data: &[String], use_ilvl: bool) -> Result<Self, crate::SquadOvError> {
+        let has_armor = data.len() == 17;
+
+        let level: i32 = data[if has_armor { 16 } else { 15 }].parse()?;
+        let resource_type: Vec<i32> = data[if has_armor { 8 } else { 7 }].split('|').map(|x| {
             Ok(x.parse()?)
         }).collect::<Result<Vec<i32>, SquadOvError>>()?;
-        let current_resource: Vec<i64> = data[9].split('|').map(|x| {
+        let current_resource: Vec<i64> = data[if has_armor { 9 } else { 8 }].split('|').map(|x| {
             Ok(x.parse()?)
         }).collect::<Result<Vec<i64>, SquadOvError>>()?;
-        let max_resource: Vec<i64> = data[10].split('|').map(|x| {
+        let max_resource: Vec<i64> = data[if has_armor { 10 } else { 9 }].split('|').map(|x| {
             Ok(x.parse()?)
         }).collect::<Result<Vec<i64>, SquadOvError>>()?;
-        let resource_cost: Vec<i64> = data[11].split('|').map(|x| {
+        let resource_cost: Vec<i64> = data[if has_armor { 11 } else { 10 }].split('|').map(|x| {
             Ok(x.parse()?)
         }).collect::<Result<Vec<i64>, SquadOvError>>()?;
 
@@ -444,16 +450,16 @@ impl WoWCombatLogAdvancedCVars {
             max_hp: data[3].parse()?,
             attack_power: data[4].parse()?,
             spell_power: data[5].parse()?,
-            armor: data[6].parse()?,
-            unk1: data[7].parse()?,
+            armor: if has_armor { data[6].parse()? } else { 0 },
+            unk1: data[if has_armor { 7 } else { 6}].parse()?,
             resource_type,
             current_resource,
             max_resource,
             resource_cost,
-            coord0: data[12].parse()?,
-            coord1: data[13].parse()?,
-            map_id: data[14].parse()?,
-            facing: data[15].parse()?,
+            coord0: data[if has_armor { 12 } else { 11} ].parse()?,
+            coord1: data[if has_armor { 13 } else { 12} ].parse()?,
+            map_id: data[if has_armor { 14 } else { 13 }].parse()?,
+            facing: data[if has_armor { 15 } else { 14} ].parse()?,
             level: if use_ilvl {
                 WoWGenericLevel::ItemLevel{level}
             } else {
@@ -476,24 +482,32 @@ pub struct WoWCombatLogEvent {
     pub event: WoWCombatLogEventType
 }
 
-pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogState, payload: &RawWoWCombatLogPayload) -> Result<(Option<WoWCombatLogAdvancedCVars>, WoWCombatLogEventType), crate::SquadOvError> {
+#[derive(Clone,Debug)]
+pub struct WowClassUpdateFromSpell {
+    player_guid: String,
+    spell_id: i64,
+}
+
+pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogState, payload: &RawWoWCombatLogPayload) -> Result<(Option<WoWCombatLogAdvancedCVars>, WoWCombatLogEventType, Option<WowClassUpdateFromSpell>), crate::SquadOvError> {
     let action_parts: Vec<&str> = payload.parts[0].split("_").collect();
-    
+    let cl_version: i32 = state.combat_log_version.parse::<i32>()?;
+    let advanced_cvar_offset: usize = if cl_version == 9 { 16 } else { 17 };
+
     match action_parts[0] {
         "SPELL" => {
             match action_parts[1] {
                 // Need to handle ABSORBED separately since its format is different from other spells.
-                "ABSORBED" => Ok((None, WoWCombatLogEventType::Unknown)),
+                "ABSORBED" => Ok((None, WoWCombatLogEventType::Unknown, None)),
                 _ => {
                     if payload.parts.len() < 12 {
-                        return Ok((None, WoWCombatLogEventType::Unknown));
+                        return Ok((None, WoWCombatLogEventType::Unknown, None));
                     }
 
                     let mut idx = 9;
 
                     if !payload.parts[idx+2].starts_with("0x") {
                         log::warn!("Invalid spell school: {}", payload.flatten());
-                        return Ok((None, WoWCombatLogEventType::Unknown));
+                        return Ok((None, WoWCombatLogEventType::Unknown, None));
                     }
 
                     let spell_info = WoWSpellInfo{
@@ -506,45 +520,45 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                     match payload.parts[0].as_str() {
                         "SPELL_DAMAGE" | "SPELL_PERIODIC_DAMAGE" => Ok({
                             let advanced = if state.advanced_log {
-                                Some(WoWCombatLogAdvancedCVars::new(payload.parts[idx..idx+17].try_into()?, payload.parts[0].as_str() == "SPELL_DAMAGE")?)
+                                Some(WoWCombatLogAdvancedCVars::new(&payload.parts[idx..idx+advanced_cvar_offset], payload.parts[0].as_str() == "SPELL_DAMAGE")?)
                             } else {
                                 None
                             };
-                            idx += 17;
+                            idx += advanced_cvar_offset;
         
                             (advanced, WoWCombatLogEventType::DamageDone{
                                 damage: WoWDamageType::SpellDamage(spell_info),
                                 amount: payload.parts[idx].parse()?,
                                 overkill: payload.parts[idx+1].parse()?,    
-                            })
+                            }, None)
                         }),
                         "SPELL_HEAL" | "SPELL_PERIODIC_HEAL" => Ok({
                             let advanced = if state.advanced_log {
-                                Some(WoWCombatLogAdvancedCVars::new(payload.parts[idx..idx+17].try_into()?, true)?)
+                                Some(WoWCombatLogAdvancedCVars::new(&payload.parts[idx..idx+advanced_cvar_offset], true)?)
                             } else {
                                 None
                             };
-                            idx += 17;
+                            idx += advanced_cvar_offset;
         
                             (advanced, WoWCombatLogEventType::Healing{
                                 spell: spell_info,
                                 amount: payload.parts[idx+1].parse()?,
                                 overheal: payload.parts[idx+2].parse()?,
                                 absorbed: payload.parts[idx+3].parse()?,
-                            })
+                            }, None)
                         }),
-                        "SPELL_RESURRECT" => Ok((None, WoWCombatLogEventType::Resurrect(spell_info))),
+                        "SPELL_RESURRECT" => Ok((None, WoWCombatLogEventType::Resurrect(spell_info), None)),
                         "SPELL_AURA_APPLIED" => Ok((None, WoWCombatLogEventType::SpellAura{
                             spell: spell_info,
                             aura_type: WoWSpellAuraType::from_str(&payload.parts[idx])?,
                             applied: true
-                        })),
+                        }, None)),
                         "SPELL_AURA_REMOVED" => Ok((None, WoWCombatLogEventType::SpellAura{
                             spell: spell_info,
                             aura_type: WoWSpellAuraType::from_str(&payload.parts[idx])?,
                             applied: false
-                        })),
-                        "SPELL_SUMMON" => Ok((None, WoWCombatLogEventType::SpellSummon(spell_info))),
+                        }, None)),
+                        "SPELL_SUMMON" => Ok((None, WoWCombatLogEventType::SpellSummon(spell_info), None)),
                         "SPELL_AURA_BROKEN_SPELL" => Ok({
                             let by_spell = WoWSpellInfo{
                                 id: payload.parts[idx].parse()?,
@@ -558,26 +572,27 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                                 aura: spell_info,
                                 spell: Some(by_spell),
                                 aura_type: WoWSpellAuraType::from_str(&payload.parts[idx])?,
-                            })
+                            }, None)
                         }),
                         "SPELL_AURA_BROKEN" => Ok((None, WoWCombatLogEventType::AuraBreak{
                             aura: spell_info,
                             spell: None,
                             aura_type: WoWSpellAuraType::from_str(&payload.parts[idx])?,
-                        })),
+                        }, None)),
                         "SPELL_CAST_START" => Ok((None, WoWCombatLogEventType::SpellCast{
                             spell: spell_info,
                             start: true,
                             finish: false,
                             success: false,
-                        })),
+                        }, None)),
                         "SPELL_CAST_SUCCESS" => Ok({
                             let advanced = if state.advanced_log {
-                                Some(WoWCombatLogAdvancedCVars::new(payload.parts[idx..idx+17].try_into()?, true)?)
+                                Some(WoWCombatLogAdvancedCVars::new(&payload.parts[idx..idx+advanced_cvar_offset], true)?)
                             } else {
                                 None
                             };
-
+                            
+                            let spell_id = spell_info.id;
                             (
                                 advanced,
                                 WoWCombatLogEventType::SpellCast{
@@ -585,6 +600,23 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                                     start: false,
                                     finish: true,
                                     success: true,
+                                },
+                                // In the case older combat logs for wow classic, the class spec isn't printed into the combat log
+                                // so we need to infer it from the spells they cast. We don't want to do this for non-player characters
+                                // so we want to compare the player flags and make sure it ANDs againt 0x500 correctly which is
+                                // 0x100 -> controlled by player and 0x400 -> type player.
+                                if cl_version == 9 {
+                                    let flags = i64::from_str_radix(&payload.parts[3][2..], 16)?;
+                                    if flags & 0x500 > 0 {
+                                        Some(WowClassUpdateFromSpell{
+                                            player_guid: payload.parts[1].clone(),
+                                            spell_id,
+                                        })
+                                    } else { 
+                                        None
+                                    }
+                                } else {
+                                    None
                                 }
                             )
                         }),
@@ -593,32 +625,48 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                             start: false,
                             finish: true,
                             success: false,
-                        })),
-                        _ => Ok((None, WoWCombatLogEventType::Unknown)),
+                        }, None)),
+                        _ => Ok((None, WoWCombatLogEventType::Unknown, None)),
                     }
                 }
             }
         },
         _ => match payload.parts[0].as_str() {
             "UNIT_DIED" => Ok((None, WoWCombatLogEventType::UnitDied{
-                unconcious: payload.parts[9] == "1",
-            })),
+                unconcious: if cl_version == 9 { false } else { payload.parts[9] == "1" },
+            }, None)),
             "SWING_DAMAGE_LANDED" => Ok({
                 let mut idx = 9;
                 let advanced = if state.advanced_log {
-                    Some(WoWCombatLogAdvancedCVars::new(payload.parts[idx..idx+17].try_into()?, false)?)
+                    Some(WoWCombatLogAdvancedCVars::new(&payload.parts[idx..idx+advanced_cvar_offset], false)?)
                 } else {
                     None
                 };
-                idx += 17;
+                idx += advanced_cvar_offset;
 
                 (advanced, WoWCombatLogEventType::DamageDone{
                     damage: WoWDamageType::SwingDamage,
                     amount: payload.parts[idx].parse()?,
                     overkill: payload.parts[idx+1].parse()?,
-                })
+                }, None)
             }),
-            "COMBATANT_INFO" => if payload.parts.len() >= 33 {
+            "COMBATANT_INFO" =>  if cl_version == 9 && payload.parts.len() >= 31 {
+                Ok((None, WoWCombatLogEventType::CombatantInfo{
+                    guid: payload.parts[1].clone(),
+                    team: payload.parts[2].parse()?,
+                    strength: payload.parts[3].parse()?,
+                    agility: payload.parts[4].parse()?,
+                    stamina: payload.parts[5].parse()?,
+                    intelligence: payload.parts[6].parse()?,
+                    armor: 0,
+                    spec_id: 0,
+                    talents: vec![],
+                    pvp_talents: vec![],
+                    covenant: None,
+                    items: parse_wow_item_info_from_str(&payload.parts[27])?,
+                    rating: payload.parts[30].parse()?,
+                }, None))
+            } else if payload.parts.len() >= 33 {
                 Ok((None, WoWCombatLogEventType::CombatantInfo{
                     guid: payload.parts[1].clone(),
                     team: payload.parts[2].parse()?,
@@ -633,10 +681,10 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                     covenant: parse_wow_covenant_from_str(&payload.parts[27])?,
                     items: parse_wow_item_info_from_str(&payload.parts[28])?,
                     rating: payload.parts[32].parse()?,
-                }))
+                }, None))
             } else {
-                log::warn!("Bad COMBATANT_INFO line: {}", payload.flatten());
-                Ok((None, WoWCombatLogEventType::Unknown))
+                log::warn!("Bad COMBATANT_INFO line: {} - {} @ {}", payload.flatten(), payload.parts.len(), cl_version);
+                Ok((None, WoWCombatLogEventType::Unknown, None))
             },
             "ENCOUNTER_START" => Ok((None, WoWCombatLogEventType::EncounterStart{
                 encounter_id: payload.parts[1].parse()?,
@@ -644,30 +692,30 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                 difficulty: payload.parts[3].parse()?,
                 num_players: payload.parts[4].parse()?,
                 instance_id: payload.parts[5].parse()?,
-            })),
+            }, None)),
             "ENCOUNTER_END" => Ok((None, WoWCombatLogEventType::EncounterEnd{
                 encounter_id: payload.parts[1].parse()?,
                 encounter_name: payload.parts[2].clone(),
                 difficulty: payload.parts[3].parse()?,
                 num_players: payload.parts[4].parse()?,
                 success: payload.parts[5] == "1"
-            })),
+            }, None)),
             "CHALLENGE_MODE_START" => Ok((None, WoWCombatLogEventType::ChallengeModeStart{
                 challenge_name: payload.parts[1].clone(),
                 instance_id: payload.parts[2].parse()?,
                 keystone: payload.parts[4].parse()?,
-            })),
+            }, None)),
             "CHALLENGE_MODE_END" => Ok((None, WoWCombatLogEventType::ChallengeModeEnd{
                 instance_id: payload.parts[1].parse()?,
                 success: payload.parts[2] == "1",
                 keystone: payload.parts[3].parse()?,
                 time_ms: payload.parts[4].parse()?,
-            })),
+            }, None)),
             "ARENA_MATCH_START" => Ok((None, WoWCombatLogEventType::ArenaStart{
                 instance_id: payload.parts[1].parse()?,
                 arena_type: payload.parts[3].clone(),
                 local_team_id: payload.parts[4].parse()?,
-            })),
+            }, None)),
             "ARENA_MATCH_END" => Ok((None, WoWCombatLogEventType::ArenaEnd{
                 winning_team_id: payload.parts[1].parse()?,
                 match_duration_seconds: payload.parts[2].parse()?,
@@ -675,16 +723,16 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                     payload.parts[3].parse()?,
                     payload.parts[4].parse()?,
                 ],
-            })),
-            _ => Ok((None, WoWCombatLogEventType::Unknown))
+            }, None)),
+            _ => Ok((None, WoWCombatLogEventType::Unknown, None))
         },
     }
 }
 
-pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, alt_id: i64, user_id: i64, state: &WoWCombatLogState, payload: &RawWoWCombatLogPayload) -> Result<Option<WoWCombatLogEvent>, crate::SquadOvError> {
-    let (advanced, event) = parse_advanced_cvars_and_event_from_wow_combat_log(state, payload).unwrap_or((None, WoWCombatLogEventType::Unknown));
+pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, alt_id: i64, user_id: i64, state: &WoWCombatLogState, payload: &RawWoWCombatLogPayload) -> Result<Vec<WoWCombatLogEvent>, crate::SquadOvError> {
+    let (advanced, event, class_update) = parse_advanced_cvars_and_event_from_wow_combat_log(state, payload).unwrap_or((None, WoWCombatLogEventType::Unknown, None));
     if event == WoWCombatLogEventType::Unknown {
-        return Ok(None)
+        return Ok(vec![])
     }
 
     let has_source_dest = match payload.parts[0].as_str() {
@@ -701,7 +749,7 @@ pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, alt_id: i64, user_id: i64, 
         _ => true,
     };
 
-    Ok(Some(WoWCombatLogEvent{
+    let mut ret = vec![WoWCombatLogEvent{
         view_id: uuid.clone(),
         alt_view_id: alt_id,
         user_id,
@@ -729,7 +777,26 @@ pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, alt_id: i64, user_id: i64, 
         },
         advanced,
         event
-    }))
+    }];
+
+    if let Some(update) = class_update {
+        ret.push(WoWCombatLogEvent{
+            view_id: uuid.clone(),
+            alt_view_id: alt_id,
+            user_id,
+            log_line: 0,
+            timestamp: payload.timestamp.clone(),
+            source: None,
+            dest: None,
+            advanced: None,
+            event: WoWCombatLogEventType::ClassUpdateFromSpell{
+                player_guid: update.player_guid,
+                spell_id: update.spell_id,
+            },
+        });
+    }
+
+    Ok(ret)
 }
 
 async fn insert_missing_wow_character_presence_for_events(tx: &mut Transaction<'_, Postgres>, events: &[WoWCombatLogEvent]) -> Result<(), SquadOvError> {
@@ -1692,6 +1759,53 @@ async fn bulk_insert_wow_spell_cast_events(tx: &mut Transaction<'_, Postgres>, e
     Ok(())
 }
 
+async fn bulk_update_combatant_class_from_spell_cast(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>) -> Result<(), SquadOvError> {
+    // What needs to happen here is that we need to update the class_id column in wow_match_view_combatants 
+    // by inferring what class it is from the spell ID. Really just a lot of fun all around.
+    let mut player_guids: Vec<String> = vec![];
+    let mut spell_ids: Vec<i64> = vec![];
+    let mut alt_view_ids: Vec<i64> = vec![];
+    
+    events.into_iter().for_each(|x| {
+        if let WoWCombatLogEventType::ClassUpdateFromSpell{player_guid, spell_id} = x.event {
+            player_guids.push(player_guid);
+            spell_ids.push(spell_id);
+            alt_view_ids.push(x.alt_view_id);
+        }
+    });
+
+    sqlx::query!(
+        "
+        UPDATE squadov.wow_match_view_combatants AS wvc
+        SET class_id = sub.class_id
+        FROM (
+            SELECT wve.event_id, wsc.class_id
+            FROM UNNEST($1::VARCHAR[], $2::BIGINT[], $3::BIGINT[]) AS t(guid, spell_id, view_id)
+            INNER JOIN squadov.wow_match_view AS wmv
+                ON wmv.alt_id = t.view_id
+            INNER JOIN squadov.wow_spell_to_class AS wsc
+                ON wsc.spell_id = t.spell_id
+                    AND wmv.build_version LIKE wsc.build_id  || '%'
+            INNER JOIN squadov.wow_match_view_events AS wve
+                ON wve.view_id = wmv.alt_id
+            INNER JOIN squadov.wow_match_view_combatants AS wvc
+                ON wvc.event_id = wve.event_id
+            INNER JOIN squadov.wow_match_view_character_presence AS wcp
+                ON wcp.character_id = wvc.character_id
+                    AND wcp.view_id = wmv.id
+                    AND wcp.unit_guid = t.guid
+        ) AS sub
+        WHERE wvc.event_id = sub.event_id
+        ",
+        &player_guids,
+        &spell_ids,
+        &alt_view_ids,
+    )
+        .execute(tx)
+        .await?;
+    Ok(())
+}
+
 async fn bulk_insert_wow_events(tx: &mut Transaction<'_, Postgres>, events: Vec<WoWCombatLogEvent>, ids: &WowEventIdMap, mapping: &WowCharacterIdMap) -> Result<(), SquadOvError> {
     // We first split the input events into individual vectors that are split according to how our database tables are split.
     // This way we can do a O(N) operation to parse out the bulk inserts instead of a M O(N) operation (where M is the number of tables we have).
@@ -1707,6 +1821,7 @@ async fn bulk_insert_wow_events(tx: &mut Transaction<'_, Postgres>, events: Vec<
     let mut death_events: Vec<WoWCombatLogEvent> = vec![];
     let mut aura_break_events: Vec<WoWCombatLogEvent> = vec![];
     let mut spell_cast_events: Vec<WoWCombatLogEvent> = vec![];
+    let mut class_updates_from_spell_events: Vec<WoWCombatLogEvent> = vec![];
 
     // (User ID, Unit GUID) -> View UUID. This way we are able to do an upsert
     // via an INSERT/SELECT to find the combatant info in the view for this unit.
@@ -1736,6 +1851,7 @@ async fn bulk_insert_wow_events(tx: &mut Transaction<'_, Postgres>, events: Vec<
             WoWCombatLogEventType::UnitDied{..} => death_events.push(x),
             WoWCombatLogEventType::AuraBreak{..} => aura_break_events.push(x),
             WoWCombatLogEventType::SpellCast{..} => spell_cast_events.push(x),
+            WoWCombatLogEventType::ClassUpdateFromSpell{..} => class_updates_from_spell_events.push(x),
             _ => log::warn!("Handling an event that can't be parsed into a table? {:?}", x),
         }
     });
@@ -1751,6 +1867,7 @@ async fn bulk_insert_wow_events(tx: &mut Transaction<'_, Postgres>, events: Vec<
     bulk_insert_wow_aura_break_events(&mut *tx, aura_break_events, ids).await?;
     bulk_insert_wow_spell_cast_events(&mut *tx, spell_cast_events, ids).await?;
     bulk_update_wow_user_character_cache(&mut *tx, user_character_cache).await?;
+    bulk_update_combatant_class_from_spell_cast(&mut *tx, class_updates_from_spell_events).await?;
 
     Ok(())
 }
