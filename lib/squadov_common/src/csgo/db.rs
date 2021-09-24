@@ -118,16 +118,14 @@ pub async fn get_steam_ids_in_match_for_user_uuids(ex: &PgPool, match_uuid: &Uui
             "
             SELECT DISTINCT u.uuid, sul.steam_id
             FROM squadov.csgo_match_views AS cmv
-            INNER JOIN squadov.users AS u
-                ON u.id = cmv.user_id
-            INNER JOIN squadov.steam_user_links AS sul
-                ON sul.user_id = u.id
-            INNER JOIN squadov.steam_users_cache AS suc
-                ON suc.steam_id = sul.steam_id
             INNER JOIN squadov.csgo_event_container AS cec
                 ON cec.view_uuid = cmv.view_uuid
             INNER JOIN squadov.csgo_event_container_players AS ccp
                 ON ccp.container_id = cec.id
+            INNER JOIN squadov.steam_user_links AS sul
+                ON sul.steam_id = ccp.steam_id
+            INNER JOIN squadov.users AS u
+                ON u.id = sul.user_id
             WHERE cmv.match_uuid = $1
                 AND u.uuid = ANY($2)
             ",
@@ -467,10 +465,16 @@ where
                 LIMIT 1
             ) AS cec
             CROSS JOIN LATERAL (
-                SELECT sul.steam_id
-                FROM squadov.steam_user_links AS sul
-                WHERE sul.user_id = u.id
-                LIMIT 1
+                SELECT DISTINCT ccp.steam_id
+                FROM squadov.csgo_match_views AS cmv
+                INNER JOIN squadov.csgo_event_container AS cec
+                    ON cec.view_uuid = cmv.view_uuid
+                INNER JOIN squadov.csgo_event_container_players AS ccp
+                    ON ccp.container_id = cec.id
+                INNER JOIN squadov.steam_user_links AS sul
+                    ON sul.steam_id = ccp.steam_id
+                WHERE cmv.match_uuid = inp.match_uuid
+                    AND sul.user_id = u.id
             ) AS sul
             INNER JOIN squadov.csgo_event_container_players AS cecp
                 ON cecp.container_id = cec.id AND cecp.steam_id = sul.steam_id

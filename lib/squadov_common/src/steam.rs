@@ -23,6 +23,7 @@ pub async fn link_steam_id_to_user(ex: &mut Transaction<'_, Postgres>, steam_id:
             $1,
             $2
         )
+        ON CONFLICT DO NOTHING
     ",
         steam_id,
         user_id
