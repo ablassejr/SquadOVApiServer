@@ -12,7 +12,6 @@ impl api::ApiApplication {
             SELECT
                 sq.id AS "id!",
                 sq.squad_name AS "squad_name!",
-                sq.squad_group AS "squad_group!",
                 sq.creation_time AS "creation_time!",
                 sq.member_count AS "member_count!",
                 sq.pending_invite_count AS "pending_invite_count!"
@@ -51,7 +50,6 @@ impl api::ApiApplication {
             SELECT
                 sq.id AS "id!",
                 sq.squad_name AS "squad_name!",
-                sq.squad_group AS "squad_group!",
                 sq.creation_time AS "creation_time!",
                 sq.member_count AS "member_count!",
                 sq.pending_invite_count AS "pending_invite_count!",
@@ -78,7 +76,6 @@ impl api::ApiApplication {
                 squad: SquadOvSquad{
                     id: x.id,
                     squad_name: x.squad_name,
-                    squad_group: x.squad_group,
                     creation_time: x.creation_time,
                     member_count: x.member_count,
                     pending_invite_count: x.pending_invite_count,
@@ -96,7 +93,6 @@ impl api::ApiApplication {
             SELECT
                 sq.id AS "id!",
                 sq.squad_name AS "squad_name!",
-                sq.squad_group AS "squad_group!",
                 sq.creation_time AS "creation_time!",
                 sq.member_count AS "member_count!",
                 sq.pending_invite_count AS "pending_invite_count!",
@@ -120,7 +116,6 @@ impl api::ApiApplication {
                 squad: SquadOvSquad{
                     id: x.id,
                     squad_name: x.squad_name,
-                    squad_group: x.squad_group,
                     creation_time: x.creation_time,
                     member_count: x.member_count,
                     pending_invite_count: x.pending_invite_count,
@@ -138,7 +133,6 @@ impl api::ApiApplication {
             SELECT
                 sq.id AS "id!",
                 sq.squad_name AS "squad_name!",
-                sq.squad_group AS "squad_group!",
                 sq.creation_time AS "creation_time!",
                 sq.member_count AS "member_count!",
                 sq.pending_invite_count AS "pending_invite_count!",
@@ -168,7 +162,6 @@ impl api::ApiApplication {
             squad: SquadOvSquad{
                 id: x.id,
                 squad_name: x.squad_name,
-                squad_group: x.squad_group,
                 creation_time: x.creation_time,
                 member_count: x.member_count,
                 pending_invite_count: x.pending_invite_count,
