@@ -86,7 +86,8 @@ where
             youtube = $6,
             snapchat = $7,
             twitter = $8,
-            tiktok = $9
+            tiktok = $9,
+            display_name = $10
         WHERE user_id = $1
         ",
         user_id,
@@ -98,6 +99,7 @@ where
         data.snapchat,
         data.twitter,
         data.tiktok,
+        data.display_name,
     )
         .execute(ex)
         .await?;
