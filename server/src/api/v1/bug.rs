@@ -5,7 +5,7 @@ use crate::api;
 use crate::api::auth::SquadOVSession;
 use std::sync::Arc;
 use futures::{StreamExt, TryStreamExt};
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use chrono::Utc;
 use reqwest::header;
 
@@ -45,19 +45,30 @@ impl api::ApiApplication {
             .json::<GitlabUploadFileResult>()
             .await?;
 
+        #[derive(Serialize)]
+        struct BugReportPacket {
+            created_at: String,
+            title: String,
+            description: String,
+            labels: String,
+        }
+
         let issue_result = gitlab_client
-            .post(&format!("https://gitlab.com/api/v4/projects/{project_id}/issues?title={title}&labels=bug,user-reported&description={desc}&created_at={created}",
+            .post(&format!("https://gitlab.com/api/v4/projects/{project_id}/issues",
                 project_id=self.config.gitlab.project_id,
-                created=&timestamp,
-                title=squadov_common::url_encode(&format!("[USER REPORTED BUG] {title}", title=title)),
-                desc=squadov_common::url_encode(&format!(r#"
+            ))
+            .json(&BugReportPacket{
+                created_at: timestamp.clone(),
+                labels: "bug,user-reported".to_string(),
+                title: format!("[USER REPORTED BUG] {title}", title=title),
+                description: format!(r#"
 USER ID: {user_id}
 
 LOGS: {log}
 
 DESCRIPTION: {description}
                 "#, user_id=user_id, log=&file_upload_result.markdown, description=description),
-            )))
+            })
             .send()
             .await?;
 
