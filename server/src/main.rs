@@ -115,7 +115,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 "x-squadov-access-token",
                                 "x-squadov-session-id",
                                 "x-squadov-share-id",
-                                "content-type"
+                                "content-type",
+                                "pragma",
+                                "cache-control",
                             ])
                             .finish()
                     )
