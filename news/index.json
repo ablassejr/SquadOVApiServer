@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.10.0",
+        "description": "WoW classic has arrived!",
+        "timestamp": 1630532116000,
+        "data": "data/update-v0.10.0.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.9.9",
         "description": "User profiles are rolling out to a subset of users!",
         "timestamp": 1630532116000,

@@ -1789,6 +1789,62 @@
       ]
     }
   },
+  "24248f9c4040fe12408fa9e13088dd124ba01d8881ee95609954b53b1b46f43e": {
+    "query": "\n                SELECT\n                    wucc.unit_guid AS \"guid\",\n                    COALESCE(wcp.unit_name, '') AS \"name!\",\n                    COALESCE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS \"items!\",\n                    wvc.spec_id,\n                    wvc.team,\n                    wvc.rating,\n                    wvc.class_id\n                FROM squadov.wow_user_character_cache AS wucc\n                INNER JOIN squadov.wow_match_view_combatants AS wvc\n                    ON wvc.event_id = wucc.event_id\n                INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                    ON wcp.character_id = wvc.character_id\n                LEFT JOIN squadov.wow_match_view_combatant_items AS wci\n                    ON wci.event_id = wvc.event_id\n                WHERE wucc.user_id = $1\n                GROUP BY wucc.unit_guid, wcp.unit_name, wvc.spec_id, wvc.team, wvc.rating, wvc.class_id\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "guid",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "name!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "items!",
+          "type_info": "Int4Array"
+        },
+        {
+          "ordinal": 3,
+          "name": "spec_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "team",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "rating",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "class_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        null,
+        null,
+        false,
+        false,
+        false,
+        true
+      ]
+    }
+  },
   "24678c48e1187b2ed630ccb0f05c7cef18ae7d8524b80f37170c9b4d518327e5": {
     "query": "\n            SELECT (\n                SELECT COUNT(*)\n                FROM squadov.clip_reacts\n                WHERE user_id = $1\n            ) AS \"likes!\", (\n                SELECT COUNT(*)\n                FROM squadov.clip_comments\n                WHERE user_id = $1\n            ) AS \"comments!\"\n            ",
     "describe": {
@@ -3773,362 +3829,6 @@
       "nullable": []
     }
   },
-  "42d2240cdc49bf199cca11ccbb77d218e1e8c3aec5791434b6712a7114e3c552": {
-    "query": "\n            SELECT lmp.*\n            FROM squadov.lol_match_participants AS lmp\n            WHERE lmp.match_uuid = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "participant_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "champion_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "team_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "spell1_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "spell2_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "champ_level",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "win",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 8,
-          "name": "kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 9,
-          "name": "deaths",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 10,
-          "name": "assists",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 11,
-          "name": "item0",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 12,
-          "name": "item1",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 13,
-          "name": "item2",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 14,
-          "name": "item3",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 15,
-          "name": "item4",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 16,
-          "name": "item5",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 17,
-          "name": "item6",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 18,
-          "name": "double_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 19,
-          "name": "triple_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 20,
-          "name": "quadra_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 21,
-          "name": "penta_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 22,
-          "name": "first_blood_kill",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 23,
-          "name": "gold_earned",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 24,
-          "name": "gold_spent",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 25,
-          "name": "neutral_minions_killed_team_jungle",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 26,
-          "name": "neutral_minions_killed_enemy_jungle",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 27,
-          "name": "wards_killed",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 28,
-          "name": "wards_placed",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 29,
-          "name": "vision_wards_bought_in_game",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 30,
-          "name": "sight_wards_bought_in_game",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 31,
-          "name": "neutral_minions_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 32,
-          "name": "total_minions_killed",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 33,
-          "name": "damage_dealt_to_objectives",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 34,
-          "name": "inhibitor_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 35,
-          "name": "turret_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 36,
-          "name": "damage_dealt_to_turrets",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 37,
-          "name": "total_player_score",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 38,
-          "name": "total_score_rank",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 39,
-          "name": "objective_player_score",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 40,
-          "name": "combat_player_score",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 41,
-          "name": "vision_score",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 42,
-          "name": "total_damage_dealt_to_champions",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 43,
-          "name": "physical_damage_dealt_to_champions",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 44,
-          "name": "magic_damage_dealt_to_champions",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 45,
-          "name": "true_damage_dealt_to_champions",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 46,
-          "name": "total_damage_dealt",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 47,
-          "name": "physical_damage_dealt",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 48,
-          "name": "magic_damage_dealt",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 49,
-          "name": "true_damage_dealt",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 50,
-          "name": "total_damage_taken",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 51,
-          "name": "physical_damage_taken",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 52,
-          "name": "magical_damage_taken",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 53,
-          "name": "true_damage_taken",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 54,
-          "name": "total_heal",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 55,
-          "name": "damage_self_mitigated",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 56,
-          "name": "lane",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "44bd28db999a124fa8a17d6809e2f885f0717a3bfb7dfa268fa4b463403650a2": {
     "query": "\n            SELECT id\n            FROM squadov.share_tokens\n            WHERE match_uuid = $1 AND user_id = $2\n            ",
     "describe": {
@@ -4695,6 +4395,50 @@
         false,
         false,
         false,
+        true,
+        true
+      ]
+    }
+  },
+  "4fadb09b74f22b385f2d8da75d87921122a0df09229b7b79947513c4ccff6805": {
+    "query": "\n            SELECT\n                sq.id AS \"id!\",\n                sq.squad_name AS \"squad_name!\",\n                sq.creation_time AS \"creation_time!\",\n                sq.member_count AS \"member_count!\",\n                sq.pending_invite_count AS \"pending_invite_count!\"\n            FROM squadov.squad_overview AS sq\n            WHERE id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "squad_name!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "creation_time!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "member_count!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "pending_invite_count!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        true,
         true,
         true
       ]
@@ -6216,6 +5960,33 @@
       "nullable": []
     }
   },
+  "6d0d3d4c9b2f816e0ae67472ee9f1eeb03ddf8e43f02e0e35f999379c4077510": {
+    "query": "\n            SELECT DISTINCT u.uuid, sul.steam_id\n            FROM squadov.csgo_match_views AS cmv\n            INNER JOIN squadov.csgo_event_container AS cec\n                ON cec.view_uuid = cmv.view_uuid\n            INNER JOIN squadov.csgo_event_container_players AS ccp\n                ON ccp.container_id = cec.id\n            INNER JOIN squadov.steam_user_links AS sul\n                ON sul.steam_id = ccp.steam_id\n            INNER JOIN squadov.users AS u\n                ON u.id = sul.user_id\n            WHERE cmv.match_uuid = $1\n                AND u.uuid = ANY($2)\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "steam_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "UuidArray"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
   "6d7784e893dcc178dd7ddd570923cb2e3b2726ec1f6a4dbcb5c36447317938e0": {
     "query": "\n        SELECT squadov.create_user_profile($1, $2)\n        ",
     "describe": {
@@ -6448,6 +6219,78 @@
       ]
     }
   },
+  "7381409639879a38460f36be1e2f07908827f0aa392018f19a9684037844e479": {
+    "query": "\n            SELECT\n                sq.id AS \"id!\",\n                sq.squad_name AS \"squad_name!\",\n                sq.creation_time AS \"creation_time!\",\n                sq.member_count AS \"member_count!\",\n                sq.pending_invite_count AS \"pending_invite_count!\",\n                sra.squad_role AS \"squad_role: SquadRole\",\n                us.username AS \"username\",\n                us.id AS \"user_id\"\n            FROM squadov.squad_overview AS sq\n            INNER JOIN squadov.squad_role_assignments AS sra\n                ON sra.squad_id = sq.id\n            INNER JOIN squadov.users AS us\n                ON us.id = sra.user_id\n            INNER JOIN squadov.squads AS s\n                ON s.id = sq.id\n            WHERE sra.user_id = $1\n                AND (NOT us.is_admin OR NOT s.is_default)\n            ORDER BY sq.squad_name\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "squad_name!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "creation_time!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "member_count!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "pending_invite_count!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "squad_role: SquadRole",
+          "type_info": {
+            "Custom": {
+              "name": "squad_role",
+              "kind": {
+                "Enum": [
+                  "Owner",
+                  "Member"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 6,
+          "name": "username",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 7,
+          "name": "user_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "738220b5cc48c2d7b2e4f3a4a51d937b9900ce1454d527a9b378abf9f50dc2da": {
     "query": "\n                INSERT INTO squadov.hearthstone_match_players (\n                    user_id,\n                    view_uuid,\n                    player_match_id,\n                    player_name,\n                    card_back_id,\n                    arena_wins,\n                    arena_loss,\n                    tavern_brawl_wins,\n                    tavern_brawl_loss,\n                    battlegrounds_rating,\n                    duels_casual_rating,\n                    duels_heroic_rating\n                )\n                VALUES (\n                    $1,\n                    $2,\n                    $3,\n                    $4,\n                    $5,\n                    $6,\n                    $7,\n                    $8,\n                    $9,\n                    $10,\n                    $11,\n                    $12\n                )\n                ON CONFLICT (view_uuid, player_match_id) DO UPDATE SET\n                    user_id = COALESCE(squadov.hearthstone_match_players.user_id, EXCLUDED.user_id),\n                    arena_wins = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.arena_wins\n                                      ELSE squadov.hearthstone_match_players.arena_wins END,\n                    arena_loss = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.arena_loss\n                                 ELSE squadov.hearthstone_match_players.arena_loss END,\n                    tavern_brawl_wins = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.tavern_brawl_wins\n                                        ELSE squadov.hearthstone_match_players.tavern_brawl_wins END,\n                    tavern_brawl_loss = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.tavern_brawl_loss\n                                        ELSE squadov.hearthstone_match_players.tavern_brawl_loss END,\n                    battlegrounds_rating = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.battlegrounds_rating\n                                           ELSE squadov.hearthstone_match_players.battlegrounds_rating END,\n                    duels_casual_rating = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.duels_casual_rating\n                                          ELSE squadov.hearthstone_match_players.duels_casual_rating END,\n                    duels_heroic_rating = CASE WHEN EXCLUDED.user_id IS NOT NULL THEN EXCLUDED.duels_heroic_rating\n                                          ELSE squadov.hearthstone_match_players.duels_heroic_rating END\n                ",
     "describe": {
@@ -6469,6 +6312,79 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "75cbe7975eec2895d4eb2ad4360811b70d639cc0be630764bbcd29d48e8da0a4": {
+    "query": "\n            SELECT\n                sq.id AS \"id!\",\n                sq.squad_name AS \"squad_name!\",\n                sq.creation_time AS \"creation_time!\",\n                sq.member_count AS \"member_count!\",\n                sq.pending_invite_count AS \"pending_invite_count!\",\n                sra.squad_role AS \"squad_role: SquadRole\",\n                us.username AS \"username\",\n                us.id AS \"user_id\"\n            FROM squadov.squad_overview AS sq\n            INNER JOIN squadov.squad_role_assignments AS sra\n                ON sra.squad_id = sq.id\n            INNER JOIN squadov.users AS us\n                ON us.id = sra.user_id\n            WHERE sra.user_id = $1 AND sra.squad_id = $2\n            ORDER BY sq.squad_name\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "squad_name!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "creation_time!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "member_count!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "pending_invite_count!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "squad_role: SquadRole",
+          "type_info": {
+            "Custom": {
+              "name": "squad_role",
+              "kind": {
+                "Enum": [
+                  "Owner",
+                  "Member"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 6,
+          "name": "username",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 7,
+          "name": "user_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false
+      ]
     }
   },
   "75ddd119e403ece3ead2272f618c428eebe7af2dfe9e7683ec4693f0fdc95e48": {
@@ -6584,6 +6500,19 @@
         false,
         false
       ]
+    }
+  },
+  "761d12cedeab5358ea5201615cb0cc3b4b59b6d2497f13b124ac5a099521f0ab": {
+    "query": "\n        INSERT INTO squadov.steam_user_links (\n            steam_id,\n            user_id\n        ) VALUES (\n            $1,\n            $2\n        )\n        ON CONFLICT DO NOTHING\n    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "79bbe74adeb52bd21131efd638ca94cd292186cfa35b3b9389587c24025dd3e4": {
@@ -7687,6 +7616,27 @@
       ]
     }
   },
+  "8c0c4be4a99803b312a0086a699cc681f9ce48a0eeea804af474cad52b528b5d": {
+    "query": "\n        UPDATE squadov.user_profiles\n        SET description = $2,\n            facebook = $3,\n            instagram = $4,\n            twitch = $5,\n            youtube = $6,\n            snapchat = $7,\n            twitter = $8,\n            tiktok = $9,\n            display_name = $10\n        WHERE user_id = $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Varchar",
+          "Varchar",
+          "Varchar",
+          "Varchar",
+          "Varchar",
+          "Varchar",
+          "Varchar",
+          "Varchar",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "8c172df0494118dd1e59c14037d3ba673e685f25596a3318cd2d5efe7d037ec6": {
     "query": "\n            SELECT\n                team_id,\n                puuid,\n                character_id,\n                competitive_tier,\n                total_combat_score,\n                rounds_played,\n                kills,\n                deaths,\n                assists\n            FROM squadov.valorant_match_players\n            WHERE match_uuid = $1\n            ",
     "describe": {
@@ -7853,410 +7803,6 @@
         false,
         false,
         false
-      ]
-    }
-  },
-  "8f1cd75644925e6e2871712cf2e00ab9776b04600a1301cc48646fbd6c603d91": {
-    "query": "\n            SELECT lmp.*, lmpi.*\n            FROM squadov.lol_match_participants AS lmp\n            INNER JOIN squadov.lol_match_participant_identities AS lmpi\n                ON lmpi.match_uuid = lmp.match_uuid\n                    AND lmpi.participant_id = lmpi.participant_id\n            WHERE lmp.match_uuid = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "participant_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "champion_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "team_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "spell1_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "spell2_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "champ_level",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "win",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 8,
-          "name": "kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 9,
-          "name": "deaths",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 10,
-          "name": "assists",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 11,
-          "name": "item0",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 12,
-          "name": "item1",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 13,
-          "name": "item2",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 14,
-          "name": "item3",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 15,
-          "name": "item4",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 16,
-          "name": "item5",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 17,
-          "name": "item6",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 18,
-          "name": "double_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 19,
-          "name": "triple_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 20,
-          "name": "quadra_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 21,
-          "name": "penta_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 22,
-          "name": "first_blood_kill",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 23,
-          "name": "gold_earned",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 24,
-          "name": "gold_spent",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 25,
-          "name": "neutral_minions_killed_team_jungle",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 26,
-          "name": "neutral_minions_killed_enemy_jungle",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 27,
-          "name": "wards_killed",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 28,
-          "name": "wards_placed",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 29,
-          "name": "vision_wards_bought_in_game",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 30,
-          "name": "sight_wards_bought_in_game",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 31,
-          "name": "neutral_minions_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 32,
-          "name": "total_minions_killed",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 33,
-          "name": "damage_dealt_to_objectives",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 34,
-          "name": "inhibitor_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 35,
-          "name": "turret_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 36,
-          "name": "damage_dealt_to_turrets",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 37,
-          "name": "total_player_score",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 38,
-          "name": "total_score_rank",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 39,
-          "name": "objective_player_score",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 40,
-          "name": "combat_player_score",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 41,
-          "name": "vision_score",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 42,
-          "name": "total_damage_dealt_to_champions",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 43,
-          "name": "physical_damage_dealt_to_champions",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 44,
-          "name": "magic_damage_dealt_to_champions",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 45,
-          "name": "true_damage_dealt_to_champions",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 46,
-          "name": "total_damage_dealt",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 47,
-          "name": "physical_damage_dealt",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 48,
-          "name": "magic_damage_dealt",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 49,
-          "name": "true_damage_dealt",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 50,
-          "name": "total_damage_taken",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 51,
-          "name": "physical_damage_taken",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 52,
-          "name": "magical_damage_taken",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 53,
-          "name": "true_damage_taken",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 54,
-          "name": "total_heal",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 55,
-          "name": "damage_self_mitigated",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 56,
-          "name": "lane",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 57,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 58,
-          "name": "participant_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 59,
-          "name": "account_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 60,
-          "name": "current_account_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 61,
-          "name": "current_platform_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 62,
-          "name": "summoner_name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 63,
-          "name": "summoner_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 64,
-          "name": "platform_id",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true
       ]
     }
   },
@@ -8517,6 +8063,78 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "95876a284e8a65f7ea16c1c44e94f63713f823384e6ede4c856b52932f60b9e8": {
+    "query": "\n            SELECT\n                sq.id AS \"id!\",\n                sq.squad_name AS \"squad_name!\",\n                sq.creation_time AS \"creation_time!\",\n                sq.member_count AS \"member_count!\",\n                sq.pending_invite_count AS \"pending_invite_count!\",\n                sra.squad_role AS \"squad_role: SquadRole\",\n                us.username AS \"username\",\n                us.id AS \"user_id\"\n            FROM squadov.squad_overview AS sq\n            INNER JOIN squadov.squad_role_assignments AS sra\n                ON sra.squad_id = sq.id\n            INNER JOIN squadov.users AS us\n                ON us.id = sra.user_id\n            WHERE sra.squad_id = $1\n            ORDER BY sq.squad_name\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "squad_name!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "creation_time!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "member_count!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "pending_invite_count!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "squad_role: SquadRole",
+          "type_info": {
+            "Custom": {
+              "name": "squad_role",
+              "kind": {
+                "Enum": [
+                  "Owner",
+                  "Member"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 6,
+          "name": "username",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 7,
+          "name": "user_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false
+      ]
     }
   },
   "95ad9198dfe37a2eab688fb62f82a1e7fccc7b0500213cb4d00779e9de2c49e7": {
@@ -9041,68 +8659,6 @@
       "nullable": [
         false,
         false
-      ]
-    }
-  },
-  "9dc60fd5e5d07f7f412e64c0f46ff549f0349b1a7407a6185ef8ef994151e2db": {
-    "query": "\n            SELECT lmpi.*\n            FROM squadov.lol_match_participant_identities AS lmpi\n            WHERE lmpi.match_uuid = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "participant_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "account_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 3,
-          "name": "current_account_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "current_platform_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 5,
-          "name": "summoner_name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 6,
-          "name": "summoner_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 7,
-          "name": "platform_id",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true
       ]
     }
   },
@@ -9747,380 +9303,6 @@
       ]
     }
   },
-  "ab190bfad846e97cc0ea302e4c46da912dcca54163b0c334f4b31171a6f02e80": {
-    "query": "\n            SELECT lmp.*, lmpi.puuid, lmpi.summoner_name, lmpi.summoner_id\n            FROM squadov.lol_match_participants AS lmp\n            INNER JOIN squadov.lol_match_participant_identities AS lmpi\n                ON lmpi.match_uuid = lmp.match_uuid\n                    AND lmpi.participant_id = lmpi.participant_id\n            WHERE lmp.match_uuid = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "participant_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "champion_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "team_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "spell1_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "spell2_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "champ_level",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "win",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 8,
-          "name": "kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 9,
-          "name": "deaths",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 10,
-          "name": "assists",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 11,
-          "name": "item0",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 12,
-          "name": "item1",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 13,
-          "name": "item2",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 14,
-          "name": "item3",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 15,
-          "name": "item4",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 16,
-          "name": "item5",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 17,
-          "name": "item6",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 18,
-          "name": "double_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 19,
-          "name": "triple_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 20,
-          "name": "quadra_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 21,
-          "name": "penta_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 22,
-          "name": "first_blood_kill",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 23,
-          "name": "gold_earned",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 24,
-          "name": "gold_spent",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 25,
-          "name": "neutral_minions_killed_team_jungle",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 26,
-          "name": "neutral_minions_killed_enemy_jungle",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 27,
-          "name": "wards_killed",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 28,
-          "name": "wards_placed",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 29,
-          "name": "vision_wards_bought_in_game",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 30,
-          "name": "sight_wards_bought_in_game",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 31,
-          "name": "neutral_minions_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 32,
-          "name": "total_minions_killed",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 33,
-          "name": "damage_dealt_to_objectives",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 34,
-          "name": "inhibitor_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 35,
-          "name": "turret_kills",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 36,
-          "name": "damage_dealt_to_turrets",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 37,
-          "name": "total_player_score",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 38,
-          "name": "total_score_rank",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 39,
-          "name": "objective_player_score",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 40,
-          "name": "combat_player_score",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 41,
-          "name": "vision_score",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 42,
-          "name": "total_damage_dealt_to_champions",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 43,
-          "name": "physical_damage_dealt_to_champions",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 44,
-          "name": "magic_damage_dealt_to_champions",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 45,
-          "name": "true_damage_dealt_to_champions",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 46,
-          "name": "total_damage_dealt",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 47,
-          "name": "physical_damage_dealt",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 48,
-          "name": "magic_damage_dealt",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 49,
-          "name": "true_damage_dealt",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 50,
-          "name": "total_damage_taken",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 51,
-          "name": "physical_damage_taken",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 52,
-          "name": "magical_damage_taken",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 53,
-          "name": "true_damage_taken",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 54,
-          "name": "total_heal",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 55,
-          "name": "damage_self_mitigated",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 56,
-          "name": "lane",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 57,
-          "name": "puuid",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 58,
-          "name": "summoner_name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 59,
-          "name": "summoner_id",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        true
-      ]
-    }
-  },
   "ab31b9de96ddfd358b4c8f58fa6ad2318f1b63a9c7ba1895d4b52758328796e7": {
     "query": "\n            SELECT\n                vmul.match_id,\n                vm.game_mode,\n                vm.map_id,\n                vm.is_ranked,\n                vm.provisioning_flow_id,\n                vm.server_start_time_utc,\n                vm.game_length_millis,\n                vm.season_id\n            FROM squadov.valorant_matches AS vm\n            INNER JOIN squadov.valorant_match_uuid_link AS vmul\n                ON vmul.match_uuid = vm.match_uuid\n            WHERE vm.match_uuid = $1\n            ",
     "describe": {
@@ -10323,6 +9505,135 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "af7a603ffbf236d5b0db961493e505088fd474db855e832b4596b9aa62e7b20b": {
+    "query": "\n            SELECT\n                inp.match_uuid AS \"match_uuid!\",\n                inp.user_uuid AS \"user_uuid!\",\n                cmv.map AS \"map!\",\n                cmv.mode AS \"mode!\",\n                cmv.start_time AS \"match_start_time!\",\n                COALESCE(EXTRACT(EPOCH FROM cmv.stop_time - cmv.start_time), 0)::INTEGER AS \"match_length_seconds!\",\n                cecp.kills AS \"kills!\",\n                cecp.deaths AS \"deaths!\",\n                cecp.assists AS \"assists!\",\n                cecp.mvps AS \"mvps!\",\n                COALESCE(winner.win, FALSE) AS \"winner!\",\n                cec.event_source = 1 AS \"has_demo!\",\n                (COUNT(crd.*) FILTER(WHERE crd.hitgroup = 1))::INTEGER AS \"headshots!\",\n                (COUNT(crd.*) FILTER(WHERE crd.hitgroup >= 2 OR crd.hitgroup <= 5))::INTEGER AS \"bodyshots!\",\n                (COUNT(crd.*) FILTER(WHERE crd.hitgroup > 5))::INTEGER AS \"legshots!\",\n                COALESCE(((SUM(crd.damage_health))::DOUBLE PRECISION / (winner.last_round+1)::DOUBLE PRECISION), 0.0) AS \"damage_per_round!\",\n                (rounds.win)::INTEGER AS \"friendly_rounds!\",\n                (rounds.lost)::INTEGER AS \"enemy_rounds!\",\n                sul.steam_id AS \"steam_id!\"\n            FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)\n            INNER JOIN squadov.users AS u\n                ON u.uuid = inp.user_uuid\n            INNER JOIN squadov.csgo_match_views AS cmv\n                ON cmv.match_uuid = inp.match_uuid\n                    AND cmv.user_id = u.id\n            CROSS JOIN LATERAL (\n                SELECT cec.id, cec.event_source\n                FROM squadov.csgo_event_container AS cec\n                WHERE cec.view_uuid = cmv.view_uuid\n                ORDER BY cec.event_source DESC\n                LIMIT 1\n            ) AS cec\n            CROSS JOIN LATERAL (\n                SELECT DISTINCT ccp.steam_id\n                FROM squadov.csgo_match_views AS cmv\n                INNER JOIN squadov.csgo_event_container AS cec\n                    ON cec.view_uuid = cmv.view_uuid\n                INNER JOIN squadov.csgo_event_container_players AS ccp\n                    ON ccp.container_id = cec.id\n                INNER JOIN squadov.steam_user_links AS sul\n                    ON sul.steam_id = ccp.steam_id\n                WHERE cmv.match_uuid = inp.match_uuid\n                    AND sul.user_id = u.id\n            ) AS sul\n            INNER JOIN squadov.csgo_event_container_players AS cecp\n                ON cecp.container_id = cec.id AND cecp.steam_id = sul.steam_id\n            LEFT JOIN LATERAL (\n                SELECT ccr.winning_team = cps.team, ccr.round_num\n                FROM squadov.csgo_event_container_rounds AS ccr\n                INNER JOIN squadov.csgo_event_container_round_player_stats AS cps\n                    ON cps.container_id = ccr.container_id\n                        AND cps.round_num = ccr.round_num\n                        AND user_id = cecp.user_id\n                WHERE ccr.container_id = cec.id\n                ORDER BY ccr.round_num DESC\n                LIMIT 1\n            ) AS winner(win, last_round) ON TRUE\n            CROSS JOIN LATERAL (\n                SELECT\n                    COUNT(crr.round_num) FILTER(WHERE crr.winning_team = cps.team),\n                    COUNT(crr.round_num) FILTER(WHERE crr.winning_team != cps.team)\n                FROM squadov.csgo_event_container_rounds AS crr\n                INNER JOIN squadov.csgo_event_container_round_player_stats AS cps\n                    ON cps.container_id = crr.container_id\n                        AND cps.round_num = crr.round_num\n                WHERE crr.container_id = cec.id\n                    AND cps.user_id = cecp.user_id\n            ) AS rounds(win, lost)\n            LEFT JOIN squadov.csgo_event_container_round_damage AS crd\n                ON crd.container_id = cec.id\n                    AND crd.attacker = cecp.user_id\n            GROUP BY\n                inp.match_uuid,\n                inp.user_uuid,\n                cmv.map,\n                cmv.mode,\n                cmv.start_time,\n                \"match_length_seconds!\",\n                cecp.kills,\n                cecp.deaths,\n                cecp.assists,\n                cecp.mvps,\n                winner.win,\n                winner.last_round,\n                cec.event_source,\n                rounds.win,\n                rounds.lost,\n                sul.steam_id\n            ORDER BY cmv.start_time DESC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "user_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "map!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "mode!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "match_start_time!",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "match_length_seconds!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "kills!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "deaths!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 8,
+          "name": "assists!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 9,
+          "name": "mvps!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 10,
+          "name": "winner!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 11,
+          "name": "has_demo!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 12,
+          "name": "headshots!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 13,
+          "name": "bodyshots!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 14,
+          "name": "legshots!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 15,
+          "name": "damage_per_round!",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 16,
+          "name": "friendly_rounds!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 17,
+          "name": "enemy_rounds!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 18,
+          "name": "steam_id!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "UuidArray"
+        ]
+      },
+      "nullable": [
+        null,
+        null,
+        false,
+        false,
+        false,
+        null,
+        false,
+        false,
+        false,
+        false,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        false
       ]
     }
   },
@@ -10696,6 +10007,63 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "c01fb6825aa4f6eb0d1d66f30ce7fc666a092cd69e18e9d3c6585b0134cafd22": {
+    "query": "\n                SELECT\n                    wucc.unit_guid AS \"guid\",\n                    COALESCE(wcp.unit_name, '') AS \"name!\",\n                    COALESCE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS \"items!\",\n                    wvc.spec_id,\n                    wvc.team,\n                    wvc.rating,\n                    wvc.class_id\n                FROM squadov.wow_user_character_cache AS wucc\n                INNER JOIN squadov.wow_match_view_combatants AS wvc\n                    ON wvc.event_id = wucc.event_id\n                INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                    ON wcp.character_id = wvc.character_id\n                INNER JOIN squadov.wow_match_view AS wmv\n                    ON wmv.id = wcp.view_id\n                LEFT JOIN squadov.wow_match_view_combatant_items AS wci\n                    ON wci.event_id = wvc.event_id\n                WHERE wucc.user_id = $1\n                    AND wmv.build_version SIMILAR TO $2::VARCHAR\n                GROUP BY wucc.unit_guid, wcp.unit_name, wvc.spec_id, wvc.team, wvc.rating, wvc.class_id\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "guid",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "name!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "items!",
+          "type_info": "Int4Array"
+        },
+        {
+          "ordinal": 3,
+          "name": "spec_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "team",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "rating",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "class_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Varchar"
+        ]
+      },
+      "nullable": [
+        false,
+        null,
+        null,
+        false,
+        false,
+        false,
+        true
+      ]
     }
   },
   "c031d6275f4e71bd635ed4dfcd760f8c20a6b280878806c2c51adacefca57bf9": {
@@ -12008,18 +11376,6 @@
       ]
     }
   },
-  "d816ccc8bd4ca63986a681b740ae62012e45d1b9869a9b9e578420bfd1fc5729": {
-    "query": "\n        UPDATE squadov.riot_accounts\n        SET last_backfill_lol_time = NOW()\n        WHERE account_id = $1\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "d9033950ddbce8172d7aba46dd7660a1a9aa80fd30c142bcd3e9d4641d649b77": {
     "query": "\n            SELECT t.platform AS \"platform!\", t.game_id AS \"game_id!\"\n            FROM UNNEST($1::VARCHAR[], $2::BIGINT[]) AS t(platform, game_id)\n            LEFT JOIN squadov.tft_matches AS tft\n                ON tft.platform = t.platform\n                    AND tft.match_id = t.game_id\n            LEFT JOIN squadov.tft_match_info AS tmi\n                ON tmi.match_uuid = tft.match_uuid\n            WHERE tmi.match_uuid IS NULL\n            ",
     "describe": {
@@ -12603,6 +11959,20 @@
       ]
     }
   },
+  "e4d18e9ab8473404728b7e53f46e4c377a994e6c50793d2caa21c346126b455a": {
+    "query": "\n        UPDATE squadov.wow_match_view_combatants AS wvc\n        SET class_id = sub.class_id\n        FROM (\n            SELECT wve.event_id, wsc.class_id\n            FROM UNNEST($1::VARCHAR[], $2::BIGINT[], $3::BIGINT[]) AS t(guid, spell_id, view_id)\n            INNER JOIN squadov.wow_match_view AS wmv\n                ON wmv.alt_id = t.view_id\n            INNER JOIN squadov.wow_spell_to_class AS wsc\n                ON wsc.spell_id = t.spell_id\n                    AND wmv.build_version LIKE wsc.build_id  || '%'\n            INNER JOIN squadov.wow_match_view_events AS wve\n                ON wve.view_id = wmv.alt_id\n            INNER JOIN squadov.wow_match_view_combatants AS wvc\n                ON wvc.event_id = wve.event_id\n            INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                ON wcp.character_id = wvc.character_id\n                    AND wcp.view_id = wmv.id\n                    AND wcp.unit_guid = t.guid\n        ) AS sub\n        WHERE wvc.event_id = sub.event_id\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "VarcharArray",
+          "Int8Array",
+          "Int8Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "e60b00bf6030721a8701024c37c8c42fb3b71ee063ff18b12e723c65c73eafe7": {
     "query": "\n            SELECT draft_deck_id, creation_time\n            FROM squadov.hearthstone_arena_drafts\n            WHERE collection_uuid = $1 AND user_id = $2\n            ",
     "describe": {
@@ -13146,6 +12516,63 @@
       ]
     }
   },
+  "effe2bd673be58ec2045cbfde3d613b5f3de4aa63bd5de01743639a64c060a77": {
+    "query": "\n                    SELECT DISTINCT\n                        wcp.unit_guid AS \"guid\",\n                        COALESCE(wcp.unit_name, '') AS \"name!\",\n                        COALESCE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS \"items!\",\n                        wvc.spec_id,\n                        wvc.team,\n                        wvc.rating,\n                        wvc.class_id\n                    FROM squadov.wow_match_view AS wmv\n                    INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                        ON wcp.view_id = wmv.id\n                            AND wcp.has_combatant_info\n                    INNER JOIN squadov.wow_match_view_combatants AS wvc\n                        ON wvc.character_id = wcp.character_id\n                    LEFT JOIN squadov.wow_match_view_combatant_items AS wci\n                        ON wci.event_id = wvc.event_id\n                    WHERE wmv.match_uuid = $1\n                        AND wmv.user_id = $2\n                    GROUP BY wcp.unit_guid, wcp.unit_name, wvc.spec_id, wvc.team, wvc.event_id, wvc.rating, wvc.class_id\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "guid",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "name!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "items!",
+          "type_info": "Int4Array"
+        },
+        {
+          "ordinal": 3,
+          "name": "spec_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "team",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "rating",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "class_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        null,
+        null,
+        false,
+        false,
+        false,
+        true
+      ]
+    }
+  },
   "f0a8362858f3d43e95a63e2659f3efe5dccb5cd22dc951ed555aec0ba358de90": {
     "query": "\n            SELECT DISTINCT\n                wmv.match_uuid AS \"match_uuid!\",\n                u.uuid AS \"player_uuid!\",\n                wmv.start_tm\n            FROM squadov.wow_match_view AS wmv\n            INNER JOIN squadov.wow_arena_view AS wav\n                ON wav.view_id = wmv.id\n            INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                ON wcp.view_id = wmv.id\n            INNER JOIN squadov.wow_match_view_combatants AS mvc\n                ON mvc.character_id = wcp.character_id\n            INNER JOIN squadov.users AS u\n                ON u.id = wmv.user_id\n            LEFT JOIN squadov.vods AS v\n                ON v.match_uuid = wmv.match_uuid\n                    AND v.user_uuid = u.uuid\n                    AND v.is_clip = FALSE\n            LEFT JOIN squadov.view_share_connections_access_users AS sau\n                ON sau.match_uuid = wmv.match_uuid\n                    AND sau.user_id = $7\n            WHERE wmv.user_id = $2\n                AND wcp.unit_guid = $1\n                AND wmv.match_uuid IS NOT NULL\n                AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))\n                AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)\n                AND ($2 = $7 OR sau.match_uuid IS NOT NULL)\n                AND (CARDINALITY($8::VARCHAR[]) = 0 OR wav.arena_type = ANY($8))\n                AND ($9::BOOLEAN IS NULL OR ((wav.winning_team_id = mvc.team) = $9))\n            ORDER BY wmv.start_tm DESC, wmv.match_uuid, u.uuid\n            LIMIT $3 OFFSET $4\n            ",
     "describe": {
@@ -13356,6 +12783,28 @@
         null,
         false,
         null
+      ]
+    }
+  },
+  "f2ed69a0725626679d0eccd5fdfb9848a4e07d8981a2b6acbdc2ce1bbcc4b084": {
+    "query": "\n                INSERT INTO squadov.squads (\n                    squad_name,\n                    creation_time,\n                    is_default\n                )\n                VALUES (\n                    $1,\n                    $2,\n                    $3\n                )\n                RETURNING id\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Timestamptz",
+          "Bool"
+        ]
+      },
+      "nullable": [
+        false
       ]
     }
   },
@@ -13718,6 +13167,63 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "f889cd3a37871ea8048193593711c81248640958d69114d2964cdff36e2a3d4e": {
+    "query": "\n                SELECT\n                    wucc.unit_guid AS \"guid\",\n                    COALESCE(wcp.unit_name, '') AS \"name!\",\n                    COALESCE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS \"items!\",\n                    wvc.spec_id,\n                    wvc.team,\n                    wvc.rating,\n                    wvc.class_id\n                FROM squadov.wow_user_character_cache AS wucc\n                INNER JOIN squadov.wow_match_view_combatants AS wvc\n                    ON wvc.event_id = wucc.event_id\n                INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                    ON wcp.character_id = wvc.character_id\n                INNER JOIN squadov.wow_match_view AS wmv\n                    ON wmv.id = wcp.view_id\n                LEFT JOIN squadov.wow_match_view_combatant_items AS wci\n                    ON wci.event_id = wvc.event_id\n                WHERE wucc.user_id = $1\n                    AND ($2::VARCHAR IS NULL OR wmv.build_version LIKE $2::VARCHAR)\n                GROUP BY wucc.unit_guid, wcp.unit_name, wvc.spec_id, wvc.team, wvc.rating, wvc.class_id\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "guid",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "name!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "items!",
+          "type_info": "Int4Array"
+        },
+        {
+          "ordinal": 3,
+          "name": "spec_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "team",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "rating",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "class_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Varchar"
+        ]
+      },
+      "nullable": [
+        false,
+        null,
+        null,
+        false,
+        false,
+        false,
+        true
       ]
     }
   },
