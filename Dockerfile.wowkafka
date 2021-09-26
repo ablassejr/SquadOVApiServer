@@ -39,5 +39,6 @@ COPY --from=builder /squadov/gcp ./gcp
 
 RUN mkdir -p /squadov/aws
 COPY devops/aws/$DEPLOYMENT_ENVIRONMENT.profile ./aws/api.profile
+COPY devops/aws/keys/private_s3_vod_cloudfront.pem ./aws/private_s3_vod_cloudfront.pem
 COPY run_wow_kafkaworker.sh ./
 ENTRYPOINT ["./run_wow_kafkaworker.sh"]
