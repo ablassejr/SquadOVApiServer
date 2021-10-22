@@ -293,7 +293,7 @@ impl api::ApiApplication {
                     AND upv.user_id = u.id
             LEFT JOIN squadov.wow_match_view AS wmv
                 ON wmv.match_uuid = v.match_uuid
-                    AND wmv.user_id = u.id
+                    AND wmv.user_id = vu.id
             LEFT JOIN squadov.wow_encounter_view AS wev
                 ON wev.view_id = wmv.id
             LEFT JOIN squadov.wow_challenge_view AS wcv
