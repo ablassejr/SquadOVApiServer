@@ -1,8 +1,15 @@
 [
     {
+        "title": "SquadOV v0.10.2",
+        "description": "QOL update and profile pages general release.",
+        "timestamp": 1634950899000,
+        "data": "data/update-v0.10.2.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.10.0",
         "description": "WoW classic has arrived!",
-        "timestamp": 1630532116000,
+        "timestamp": 1632671580000,
         "data": "data/update-v0.10.0.md",
         "type": "update"
     },
@@ -54,75 +61,5 @@
         "timestamp": 1622221696000,
         "data": "data/update-v0.8.4.md",
         "type": "update"
-    },
-    {
-        "title": "SquadOV v0.8.0",
-        "description": "CS:GO support and more.",
-        "timestamp": 1621007211000,
-        "data": "data/update-v0.8.0.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.7.22",
-        "description": "Some improvements for local recording and push-to-talk.",
-        "timestamp": 1618443565000,
-        "data": "data/update-v0.7.22.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.7.20",
-        "description": "Some fixes that cropped up for Valorant and local recording.",
-        "timestamp": 1618076762000,
-        "data": "data/hotfix-v0.7.20.md",
-        "type": "hotfix"
-    },
-    {
-        "title": "SquadOV v0.7.19",
-        "description": "Welcome /r/valorant!",
-        "timestamp": 1617906139000,
-        "data": "data/hotfix-v0.7.19.md",
-        "type": "hotfix"
-    },
-    {
-        "title": "SquadOV v0.7.16",
-        "description": "Minor update with local recording to prep for Valorant release!",
-        "timestamp": 1617741833000,
-        "data": "data/update-v0.7.16.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.7.15",
-        "description": "QOL update with bug fixes and the like!",
-        "timestamp": 1617324501000,
-        "data": "data/update-v0.7.15.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.7.12",
-        "description": "VOD overlay drawing, WoW death recaps, and WoW player info!",
-        "timestamp": 1616803306000,
-        "data": "data/update-v0.7.12.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.7.9",
-        "description": "Better WoW timeline and spell/aura analysis!",
-        "timestamp": 1616101680000,
-        "data": "data/update-v0.7.9.md",
-        "type": "update"
-    },
-    {
-        "title": "SquadOV v0.7.4",
-        "description": "Urgent hotfix to handle thew latest WoW patch!",
-        "timestamp": 1615329482000,
-        "data": "data/hotfix-v0.7.4.md",
-        "type": "hotfix"
-    },
-    {
-        "title": "SquadOV v0.7.3",
-        "description": "Urgent hotfix - update now to resolve issues with WoW!",
-        "timestamp": 1615315799000,
-        "data": "data/hotfix-v0.7.3.md",
-        "type": "hotfix"
     }
 ]
