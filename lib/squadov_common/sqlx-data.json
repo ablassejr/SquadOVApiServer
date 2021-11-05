@@ -237,6 +237,63 @@
       ]
     }
   },
+  "0aecb5366a7a671af55c384e62a2441acd8e98d7773c33c542ee4dd671f413d3": {
+    "query": "\n        SELECT\n            tmpt.match_uuid AS \"match_uuid!\",\n            tmpt.name AS \"name!\",\n            tmpt.num_units AS \"num_units!\",\n            tmpt.style AS \"style!\",\n            tmpt.tier_current AS \"tier_current!\",\n            tmpt.tier_total AS \"tier_total!\",\n            u.uuid AS \"user_uuid!\"\n        FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)\n        INNER JOIN squadov.users AS u\n            ON u.uuid = inp.user_uuid\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.user_id = u.id\n        INNER JOIN squadov.tft_match_participant_traits AS tmpt\n            ON tmpt.match_uuid = inp.match_uuid\n                AND tmpt.puuid = ral.puuid\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "name!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "num_units!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "style!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "tier_current!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "tier_total!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "user_uuid!",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "UuidArray"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
   "0db34b6ccbdf3cfff1d46c22b3190bf8b6dad430bfafbbea8f7f5afd53d7ec72": {
     "query": "\n        SELECT u.username, u.registration_time, ta.twitch_name AS \"twitch_name?\"\n        FROM squadov.users AS u\n        LEFT JOIN squadov.linked_twitch_accounts AS lta\n            ON lta.user_id = u.id\n        LEFT JOIN squadov.twitch_accounts AS ta\n            ON ta.twitch_user_id = lta.twitch_user_id\n        WHERE u.id = $1\n        ",
     "describe": {
@@ -1429,75 +1486,6 @@
         ]
       },
       "nullable": [
-        false
-      ]
-    }
-  },
-  "34550a2d62b81e2a798e35978c7e025470de543906d90ea57270c57b52c7663a": {
-    "query": "\n        SELECT tmpu.*, u.uuid AS \"user_uuid!\"\n        FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)\n        INNER JOIN squadov.users AS u\n            ON u.uuid = inp.user_uuid\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.user_id = u.id\n        INNER JOIN squadov.tft_match_participant_units AS tmpu\n            ON tmpu.match_uuid = inp.match_uuid\n                AND tmpu.puuid = ral.puuid\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "puuid",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "character_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 3,
-          "name": "chosen",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 5,
-          "name": "rarity",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "tier",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "items",
-          "type_info": "Int4Array"
-        },
-        {
-          "ordinal": 8,
-          "name": "user_uuid!",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "UuidArray"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        true,
-        true,
-        false,
-        false,
-        false,
-        false,
         false
       ]
     }
@@ -3012,6 +3000,93 @@
       ]
     }
   },
+  "6e1c93efc90c9bdee87c34c4a0fd521e12c05bf993ad6a6f9907a6e8fbad86d5": {
+    "query": "\n            SELECT\n                vm.video_uuid AS \"video_uuid!\",\n                vm.res_x AS \"res_x!\",\n                vm.res_y AS \"res_y!\",\n                vm.fps AS \"fps!\",\n                vm.min_bitrate AS \"min_bitrate!\",\n                vm.avg_bitrate AS \"avg_bitrate!\",\n                vm.max_bitrate AS \"max_bitrate!\",\n                vm.bucket AS \"bucket!\",\n                vm.session_id AS \"session_id\",\n                vm.id AS \"id!\",\n                vm.has_fastify AS \"has_fastify!\",\n                vm.has_preview AS \"has_preview!\"\n            FROM UNNEST($1::UUID[], $2::VARCHAR[]) AS inp(uuid, id)\n            INNER JOIN squadov.vod_metadata AS vm\n                ON vm.video_uuid = inp.uuid\n                    AND vm.id = inp.id\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "res_x!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "res_y!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "fps!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "min_bitrate!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "avg_bitrate!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "max_bitrate!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 7,
+          "name": "bucket!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 8,
+          "name": "session_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 9,
+          "name": "id!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 10,
+          "name": "has_fastify!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 11,
+          "name": "has_preview!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "VarcharArray"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
   "6e3f7e5e7b8377009dcf5cba8260ac43c3b6a4d94aeb168a7ef6c2d26c7ff514": {
     "query": "\n        INSERT INTO squadov.user_hardware_specs (\n            user_id,\n            os,\n            cpu,\n            display,\n            ram_kb\n        )\n        VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            $5\n        )\n        ON CONFLICT (user_id) DO UPDATE SET\n            os=EXCLUDED.os,\n            cpu=EXCLUDED.cpu,\n            display=EXCLUDED.display,\n            ram_kb=EXCLUDED.ram_kb\n        ",
     "describe": {
@@ -3066,11 +3141,11 @@
         ]
       },
       "nullable": [
-        false,
-        false,
-        false,
         true,
-        null
+        true,
+        true,
+        true,
+        true
       ]
     }
   },
@@ -4880,6 +4955,69 @@
       "nullable": []
     }
   },
+  "c1cdc9be97317e3b7f515a086ac0bee9e32c5d90670217224a9167bb9c72600e": {
+    "query": "\n        SELECT\n            tmpu.match_uuid AS \"match_uuid!\",\n            tmpu.items AS \"items!\",\n            tmpu.character_id,\n            tmpu.chosen,\n            tmpu.name AS \"name!\",\n            tmpu.rarity AS \"rarity!\",\n            tmpu.tier AS \"tier!\",\n            u.uuid AS \"user_uuid!\"\n        FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)\n        INNER JOIN squadov.users AS u\n            ON u.uuid = inp.user_uuid\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.user_id = u.id\n        INNER JOIN squadov.tft_match_participant_units AS tmpu\n            ON tmpu.match_uuid = inp.match_uuid\n                AND tmpu.puuid = ral.puuid\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "items!",
+          "type_info": "Int4Array"
+        },
+        {
+          "ordinal": 2,
+          "name": "character_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "chosen",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "name!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "rarity!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "tier!",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "user_uuid!",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "UuidArray"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
   "c23dd6aac477af746cefb37b13c68e6539c6b2a3f5726c736ba60e1193c9a4e2": {
     "query": "\n        UPDATE squadov.csgo_match_views\n        SET has_demo = TRUE\n        WHERE view_uuid = $1\n        ",
     "describe": {
@@ -6061,69 +6199,6 @@
       ]
     }
   },
-  "ea9671ad12eb7caf3f7486d85d02de9018d963b3422c8960572c7f0c0a57a86a": {
-    "query": "\n        SELECT tmpt.*, u.uuid AS \"user_uuid!\"\n        FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)\n        INNER JOIN squadov.users AS u\n            ON u.uuid = inp.user_uuid\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.user_id = u.id\n        INNER JOIN squadov.tft_match_participant_traits AS tmpt\n            ON tmpt.match_uuid = inp.match_uuid\n                AND tmpt.puuid = ral.puuid\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "puuid",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 3,
-          "name": "num_units",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "style",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "tier_current",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "tier_total",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "user_uuid!",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "UuidArray"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "eb3aebb67abd053c06ac9a864cafd78a586d38283da4ea1d3f0bb6027df0675b": {
     "query": "\n        INSERT INTO squadov.lol_match_timeline (\n            match_uuid,\n            frame_interval\n        )\n        VALUES (\n            $1,\n            $2\n        )\n        ",
     "describe": {
@@ -6275,93 +6350,6 @@
         true,
         true,
         true,
-        true
-      ]
-    }
-  },
-  "ebef975a3372090ded562cb3ec38a245cf79fe6660f540a09f683cf482d829f3": {
-    "query": "\n            SELECT vm.*\n            FROM UNNEST($1::UUID[], $2::VARCHAR[]) AS inp(uuid, id)\n            INNER JOIN squadov.vod_metadata AS vm\n                ON vm.video_uuid = inp.uuid\n                    AND vm.id = inp.id\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "video_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "res_x",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "res_y",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "min_bitrate",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "avg_bitrate",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "max_bitrate",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 6,
-          "name": "fps",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 8,
-          "name": "has_fastify",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 9,
-          "name": "has_preview",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 10,
-          "name": "bucket",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 11,
-          "name": "session_id",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "VarcharArray"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
         true
       ]
     }

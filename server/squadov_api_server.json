@@ -342,21 +342,6 @@
       ]
     }
   },
-  "096587dc0703f582d414fbb372d0b805293668f6aec24a8f5e2ec004a5b9fd25": {
-    "query": "\n            INSERT INTO squadov.wow_instance_view (\n                view_id,\n                instance_id,\n                instance_name,\n                instance_type,\n                is_converted\n            )\n            VALUES (\n                $1,\n                $2,\n                $3,\n                $4,\n                FALSE\n            )\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Int4",
-          "Varchar",
-          "Int4"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "09f5647d6cfa260acdf67d3310ed247297da9dd8dafd140f517f78b6c21e30a5": {
     "query": "\n            SELECT\n                deck_id,\n                hero_card,\n                hero_premium,\n                deck_type,\n                create_date,\n                is_wild,\n                deck_name AS \"name\"\n            FROM squadov.hearthstone_decks\n            WHERE deck_id = $1\n                AND user_id = $2\n            ",
     "describe": {
@@ -1259,73 +1244,6 @@
       "nullable": []
     }
   },
-  "13e3f5ad725e0bb1bb152ba5f142caa267e77ee4bafd01e61de4a69587ab258e": {
-    "query": "\n            SELECT DISTINCT v.match_uuid AS \"match_uuid!\", v.user_uuid AS \"uuid!\", v.end_time\n            FROM squadov.users AS u\n            CROSS JOIN LATERAL (\n                SELECT *\n                FROM squadov.vods\n                WHERE user_uuid = u.uuid\n                UNION\n                SELECT v.*\n                FROM squadov.view_share_connections_access_users AS vi\n                INNER JOIN squadov.vods AS v\n                    ON v.video_uuid = vi.video_uuid\n                LEFT JOIN squadov.squad_role_assignments AS sra\n                    ON sra.user_id = vi.source_user_id\n                WHERE vi.user_id = u.id\n                    AND (CARDINALITY($5::BIGINT[]) = 0 OR sra.squad_id = ANY($5))\n            ) AS v\n            INNER JOIN squadov.users AS vu\n                ON vu.uuid = v.user_uuid\n            INNER JOIN squadov.matches AS m\n                ON m.uuid = v.match_uuid\n            LEFT JOIN squadov.user_favorite_matches AS ufm\n                ON ufm.match_uuid = m.uuid\n                    AND ufm.user_id = $1\n            LEFT JOIN squadov.user_watchlist_vods AS uwv\n                ON uwv.video_uuid = v.video_uuid\n                    AND uwv.user_id = $1\n            LEFT JOIN squadov.user_profile_vods AS upv\n                ON upv.video_uuid = v.video_uuid\n                    AND upv.user_id = u.id\n            LEFT JOIN squadov.wow_match_view AS wmv\n                ON wmv.match_uuid = v.match_uuid\n                    AND wmv.user_id = vu.id\n            LEFT JOIN squadov.wow_encounter_view AS wev\n                ON wev.view_id = wmv.id\n            LEFT JOIN squadov.wow_challenge_view AS wcv\n                ON wcv.view_id = wmv.id\n            LEFT JOIN squadov.wow_arena_view AS wav\n                ON wav.view_id = wmv.id\n            LEFT JOIN LATERAL (\n                SELECT wcp.character_id\n                FROM squadov.wow_match_view_character_presence AS wcp\n                INNER JOIN squadov.wow_user_character_cache AS wucc\n                    ON wucc.user_id = vu.id\n                        AND wucc.unit_guid = wcp.unit_guid\n                WHERE wcp.view_id = wmv.id\n            ) AS wcp\n                ON TRUE\n            LEFT JOIN squadov.wow_match_view_combatants AS wvc\n                ON wvc.character_id = wcp.character_id\n            LEFT JOIN LATERAL (\n                SELECT ',' || STRING_AGG(val::VARCHAR, ',') || ',' AS vv\n                FROM (\n                    SELECT MIN(wvc.spec_id)\n                    FROM squadov.wow_match_view_character_presence AS wcp\n                    INNER JOIN squadov.wow_match_view_combatants AS wvc\n                        ON wvc.character_id = wcp.character_id\n                    WHERE wcp.view_id = wmv.id\n                        AND wvc.team = 0\n                    GROUP BY wcp.view_id, wcp.unit_guid\n                ) sub(val)\n            ) AS t0(s)\n                ON TRUE\n            LEFT JOIN LATERAL (\n                SELECT ',' || STRING_AGG(val::VARCHAR, ',') || ',' AS vv\n                FROM (\n                    SELECT MIN(wvc.spec_id)\n                    FROM squadov.wow_match_view_character_presence AS wcp\n                    INNER JOIN squadov.wow_match_view_combatants AS wvc\n                        ON wvc.character_id = wcp.character_id\n                    WHERE wcp.view_id = wmv.id\n                        AND wvc.team = 1\n                    GROUP BY wcp.view_id, wcp.unit_guid\n                ) sub(val)\n            ) AS t1(s)\n                ON TRUE\n            WHERE u.id = $1\n                AND v.match_uuid IS NOT NULL\n                AND v.user_uuid IS NOT NULL\n                AND v.start_time IS NOT NULL\n                AND v.end_time IS NOT NULL\n                AND (CARDINALITY($4::INTEGER[]) = 0 OR m.game = ANY($4))\n                AND (CARDINALITY($6::BIGINT[]) = 0 OR vu.id = ANY($6))\n                AND COALESCE(v.end_time >= $7, TRUE)\n                AND COALESCE(v.end_time <= $8, TRUE)\n                AND (NOT $9::BOOLEAN OR ufm.match_uuid IS NOT NULL)\n                AND (NOT $10::BOOLEAN OR uwv.video_uuid IS NOT NULL)\n                AND v.is_clip = FALSE\n                AND (CARDINALITY($11::UUID[]) = 0 OR v.video_uuid = ANY($11))\n                AND (NOT $12::BOOLEAN OR upv.video_uuid IS NOT NULL)\n                AND (CARDINALITY($13::VARCHAR[]) = 0 OR wmv.build_version LIKE ANY ($13))\n                AND (wmv.id IS NULL OR wmv.build_version NOT LIKE '9.%' OR (\n                    wmv.build_version LIKE '9.%'\n                        AND ((\n                                wev.view_id IS NOT NULL\n                                    AND (CARDINALITY($14::INTEGER[]) = 0 OR wev.instance_id = ANY($14))\n                                    AND (CARDINALITY($15::INTEGER[]) = 0 OR wev.encounter_id = ANY($15))\n                                    AND ($16::BOOLEAN IS NULL OR wev.success = $16)\n                                    AND (CARDINALITY($17::INTEGER[]) = 0 OR wev.difficulty = ANY($17))\n                                    AND (CARDINALITY($18::INTEGER[]) = 0 OR wvc.spec_id = ANY($18))\n                                    AND (t0.s ~ $19 OR t1.s ~ $19)\n                                    AND $34\n                            )\n                            OR (\n                                wcv.view_id IS NOT NULL\n                                    AND (CARDINALITY($20::INTEGER[]) = 0 OR wcv.instance_id = ANY($20)) \n                                    AND ($21::BOOLEAN IS NULL OR wcv.success = $21)\n                                    AND ($22::INTEGER IS NULL OR wcv.keystone_level >= $22)\n                                    AND ($23::INTEGER IS NULL OR wcv.keystone_level <= $23)\n                                    AND (CARDINALITY($24::INTEGER[]) = 0 OR wvc.spec_id = ANY($24))\n                                    AND (t0.s ~ $25 OR t1.s ~ $25)\n                                    AND $35\n                            )\n                            OR (\n                                wav.view_id IS NOT NULL\n                                    AND (CARDINALITY($26::INTEGER[]) = 0 OR wav.instance_id = ANY($26))\n                                    AND (CARDINALITY($27::VARCHAR[]) = 0 OR wav.arena_type = ANY($27))\n                                    AND ($28::BOOLEAN IS NULL OR ((wav.winning_team_id = wvc.team) = $28))\n                                    AND (CARDINALITY($29::INTEGER[]) = 0 OR wvc.spec_id = ANY($29))\n                                    AND ($30::INTEGER IS NULL OR wvc.rating >= $30)\n                                    AND ($31::INTEGER IS NULL OR wvc.rating <= $31)\n                                    AND (\n                                        (t0.s ~ $32 AND t1.s ~ $33)\n                                        OR\n                                        (t0.s ~ $33 AND t1.s ~ $32)\n                                    )\n                                    AND $36\n                            )\n                        )\n                ))\n            ORDER BY v.end_time DESC\n            LIMIT $2 OFFSET $3\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 2,
-          "name": "end_time",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int4Array",
-          "Int8Array",
-          "Int8Array",
-          "Timestamptz",
-          "Timestamptz",
-          "Bool",
-          "Bool",
-          "UuidArray",
-          "Bool",
-          "VarcharArray",
-          "Int4Array",
-          "Int4Array",
-          "Bool",
-          "Int4Array",
-          "Int4Array",
-          "Text",
-          "Int4Array",
-          "Bool",
-          "Int4",
-          "Int4",
-          "Int4Array",
-          "Text",
-          "Int4Array",
-          "VarcharArray",
-          "Bool",
-          "Int4Array",
-          "Int4",
-          "Int4",
-          "Text",
-          "Text",
-          "Bool",
-          "Bool",
-          "Bool"
-        ]
-      },
-      "nullable": [
-        null,
-        null,
-        null
-      ]
-    }
-  },
   "1451fca1a2b315bb09b30353cd140dd4edea985c2a2780cae56b69192aa958c7": {
     "query": "\n            UPDATE squadov.users\n            SET registration_time = $2\n            WHERE id = $1\n            ",
     "describe": {
@@ -1874,69 +1792,6 @@
       ]
     }
   },
-  "1e9799ad4b3d723587bc5ac7f7202e2888fad16f3e3c44c4bdf67e4cf29d6c3c": {
-    "query": "\n        SELECT\n            tmpu.match_uuid AS \"match_uuid!\",\n            tmpu.items AS \"items!\",\n            tmpu.character_id AS \"character_id!\",\n            tmpu.chosen AS \"chosen!\",\n            tmpu.name AS \"name!\",\n            tmpu.rarity AS \"rarity!\",\n            tmpu.tier AS \"tier!\",\n            u.uuid AS \"user_uuid!\"\n        FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)\n        INNER JOIN squadov.users AS u\n            ON u.uuid = inp.user_uuid\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.user_id = u.id\n        INNER JOIN squadov.tft_match_participant_units AS tmpu\n            ON tmpu.match_uuid = inp.match_uuid\n                AND tmpu.puuid = ral.puuid\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "items!",
-          "type_info": "Int4Array"
-        },
-        {
-          "ordinal": 2,
-          "name": "character_id!",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 3,
-          "name": "chosen!",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "name!",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 5,
-          "name": "rarity!",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "tier!",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "user_uuid!",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "UuidArray"
-        ]
-      },
-      "nullable": [
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true
-      ]
-    }
-  },
   "1efc4190b07f8134d1b510b67df4b01b07950e09eed7130c0f34029ec7a8e962": {
     "query": "\n            UPDATE squadov.wow_arena_view\n            SET winning_team_id = $2,\n                match_duration_seconds = $3,\n                new_ratings = $4\n            WHERE view_id = $1\n            ",
     "describe": {
@@ -2034,51 +1889,6 @@
       },
       "nullable": [
         false
-      ]
-    }
-  },
-  "20e3741eefe8c23bf99427d390868bb7c048731f7d278e6f737340d5671152e0": {
-    "query": "\n                SELECT\n                    wucc.unit_guid AS \"guid\",\n                    COALESCE(wucc.unit_name, '') AS \"name!\",\n                    COALESCE(wucc.items, ARRAY[]::INTEGER[]) AS \"items!\",\n                    COALESCE(wucc.spec_id, -1) AS \"spec_id!\",\n                    COALESCE(wucc.class_id, -1) AS \"class_id!\"\n                FROM squadov.wow_user_character_cache AS wucc\n                WHERE wucc.user_id = $1\n                    AND wucc.build_version SIMILAR TO $2::VARCHAR\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "guid",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "name!",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "items!",
-          "type_info": "Int4Array"
-        },
-        {
-          "ordinal": 3,
-          "name": "spec_id!",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "class_id!",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Varchar"
-        ]
-      },
-      "nullable": [
-        false,
-        null,
-        null,
-        null,
-        null
       ]
     }
   },
@@ -2352,26 +2162,6 @@
       "nullable": []
     }
   },
-  "26f9f1c516a07bbe79b437f32021b83f3a494730e1b757a024b95fad5b1fae98": {
-    "query": "\n                SELECT bool_or(f.has_fastify) AS \"has_fastify\"\n                FROM (\n                    SELECT has_fastify\n                    FROM squadov.vod_metadata\n                    WHERE video_uuid = $1\n                ) AS f\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "has_fastify",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "27198d8ddaec95cf7351c671f75dd2b604ea176032d3b2f52b010a36e8e561cc": {
     "query": "\n        SELECT ra.puuid, ra.account_id, ra.summoner_id, ra.summoner_name, ra.last_backfill_lol_time, ra.last_backfill_tft_time\n        FROM squadov.riot_accounts AS ra\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.puuid = ra.puuid\n        WHERE ral.user_id = $1\n            AND ra.puuid = $2\n            AND ra.summoner_name IS NOT NULL\n        ",
     "describe": {
@@ -2623,33 +2413,6 @@
       "nullable": [
         false,
         false
-      ]
-    }
-  },
-  "2c7ce92f675f460b29a313d5b43de8afb74fac23601747ed4b00089cae218b0e": {
-    "query": "\n                    SELECT\n                        wcp.unit_guid,\n                        COALESCE(wcp.unit_name, '') AS \"unit_name!\"\n                    FROM squadov.wow_match_view AS wmv\n                    INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                        ON wcp.view_id = wmv.id\n                    WHERE wmv.match_uuid = $1\n                        AND wmv.user_id = $2\n                        AND (wcp.flags & x'100'::BIGINT) > 0\n                        AND (wcp.flags & x'400'::BIGINT) > 0\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "unit_guid",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "unit_name!",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        null
       ]
     }
   },
@@ -3584,8 +3347,8 @@
         ]
       },
       "nullable": [
-        null,
-        false
+        true,
+        true
       ]
     }
   },
@@ -3607,51 +3370,6 @@
       },
       "nullable": [
         null
-      ]
-    }
-  },
-  "3d16968b677e81ac2bb93482be3a9936a027860dbcca71ec7f7591e737732cb0": {
-    "query": "\n                SELECT\n                    wucc.unit_guid AS \"guid\",\n                    COALESCE(wucc.unit_name, '') AS \"name!\",\n                    COALESCE(wucc.items, ARRAY[]::INTEGER[]) AS \"items!\",\n                    COALESCE(wucc.spec_id, -1) AS \"spec_id!\",\n                    wucc.class_id AS \"class_id!\"\n                FROM squadov.wow_user_character_cache AS wucc\n                WHERE wucc.user_id = $1\n                    AND wucc.build_version SIMILAR TO $2::VARCHAR\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "guid",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "name!",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "items!",
-          "type_info": "Int4Array"
-        },
-        {
-          "ordinal": 3,
-          "name": "spec_id!",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "class_id!",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Varchar"
-        ]
-      },
-      "nullable": [
-        false,
-        null,
-        null,
-        null,
-        true
       ]
     }
   },
@@ -5792,57 +5510,6 @@
       ]
     }
   },
-  "636a78efaa919f36129aaaa20c6f1683f6f3024b816511f08d86f7785a030cc6": {
-    "query": "\n                SELECT * FROM (\n                    SELECT DISTINCT ON (wmv.match_uuid, wmv.user_id)\n                        wmv.match_uuid AS \"match_uuid!\",\n                        wmv.start_tm AS \"tm!\",\n                        wmv.end_tm AS \"finish_time\", \n                        wmv.build_version AS \"build!\",\n                        '' AS \"combatants_key\",\n                        FALSE AS \"success\"\n                    FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)\n                    INNER JOIN squadov.wow_match_view AS wmv\n                        ON wmv.match_uuid = inp.match_uuid\n                            AND wmv.user_id = inp.user_id\n                    INNER JOIN squadov.new_wow_instances AS nwi\n                        ON nwi.match_uuid = wmv.match_uuid\n                    ORDER BY wmv.match_uuid, wmv.user_id\n                ) AS t\n                ORDER BY finish_time DESC\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "tm!",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 2,
-          "name": "finish_time",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 3,
-          "name": "build!",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "combatants_key",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 5,
-          "name": "success",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "Int8Array"
-        ]
-      },
-      "nullable": [
-        true,
-        false,
-        true,
-        false,
-        null,
-        null
-      ]
-    }
-  },
   "64001db312548f4e16f805112a9f663a2db59ffd419a2f4cf931f99b2aa20134": {
     "query": "\n        SELECT *\n        FROM squadov.tft_match_participant_units\n        WHERE match_uuid = $1\n        ",
     "describe": {
@@ -6063,69 +5730,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "6ba2302a44a01e75d45230be700cff20d31dd79d19a89f7d755a661313ddf161": {
-    "query": "\n        SELECT\n            tmpu.match_uuid AS \"match_uuid!\",\n            tmpu.items,\n            tmpu.character_id,\n            tmpu.chosen,\n            tmpu.name,\n            tmpu.rarity,\n            tmpu.tier,\n            u.uuid AS \"user_uuid!\"\n        FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, user_uuid)\n        INNER JOIN squadov.users AS u\n            ON u.uuid = inp.user_uuid\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.user_id = u.id\n        INNER JOIN squadov.tft_match_participant_units AS tmpu\n            ON tmpu.match_uuid = inp.match_uuid\n                AND tmpu.puuid = ral.puuid\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "items",
-          "type_info": "Int4Array"
-        },
-        {
-          "ordinal": 2,
-          "name": "character_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 3,
-          "name": "chosen",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 5,
-          "name": "rarity",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "tier",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "user_uuid!",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "UuidArray"
-        ]
-      },
-      "nullable": [
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true
-      ]
     }
   },
   "6bc17fe17763891ec0668c57988f6439ae6854a0701747f3c30b4b0224de8b04": {
@@ -10289,69 +9893,6 @@
       ]
     }
   },
-  "bda56a09c81acec9d479670604366749b6ee80eb4d8ddd4c5f5ddccc529b1d29": {
-    "query": "\n                SELECT * FROM (\n                    SELECT DISTINCT ON (wmv.match_uuid, wmv.user_id)\n                        wmv.match_uuid AS \"match_uuid!\",\n                        wmv.start_tm AS \"tm!\",\n                        wmv.end_tm AS \"finish_time\", \n                        wmv.build_version AS \"build!\",\n                        '' AS \"combatants_key!\",\n                        FALSE AS \"success!\",\n                        nwi.instance_id,\n                        nwi.instance_type\n                    FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)\n                    INNER JOIN squadov.wow_match_view AS wmv\n                        ON wmv.match_uuid = inp.match_uuid\n                            AND wmv.user_id = inp.user_id\n                    INNER JOIN squadov.new_wow_instances AS nwi\n                        ON nwi.match_uuid = wmv.match_uuid\n                    ORDER BY wmv.match_uuid, wmv.user_id\n                ) AS t\n                ORDER BY finish_time DESC\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "match_uuid!",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "tm!",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 2,
-          "name": "finish_time",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 3,
-          "name": "build!",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "combatants_key!",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 5,
-          "name": "success!",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 6,
-          "name": "instance_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "instance_type",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "Int8Array"
-        ]
-      },
-      "nullable": [
-        true,
-        false,
-        true,
-        false,
-        null,
-        null,
-        false,
-        false
-      ]
-    }
-  },
   "bdb0bd9ceb7b864fa61b54465ee9126865b50455a61a1e98954b6adf68d53ad2": {
     "query": "\n        INSERT INTO squadov.twitch_accounts (\n            twitch_user_id,\n            twitch_name,\n            access_token,\n            refresh_token,\n            access_expiration\n        ) VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            $5\n        ) ON CONFLICT (twitch_user_id) DO UPDATE SET\n            twitch_name = EXCLUDED.twitch_name,\n            access_token = EXCLUDED.access_token,\n            refresh_token = EXCLUDED.refresh_token\n        ",
     "describe": {
@@ -10406,63 +9947,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "c01fb6825aa4f6eb0d1d66f30ce7fc666a092cd69e18e9d3c6585b0134cafd22": {
-    "query": "\n                SELECT\n                    wucc.unit_guid AS \"guid\",\n                    COALESCE(wcp.unit_name, '') AS \"name!\",\n                    COALESCE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS \"items!\",\n                    wvc.spec_id,\n                    wvc.team,\n                    wvc.rating,\n                    wvc.class_id\n                FROM squadov.wow_user_character_cache AS wucc\n                INNER JOIN squadov.wow_match_view_combatants AS wvc\n                    ON wvc.event_id = wucc.event_id\n                INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                    ON wcp.character_id = wvc.character_id\n                INNER JOIN squadov.wow_match_view AS wmv\n                    ON wmv.id = wcp.view_id\n                LEFT JOIN squadov.wow_match_view_combatant_items AS wci\n                    ON wci.event_id = wvc.event_id\n                WHERE wucc.user_id = $1\n                    AND wmv.build_version SIMILAR TO $2::VARCHAR\n                GROUP BY wucc.unit_guid, wcp.unit_name, wvc.spec_id, wvc.team, wvc.rating, wvc.class_id\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "guid",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "name!",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "items!",
-          "type_info": "Int4Array"
-        },
-        {
-          "ordinal": 3,
-          "name": "spec_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "team",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "rating",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "class_id",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Varchar"
-        ]
-      },
-      "nullable": [
-        false,
-        null,
-        null,
-        false,
-        false,
-        false,
-        true
-      ]
     }
   },
   "c031d6275f4e71bd635ed4dfcd760f8c20a6b280878806c2c51adacefca57bf9": {
@@ -11308,26 +10792,6 @@
       },
       "nullable": [
         null,
-        null
-      ]
-    }
-  },
-  "ce2a104268971f9a99226415db589f97d31c0b999f788ecd1a9e4e564e60d101": {
-    "query": "\n                SELECT bool_or(f.has_fastify) AS \"has_fastify!\"\n                FROM (\n                    SELECT has_fastify\n                    FROM squadov.vod_metadata\n                    WHERE video_uuid = $1\n                ) AS f\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "has_fastify!",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
         null
       ]
     }
@@ -12501,20 +11965,6 @@
       ]
     }
   },
-  "e4d18e9ab8473404728b7e53f46e4c377a994e6c50793d2caa21c346126b455a": {
-    "query": "\n        UPDATE squadov.wow_match_view_combatants AS wvc\n        SET class_id = sub.class_id\n        FROM (\n            SELECT wve.event_id, wsc.class_id\n            FROM UNNEST($1::VARCHAR[], $2::BIGINT[], $3::BIGINT[]) AS t(guid, spell_id, view_id)\n            INNER JOIN squadov.wow_match_view AS wmv\n                ON wmv.alt_id = t.view_id\n            INNER JOIN squadov.wow_spell_to_class AS wsc\n                ON wsc.spell_id = t.spell_id\n                    AND wmv.build_version LIKE wsc.build_id  || '%'\n            INNER JOIN squadov.wow_match_view_events AS wve\n                ON wve.view_id = wmv.alt_id\n            INNER JOIN squadov.wow_match_view_combatants AS wvc\n                ON wvc.event_id = wve.event_id\n            INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                ON wcp.character_id = wvc.character_id\n                    AND wcp.view_id = wmv.id\n                    AND wcp.unit_guid = t.guid\n        ) AS sub\n        WHERE wvc.event_id = sub.event_id\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "VarcharArray",
-          "Int8Array",
-          "Int8Array"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "e60b00bf6030721a8701024c37c8c42fb3b71ee063ff18b12e723c65c73eafe7": {
     "query": "\n            SELECT draft_deck_id, creation_time\n            FROM squadov.hearthstone_arena_drafts\n            WHERE collection_uuid = $1 AND user_id = $2\n            ",
     "describe": {
@@ -12898,21 +12348,6 @@
         false,
         true
       ]
-    }
-  },
-  "ebbec3aac448c66d8664ff863f1f796e52d7355dec6c3654b2a09a2804d757db": {
-    "query": "\n            INSERT INTO squadov.new_wow_instances (\n                match_uuid,\n                tr,\n                instance_id,\n                instance_type,\n                players\n            )\n            SELECT\n                $1,\n                tstzrange(wmv.start_tm, $4, '[]'),\n                wav.instance_id,\n                wav.instance_type,\n                $2\n            FROM squadov.wow_match_view AS wmv\n            INNER JOIN squadov.wow_instance_view AS wav\n                ON wav.view_id = wmv.id\n            WHERE wmv.id = $3\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Int4Array",
-          "Uuid",
-          "Timestamptz"
-        ]
-      },
-      "nullable": []
     }
   },
   "ebdf62e2f6baa9989a7a3b05f7f5064c0aca846318fa7936b39cafce9f7721d5": {
