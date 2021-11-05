@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.10.7",
+        "description": "Finishing up WoW classic.",
+        "timestamp": 1636137276000,
+        "data": "data/update-v0.10.7.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.10.2",
         "description": "QOL update and profile pages general release.",
         "timestamp": 1634950899000,
