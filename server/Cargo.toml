@@ -24,7 +24,7 @@ tokio = { version = "0.2", features = ["full"] }
 toml = "0.5"
 structopt = "0.3"
 uuid = { version = "0.8", features = ["serde", "v4"] }
-sqlx = { path="../deps/cargo/sqlx", version = "0.4.0-beta.1", default-features = false, features = [ "bigdecimal", "runtime-async-std", "macros", "postgres", "json", "ipnetwork", "uuid", "chrono", "offline"] }
+sqlx = { version = "0.5.9", default-features = false, features = [ "bigdecimal", "runtime-async-std-native-tls", "macros", "postgres", "json", "ipnetwork", "uuid", "chrono", "offline"] }
 futures = "0.3.13"
 futures-util = "0.3.13"
 chrono = { version = "0.4.19", features = ["serde"] }
@@ -50,7 +50,7 @@ serde_qs = { version = "0.8", features = ["actix"] }
 lru = "0.6.5"
 harsh = "0.2.1"
 hmac = "0.11.0"
-petname = "1.1.0"
+petname = { path="../deps/cargo/rust-petname", version = "1.1.0" }
 convert_case = "0.4.0"
 
 [[bin]]
