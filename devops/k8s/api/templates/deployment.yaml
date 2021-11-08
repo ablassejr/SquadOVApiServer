@@ -24,18 +24,18 @@ spec:
                         path: /healthz
                         port: 8080
                     initialDelaySeconds: 30
-                    periodSeconds: 5
-                    timeoutSeconds: 5
+                    periodSeconds: 60
+                    timeoutSeconds: 20
                   readinessProbe:
                     httpGet:
                         path: /healthz
                         port: 8080
                     initialDelaySeconds: 30
-                    timeoutSeconds: 5
+                    timeoutSeconds: 20
                   resources:
                     requests:
                         cpu: "1000m"
-                        memory: "2Gi"
+                        memory: "4Gi"
                   env:
                     - name: FFMPEG_BINARY_PATH
                       value: ffmpeg
