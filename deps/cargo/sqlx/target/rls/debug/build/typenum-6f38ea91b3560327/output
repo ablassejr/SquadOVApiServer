@@ -1,0 +1,2 @@
+cargo:rustc-env=TYPENUM_BUILD_CONSTS=a:\Git\SquadOVApiServer\deps\cargo\sqlx\target\rls\debug\build\typenum-6f38ea91b3560327\out\consts.rs
+cargo:rustc-env=TYPENUM_BUILD_OP=a:\Git\SquadOVApiServer\deps\cargo\sqlx\target\rls\debug\build\typenum-6f38ea91b3560327\out\op.rs
