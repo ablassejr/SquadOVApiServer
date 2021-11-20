@@ -72,7 +72,9 @@ impl api::ApiApplication {
 
         if combatant_guids.is_empty() {
             // If combatant guids don't exist, then combatant info does not exist in this match and we thus
-            // will need to fill in filler data for characters.
+            // will need to fill in filler data for characters. Note that we don't want to send people with
+            // null class ids back to the client since we can't say for certain whether or not that user is
+            // actually in that match or the combat log picked them up by accident.
             Ok(
                 sqlx::query!(
                     r#"
@@ -87,6 +89,7 @@ impl api::ApiApplication {
                         AND wmv.user_id = $2
                         AND (wcp.flags & x'100'::BIGINT) > 0
                         AND (wcp.flags & x'400'::BIGINT) > 0
+                        AND wcp.class_id IS NOT NULL
                     "#,
                     match_uuid,
                     user_id
@@ -115,7 +118,7 @@ impl api::ApiApplication {
             Ok(
                 sqlx::query!(
                     r#"
-                    SELECT DISTINCT
+                    SELECT DISTINCT ON (wcp.unit_guid)
                         wcp.unit_guid AS "guid",
                         COALESCE(wcp.unit_name, '') AS "name!",
                         COALESCE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS "items!",
@@ -134,6 +137,7 @@ impl api::ApiApplication {
                     WHERE wmv.match_uuid = $1
                         AND wmv.user_id = $2
                     GROUP BY wcp.unit_guid, wcp.unit_name, wvc.spec_id, wvc.team, wvc.event_id, wvc.rating, wvc.class_id
+                    ORDER BY wcp.unit_guid, wvc.class_id
                     "#,
                     match_uuid,
                     user_id
