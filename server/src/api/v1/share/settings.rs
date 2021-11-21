@@ -4,16 +4,33 @@ use serde::{Serialize, Deserialize};
 use actix_web::{web, HttpResponse, HttpRequest};
 use squadov_common::SquadOvError;
 use std::sync::Arc;
-use sqlx::{Transaction, Postgres};
+use sqlx::{Transaction, Executor, Postgres};
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct AutoShareSetting {
     share_on_join: bool
 }
 
 impl api::ApiApplication {
-    pub async fn get_user_auto_share_settings(&self, user_id: i64) -> Result<AutoShareSetting, SquadOvError> {
+    pub async fn create_auto_share_settings_for_user_if_not_exist(&self, tx: &mut Transaction<'_, Postgres>, user_id: i64) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            "
+            INSERT INTO squadov.user_autoshare_common_settings (user_id)
+            VALUES ($1)
+            ON CONFLICT DO NOTHING
+            ",
+            user_id
+        )
+            .execute(tx)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_user_auto_share_settings<'a, T>(&self, ex: T, user_id: i64) -> Result<AutoShareSetting, SquadOvError>
+    where
+        T: Executor<'a, Database = Postgres>
+    {
         Ok(
             sqlx::query_as!(
                 AutoShareSetting,
@@ -24,12 +41,15 @@ impl api::ApiApplication {
                 ",
                 user_id
             )
-                .fetch_one(&*self.pool)
+                .fetch_one(ex)
                 .await?
         )
     }
 
     pub async fn update_user_auto_share_settings(&self, user_id: i64, data: &AutoShareSetting) -> Result<(), SquadOvError> {
+        let mut tx = self.pool.begin().await?;
+        self.create_auto_share_settings_for_user_if_not_exist(&mut tx, user_id).await?;
+
         sqlx::query!(
             "
             UPDATE squadov.user_autoshare_common_settings
@@ -39,13 +59,17 @@ impl api::ApiApplication {
             user_id,
             data.share_on_join,
         )
-            .execute(&*self.pool)
+            .execute(&mut tx)
             .await?;
+        tx.commit().await?;
         Ok(())
     }
 
     pub async fn autoshare_to_squad_for_user_on_join(&self, tx: &mut Transaction<'_, Postgres>, user_id: i64, squad_id: i64) -> Result<(), SquadOvError> {
-        let settings = self.get_user_auto_share_settings(user_id).await?;
+        self.create_auto_share_settings_for_user_if_not_exist(&mut *tx, user_id).await?;
+
+        let settings = self.get_user_auto_share_settings(&mut *tx, user_id).await?;
+
         if settings.share_on_join {
             // Need to do matches and clips separately since clips don't need match uuid attached.
             sqlx::query!(
@@ -134,7 +158,7 @@ pub async fn get_user_auto_share_settings_handler(app : web::Data<Arc<api::ApiAp
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
     Ok(HttpResponse::Ok().json(
-        &app.get_user_auto_share_settings(session.user.id).await?
+        &app.get_user_auto_share_settings(&*app.pool, session.user.id).await?
     ))
 }
 
