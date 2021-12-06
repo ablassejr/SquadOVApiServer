@@ -10,6 +10,7 @@ use actix_web::{web, HttpResponse, HttpRequest};
 use squadov_common::{
     SquadOvError,
     SquadOvGames,
+    games,
     share::{
         self,
         MatchVideoShareConnection,
@@ -117,6 +118,7 @@ impl api::ApiApplication {
                                     )
                                 )
                                 OR ($7::BOOLEAN AND (wiv.view_id IS NOT NULL AND wiv.instance_type = 3))
+                                OR (wmv.build_version LIKE ANY ($8::VARCHAR[]))
                             ) AS "value!"
                             FROM squadov.wow_match_view AS wmv
                             LEFT JOIN squadov.wow_encounter_view AS wev
@@ -137,6 +139,9 @@ impl api::ApiApplication {
                             settings.wow.disable_keystones,
                             settings.wow.disable_arenas,
                             settings.wow.disable_bgs,
+                            &settings.wow.disabled_releases.iter().map(|x| {
+                                String::from(games::wow_release_to_db_build_expression(*x))
+                            }).collect::<Vec<String>>()
                         )
                             .fetch_one(&mut *tx)
                             .await?
