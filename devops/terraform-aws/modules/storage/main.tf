@@ -21,6 +21,11 @@ resource "aws_s3_bucket" "vod_storage_bucket" {
             days = 30
             storage_class = "STANDARD_IA"
         }
+
+        transition {
+            days = 90
+            storage_class = "GLACIER_IR"
+        }
     }
 
     server_side_encryption_configuration {
@@ -98,6 +103,29 @@ resource "aws_s3_bucket_policy" "vod_bucket_policy" {
     policy = data.aws_iam_policy_document.vod_access_policy.json
 }
 
+resource "aws_s3_bucket" "speed_check_storage_bucket" {
+    bucket = "squadov-us-speed-check-bucket${var.bucket_suffix}"
+    acl = "private"
+
+    lifecycle_rule {
+        enabled = true
+        abort_incomplete_multipart_upload_days = 1
+    }
+
+    server_side_encryption_configuration {
+        rule {
+            apply_server_side_encryption_by_default {
+                sse_algorithm = "AES256"
+            }
+        }
+    }
+
+    tags = {
+        "s3" = "speed_check"
+        "speed_check" = "raw_s3"
+    }
+}
+
 resource "aws_s3_bucket" "blob_storage_bucket" {
     bucket = "squadov-us-blob-bucket${var.bucket_suffix}"
     acl = "private"
@@ -166,12 +194,12 @@ resource "aws_s3_bucket_policy" "blob_bucket_policy" {
 }
 
 resource "aws_cloudfront_public_key" "private_s3_vod_cloudfront_public_key" {
-    name = "private-s3-vod-cloudfront-public-key"
+    name = "private-s3-vod-cloudfront-public-key${var.bucket_suffix}"
     encoded_key = file("../../aws/keys/private_s3_vod_cloudfront_PUBLIC_KEY.pem")
 }
 
 resource "aws_cloudfront_key_group" "private_s3_vod_cloudfront_key_group" {
-    name = "private-s3-vod-cloudfront-key-group"
+    name = "private-s3-vod-cloudfront-key-group${var.bucket_suffix}"
     items = [ aws_cloudfront_public_key.private_s3_vod_cloudfront_public_key.id ]
 }
 

@@ -25,11 +25,15 @@ use squadov_common::{
     vod,
     vod::VodProcessingInterface,
     vod::manager::{
-        VodManagerType,
+        UploadManagerType,
         VodManager,
         GCSVodManager,
         FilesystemVodManager,
         S3VodManager,
+    },
+    speed_check::manager::{
+        SpeedCheckManager,
+        S3SpeedCheckManager,
     },
     csgo::rabbitmq::CsgoRabbitmqInterface,
     steam::{
@@ -69,6 +73,10 @@ use squadov_common::{
         oauth,
     },
     config::CommonConfig,
+    discord::{
+        DiscordConfig,
+    },
+    share::rabbitmq::SharingRabbitmqInterface,
 };
 use url::Url;
 use std::vec::Vec;
@@ -199,6 +207,7 @@ pub struct SquadOvConfig {
 pub struct SquadOvStorageConfig {
     pub vods: CloudStorageBucketsConfig,
     pub blobs: CloudStorageBucketsConfig,
+    pub speed_check: CloudStorageBucketsConfig,
 }
 
 #[derive(Deserialize,Debug,Clone)]
@@ -222,6 +231,7 @@ pub struct ApiConfig {
     pub ipstack: IpstackConfig,
     pub segment: SegmentConfig,
     pub sentry: SentryConfig,
+    pub discord: DiscordConfig,
 }
 
 impl CommonConfig for DatabaseConfig {
@@ -253,6 +263,7 @@ pub struct ApiApplication {
     pub users: auth::UserManager,
     session: auth::SessionManager,
     vod: Arc<StorageManager<Arc<dyn VodManager + Send + Sync>>>,
+    speed_check: Arc<StorageManager<Arc<dyn SpeedCheckManager + Send + Sync>>>,
     pub pool: Arc<PgPool>,
     pub heavy_pool: Arc<PgPool>,
     schema: Arc<graphql::GraphqlSchema>,
@@ -266,6 +277,7 @@ pub struct ApiApplication {
     pub csgo_itf: Arc<CsgoRabbitmqInterface>,
     pub steam_itf: Arc<SteamApiRabbitmqInterface>,
     pub twitch_itf: Arc<TwitchApiRabbitmqInterface>,
+    pub sharing_itf: Arc<SharingRabbitmqInterface>,
     gcp: Arc<Option<GCPClient>>,
     aws: Arc<Option<AWSClient>>,
     pub hashid: Arc<harsh::Harsh>,
@@ -323,13 +335,27 @@ impl ApiApplication {
         self.vod.get_bucket(bucket).await.ok_or(SquadOvError::NotFound)
     }
 
+    pub async fn get_speed_check_manager(&self, bucket: &str) -> Result<Arc<dyn SpeedCheckManager + Send + Sync>, SquadOvError> {
+        self.speed_check.get_bucket(bucket).await.ok_or(SquadOvError::NotFound)
+    }
+
     async fn create_vod_manager(&mut self, bucket: &str) -> Result<(), SquadOvError> {
-        let vod_manager = match vod::manager::get_vod_manager_type(bucket) {
-            VodManagerType::GCS => Arc::new(GCSVodManager::new(bucket, self.gcp.clone()).await?) as Arc<dyn VodManager + Send + Sync>,
-            VodManagerType::S3 => Arc::new(S3VodManager::new(bucket, self.aws.clone(), self.config.aws.cdn.clone()).await?) as Arc<dyn VodManager + Send + Sync>,
-            VodManagerType::FileSystem => Arc::new(FilesystemVodManager::new(bucket)?) as Arc<dyn VodManager + Send + Sync>
+        let vod_manager = match vod::manager::get_upload_manager_type(bucket) {
+            UploadManagerType::GCS => Arc::new(GCSVodManager::new(bucket, self.gcp.clone()).await?) as Arc<dyn VodManager + Send + Sync>,
+            UploadManagerType::S3 => Arc::new(S3VodManager::new(bucket, self.aws.clone(), self.config.aws.cdn.clone()).await?) as Arc<dyn VodManager + Send + Sync>,
+            UploadManagerType::FileSystem => Arc::new(FilesystemVodManager::new(bucket)?) as Arc<dyn VodManager + Send + Sync>
         };
         self.vod.new_bucket(bucket, vod_manager).await;
+        Ok(())
+    }
+
+    async fn create_speed_check_manager(&mut self, bucket: &str) -> Result<(), SquadOvError> {
+        let speed_check_manager = match vod::manager::get_upload_manager_type(bucket) {
+            UploadManagerType::S3 => Arc::new(S3SpeedCheckManager::new(bucket, self.aws.clone()).await?) as Arc<dyn SpeedCheckManager + Send + Sync>,
+            UploadManagerType::GCS => panic!("We currently do not support GCS upload for speedcheck"),
+            UploadManagerType::FileSystem => panic!("We currently do not support FileSystem upload for speedcheck"),
+        };
+        self.speed_check.new_bucket(bucket, speed_check_manager).await;
         Ok(())
     }
 
@@ -400,6 +426,7 @@ impl ApiApplication {
         let steam_itf = Arc::new(SteamApiRabbitmqInterface::new(steam_api.clone(), &config.rabbitmq, rabbitmq.clone(), pool.clone()));
         let csgo_itf = Arc::new(CsgoRabbitmqInterface::new(steam_itf.clone(), &config.rabbitmq, rabbitmq.clone(), pool.clone()));
         let twitch_itf = Arc::new(TwitchApiRabbitmqInterface::new(config.twitch.clone(), config.rabbitmq.clone(), rabbitmq.clone(), pool.clone()));
+        let sharing_itf = Arc::new(SharingRabbitmqInterface::new(config.rabbitmq.clone(), rabbitmq.clone(), pool.clone()));
 
         if !disable_rabbitmq {
             if config.rabbitmq.enable_rso {
@@ -408,6 +435,7 @@ impl ApiApplication {
 
             if config.rabbitmq.enable_valorant {
                 RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.valorant_queue.clone(), valorant_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.misc_valorant_queue.clone(), valorant_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
             }
 
             if config.rabbitmq.enable_lol {
@@ -429,11 +457,19 @@ impl ApiApplication {
             if config.rabbitmq.enable_twitch {
                 RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.twitch_queue.clone(), twitch_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
             }
+
+            if config.rabbitmq.enable_sharing {
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.sharing_queue.clone(), sharing_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
+            }
         }
 
         let mut vod_manager = StorageManager::<Arc<dyn VodManager + Send + Sync>>::new(); 
         vod_manager.set_location_map(CloudStorageLocation::Global, &config.storage.vods.global);
         let vod_manager = Arc::new(vod_manager);
+
+        let mut speed_check_manager = StorageManager::<Arc<dyn SpeedCheckManager + Send + Sync>>::new();
+        speed_check_manager.set_location_map(CloudStorageLocation::Global, &config.storage.speed_check.global);
+        let speed_check_manager = Arc::new(speed_check_manager);
 
         let mut blob = StorageManager::<Arc<BlobManagementClient>>::new();
         blob.set_location_map(CloudStorageLocation::Global, &config.storage.blobs.global);
@@ -456,6 +492,7 @@ impl ApiApplication {
             users: auth::UserManager{},
             session: auth::SessionManager::new(),
             vod: vod_manager,
+            speed_check: speed_check_manager,
             pool: pool.clone(),
             heavy_pool,
             schema: Arc::new(graphql::create_schema()),
@@ -469,6 +506,7 @@ impl ApiApplication {
             csgo_itf,
             steam_itf,
             twitch_itf,
+            sharing_itf,
             gcp,
             aws,
             hashid: Arc::new(harsh::Harsh::builder().salt(config.squadov.hashid_salt.as_str()).length(6).build().unwrap()),
@@ -491,6 +529,8 @@ impl ApiApplication {
         if config.storage.blobs.global != config.storage.blobs.legacy {
             app.create_blob_manager(&config.storage.blobs.legacy).await.unwrap();
         }
+
+        app.create_speed_check_manager(&config.storage.speed_check.global).await.unwrap();
 
         app
     }

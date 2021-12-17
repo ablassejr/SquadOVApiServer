@@ -58,6 +58,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                     web::scope("/oauth")
                         .route("/riot", web::post().to(v1::handle_riot_oauth_callback_handler))
                         .route("/twitch", web::post().to(v1::handle_twitch_oauth_callback_handler))
+                        .route("/discord", web::post().to(v1::handle_discord_oauth_callback_handler))
                 )
                 .service(
                     // These are the only two endpoints where the user needs to provide a valid session to use.
@@ -141,6 +142,14 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .service(
                             web::scope("/{link_id}")
                                 .route("/accept", web::post().to(v1::use_link_to_join_squad_handler))
+                        )
+                )
+                .service(
+                    web::scope("/speedcheck")
+                        .service(
+                            web::scope("/{file_name_uuid}")
+                                .route("", web::get().to(v1::get_upload_speed_check_path_handler))
+                                .route("", web::post().to(v1::update_user_speed_check_handler))
                         )
                 )
                 .service(
@@ -258,10 +267,18 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                             web::scope("/twitch")
                                                 .route("", web::get().to(v1::get_my_linked_twitch_account_handler))
                                         )
+                                        .service(
+                                            web::scope("/discord")
+                                                .service(
+                                                    web::resource("/{discord_snowflake}")
+                                                        .route(web::delete().to(v1::delete_linked_discord_account_handler))
+                                                )
+                                        )
                                 )
                                 .service(
                                     web::scope("/oauth")
                                         .route("/twitch", web::get().to(v1::get_twitch_login_url_handler))
+                                        .route("/discord", web::get().to(v1::get_discord_login_url_handler))
                                 )
                                 .service(
                                     web::scope("/discover")
@@ -498,7 +515,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         ))
                                         .service(
                                             web::resource("/matches")
-                                                .route(web::get().to(v1::list_valorant_matches_for_user_handler))
+                                                .route(web::post().to(v1::list_valorant_matches_for_user_handler))
                                         )
                                         .service(
                                             web::resource("/stats")
@@ -746,12 +763,14 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                             })
                                         ))
                                         .route("", web::get().to(v1::get_wow_match_handler))
+                                        .route("/pulls", web::get().to(v1::list_wow_match_pulls_handler))
                                         .route("/characters", web::get().to(v1::list_wow_characters_for_match_handler))
                                         .route("/characters/{character_guid}", web::get().to(v1::get_full_wow_character_for_match_handler))
                                         .route("/events", web::get().to(v1::list_wow_events_for_match_handler))
                                         .route("/death/{event_id}", web::get().to(v1::get_death_recap_handler))
                                         .service(
                                             web::scope("/stats")
+                                                .route("/summary", web::get().to(v1::get_wow_match_stat_summary_handler))
                                                 .route("/dps", web::get().to(v1::get_wow_match_dps_handler))
                                                 .route("/hps", web::get().to(v1::get_wow_match_heals_per_second_handler))
                                                 .route("/drps", web::get().to(v1::get_wow_match_damage_received_per_second_handler))
@@ -857,18 +876,6 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route("/watch", web::get().to(v1::check_watchlist_vod_handler))
                                 )
                                 .service(
-                                    web::resource("/{quality}/{segment_name}")
-                                        .wrap(access::ApiAccess::new(
-                                            Box::new(access::VodAccessChecker{
-                                                must_be_vod_owner: false,
-                                                obtainer: access::VodPathObtainer{
-                                                    video_uuid_key: "video_uuid"
-                                                },
-                                            }),
-                                        ))
-                                        .route(web::get().to(v1::get_vod_track_segment_handler))
-                                )
-                                .service(
                                     web::resource("/clip")
                                         .wrap(access::ApiAccess::new(
                                             Box::new(access::VodAccessChecker{
@@ -879,6 +886,44 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                             }),
                                         ))
                                         .route(web::post().to(v1::create_clip_for_vod_handler))
+                                )
+                                .service(
+                                    web::scope("/profile")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::VodAccessChecker{
+                                                must_be_vod_owner: false,
+                                                obtainer: access::VodPathObtainer{
+                                                    video_uuid_key: "video_uuid"
+                                                },
+                                            }),
+                                        ))
+                                        .route("", web::get().to(v1::get_profile_info_for_vod_handler))
+                                )
+                                .service(
+                                    web::scope("/tag")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::VodAccessChecker{
+                                                must_be_vod_owner: false,
+                                                obtainer: access::VodPathObtainer{
+                                                    video_uuid_key: "video_uuid"
+                                                },
+                                            }),
+                                        ))
+                                        .route("", web::get().to(v1::get_tags_for_vod_handler))
+                                        .route("", web::post().to(v1::add_tags_for_vod_handler))
+                                        .route("/{tag_id}", web::delete().to(v1::delete_tag_for_vod_handler))
+                                )
+                                .service(
+                                    web::resource("/{quality}/{segment_name}")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::VodAccessChecker{
+                                                must_be_vod_owner: false,
+                                                obtainer: access::VodPathObtainer{
+                                                    video_uuid_key: "video_uuid"
+                                                },
+                                            }),
+                                        ))
+                                        .route(web::get().to(v1::get_vod_track_segment_handler))
                                 )
                                 .service(
                                     web::scope("")

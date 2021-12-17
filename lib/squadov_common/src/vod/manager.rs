@@ -12,28 +12,39 @@ use crate::{
     VodSegmentId,
 };
 use serde_repr::{Serialize_repr, Deserialize_repr};
+use chrono::{DateTime, Utc};
 
 #[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(i32)]
-pub enum VodManagerType {
+pub enum UploadManagerType {
     FileSystem,
     GCS,
     S3,
 }
 
-pub fn get_vod_manager_type(root: &str) -> VodManagerType {
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
+#[repr(i32)]
+pub enum UploadPurpose {
+    VOD,
+    SpeedCheck,
+}
+
+pub fn get_upload_manager_type(root: &str) -> UploadManagerType {
     if root.starts_with("gs://") {
-        VodManagerType::GCS
+        UploadManagerType::GCS
     } else if root.starts_with("s3://") {
-        VodManagerType::S3
+        UploadManagerType::S3
     } else {
-        VodManagerType::FileSystem
+        UploadManagerType::FileSystem
     }
 }
 
 #[async_trait]
 pub trait VodManager {
-    fn manager_type(&self) -> VodManagerType;
+    fn manager_type(&self) -> UploadManagerType;
+    fn upload_purpose(&self) -> UploadPurpose {
+        UploadPurpose::VOD
+    }
 
     // Returns a session string that can be passed to get_segment_upload_uri
     async fn start_segment_upload(&self, segment: &VodSegmentId) -> Result<String, SquadOvError>;
@@ -45,7 +56,7 @@ pub trait VodManager {
     async fn download_vod_to_path(&self, segment: &VodSegmentId, path: &std::path::Path) -> Result<(), SquadOvError>;
     async fn upload_vod_from_file(&self, segment: &VodSegmentId, path: &std::path::Path) -> Result<(), SquadOvError>;
     async fn is_vod_session_finished(&self, session: &str) -> Result<bool, SquadOvError>;
-    async fn get_segment_redirect_uri(&self, segment: &VodSegmentId) -> Result<String, SquadOvError>;
+    async fn get_segment_redirect_uri(&self, segment: &VodSegmentId) -> Result<(String, Option<DateTime<Utc>>), SquadOvError>;
     async fn get_public_segment_redirect_uri(&self, segment: &VodSegmentId) -> Result<String, SquadOvError>;
     async fn make_segment_public(&self, segment: &VodSegmentId) -> Result<(), SquadOvError>;
     async fn check_vod_segment_is_public(&self, segment: &VodSegmentId) -> Result<bool, SquadOvError>;

@@ -9,7 +9,10 @@ use crate::{
         ValorantPlayerMatchSummary,
     },
     aimlab::AimlabTask,
-    vod::VodManifest,
+    vod::{
+        VodManifest,
+        VodTag,
+    },
     wow::{
         WoWEncounter,
         WoWChallenge,
@@ -48,24 +51,18 @@ where
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all="camelCase")]
-pub struct BaseRecentMatch {
-    pub match_uuid: Uuid,
-    pub tm: DateTime<Utc>,
-    pub game: SquadOvGames,
+pub struct RecentMatchPov {
+    // VOD DATA
     pub vod: VodManifest,
+    pub tm: DateTime<Utc>,
     pub username: String,
     pub user_id: i64,
     pub favorite_reason: Option<String>,
     pub is_watchlist: bool,
     pub is_local: bool,
+    pub tags: Vec<VodTag>,
     pub access_token: Option<String>,
-}
-
-#[derive(Serialize, Debug)]
-#[serde(rename_all="camelCase")]
-pub struct RecentMatch {
-    pub base: BaseRecentMatch,
-
+    // GAME DATA
     pub aimlab_task: Option<AimlabTask>,
     pub lol_match: Option<LolPlayerMatchSummary>,
     pub tft_match: Option<TftPlayerMatchSummary>,
@@ -75,6 +72,78 @@ pub struct RecentMatch {
     pub wow_arena: Option<WoWArena>,
     pub wow_instance: Option<WowInstance>,
     pub csgo_match: Option<CsgoPlayerMatchSummary>,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all="camelCase")]
+pub struct RecentMatch {
+    pub match_uuid: Uuid,
+    pub game: SquadOvGames,
+    pub povs: Vec<RecentMatchPov>,
+}
+
+pub async fn add_match_to_collection<'a, T>(ex: T, match_uuid: &Uuid, collection_uuid: &Uuid) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        INSERT INTO squadov.match_to_match_collection (
+            collection_uuid,
+            match_uuid,
+            match_order
+        )
+        SELECT $1, $2, COALESCE(
+            (SELECT MAX(match_order)
+            FROM squadov.match_to_match_collection
+            WHERE collection_uuid = $1
+            GROUP BY collection_uuid)
+        , 0) + 1
+        ON CONFLICT DO NOTHING
+        ",
+        collection_uuid,
+        match_uuid,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
+pub async fn create_new_match_collection<'a, T>(ex: T) -> Result<Uuid, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            INSERT INTO squadov.match_collections (uuid)
+            VALUES ( gen_random_uuid() )
+            RETURNING uuid
+            ",
+        )
+            .fetch_one(ex)
+            .await?
+            .uuid
+    )
+}
+
+pub async fn get_match_collection_for_match<'a, T>(ex: T, match_uuid: &Uuid) -> Result<Uuid, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT collection_uuid
+            FROM squadov.match_to_match_collection
+            WHERE match_uuid = $1
+            ",
+            match_uuid,
+        )
+            .fetch_one(ex)
+            .await?
+            .collection_uuid
+    )
 }
 
 pub async fn is_user_in_match<'a, T>(ex: T, user_id: i64, match_uuid: &Uuid, game: SquadOvGames) -> Result<bool, SquadOvError>

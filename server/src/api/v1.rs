@@ -19,6 +19,8 @@ mod community;
 mod profile;
 mod sentry;
 mod twitch;
+mod speed_check;
+mod discord;
 
 pub use user::*;
 pub use matches::*;
@@ -26,6 +28,7 @@ pub use aimlab::*;
 pub use hearthstone::*;
 pub use valorant::*;
 pub use vod::*;
+pub use speed_check::*;
 pub use squad::*;
 pub use bug::*;
 pub use wow::*;
@@ -41,6 +44,7 @@ pub use community::*;
 pub use profile::*;
 pub use sentry::*;
 pub use twitch::*;
+pub use discord::*;
 
 use serde::Serialize;
 
