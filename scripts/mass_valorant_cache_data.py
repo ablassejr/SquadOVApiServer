@@ -2,6 +2,7 @@ import argparse
 import csv
 import subprocess
 import json
+from multiprocessing import Pool
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -11,6 +12,7 @@ if __name__ == '__main__':
     parser.add_argument('--username', required=True)
     parser.add_argument('--password', required=True)
     parser.add_argument('--key', required=True)
+    parser.add_argument('--threads', required=True, type=int)
     args = parser.parse_args()
 
     data = []
@@ -21,7 +23,7 @@ if __name__ == '__main__':
                 continue
             data.append(row[args.key])
 
-    for i in range(0, len(data), 1):
+    def process(data):
         cmd = [
             'rabbitmqadmin',
             '--host={}'.format(args.host),
@@ -36,10 +38,13 @@ if __name__ == '__main__':
             'payload={}'.format(
                 json.dumps({
                     'type': 'ValorantMatchCacheData',
-                    'match_uuid': data[i],
+                    'match_uuid': data,
                 })
             )
         ]
 
         print(cmd)
         subprocess.call(cmd)
+
+    with Pool(args.threads) as p:
+        p.map(process, data)
