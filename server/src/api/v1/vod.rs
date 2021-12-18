@@ -185,44 +185,45 @@ impl api::ApiApplication {
         // Get all the segments that exist for this VOD.
         let quality_options = self.get_vod_quality_options(&[video_uuid.clone()]).await?;
         let assocs = self.find_vod_associations(&[video_uuid.clone()]).await?;
-        let metadata = db::get_vod_metadata(&*self.pool, video_uuid, "source").await?;
+        if let Some(vod) = assocs.get(video_uuid) {
+            if !vod.is_local {
+                let metadata = db::get_vod_metadata(&*self.pool, video_uuid, "source").await?;
+                let manager = self.get_vod_manager(&metadata.bucket).await?;
+                if let Some(quality_arr) = quality_options.get(video_uuid) {    
+                    let raw_extension = squadov_common::container_format_to_extension(&vod.raw_container_format);
+                    for quality in quality_arr {
+                        // We only need to make one segment public since only one or the other will ever exist
+                        // at a given point in time.
+                        let base_segment = if quality.has_fastify {
+                            squadov_common::VodSegmentId{
+                                video_uuid: video_uuid.clone(),
+                                quality: quality.id.clone(),
+                                segment_name: String::from("fastify.mp4"),
+                            }
+                        } else {
+                            squadov_common::VodSegmentId{
+                                video_uuid: video_uuid.clone(),
+                                quality: quality.id.clone(),
+                                segment_name: format!("video.{}", &raw_extension),
+                            }
+                        };
 
-        let manager = self.get_vod_manager(&metadata.bucket).await?;
-        if let Some(quality_arr) = quality_options.get(video_uuid) {
-            if let Some(vod) = assocs.get(video_uuid) {
-                let raw_extension = squadov_common::container_format_to_extension(&vod.raw_container_format);
-                for quality in quality_arr {
-                    // We only need to make one segment public since only one or the other will ever exist
-                    // at a given point in time.
-                    let base_segment = if quality.has_fastify {
-                        squadov_common::VodSegmentId{
-                            video_uuid: video_uuid.clone(),
-                            quality: quality.id.clone(),
-                            segment_name: String::from("fastify.mp4"),
-                        }
-                    } else {
-                        squadov_common::VodSegmentId{
-                            video_uuid: video_uuid.clone(),
-                            quality: quality.id.clone(),
-                            segment_name: format!("video.{}", &raw_extension),
-                        }
-                    };
+                        manager.make_segment_public(&base_segment).await?;
+                    }
+                }
+                
+                if let Some(thumbnail) = db::get_vod_thumbnail(&*self.pool, video_uuid).await? {
+                    // We expect the filepatht to be
+                    // UUID/QUALITY/SEGMENT NAME.
+                    let parts = thumbnail.filepath.split("/").collect::<Vec<&str>>();
 
-                    manager.make_segment_public(&base_segment).await?;
+                    manager.make_segment_public(&squadov_common::VodSegmentId{
+                        video_uuid: video_uuid.clone(),
+                        quality: parts[1].to_string(),
+                        segment_name: parts[2].to_string(),
+                    }).await?; 
                 }
             }
-        }
-        
-        if let Some(thumbnail) = db::get_vod_thumbnail(&*self.pool, video_uuid).await? {
-            // We expect the filepatht to be
-            // UUID/QUALITY/SEGMENT NAME.
-            let parts = thumbnail.filepath.split("/").collect::<Vec<&str>>();
-
-            manager.make_segment_public(&squadov_common::VodSegmentId{
-                video_uuid: video_uuid.clone(),
-                quality: parts[1].to_string(),
-                segment_name: parts[2].to_string(),
-            }).await?; 
         }
 
         Ok(())
