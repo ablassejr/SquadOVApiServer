@@ -50,7 +50,7 @@
 	"SENTRY_WEB_DSN": "ENC[AES256_GCM,data:oEirW/GjLtIEisKRbx+TdYejuyNv3pU62vUy0UjtS1zucne6si776hmh2MjZxHQiYLNAYrvtCEAaqXyTe7M59HKcKvhA/Xh0Xg==,iv:qgfWP7chPSSyWRocXNyzCjosNykmYV+mGpO591KqYK8=,tag:7+EucXTJkjVTjDYOJfGLXA==,type:str]",
 	"DISCORD_CLIENT_ID": "ENC[AES256_GCM,data:GBrOfj3un5an4/rmIosigRXU,iv:l9/84pnH8QYtH6wxec+j7U/IPbezmlmW2usS+qE1JDs=,tag:GoJpE2UyMzj//dCM5tZXSQ==,type:str]",
 	"DISCORD_CLIENT_SECRET": "ENC[AES256_GCM,data:QC5TlgtZq9DZwKz0xt3X0UizU3CiAvnpASChF/oCG9Y=,iv:TjL6rFI0P+HpmHSOAQG58s4fODoaHhiEy9HjsBC5C08=,tag:1OIcLGtjD+KF/4vK+/VDKA==,type:str]",
-	"DEFAULT_SPEED_CHECK_BUCKET": "ENC[AES256_GCM,data:cfuK3jEIFDWj2IhZKXh/YZFaY1+iGRUyS+aEq9cfyPpmCg==,iv:RjxNvTXgLNrt/PALhiPeYekANqNg5xcLTyM7SyDisAQ=,tag:7zrUrZJkRX8tHqcudgsq2Q==,type:str]",
+	"DEFAULT_SPEED_CHECK_BUCKET": "ENC[AES256_GCM,data:oGYKn/bBTDSBRlOGS2+K96iG3HoIIWDRhCeSOaN1COzRZUhexC6J,iv:QkZHuZajsiowRkRZIEx2f0LH73WqLTSyn8nr/7ZXc0U=,tag:XzqS+OIM7PtzTH0hW1cVvw==,type:str]",
 	"sops": {
 		"kms": null,
 		"gcp_kms": [
@@ -62,8 +62,8 @@
 		],
 		"azure_kv": null,
 		"hc_vault": null,
-		"lastmodified": "2021-12-17T23:14:23Z",
-		"mac": "ENC[AES256_GCM,data:3iZfJdIoc9aVh+Qo4TGW+qkFIjFH8zypvyhR8RhUElbhn8J0RJQEMyAmVA2U+kUaO40zQbitBIiQFa9HMutL9mirIGgBqd4tX/FYBhx9Drnnf4zxwUEjsMhouoMNnuBmtHngqQsVuMS69gMO3MUU99EybhiKnULs6ctBh5aDN1E=,iv:yMnnWJk7YChUsMA2nS9B9gJh+36qjC/238HW+j/IQbE=,tag:1rTKa98/2Q4Fhs+yfSImMQ==,type:str]",
+		"lastmodified": "2021-12-18T02:22:30Z",
+		"mac": "ENC[AES256_GCM,data:QZzGdW/BZgeZdgH/l9eINmYMPVluIViX0PnxafpT+UIHLIECTDFttjpnCAzayt45XJFCffZSIB/sy6C6bIf4WhbVYuiq3a3NT6SyazvWiQf36IHaA4BvO1oTg9XZqyyO9he2G+HE5b9vS2Q0XVhxEG6hEiUfNTedNaL5/bsh81o=,iv:3WkKxQSdR/eOmvhFvTL9VLF85cBbcDcoGi9uuYy+GrU=,tag:MelVdm5gAIbw6KjtZPF1jQ==,type:str]",
 		"pgp": null,
 		"unencrypted_suffix": "_unencrypted",
 		"version": "3.6.1"

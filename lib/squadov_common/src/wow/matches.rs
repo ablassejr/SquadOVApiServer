@@ -35,8 +35,8 @@ pub struct WoWEncounterEnd {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct WowBossStatus {
-    pub name: String,
-    pub npc_id: i64,
+    pub name: Option<String>,
+    pub npc_id: Option<i64>,
     pub current_hp: Option<i64>,
     pub max_hp: Option<i64>,
 }

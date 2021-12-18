@@ -285,8 +285,8 @@ impl api::ApiApplication {
                         wav.num_players,
                         wav.instance_id,
                         COALESCE(wav.success, FALSE) AS "success!",
-                        ARRAY_AGG(web.name) AS "boss_names!",
-                        ARRAY_AGG(web.npc_id) AS "boss_ids!",
+                        ARRAY_AGG(web.name) AS "boss_names!: Vec<Option<String>>",
+                        ARRAY_AGG(web.npc_id) AS "boss_ids!: Vec<Option<i64>>",
                         ARRAY_AGG(wcp.current_hp) AS "boss_hps!: Vec<Option<i64>>",
                         ARRAY_AGG(wcp.max_hp) AS "boss_max_hps!: Vec<Option<i64>>",
                         MAX(mmc.match_order) AS "pull_number"
@@ -351,7 +351,11 @@ impl api::ApiApplication {
                                 current_hp: hp,
                                 max_hp: max,
                             }
-                        }).collect::<Vec<WowBossStatus>>(),
+                        })
+                            .filter(|x| {
+                                x.name.is_some() && x.npc_id.is_some()
+                            })
+                            .collect::<Vec<WowBossStatus>>(),
                         pull_number: x.pull_number,
                     }
                 })
