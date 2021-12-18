@@ -1,5 +1,12 @@
 [
     {
+        "title": "SquadOV v0.11.0",
+        "description": "Big patch! Read more inside, but now you can have SquadOV only record certain programs!",
+        "timestamp": 1639783947000,
+        "data": "data/update-v0.11.0.md",
+        "type": "update"
+    },
+    {
         "title": "SquadOV v0.10.8",
         "description": "A lot more control for squad owners on what gets shared to squads!",
         "timestamp": 1637442810000,
