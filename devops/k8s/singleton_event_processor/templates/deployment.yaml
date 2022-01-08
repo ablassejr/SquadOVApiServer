@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: singleton-event-processing
+    labels:
+        task: event
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            task: event
+    template:
+        metadata:
+            labels:
+                task: event
+        spec:
+            containers:
+                - name: worker
+                  image: "registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/singleton_event_processing:{{ .Values.commitHash }}"
+                  env:
+                    - name: DB_CONNS
+                      value: "24"
+                  resources:
+                    requests:
+                        cpu: "250m"
+                        memory: "1Gi"
+            imagePullSecrets:
+                - name: regcred

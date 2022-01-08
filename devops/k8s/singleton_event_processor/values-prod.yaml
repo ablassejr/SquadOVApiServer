@@ -1,0 +1,3 @@
+commitHash: f45097134a55ac63a9b73ce99169055ab372de03
+environment: "production"
+replicas: 36

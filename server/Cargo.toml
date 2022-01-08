@@ -65,3 +65,7 @@ path = "src/wow_kafka_worker.rs"
 [[bin]]
 name = "vod_processing_worker"
 path = "src/vod_processing_worker.rs"
+
+[[bin]]
+name = "singleton_event_processing_worker"
+path = "src/singleton_event_processing_worker.rs"

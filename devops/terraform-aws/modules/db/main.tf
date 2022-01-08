@@ -116,3 +116,117 @@ resource "aws_db_instance" "primary_db" {
         "db" = "primary"
     }
 }
+
+resource "aws_iam_role" "rds_proxy_role" {
+    name = "rds-proxy-role"
+
+    assume_role_policy = <<POLICY
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": [
+                    "rds.amazonaws.com"
+                ]
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
+POLICY
+}
+
+resource "aws_iam_policy" "rds_proxy_policy" {
+    name = "rds-proxy-policy"
+    description = "Policy to allow RDS proxy to access le secrets."
+
+    policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "secretsmanager:GetSecretValue"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "kms:Decrypt"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "kms:ViaService": "secretsmanager.us-east-2.amazonaws.com"
+                }
+            }
+        }
+    ]
+}
+EOF
+}
+
+resource "aws_iam_role_policy_attachment" "rds_proxy_policy_attachment" {
+    role = aws_iam_role.rds_proxy_role.name
+    policy_arn = aws_iam_policy.rds_proxy_policy.arn
+}
+
+resource "aws_secretsmanager_secret" "primary_db_credentials_secret" {
+    name = "primary_db_credentials_secret"
+}
+
+resource "aws_secretsmanager_secret_version" "primary_db_credentials_secret_ver" {
+    secret_id     = aws_secretsmanager_secret.primary_db_credentials_secret.id
+    secret_string = jsonencode({
+        "username" = var.postgres_user,
+        "password" = var.postgres_password,
+        "engine"="postgres",
+        "host" = aws_db_instance.primary_db.address
+        "port" = 5432,
+        "dbInstanceIdentifier" = aws_db_instance.primary_db.id
+    })
+}
+
+resource "aws_db_proxy" "primary_db_proxy" {
+    name = "${var.postgres_instance_name}-proxy"
+    debug_logging = false
+    engine_family = "POSTGRESQL"
+    idle_client_timeout = 1800
+    require_tls = true
+    role_arn = aws_iam_role.rds_proxy_role.arn
+    vpc_subnet_ids = var.postgres_db_subnets
+
+    auth {
+        auth_scheme = "SECRETS"
+        iam_auth = "DISABLED"
+        secret_arn  = aws_secretsmanager_secret.primary_db_credentials_secret.arn
+    }
+}
+
+resource "aws_db_proxy_default_target_group" "primary_db_proxy_target_group" {
+    db_proxy_name = aws_db_proxy.primary_db_proxy.name
+
+    connection_pool_config {
+        connection_borrow_timeout    = 120
+        init_query                   = "SET TIME ZONE 'GMT'"
+        max_connections_percent      = 90
+        max_idle_connections_percent = 50
+    }
+}
+
+resource "aws_db_proxy_target" "primary_db_proxy_target" {
+    db_instance_identifier = aws_db_instance.primary_db.id
+    db_proxy_name          = aws_db_proxy.primary_db_proxy.name
+    target_group_name      = aws_db_proxy_default_target_group.primary_db_proxy_target_group.name
+}
+
+resource "aws_db_proxy_endpoint" "primary_db_proxy_endpoint" {
+    db_proxy_name          = aws_db_proxy.primary_db_proxy.name
+    db_proxy_endpoint_name = "${var.postgres_instance_name}-proxy-endpoint"
+    vpc_subnet_ids         = var.postgres_db_subnets
+    target_role            = "READ_WRITE"
+}
