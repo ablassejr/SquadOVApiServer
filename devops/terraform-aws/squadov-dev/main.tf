@@ -30,4 +30,6 @@ module "storage" {
     source = "../modules/storage"
 
     bucket_suffix = "-dev-mike"
+    cloudfront_suffix = "-dev-mike"
+
 }

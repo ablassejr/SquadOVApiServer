@@ -49,6 +49,8 @@ module "storage" {
     source = "../modules/storage"
 
     bucket_suffix = "-prod"
+    cloudfront_suffix = ""
+
 }
 
 module "k8s" {
