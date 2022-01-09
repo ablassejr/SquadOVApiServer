@@ -171,6 +171,16 @@ impl UserActivityStatusTracker {
         })
     }
 
+    async fn batch_get_multiple_user_states(&self, user_ids: &[i64]) -> Result<Vec<UserActivityState>, SquadOvError> {
+        // Break the input user ids into batches. Running a ton of keys on MGET at a single time is a YIKES.
+        let mut result: Vec<UserActivityState> = vec![];
+        for ch in user_ids.chunks(10) {
+            let inner = self.get_multiple_user_states(ch).await?;
+            result.extend(inner.into_iter());
+        }
+        Ok(result)
+    }
+
     async fn get_multiple_user_states(&self, user_ids: &[i64]) -> Result<Vec<UserActivityState>, SquadOvError> {
         let mut conn = self.get_connection().await?;
         let raw: Vec<Option<String>> = deadpool_redis::cmd("MGET")
@@ -249,7 +259,7 @@ impl UserActivityStatusTracker {
 
     async fn add_subscriptions(&self, id: &Uuid, user_ids: &[i64]) -> Result<(), SquadOvError> {
         let mut subs = self.per_user_sessions.write().await;
-        let user_states = self.get_multiple_user_states(user_ids).await?;
+        let user_states = self.batch_get_multiple_user_states(user_ids).await?;
         for (idx, uid) in user_ids.iter().enumerate() {
             if !subs.contains_key(uid) {
                 subs.insert(*uid, HashSet::new());
