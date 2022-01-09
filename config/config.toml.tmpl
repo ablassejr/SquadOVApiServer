@@ -183,3 +183,8 @@ web_dsn = "${SENTRY_WEB_DSN}"
 base_url = "https://discord.com/api/oauth2/authorize?client_id=910634082608762880&redirect_uri=https%3A%2F%2Fapp.squadov.gg%2Fdiscord%2Foauth-callback&response_type=code&scope=identify"
 client_id = "${DISCORD_CLIENT_ID}"
 client_secret = "${DISCORD_CLIENT_SECRET}"
+
+[redis]
+url = "redis://${REDIS_URL}"
+pool_size = 4
+timeout_ms = 15000

@@ -230,3 +230,19 @@ resource "aws_db_proxy_endpoint" "primary_db_proxy_endpoint" {
     vpc_subnet_ids         = var.postgres_db_subnets
     target_role            = "READ_WRITE"
 }
+
+resource "aws_elasticache_subnet_group" "redis_subnet" {
+    name = "redis-subnet-group"
+    subnet_ids = var.postgres_db_subnets
+}
+
+resource "aws_elasticache_cluster" "redis" {
+    cluster_id = "squadov-redis"
+    engine = "redis"
+    node_type = var.redis_instance_type
+    num_cache_nodes = 1
+    parameter_group_name = "default.redis6.x"
+    engine_version = "6.x"
+    port = 6379
+    subnet_group_name = aws_elasticache_subnet_group.redis_subnet.name
+}
