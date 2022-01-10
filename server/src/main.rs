@@ -5,7 +5,6 @@ mod api;
 mod wow_kafka;
 
 use tokio;
-use actix::Actor;
 use actix_rt;
 use actix_web::{http, App, HttpServer, web};
 use actix_web::middleware::{Logger, Compress};
@@ -61,7 +60,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         kafka_config.set("enable.auto.offset.store", "false");
 
         let app = Arc::new(api::ApiApplication::new(&config).await);
-        api::start_event_loop(app.clone());
 
         // A hacky way of doing things related to api::ApiApplication...
         if opts.mode.is_some() {
@@ -92,7 +90,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 wow_kafka::create_wow_consumer_thread(app.clone(), &config.kafka.wow_combat_log_topic, &kafka_config);
             }
 
-            let user_status_tracker = squadov_common::squad::status::UserActivityStatusTracker::new().start();
+            let redis_pool = Arc::new(deadpool_redis::Config{
+                url: Some(config.redis.url.clone()),
+                pool: Some(deadpool::managed::PoolConfig{
+                    max_size: config.redis.pool_size,
+                    timeouts: deadpool::managed::Timeouts{
+                        wait: Some(std::time::Duration::from_millis(config.redis.timeout_ms)),
+                        create: Some(std::time::Duration::from_millis(config.redis.timeout_ms)),
+                        recycle: Some(std::time::Duration::from_millis(config.redis.timeout_ms)),
+                    },
+                }),
+            }.create_pool().unwrap());
+
+            let user_status_tracker = squadov_common::squad::status::UserActivityStatusTracker::new(&config.redis, redis_pool.clone()).await;
             
             // The API service is primarily used for dealing with API calls.actix_web
             // We're not going to have a web-based interface at the moment (only going to be desktop client-based)
@@ -124,7 +134,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .finish()
                     )
                     .wrap(Logger::default())
-                    .data(user_status_tracker.clone())
+                    .app_data(web::Data::new(user_status_tracker.clone()))
                     .app_data(web::Data::new(app.clone()))
                     .service(api_service::create_service(config.server.graphql_debug))
                 })

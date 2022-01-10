@@ -311,3 +311,15 @@ impl From<hmac::crypto_mac::InvalidKeyLength> for SquadOvError {
         return Self::InternalError(format!("HMAC Error {:?}", err))
     }
 }
+
+impl From<deadpool_redis::PoolError> for SquadOvError {
+    fn from(err: deadpool_redis::PoolError) -> Self {
+        return Self::InternalError(format!("Deadpool Redis Error {:?}", err))
+    }
+}
+
+impl From<redis::RedisError> for SquadOvError {
+    fn from(err: redis::RedisError) -> Self {
+        return Self::InternalError(format!("Redis Error {:?}", err))
+    }
+}

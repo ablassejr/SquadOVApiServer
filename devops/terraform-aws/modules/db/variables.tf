@@ -29,3 +29,7 @@ variable "postgres_db_size" {
 variable "postgres_max_db_size" {
     type = number
 }
+
+variable "redis_instance_type" {
+    type = string
+}

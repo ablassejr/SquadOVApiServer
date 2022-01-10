@@ -3,7 +3,7 @@
 	"POSTGRES_PASSWORD": "ENC[AES256_GCM,data:Vp/V81OfP8YK3wRFNqJDJkCgHqs=,iv:y6+4ZfaxEuXF/MYp4qCZ9EVQ1Ld0PnQ/bSFZCD57Ee8=,tag:UtJk5+sAxVXcKxey8C7szQ==,type:str]",
 	"POSTGRES_INSTANCE_NAME": "ENC[AES256_GCM,data:PfIcnbJ7Cl8AjqWIX4Al+xP4pMc7aKft,iv:6PCroa/3TWiSRyl1vZSxxrpf78AwDprw+XlvebXhL5I=,tag:iudehmSBG8FrV1xW+S9H4A==,type:str]",
 	"DATABASE_HOST": "ENC[AES256_GCM,data:PDOalMNzqR1zR+GyLtZHbijD6ugFlT8737rgxJrIWFPBtNZ8K5LOg3/+LRKVDqjEBZ5jKnA/ApYQy1iKyKZQlhY=,iv:mPAyr2O23N7wePmA5tsnAhMVe9s7spcZAhplBpsFaJc=,tag:PTbc0Fh2niq7vT1Y0MBZOQ==,type:str]",
-	"DATABASE_URL": "ENC[AES256_GCM,data:FZFGPvSAKkKIJ/yUa1apc1jsvHSdOU+TBc2Hw1G4KGkjzWcWLruXoUHLU8Vcg2KoQt6koNdAt+3M35ziXgR30j3MhzVgyQBTM2ZeCq0jY/0jOSBHNpL3MA9RJ2CEViWOKpZspA7APazjQovsLDauIMlyAbAls+s=,iv:4unODfupm/QqPW4gvM407wC/+CSXDP+N3QDf2z1Z23w=,tag:IcVCFt9MHtZR5C0bnVOYgw==,type:str]",
+	"DATABASE_URL": "ENC[AES256_GCM,data:bI3VK1iOPDH0SLaHIGGpJy130hMqJ2ZHqcTsfpbwDAmFCz1wCZx+1V0WSDz4J0LoTcIE1ZC4xUefy5dPYiulBnqI5pRMgA0durV/2saxOcqc3JG5uuMCpQlaAKCLtKOfRZnHKNqNHkodcWux/2Tn/KW3/N2Qbr4Y86CCUF6HnNMa20vW4NbKge0PIvv5h/ucme8Llh0=,iv:EOLhDmfp4FQevY268J+A/qpaqaARt/oQ+Ngx58Kkk4A=,tag:cFVjb5WN/wx6iF9kZHJhLg==,type:str]",
 	"DEPLOYMENT_ENVIRONMENT": "ENC[AES256_GCM,data:ecVEX0VdCxckcw==,iv:z/nIbxgr1yyNX2/yYU65xX1bGkPWpuo+/MnPwywBU/M=,tag:hcVsyGK5nycuJiSG6BMrpw==,type:str]",
 	"GITLAB_USERNAME": "ENC[AES256_GCM,data:51PIuw==,iv:9qIoWoT/0ssdis3kkkl8SucQaFMZ5O7BT1yp8rGXymU=,tag:eQ5xi37E2zB4Me3JFKt5xQ==,type:str]",
 	"GITLAB_REGISTRY_TOKEN": "ENC[AES256_GCM,data:n6LRRJVckXKlxGBAZxicbrLmn4U=,iv:k7Ur2Tid5EYyw0cnXEFlI4oubhocG+qIt9OPxrgkQV4=,tag:iW+W14XEUAbCSWYxXQat4g==,type:str]",
@@ -51,6 +51,7 @@
 	"DISCORD_CLIENT_ID": "ENC[AES256_GCM,data:GBrOfj3un5an4/rmIosigRXU,iv:l9/84pnH8QYtH6wxec+j7U/IPbezmlmW2usS+qE1JDs=,tag:GoJpE2UyMzj//dCM5tZXSQ==,type:str]",
 	"DISCORD_CLIENT_SECRET": "ENC[AES256_GCM,data:QC5TlgtZq9DZwKz0xt3X0UizU3CiAvnpASChF/oCG9Y=,iv:TjL6rFI0P+HpmHSOAQG58s4fODoaHhiEy9HjsBC5C08=,tag:1OIcLGtjD+KF/4vK+/VDKA==,type:str]",
 	"DEFAULT_SPEED_CHECK_BUCKET": "ENC[AES256_GCM,data:oGYKn/bBTDSBRlOGS2+K96iG3HoIIWDRhCeSOaN1COzRZUhexC6J,iv:QkZHuZajsiowRkRZIEx2f0LH73WqLTSyn8nr/7ZXc0U=,tag:XzqS+OIM7PtzTH0hW1cVvw==,type:str]",
+	"REDIS_URL": "ENC[AES256_GCM,data:Lpqwed+jGLWqYKw9O5Utl7PI5SetWeAAhKvrmrhqANVjR7bSNCAC47kx3HURDrguGr8=,iv:d09OM9v4Wbv2/607O6uqT8QDmJ186+jkNouiEVRKM0s=,tag:XTMph2Y2YnNSk5OcZTeBhg==,type:str]",
 	"sops": {
 		"kms": null,
 		"gcp_kms": [
@@ -62,8 +63,8 @@
 		],
 		"azure_kv": null,
 		"hc_vault": null,
-		"lastmodified": "2021-12-18T02:22:30Z",
-		"mac": "ENC[AES256_GCM,data:QZzGdW/BZgeZdgH/l9eINmYMPVluIViX0PnxafpT+UIHLIECTDFttjpnCAzayt45XJFCffZSIB/sy6C6bIf4WhbVYuiq3a3NT6SyazvWiQf36IHaA4BvO1oTg9XZqyyO9he2G+HE5b9vS2Q0XVhxEG6hEiUfNTedNaL5/bsh81o=,iv:3WkKxQSdR/eOmvhFvTL9VLF85cBbcDcoGi9uuYy+GrU=,tag:MelVdm5gAIbw6KjtZPF1jQ==,type:str]",
+		"lastmodified": "2022-01-09T17:54:33Z",
+		"mac": "ENC[AES256_GCM,data:RD2HXmLfvAJ82r+n+w7wtU8UXGjbveXKMqBNCwGEpsHLWWgC670dfF68QkRVpByJd9ugdqQOlYA6m8JXV6320gCLMMxmkmrUSWtYwSjJuWcpIXXlE0D1KHx/hx+eahz20bDTIzA0U1OiiST7ftBKBKzpuK+w16lbYLdw9wsiTd0=,iv:7K5Tq6BzOlh6x7N1uXCchL9SswClPf87WvmBcbyx0bQ=,tag:c3COviFSGGkgkTcmkw6FEg==,type:str]",
 		"pgp": null,
 		"unencrypted_suffix": "_unencrypted",
 		"version": "3.6.1"

@@ -45,6 +45,8 @@ module "db" {
     postgres_instance_type = "db.m6g.4xlarge"
     postgres_db_subnets = module.network.database_subnets
     postgres_db_security_groups = module.network.database_security_groups
+
+    redis_instance_type = "cache.t4g.medium"
 }
 
 module "storage" {

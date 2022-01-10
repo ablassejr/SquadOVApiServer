@@ -77,6 +77,7 @@ use squadov_common::{
         DiscordConfig,
     },
     share::rabbitmq::SharingRabbitmqInterface,
+    redis::RedisConfig,
 };
 use url::Url;
 use std::vec::Vec;
@@ -232,6 +233,7 @@ pub struct ApiConfig {
     pub segment: SegmentConfig,
     pub sentry: SentryConfig,
     pub discord: DiscordConfig,
+    pub redis: RedisConfig,
 }
 
 impl CommonConfig for DatabaseConfig {

@@ -54,6 +54,9 @@ petname = { path="../deps/cargo/rust-petname", version = "1.1.0" }
 convert_case = "0.4.0"
 itertools = "0.10.3"
 rusoto_cognito_identity = "0.45.0"
+deadpool = "0.5.2"
+deadpool-redis = "0.5.2"
+redis = "0.15.1"
 
 [[bin]]
 name = "squadov_api_server"
@@ -66,3 +69,7 @@ path = "src/wow_kafka_worker.rs"
 [[bin]]
 name = "vod_processing_worker"
 path = "src/vod_processing_worker.rs"
+
+[[bin]]
+name = "singleton_event_processing_worker"
+path = "src/singleton_event_processing_worker.rs"

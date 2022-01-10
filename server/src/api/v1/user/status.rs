@@ -1,4 +1,3 @@
-use actix::{Addr};
 use actix_web::{web, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use crate::api;
@@ -38,7 +37,7 @@ pub struct UserStatusInput {
     user_id: i64
 }
 
-pub async fn get_user_status_handler(req: HttpRequest, stream: web::Payload, app : web::Data<Arc<api::ApiApplication>>, tracker: web::Data<Addr<UserActivityStatusTracker>>, path: web::Path<UserStatusInput>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_user_status_handler(req: HttpRequest, stream: web::Payload, app : web::Data<Arc<api::ApiApplication>>, tracker: web::Data<Arc<UserActivityStatusTracker>>, path: web::Path<UserStatusInput>) -> Result<HttpResponse, SquadOvError> {
     let resp = ws::start(UserActivitySession::new(path.user_id, tracker.get_ref().clone(), app.get_ref().clone()), &req, stream)?;
     Ok(resp)
 }
