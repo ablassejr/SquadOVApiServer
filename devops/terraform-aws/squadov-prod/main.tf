@@ -40,7 +40,7 @@ module "db" {
     postgres_password = var.postgres_password
     postgres_db_size = 1024
     postgres_max_db_size = 65536
-    postgres_instance_type = "db.m6g.4xlarge"
+    postgres_instance_type = "db.m6g.8xlarge"
     postgres_db_subnets = module.network.database_subnets
     postgres_db_security_groups = module.network.database_security_groups
 
