@@ -195,7 +195,7 @@ resource "aws_db_proxy" "primary_db_proxy" {
     name = "${var.postgres_instance_name}-proxy"
     debug_logging = false
     engine_family = "POSTGRESQL"
-    idle_client_timeout = 1800
+    idle_client_timeout = 600
     require_tls = true
     role_arn = aws_iam_role.rds_proxy_role.arn
     vpc_subnet_ids = var.postgres_db_subnets
