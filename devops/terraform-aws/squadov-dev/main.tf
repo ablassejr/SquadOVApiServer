@@ -28,9 +28,14 @@ module "network" {
     domain_prefix = "mikedev."
 }
 
+module "combatlog" {
+    source = "../modules/combatlog"
+}
+
 module "iam" {
     source = "../modules/iam"
     resource_suffix = "-dev-mike"
+    api_gateway_id = module.combatlog.api_gateway_id
 }
 
 module "storage" {
@@ -38,10 +43,6 @@ module "storage" {
 
     bucket_suffix = "-dev-mike"
     cloudfront_suffix = "-dev-mike"
-}
-
-module "combatlog" {
-    source = "../modules/combatlog"
 }
 
 module "db" {

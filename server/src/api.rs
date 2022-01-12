@@ -212,6 +212,11 @@ pub struct SquadOvStorageConfig {
 }
 
 #[derive(Deserialize,Debug,Clone)]
+pub struct CombatLogConfig {
+    pub hostname: String,
+}
+
+#[derive(Deserialize,Debug,Clone)]
 pub struct ApiConfig {
     fusionauth: fusionauth::FusionAuthConfig,
     pub gcp: squadov_common::GCPConfig,
@@ -234,6 +239,7 @@ pub struct ApiConfig {
     pub sentry: SentryConfig,
     pub discord: DiscordConfig,
     pub redis: RedisConfig,
+    pub combatlog: CombatLogConfig,
 }
 
 impl CommonConfig for DatabaseConfig {
