@@ -41,6 +41,8 @@ pub enum SquadOvError {
     Forbidden,
 }
 
+impl std::error::Error for SquadOvError {}
+
 impl error::ResponseError for SquadOvError {
     fn error_response(&self) -> HttpResponse {
         let body = ErrorBody{
@@ -321,5 +323,17 @@ impl From<deadpool_redis::PoolError> for SquadOvError {
 impl From<redis::RedisError> for SquadOvError {
     fn from(err: redis::RedisError) -> Self {
         return Self::InternalError(format!("Redis Error {:?}", err))
+    }
+}
+
+impl From<Box<dyn std::error::Error + Send + Sync + 'static>> for SquadOvError {
+    fn from(err: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
+        return Self::InternalError(format!("Generic Error {:?}", err))
+    }
+}
+
+impl From<rusoto_core::region::ParseRegionError> for SquadOvError {
+    fn from(err: rusoto_core::region::ParseRegionError) -> Self {
+        return Self::InternalError(format!("Rusoto Parse Region Error {:?}", err))
     }
 }

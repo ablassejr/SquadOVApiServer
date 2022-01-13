@@ -28,6 +28,12 @@ module "network" {
     domain_prefix = "mikedev."
 }
 
+module "lambda" {
+    source = "../modules/lambda"
+
+    primary_vpc = module.network.primary_vpc
+}
+
 module "combatlog" {
     source = "../modules/combatlog"
 }

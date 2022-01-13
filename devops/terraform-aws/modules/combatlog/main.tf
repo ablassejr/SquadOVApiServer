@@ -78,6 +78,7 @@ resource "aws_apigatewayv2_route" "ff14_stream_route" {
     target = "integrations/${aws_apigatewayv2_integration.ff14_stream_integration.id}"
 }
 
+
 resource "aws_apigatewayv2_stage" "combat_log_gateway_stage" {
     api_id = aws_apigatewayv2_api.combat_log_gateway.id
     auto_deploy = true

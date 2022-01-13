@@ -233,3 +233,7 @@ resource "aws_acm_certificate" "domain_certificates" {
     subject_alternative_names = [ "*.${var.domain_prefix}squadov.gg" ]
     validation_method = "DNS"
 }
+
+output "primary_vpc" {
+    value = aws_vpc.primary.id
+}
