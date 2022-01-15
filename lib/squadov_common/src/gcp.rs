@@ -7,7 +7,7 @@ use jsonwebtoken::{Header, Algorithm, EncodingKey};
 use std::io::Read;
 use chrono::{DateTime, Utc, NaiveDateTime, Duration};
 use reqwest;
-use reqwest::header;
+use reqwest::{StatusCode, header};
 use futures::executor::block_on;
 
 #[derive(Deserialize,Debug,Clone)]
@@ -60,17 +60,20 @@ impl GCPHttpAuthClient {
             .timeout(std::time::Duration::from_secs(120))
             .connect_timeout(std::time::Duration::from_secs(60))
             .build()?;
-        Ok(
-            client.post("https://oauth2.googleapis.com/token")
-                .json(&GCPTokenRequest{
-                    grant_type: String::from("urn:ietf:params:oauth:grant-type:jwt-bearer"),
-                    assertion: String::from(jwt),
-                })
-                .send()
-                .await?
-                .json()
-                .await?
-        )
+
+        let resp = client.post("https://oauth2.googleapis.com/token")
+            .json(&GCPTokenRequest{
+                grant_type: String::from("urn:ietf:params:oauth:grant-type:jwt-bearer"),
+                assertion: String::from(jwt),
+            })
+            .send()
+            .await?;
+
+        if resp.status() == StatusCode::OK {
+            Err(SquadOvError::InternalError(format!("Failed to get GCS access token {}", resp.text().await?)))
+        } else {
+            Ok(resp.json().await?)
+        }
     }
 
     fn construct_oauth_jwt(&self) -> Result<String, SquadOvError> {
@@ -105,6 +108,7 @@ impl GCPHttpAuthClient {
         let mut file = std::fs::File::open(&config.service_account_key).unwrap();
         let mut key_data = String::new();
         file.read_to_string(&mut key_data).unwrap();
+
         let credentials: GCPServiceAccountJson = serde_json::from_str(&key_data).unwrap();
 
         // Need to create an HTTP client that is properly authenticated with
