@@ -69,10 +69,12 @@ impl GCPHttpAuthClient {
             .send()
             .await?;
 
-        if resp.status() == StatusCode::OK {
-            Err(SquadOvError::InternalError(format!("Failed to get GCS access token {}", resp.text().await?)))
+        let status = resp.status();
+        let body_text = resp.text().await?;
+        if status == StatusCode::OK {
+            Ok(serde_json::from_str::<OAuthAccessToken>(&body_text.replace("\\\"", "\""))?)
         } else {
-            Ok(resp.json().await?)
+            Err(SquadOvError::InternalError(format!("Failed to get GCS access token {}", body_text)))
         }
     }
 
