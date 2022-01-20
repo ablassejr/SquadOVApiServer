@@ -268,6 +268,11 @@ fn parse_wow_covenant_from_str(s: &str) -> Result<Option<WowCovenantInfo>, Squad
     }
 
     let tokens = split_wow_combat_log_tokens(&s[1..s.len()-1]);
+
+    if tokens.len() < 4 {
+        return Ok(None);
+    }
+
     Ok(
         Some(
             WowCovenantInfo{
