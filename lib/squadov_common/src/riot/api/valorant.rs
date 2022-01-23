@@ -105,19 +105,19 @@ impl super::RiotApiApplicationInterface {
                 }
             };
 
-            log::info!("...Store Val Match DTO: {} [{}]", match_id, shard);
+            log::info!("...Store Val Match DTO: {} [{}] - {}", match_id, shard, &match_uuid);
             db::store_valorant_match_dto(&mut tx, &match_uuid, &valorant_match).await?;
 
-            log::info!("...Cache Val Match Info: {} [{}]", match_id, shard);
+            log::info!("...Cache Val Match Info: {} [{}] - {}", match_id, shard, &match_uuid);
             db::cache_valorant_match_information(&mut tx, &match_uuid).await?;
 
             // Cache POV information for each player already registered to squadov
             // We do this for users who have their accounts linked already because we need to cache relative to user ids.
             // We'll fill in that information for other users when/if they ever link their account.
-            log::info!("...Get SquadOV Users in Val Match: {} [{}]", match_id, shard);
+            log::info!("...Get SquadOV Users in Val Match: {} [{}] - {}", match_id, shard, &match_uuid);
             let match_user_ids = db::get_squadov_user_ids_in_valorant_match(&mut tx, &match_uuid).await?;
             for user_id in match_user_ids {
-                log::info!("...Cache Val Match POV: {} [{}] - User ID: {}", match_id, shard, user_id);
+                log::info!("...Cache Val Match POV: {} [{}] - User ID: {} - {}", match_id, shard, user_id, &match_uuid);
                 db::cache_valorant_player_pov_information(&mut tx, &match_uuid, user_id).await?;
             }
 
