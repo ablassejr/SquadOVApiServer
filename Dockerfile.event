@@ -18,6 +18,7 @@ COPY server /squadov/server
 COPY tools /squadov/tools
 COPY deps /squadov/deps
 COPY msa /squadov/msa
+COPY lambda /squadov/lambda
 COPY config/squadov_$DEPLOYMENT_ENVIRONMENT.toml /squadov/config/config.toml
 COPY Cargo.toml /squadov/
 COPY Cargo.lock /squadov/

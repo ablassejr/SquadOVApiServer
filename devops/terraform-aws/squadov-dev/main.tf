@@ -34,8 +34,12 @@ module "lambda" {
     primary_vpc = module.network.primary_vpc
 }
 
-module "combatlog" {
-    source = "../modules/combatlog"
+
+module "storage" {
+    source = "../modules/storage"
+
+    bucket_suffix = "-dev-mike"
+    cloudfront_suffix = "-dev-mike"
 }
 
 module "iam" {
@@ -44,11 +48,8 @@ module "iam" {
     api_gateway_id = module.combatlog.api_gateway_id
 }
 
-module "storage" {
-    source = "../modules/storage"
-
-    bucket_suffix = "-dev-mike"
-    cloudfront_suffix = "-dev-mike"
+module "combatlog" {
+    source = "../modules/combatlog"
 }
 
 module "db" {
