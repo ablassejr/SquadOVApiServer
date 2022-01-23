@@ -51,6 +51,9 @@ impl super::RiotApiApplicationInterface {
         db::set_user_account_shard(&*self.db, puuid, VALORANT_SHORTHAND, &shard).await?;
 
         log::info!("Requesting Valorant Backfill: {} [{}]", puuid, shard);
+
+        // Disable backfill for now until we have a better idea on how to process more matches quickly.
+        /*
         // Obtain a list of matches that the user played from the VALORANT API and then cross check that
         // with the matches we have stored. If the match doesn't exist then go ahead and request a low
         // priority match retrieval for that particular match.
@@ -60,6 +63,7 @@ impl super::RiotApiApplicationInterface {
         for mid in &backfill_ids {
             self.request_obtain_valorant_match_info(&mid, &shard, false).await?;
         }
+        */
         Ok(())
     }
 
