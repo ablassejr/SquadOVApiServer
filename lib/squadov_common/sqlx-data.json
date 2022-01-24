@@ -11717,33 +11717,6 @@
       "nullable": []
     }
   },
-  "cc276f009e871eac36264cf31ccfdcd6abe2590c7b0d9dadc80019659ccd6966": {
-    "query": "\n        SELECT\n            vmk.round_num,\n            COUNT(vmk.victim_puuid) AS \"kills!\"\n        FROM squadov.valorant_match_players AS vmp\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.puuid = vmp.puuid\n        LEFT JOIN squadov.valorant_match_kill AS vmk\n            ON vmk.match_uuid = vmp.match_uuid\n                AND vmk.killer_puuid = vmp.puuid\n        WHERE vmp.match_uuid = $1\n            AND ral.user_id = $2\n        GROUP BY vmk.round_num\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "round_num",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "kills!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        null
-      ]
-    }
-  },
   "cd44a39b93faa9acc827c3d85aa59149ddf9a85253d98721ff1968e71307ed6c": {
     "query": "\n        SELECT lmb.*\n        FROM squadov.lol_match_bans AS lmb\n        WHERE lmb.match_uuid = $1\n        ",
     "describe": {
@@ -12591,6 +12564,33 @@
         ]
       },
       "nullable": [
+        null
+      ]
+    }
+  },
+  "e026da1cbad2cf59ac3e26e557b1a4577fdfd627f7e8bc3e6a82ce3b0dc75b12": {
+    "query": "\n        SELECT\n            vmk.round_num,\n            COALESCE(COUNT(vmk.victim_puuid), 0) AS \"kills!\"\n        FROM squadov.valorant_match_players AS vmp\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.puuid = vmp.puuid\n        LEFT JOIN squadov.valorant_match_kill AS vmk\n            ON vmk.match_uuid = vmp.match_uuid\n                AND vmk.killer_puuid = vmp.puuid\n        WHERE vmp.match_uuid = $1\n            AND ral.user_id = $2\n            AND vmk.round_num IS NOT NULL\n        GROUP BY vmk.round_num\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "round_num",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "kills!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
         null
       ]
     }
