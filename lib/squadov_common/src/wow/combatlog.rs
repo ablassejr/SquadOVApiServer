@@ -605,7 +605,7 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                             success: false,
                         }, None)),
                         "SPELL_CAST_SUCCESS" => Ok({
-                            let advanced = if state.advanced_log {
+                            let advanced = if state.advanced_log && (payload.parts.len() >= (idx+advanced_cvar_offset)) {
                                 Some(WoWCombatLogAdvancedCVars::new(&payload.parts[idx..idx+advanced_cvar_offset], true)?)
                             } else {
                                 None
