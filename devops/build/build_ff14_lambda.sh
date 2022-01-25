@@ -15,3 +15,4 @@ docker rm -v $DOCKER_ID
 
 cd ${ROOTDIR}/devops/aws/lambda/build/ff14
 zip ff14.zip bootstrap
+mv ff14.zip ../../

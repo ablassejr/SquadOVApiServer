@@ -45,54 +45,6 @@ resource "aws_iam_role_policy" "combat_log_policy" {
 EOF
 }
 
-resource "aws_iam_role" "lambda_role" {
-    name = "lambda_role"
-    assume_role_policy = <<POLICY
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Principal": {
-                "Service": [
-                    "lambda.amazonaws.com"
-                ]
-            },
-            "Action": "sts:AssumeRole"
-        }
-    ]
-}
-POLICY
-}
-
-resource "aws_iam_role_policy" "lambda_policy" {
-    name = "lambda_policy"
-    role = aws_iam_role.lambda_role.id
-
-    policy = <<EOF
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "kinesis:DescribeStream",
-                "kinesis:DescribeStreamSummary",
-                "kinesis:GetRecords",
-                "kinesis:GetShardIterator",
-                "kinesis:ListShards",
-                "kinesis:ListStreams",
-                "kinesis:SubscribeToShard"
-            ],
-            "Resource": [
-                "*"
-            ]
-        }
-    ]
-}
-EOF
-}
-
 resource "aws_kinesis_stream" "ff14_stream" {
     name = "ff14-stream"
     retention_period = 24
@@ -124,25 +76,6 @@ resource "aws_apigatewayv2_route" "ff14_stream_route" {
     route_key = "PUT /ff14"
     authorization_type = "AWS_IAM"
     target = "integrations/${aws_apigatewayv2_integration.ff14_stream_integration.id}"
-}
-
-resource "aws_lambda_function" "ff14_combat_log_lambda" {
-    function_name = "ff14-combat-log-lambda"
-    role = aws_iam_role.lambda_role.arn
-
-    filename = "../../aws/lambda/build/ff14/ff14.zip"
-    source_code_hash = filebase64sha256("../../aws/lambda/build/ff14/ff14.zip")
-
-    handler = "not.used"
-    memory_size = 128
-    package_type = "Zip"
-    reserved_concurrent_executions = 64
-    runtime = "provided.al2"
-    timeout = 30
-
-    tags = {
-        "lambda" = "ff14"
-    }
 }
 
 resource "aws_apigatewayv2_stage" "combat_log_gateway_stage" {

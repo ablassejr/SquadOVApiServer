@@ -15,7 +15,7 @@ impl super::RiotApiHandler {
     pub async fn get_account_by_puuid(&self, puuid: &str) -> Result<RiotAccount, SquadOvError> {
         let client = self.create_http_client()?;
         let endpoint = Self::build_api_endpoint("americas", &format!("riot/account/v1/accounts/by-puuid/{}", puuid));
-        self.tick_thresholds().await;
+        self.tick_thresholds().await?;
 
         let resp = client.get(&endpoint)
             .send()
@@ -31,7 +31,7 @@ impl super::RiotApiHandler {
     pub async fn get_active_shard_by_game_for_puuid(&self, game: &str, puuid: &str) -> Result<String, SquadOvError> {
         let client = self.create_http_client()?;
         let endpoint = Self::build_api_endpoint("americas", &format!("riot/account/v1/active-shards/by-game/{game}/by-puuid/{puuid}", game=game, puuid=puuid));
-        self.tick_thresholds().await;
+        self.tick_thresholds().await?;
 
         let resp = client.get(&endpoint)
             .send()
@@ -57,7 +57,7 @@ impl super::RiotApiHandler {
             .connect_timeout(std::time::Duration::from_secs(60))
             .build()?;
         let endpoint = Self::build_api_endpoint("americas", "riot/account/v1/accounts/me");
-        self.tick_thresholds().await;
+        self.tick_thresholds().await?;
 
         let resp = client.get(&endpoint)
             .bearer_auth(access_token)
@@ -87,7 +87,7 @@ impl super::RiotApiHandler {
             .connect_timeout(std::time::Duration::from_secs(60))
             .build()?;
         let endpoint = Self::build_api_endpoint(region, "lol/summoner/v4/summoners/me");
-        self.tick_thresholds().await;
+        self.tick_thresholds().await?;
 
         let resp = client.get(&endpoint)
             .bearer_auth(access_token)

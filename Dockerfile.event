@@ -25,7 +25,7 @@ COPY Cargo.lock /squadov/
 COPY devops/gcp /squadov/gcp
 
 WORKDIR /squadov
-RUN cargo build --release --bin singleton_event_processing_worker
+RUN cargo build --release --features=eventloop --bin singleton_event_processing_worker
 
 FROM debian:buster-20200908-slim
 ARG DEPLOYMENT_ENVIRONMENT

@@ -28,12 +28,30 @@ module "network" {
     domain_prefix = "mikedev."
 }
 
+module "db" {
+    source = "../modules/db"
+
+    postgres_instance_name = var.postgres_instance_name
+    postgres_user = var.postgres_user
+    postgres_password = var.postgres_password
+    postgres_db_size = 20
+    postgres_max_db_size = 40
+    postgres_instance_type = "db.t4g.micro"
+    postgres_db_subnets = module.network.database_subnets
+    postgres_db_security_groups = module.network.database_security_groups
+
+    redis_instance_type = "cache.t4g.micro"
+}
+
 module "lambda" {
     source = "../modules/lambda"
 
-    primary_vpc = module.network.primary_vpc
-}
+    db_secret = module.db.db_secret
+    db_host = module.db.db_host
 
+    lambda_subnets = module.network.lambda_subnets
+    lambda_security_groups = module.network.lambda_security_groups
+}
 
 module "storage" {
     source = "../modules/storage"
@@ -50,19 +68,4 @@ module "iam" {
 
 module "combatlog" {
     source = "../modules/combatlog"
-}
-
-module "db" {
-    source = "../modules/db"
-
-    postgres_instance_name = var.postgres_instance_name
-    postgres_user = var.postgres_user
-    postgres_password = var.postgres_password
-    postgres_db_size = 20
-    postgres_max_db_size = 40
-    postgres_instance_type = "db.t4g.micro"
-    postgres_db_subnets = module.network.database_subnets
-    postgres_db_security_groups = module.network.database_security_groups
-
-    redis_instance_type = "cache.t4g.micro"
 }

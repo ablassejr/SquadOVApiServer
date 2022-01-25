@@ -10,7 +10,8 @@ use sqlx::{
     postgres::{
         PgPool,
         PgListener,
-        PgPoolOptions
+        PgPoolOptions,
+        PgConnectOptions,
     },
 };
 use chrono::{DateTime, Utc};
@@ -23,7 +24,9 @@ struct Options {
 
 #[derive(Deserialize,Debug,Clone)]
 struct Config {
-    db: String,
+    db_host: String,
+    db_username: String,
+    db_password: String,
     connections: u32,
     rabbitmq: RabbitMqConfig,
 }
@@ -137,10 +140,18 @@ async fn main() -> Result<(), SquadOvError> {
             .max_connections(config.connections)
             .max_lifetime(std::time::Duration::from_secs(6*60*60))
             .idle_timeout(std::time::Duration::from_secs(3*60*60))
-            .connect(&config.db)
+            .connect_with(PgConnectOptions::new()
+                .host(&config.db_host)
+                .username(&config.db_username)
+                .password(&config.db_password)
+                .port(5432)
+                .application_name("rabbitmq_delay_handler")
+                .database("squadov")
+                .statement_cache_capacity(0)
+            )
             .await
             .unwrap());
-        let mut listener = PgListener::connect(&config.db).await.unwrap();
+        let mut listener = PgListener::connect_with(&*pool).await.unwrap();
         listener.listen_all(vec![PG_TOPIC_RABBITMQ_DELAY]).await.unwrap();
 
         let rabbitmq = RabbitMqInterface::new(&config.rabbitmq, pool.clone(), true).await.unwrap();

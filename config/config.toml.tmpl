@@ -6,7 +6,9 @@ tenant_id = "${FUSIONAUTH_TENANT_ID}"
 application_id = "${FUSIONAUTH_CLIENT_ID}"
 
 [database]
-url = "${DATABASE_URL}"
+host = "${DATABASE_HOST}"
+username = "${POSTGRES_USER}"
+password = "${POSTGRES_PASSWORD}"
 connections = 256
 heavy_connections = 128
 

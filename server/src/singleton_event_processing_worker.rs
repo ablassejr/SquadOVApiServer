@@ -40,7 +40,7 @@ pub async fn main() -> Result<(), SquadOvError> {
 
     // Only use the provided config to connect to things.
     let _ = tokio::task::spawn(async move {
-        let app = Arc::new(api::ApiApplication::new(&config).await);
+        let app = Arc::new(api::ApiApplication::new(&config, "singleton_event").await);
         api::start_event_loop(app.clone());
 
         loop {

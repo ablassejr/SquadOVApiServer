@@ -191,6 +191,46 @@ resource "aws_secretsmanager_secret_version" "primary_db_credentials_secret_ver"
     })
 }
 
+resource "aws_db_proxy" "primary_db_proxy" {
+    name = "${var.postgres_instance_name}-proxy"
+    debug_logging = false
+    engine_family = "POSTGRESQL"
+    idle_client_timeout = 1800
+    require_tls = true
+    role_arn = aws_iam_role.rds_proxy_role.arn
+    vpc_subnet_ids = var.postgres_db_subnets
+
+    auth {
+        auth_scheme = "SECRETS"
+        iam_auth = "DISABLED"
+        secret_arn  = aws_secretsmanager_secret.primary_db_credentials_secret.arn
+    }
+}
+
+resource "aws_db_proxy_default_target_group" "primary_db_proxy_target_group" {
+    db_proxy_name = aws_db_proxy.primary_db_proxy.name
+
+    connection_pool_config {
+        connection_borrow_timeout    = 120
+        init_query                   = "SET TIME ZONE 'GMT'"
+        max_connections_percent      = 90
+        max_idle_connections_percent = 50
+    }
+}
+
+resource "aws_db_proxy_target" "primary_db_proxy_target" {
+    db_instance_identifier = aws_db_instance.primary_db.id
+    db_proxy_name          = aws_db_proxy.primary_db_proxy.name
+    target_group_name      = aws_db_proxy_default_target_group.primary_db_proxy_target_group.name
+}
+
+resource "aws_db_proxy_endpoint" "primary_db_proxy_endpoint" {
+    db_proxy_name          = aws_db_proxy.primary_db_proxy.name
+    db_proxy_endpoint_name = "${var.postgres_instance_name}-proxy-endpoint"
+    vpc_subnet_ids         = var.postgres_db_subnets
+    target_role            = "READ_WRITE"
+}
+
 resource "aws_elasticache_subnet_group" "redis_subnet" {
     name = "redis-subnet-group"
     subnet_ids = var.postgres_db_subnets
@@ -205,4 +245,12 @@ resource "aws_elasticache_cluster" "redis" {
     engine_version = "6.x"
     port = 6379
     subnet_group_name = aws_elasticache_subnet_group.redis_subnet.name
+}
+
+output "db_secret" {
+    value = aws_secretsmanager_secret.primary_db_credentials_secret.id
+}
+
+output "db_host" {
+    value = aws_db_proxy_endpoint.primary_db_proxy_endpoint.endpoint
 }

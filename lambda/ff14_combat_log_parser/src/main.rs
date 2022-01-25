@@ -1,7 +1,7 @@
 use lambda_runtime::{handler_fn, Context, Error};
 use serde::Deserialize;
 use serde_json::{Value};
-use sqlx::postgres::{PgPool, PgPoolOptions};
+use sqlx::postgres::{PgPool, PgPoolOptions, PgConnectOptions};
 use std::sync::Arc;
 use rusoto_core::{Region};
 use rusoto_secretsmanager::{
@@ -22,14 +22,24 @@ async fn main() -> Result<(), SquadOvError> {
     std::env::set_var("SQLX_LOG", "0");
     env_logger::init();
 
+    // Pull environment variables.
+    let aws_region = std::env::var("SQUADOV_LAMBDA_REGION").unwrap();
+    let secret_id = std::env::var("SQUADOV_LAMBDA_DB_SECRET").unwrap();
+    let db_host = std::env::var("SQUADOV_LAMBDA_DBHOST").unwrap();
+    log::info!("AWS Region: {}", &aws_region);
+    log::info!("Secret ID: {}", &secret_id);
+    log::info!("DB Host: {}", &db_host);
+
     // Get database secret AWS secret manager. This should have
     // already been created for the RDS proxy so it should exist.
+    log::info!("Creating Secret Manager...");
     let secrets_client = SecretsManagerClient::new(
-        Region::from_str(&std::env::var("SQUADOV_LAMBDA_REGION")?)?
+        Region::from_str(&aws_region)?
     );
 
+    log::info!("Getting DB Secret...");
     let secret_object = secrets_client.get_secret_value(GetSecretValueRequest{
-        secret_id: std::env::var("SQUADOV_LAMBDA_DB_SECRET")?,
+        secret_id,
         ..GetSecretValueRequest::default()
     }).await?;
 
@@ -42,11 +52,13 @@ async fn main() -> Result<(), SquadOvError> {
     }
 
     let creds = if let Some(secret_string) = secret_object.secret_string {
+        log::info!("...Found Creds.");
         serde_json::from_str::<DbSecret>(&secret_string)?
     } else {
         return Err(SquadOvError::BadRequest);
     };
 
+    log::info!("Creating Shared Client...");
     // Create shared state that can be frozen between invocations.
     // Note that for the database, I don't think we will
     // need more than a single connection in the pool since the Lambda
@@ -57,18 +69,17 @@ async fn main() -> Result<(), SquadOvError> {
             .max_connections(1)
             .max_lifetime(std::time::Duration::from_secs(6*60*60))
             .idle_timeout(std::time::Duration::from_secs(3*60*60))
-            // URL format: 
-            // postgresql://USERNAME:PASSWORD@HOSTNAME:PORT/DBNAME
-            // We can hardcode port and dbname.
-            // Hostname and username should come via environment variables to make it configurable.
-            // Password comes from the IAM token that we got above.
-            .connect(&format!(
-                "postgresql://{user}:{pass}@{host}:5432/squadov",
-                user=&creds.username,
-                pass=&creds.password,
-                host=std::env::var("SQUADOV_LAMBDA_DBHOST").unwrap(),
-            ))
-            .await?),
+            .connect_with(PgConnectOptions::new()
+                .host(&db_host)
+                .username(&creds.username)
+                .password(&creds.password)
+                .port(5432)
+                .application_name("ff14_combat_log_parser")
+                .database("squadov")
+                .statement_cache_capacity(0)
+            )
+            .await?
+        ),
     };
 
     let shared_ref = &shared;
@@ -88,6 +99,7 @@ async fn main() -> Result<(), SquadOvError> {
         Ok::<(), Error>(())
     };
 
+    log::info!("Starting Runtime...");
     lambda_runtime::run(handler_fn(closure)).await?;
     Ok(())
 }

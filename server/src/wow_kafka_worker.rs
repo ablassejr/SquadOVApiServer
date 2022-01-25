@@ -35,7 +35,7 @@ pub async fn main() -> Result<(), SquadOvError> {
     config.database.heavy_connections = opts.db;
 
     // Only use the provided config to connect to things.
-    let app = Arc::new(api::ApiApplication::new(&config).await);
+    let app = Arc::new(api::ApiApplication::new(&config, "wow").await);
     let mut kafka_config = ClientConfig::new();
     kafka_config.set("bootstrap.servers", &config.kafka.bootstrap_servers);
     kafka_config.set("security.protocol", "SASL_SSL");
