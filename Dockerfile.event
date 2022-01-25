@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 RUN mkdir -p /squadov/config
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
-RUN rustup toolchain install 1.51.0 && rustup default 1.51.0
+RUN rustup toolchain install 1.58.1 && rustup default 1.58.1
 
 COPY lib /squadov/lib
 COPY server /squadov/server

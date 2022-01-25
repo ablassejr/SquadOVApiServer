@@ -1,4 +1,4 @@
-FROM rustserverless/lambda-rust:0.4.0-rust-1.51.0 AS builder
+FROM rustserverless/lambda-rust:0.4.0-rust-1.58.1 AS builder
 ARG DEPLOYMENT_ENVIRONMENT
 RUN yum install -y wget curl openssl-devel
 RUN yum groupinstall -y "Development Tools"
@@ -11,7 +11,7 @@ RUN wget https://cmake.org/files/v3.18/cmake-3.18.0.tar.gz && \
 RUN mkdir -p /squadov/config
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
-RUN rustup toolchain install 1.51.0 && rustup default 1.51.0
+RUN rustup toolchain install 1.58.1 && rustup default 1.58.1
 
 COPY lib /squadov/lib
 COPY server /squadov/server
