@@ -9,7 +9,10 @@ pub mod oembed;
 pub mod meta;
 
 use serde::{Deserialize};
-use sqlx::postgres::{PgPool};
+use sqlx::{
+    ConnectOptions,
+    postgres::{PgPool},
+};
 use actix_web::{HttpRequest};
 use squadov_common;
 use squadov_common::{
@@ -394,41 +397,45 @@ impl ApiApplication {
 
         // Use TOML config to create application - e.g. for
         // database configuration, external API client configuration, etc.
-        let pool = Arc::new(PgPoolOptions::new()
-            .min_connections(1)
-            .max_connections(config.database.connections)
-            .max_lifetime(std::time::Duration::from_secs(6*60*60))
-            .idle_timeout(std::time::Duration::from_secs(3*60*60))
-            .connect_with(
-                PgConnectOptions::new()
-                    .host(&config.database.host)
-                    .username(&config.database.username)
-                    .password(&config.database.password)
-                    .port(5432)
-                    .application_name(&format!("squadov_{}_normal_pool", app_name))
-                    .database("squadov")
-                    .statement_cache_capacity(0)
-            )
-            .await
-            .unwrap());
+        let pool = {
+            let mut conn = PgConnectOptions::new()
+                .host(&config.database.host)
+                .username(&config.database.username)
+                .password(&config.database.password)
+                .port(5432)
+                .application_name(&format!("squadov_{}_normal_pool", app_name))
+                .database("squadov")
+                .statement_cache_capacity(0);
+            conn.log_statements(log::LevelFilter::Trace);
+            Arc::new(PgPoolOptions::new()
+                .min_connections(1)
+                .max_connections(config.database.connections)
+                .max_lifetime(std::time::Duration::from_secs(6*60*60))
+                .idle_timeout(std::time::Duration::from_secs(3*60*60))
+                .connect_with(conn)
+                .await
+                .unwrap());
+        };
 
-        let heavy_pool = Arc::new(PgPoolOptions::new()
-            .min_connections(1)
-            .max_connections(config.database.heavy_connections)
-            .max_lifetime(std::time::Duration::from_secs(3*60*60))
-            .idle_timeout(std::time::Duration::from_secs(1*60*60))
-            .connect_with(
-                PgConnectOptions::new()
-                    .host(&config.database.host)
-                    .username(&config.database.username)
-                    .password(&config.database.password)
-                    .port(5432)
-                    .application_name(&format!("squadov_{}_heavy_pool", app_name))
-                    .database("squadov")
-                    .statement_cache_capacity(0)
-            )
-            .await
-            .unwrap());
+        let heavy_pool = {
+            let mut conn = PgConnectOptions::new()
+                .host(&config.database.host)
+                .username(&config.database.username)
+                .password(&config.database.password)
+                .port(5432)
+                .application_name(&format!("squadov_{}_heavy_pool", app_name))
+                .database("squadov")
+                .statement_cache_capacity(0);
+            conn.log_statements(log::LevelFilter::Trace);
+            Arc::new(PgPoolOptions::new()
+                .min_connections(1)
+                .max_connections(config.database.heavy_connections)
+                .max_lifetime(std::time::Duration::from_secs(3*60*60))
+                .idle_timeout(std::time::Duration::from_secs(1*60*60))
+                .connect_with(conn)
+                .await
+                .unwrap())
+        };
 
         let gcp = Arc::new(
             if config.gcp.enabled {

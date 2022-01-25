@@ -1,7 +1,10 @@
 use lambda_runtime::{handler_fn, Context, Error};
 use serde::Deserialize;
 use serde_json::{Value};
-use sqlx::postgres::{PgPool, PgPoolOptions, PgConnectOptions};
+use sqlx::{
+    ConnectOptions,
+    postgres::{PgPool, PgPoolOptions, PgConnectOptions},
+};
 use std::sync::Arc;
 use rusoto_core::{Region};
 use rusoto_secretsmanager::{
@@ -19,7 +22,6 @@ struct SharedClient {
 #[tokio::main]
 async fn main() -> Result<(), SquadOvError> {
     std::env::set_var("RUST_LOG", "info,ff14_combat_log_parser=info");
-    std::env::set_var("SQLX_LOG", "0");
     env_logger::init();
 
     // Pull environment variables.
@@ -63,28 +65,29 @@ async fn main() -> Result<(), SquadOvError> {
     // Note that for the database, I don't think we will
     // need more than a single connection in the pool since the Lambda
     // will only ever handle one request at a time.
+    let mut conn = PgConnectOptions::new()
+        .host(&db_host)
+        .username(&creds.username)
+        .password(&creds.password)
+        .port(5432)
+        .application_name("ff14_combat_log_parser")
+        .database("squadov")
+        .statement_cache_capacity(0);
+    conn.log_statements(log::LevelFilter::Trace);
     let shared = SharedClient{
         pool: Arc::new(PgPoolOptions::new()
             .min_connections(1)
             .max_connections(1)
             .max_lifetime(std::time::Duration::from_secs(6*60*60))
             .idle_timeout(std::time::Duration::from_secs(3*60*60))
-            .connect_with(PgConnectOptions::new()
-                .host(&db_host)
-                .username(&creds.username)
-                .password(&creds.password)
-                .port(5432)
-                .application_name("ff14_combat_log_parser")
-                .database("squadov")
-                .statement_cache_capacity(0)
-            )
+            .connect_with(conn)
             .await?
         ),
     };
 
     let shared_ref = &shared;
     let closure = move |event: Value, ctx: Context| async move {
-        log::info!("Handling Kinesis Record: {:?}", event.as_str());
+        log::info!("Handling Kinesis Record: {:?}", event);
         log::info!("Do SQL Query: {}",
             sqlx::query!(
                 r#"
