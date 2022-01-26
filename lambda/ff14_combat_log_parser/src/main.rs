@@ -50,9 +50,6 @@ struct SharedClient {
 
 impl SharedClient {
     async fn handle_kinesis_data(&self, data: KinesisData) -> Result<(), SquadOvError> {
-        // The inner data is base64 encoded - note that we're expecting a JSON structure of FF14 combat logs.
-        log::info!("Handle Kinesis Data: {:?}", data);
-
         // Ensure that the partition key is for ff14.
         // Note that our partition keys will be of the form GAME_MATCHUUID.
         if !data.partition_key.starts_with("ff14_") {
@@ -60,6 +57,7 @@ impl SharedClient {
             return Err(SquadOvError::BadRequest);
         }
 
+        // The inner data is base64 encoded - note that we're expecting a JSON structure of FF14 combat logs.
         // The data that we get is BASE64(GZIP(JSON)) so we need to reverse those operations to
         // properly decode the packet.
         let decoded = serde_json::from_slice::<CombatLogData>(&{
@@ -71,7 +69,6 @@ impl SharedClient {
             }
             uncompressed_data
         })?;
-        log::info!("...Decoded {:?}", &decoded);
 
         // We do a best effort parsing of all the combat log lines. If any one line fails to parse,
         // that doesn't prevent the entire batch from being parsed. We ignore that line and move on.
@@ -84,7 +81,8 @@ impl SharedClient {
         // events and create reports.
 
         // Generate reports. Note that this is a flag sent by the client if this is the last batch of combat
-        // log lines for the current partition key.
+        // log lines for the current partition key. We don't generate the reports here but we stick a message
+        // on a queue and let someone else take care of it.
         if decoded.generate_reports {
 
         }
