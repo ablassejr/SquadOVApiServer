@@ -51,6 +51,9 @@ impl super::RiotApiApplicationInterface {
         db::set_user_account_shard(&*self.db, puuid, VALORANT_SHORTHAND, &shard).await?;
 
         log::info!("Requesting Valorant Backfill: {} [{}]", puuid, shard);
+
+        // Disable backfill for now until we have a better idea on how to process more matches quickly.
+        /*
         // Obtain a list of matches that the user played from the VALORANT API and then cross check that
         // with the matches we have stored. If the match doesn't exist then go ahead and request a low
         // priority match retrieval for that particular match.
@@ -60,6 +63,7 @@ impl super::RiotApiApplicationInterface {
         for mid in &backfill_ids {
             self.request_obtain_valorant_match_info(&mid, &shard, false).await?;
         }
+        */
         Ok(())
     }
 
@@ -86,6 +90,7 @@ impl super::RiotApiApplicationInterface {
         // or 2) we're coming from the backfill where the match UUID doesn't exist. We need to handle case #2 by creating the match UUID.
         for _i in 0..2i32 {
             let mut tx = self.db.begin().await?;
+            log::info!("...Create or Get Val Match Uuid: {} [{}]", match_id, shard);
             let match_uuid = match db::create_or_get_match_uuid_for_valorant_match(&mut tx, match_id).await {
                 Ok(x) => x,
                 Err(err) => match err {
@@ -99,14 +104,20 @@ impl super::RiotApiApplicationInterface {
                     _ => return Err(err)
                 }
             };
+
+            log::info!("...Store Val Match DTO: {} [{}] - {}", match_id, shard, &match_uuid);
             db::store_valorant_match_dto(&mut tx, &match_uuid, &valorant_match).await?;
+
+            log::info!("...Cache Val Match Info: {} [{}] - {}", match_id, shard, &match_uuid);
             db::cache_valorant_match_information(&mut tx, &match_uuid).await?;
 
             // Cache POV information for each player already registered to squadov
             // We do this for users who have their accounts linked already because we need to cache relative to user ids.
             // We'll fill in that information for other users when/if they ever link their account.
+            log::info!("...Get SquadOV Users in Val Match: {} [{}] - {}", match_id, shard, &match_uuid);
             let match_user_ids = db::get_squadov_user_ids_in_valorant_match(&mut tx, &match_uuid).await?;
             for user_id in match_user_ids {
+                log::info!("...Cache Val Match POV: {} [{}] - User ID: {} - {}", match_id, shard, user_id, &match_uuid);
                 db::cache_valorant_player_pov_information(&mut tx, &match_uuid, user_id).await?;
             }
 

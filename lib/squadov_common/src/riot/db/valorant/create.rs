@@ -619,7 +619,7 @@ pub async fn cache_valorant_player_pov_information(ex: &mut Transaction<'_, Post
         r#"
         SELECT
             vmk.round_num,
-            COUNT(vmk.victim_puuid) AS "kills!"
+            COALESCE(COUNT(vmk.victim_puuid), 0) AS "kills!"
         FROM squadov.valorant_match_players AS vmp
         INNER JOIN squadov.riot_account_links AS ral
             ON ral.puuid = vmp.puuid
@@ -628,6 +628,7 @@ pub async fn cache_valorant_player_pov_information(ex: &mut Transaction<'_, Post
                 AND vmk.killer_puuid = vmp.puuid
         WHERE vmp.match_uuid = $1
             AND ral.user_id = $2
+            AND vmk.round_num IS NOT NULL
         GROUP BY vmk.round_num
         "#,
         match_uuid,

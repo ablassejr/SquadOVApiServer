@@ -27,7 +27,7 @@ pub struct FullWoWCombatLogState {
     pub state: WoWCombatLogState,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct RawWoWCombatLogPayload {
     pub timestamp: DateTime<Utc>,
     pub parts: Vec<String>,
@@ -268,6 +268,11 @@ fn parse_wow_covenant_from_str(s: &str) -> Result<Option<WowCovenantInfo>, Squad
     }
 
     let tokens = split_wow_combat_log_tokens(&s[1..s.len()-1]);
+
+    if tokens.len() < 4 {
+        return Ok(None);
+    }
+
     Ok(
         Some(
             WowCovenantInfo{
@@ -533,33 +538,48 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                     
                     match payload.parts[0].as_str() {
                         "SPELL_DAMAGE" | "SPELL_PERIODIC_DAMAGE" => Ok({
-                            let advanced = if state.advanced_log {
+                            let advanced = if state.advanced_log && (payload.parts.len() >= (idx+advanced_cvar_offset)) {
                                 Some(WoWCombatLogAdvancedCVars::new(&payload.parts[idx..idx+advanced_cvar_offset], payload.parts[0].as_str() == "SPELL_DAMAGE")?)
                             } else {
                                 None
                             };
                             idx += advanced_cvar_offset;
         
-                            (advanced, WoWCombatLogEventType::DamageDone{
-                                damage: WoWDamageType::SpellDamage(spell_info),
-                                amount: payload.parts[idx].parse()?,
-                                overkill: payload.parts[idx+1].parse()?,    
-                            }, None)
+                            (
+                                advanced,
+                                if payload.parts.len() >= (idx+2) { 
+                                    WoWCombatLogEventType::DamageDone{
+                                        damage: WoWDamageType::SpellDamage(spell_info),
+                                        amount: payload.parts[idx].parse()?,
+                                        overkill: payload.parts[idx+1].parse()?,    
+                                    }
+                                } else {
+                                    WoWCombatLogEventType::Unknown
+                                },
+                                None
+                            )
                         }),
                         "SPELL_HEAL" | "SPELL_PERIODIC_HEAL" => Ok({
-                            let advanced = if state.advanced_log {
+                            let advanced = if state.advanced_log && (payload.parts.len() >= (idx+advanced_cvar_offset)) {
                                 Some(WoWCombatLogAdvancedCVars::new(&payload.parts[idx..idx+advanced_cvar_offset], true)?)
                             } else {
                                 None
                             };
                             idx += advanced_cvar_offset;
         
-                            (advanced, WoWCombatLogEventType::Healing{
-                                spell: spell_info,
-                                amount: payload.parts[idx+1].parse()?,
-                                overheal: payload.parts[idx+2].parse()?,
-                                absorbed: payload.parts[idx+3].parse()?,
-                            }, None)
+                            (
+                                advanced,
+                                if payload.parts.len() >= (idx+4) { 
+                                    WoWCombatLogEventType::Healing{
+                                        spell: spell_info,
+                                        amount: payload.parts[idx+1].parse()?,
+                                        overheal: payload.parts[idx+2].parse()?,
+                                        absorbed: payload.parts[idx+3].parse()?,
+                                    }
+                                } else {
+                                    WoWCombatLogEventType::Unknown
+                                },
+                            None)
                         }),
                         "SPELL_RESURRECT" => Ok((None, WoWCombatLogEventType::Resurrect(spell_info), None)),
                         "SPELL_AURA_APPLIED" => Ok((None, WoWCombatLogEventType::SpellAura{
@@ -600,7 +620,7 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                             success: false,
                         }, None)),
                         "SPELL_CAST_SUCCESS" => Ok({
-                            let advanced = if state.advanced_log {
+                            let advanced = if state.advanced_log && (payload.parts.len() >= (idx+advanced_cvar_offset)) {
                                 Some(WoWCombatLogAdvancedCVars::new(&payload.parts[idx..idx+advanced_cvar_offset], true)?)
                             } else {
                                 None
@@ -658,7 +678,7 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
             "SWING_DAMAGE_LANDED" => if payload.parts.len() >= 9 {
                 Ok({
                     let mut idx = 9;
-                    let advanced = if state.advanced_log {
+                    let advanced = if state.advanced_log && (payload.parts.len() >= (idx+advanced_cvar_offset)) {
                         Some(WoWCombatLogAdvancedCVars::new(&payload.parts[idx..idx+advanced_cvar_offset], false)?)
                     } else {
                         None
@@ -755,7 +775,13 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
 }
 
 pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, alt_id: i64, user_id: i64, state: &WoWCombatLogState, payload: &RawWoWCombatLogPayload) -> Result<Vec<WoWCombatLogEvent>, crate::SquadOvError> {
-    let (advanced, event, class_update) = parse_advanced_cvars_and_event_from_wow_combat_log(state, payload, user_id).unwrap_or((None, WoWCombatLogEventType::Unknown, None));
+    let (advanced, event, class_update) = std::panic::catch_unwind(|| {
+        parse_advanced_cvars_and_event_from_wow_combat_log(state, payload, user_id).unwrap_or((None, WoWCombatLogEventType::Unknown, None))
+    }).map_err(|e| {
+        crate::SquadOvError::InternalError(
+            format!("Unable to Parse WoW Combat Log Line: {:?} - Payload {:?} - User ID {} - UUID {}", e, payload, user_id, uuid)
+        )
+    })?;
     if event == WoWCombatLogEventType::Unknown {
         return Ok(vec![])
     }
