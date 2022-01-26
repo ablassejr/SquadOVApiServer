@@ -60,7 +60,7 @@ impl SharedClient {
             return Err(SquadOvError::BadRequest);
         }
 
-        // The data that we get is BASE64(ZLIB(JSON)) so we need to reverse those operations to
+        // The data that we get is BASE64(GZIP(JSON)) so we need to reverse those operations to
         // properly decode the packet.
         let decoded = serde_json::from_slice::<CombatLogData>(&{
             let mut uncompressed_data: Vec<u8> = Vec::new();
