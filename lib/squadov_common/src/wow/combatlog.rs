@@ -776,7 +776,7 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
 
 pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, alt_id: i64, user_id: i64, state: &WoWCombatLogState, payload: &RawWoWCombatLogPayload) -> Result<Vec<WoWCombatLogEvent>, crate::SquadOvError> {
     let (advanced, event, class_update) = std::panic::catch_unwind(|| {
-        parse_advanced_cvars_and_event_from_wow_combat_log(state, payload, user_id).unwrap_or((None, WoWCombatLogEventType::Unknown, None)
+        parse_advanced_cvars_and_event_from_wow_combat_log(state, payload, user_id).unwrap_or((None, WoWCombatLogEventType::Unknown, None))
     }).map_err(|e| {
         crate::SquadOvError::InternalError(
             format!("Unable to Parse WoW Combat Log Line: {:?} - Payload {:?} - User ID {} - UUID {}", e, payload, user_id, uuid)
