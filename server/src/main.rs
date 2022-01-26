@@ -41,7 +41,7 @@ fn main() {
 
 async fn async_main() {
     std::env::set_var("RUST_BACKTRACE", "1");
-    std::env::set_var("RUST_LOG", "info,squadov_api_server=debug,actix_web=debug,actix_http=debug,librdkafka=info,rdkafka::client=info");
+    std::env::set_var("RUST_LOG", "info,squadov_api_server=debug,actix_web=debug,actix_http=debug,librdkafka=info,rdkafka::client=info,sqlx=info");
     env_logger::init();
 
     log::info!("Start SquadOV Api Server.");

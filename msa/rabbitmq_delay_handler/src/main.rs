@@ -127,7 +127,7 @@ impl Worker {
 #[tokio::main]
 async fn main() -> Result<(), SquadOvError> {
     std::env::set_var("RUST_BACKTRACE", "1");
-    std::env::set_var("RUST_LOG", "info,rabbitmq_delay_handler=debug");
+    std::env::set_var("RUST_LOG", "info,rabbitmq_delay_handler=debug,sqlx=info");
     env_logger::init();
 
     let opts = Options::from_args();

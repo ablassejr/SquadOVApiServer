@@ -34,7 +34,12 @@ resource "aws_iam_policy" "lambda_policy" {
                 "ec2:DeleteNetworkInterface",
                 "secretsmanager:GetSecretValue",
                 "secretsmanager:DescribeSecret",
-                "secretsmanager:ListSecretVersionIds"
+                "secretsmanager:ListSecretVersionIds",
+                "kinesis:GetRecords",
+                "kinesis:GetShardIterator",
+                "kinesis:DescribeStream",
+                "kinesis:ListShards",
+                "kinesis:ListStreams"
             ],
             "Resource": "*"
         }
@@ -43,10 +48,14 @@ resource "aws_iam_policy" "lambda_policy" {
 EOF
 }
 
-
 resource "aws_iam_role_policy_attachment" "lambda_attachment" {
     role = aws_iam_role.lambda_role.name
     policy_arn = aws_iam_policy.lambda_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_basic_attachment" {
+    role = aws_iam_role.lambda_role.name
+    policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 resource "aws_lambda_function" "ff14_combat_log_lambda" {
@@ -79,4 +88,15 @@ resource "aws_lambda_function" "ff14_combat_log_lambda" {
         subnet_ids = var.lambda_subnets
         security_group_ids = var.lambda_security_groups
     }
+}
+
+resource "aws_lambda_event_source_mapping" "ff14_lambda_kinesis" {
+    event_source_arn  = var.ff14_stream
+    function_name     = aws_lambda_function.ff14_combat_log_lambda.arn
+    starting_position = "LATEST"
+
+    maximum_batching_window_in_seconds = 15
+    maximum_record_age_in_seconds = -1
+    maximum_retry_attempts = 5
+    parallelization_factor = 8
 }

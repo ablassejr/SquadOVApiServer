@@ -1,4 +1,4 @@
-use lambda_runtime::{handler_fn, Context, Error};
+use lambda_runtime::{handler_fn, Context};
 use serde::Deserialize;
 use serde_json::{Value};
 use sqlx::{
@@ -12,16 +12,90 @@ use rusoto_secretsmanager::{
     SecretsManager,
     GetSecretValueRequest,
 };
-use std::str::FromStr;
+use std::{
+    io::Read,
+    str::FromStr
+};
 use squadov_common::SquadOvError;
+
+#[derive(Deserialize)]
+struct Payload {
+    #[serde(rename="Records")]
+    records: Vec<Record>,
+}
+
+#[derive(Deserialize)]
+struct Record {
+    kinesis: KinesisData,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all="camelCase")]
+struct KinesisData {
+    partition_key: String,
+    data: String,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all="camelCase")]
+struct CombatLogData {
+    logs: Vec<String>,
+    #[serde(default)]
+    generate_reports: bool,
+}
 
 struct SharedClient {
     pool: Arc<PgPool>
 }
 
+impl SharedClient {
+    async fn handle_kinesis_data(&self, data: KinesisData) -> Result<(), SquadOvError> {
+        // The inner data is base64 encoded - note that we're expecting a JSON structure of FF14 combat logs.
+        log::info!("Handle Kinesis Data: {:?}", data);
+
+        // Ensure that the partition key is for ff14.
+        // Note that our partition keys will be of the form GAME_MATCHUUID.
+        if !data.partition_key.starts_with("ff14_") {
+            log::warn!("...Invalid Game Partition Key: {}", &data.partition_key);
+            return Err(SquadOvError::BadRequest);
+        }
+
+        // The data that we get is BASE64(ZLIB(JSON)) so we need to reverse those operations to
+        // properly decode the packet.
+        let decoded = serde_json::from_slice::<CombatLogData>(&{
+            let mut uncompressed_data: Vec<u8> = Vec::new();
+            {
+                let raw_data = base64::decode(&data.data)?;
+                let mut decoder = flate2::read::GzDecoder::new(&*raw_data);
+                decoder.read_to_end(&mut uncompressed_data)?;
+            }
+            uncompressed_data
+        })?;
+        log::info!("...Decoded {:?}", &decoded);
+
+        // We do a best effort parsing of all the combat log lines. If any one line fails to parse,
+        // that doesn't prevent the entire batch from being parsed. We ignore that line and move on.
+        for line in decoded.logs {
+            log::info!("...Handle Line: {}", &line);
+        }
+
+        // Store all the lines in DynamoDB. We chose DynamoDB because it can scale up easily to handle
+        // a shit ton of writes and the only thing we'll need to do at the end is to scoop up all the parsed
+        // events and create reports.
+
+        // Generate reports. Note that this is a flag sent by the client if this is the last batch of combat
+        // log lines for the current partition key.
+        if decoded.generate_reports {
+
+        }
+
+        Ok(())
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), SquadOvError> {
-    std::env::set_var("RUST_LOG", "info,ff14_combat_log_parser=info");
+    std::env::set_var("RUST_LOG", "info,ff14_combat_log_parser=info,sqlx=info");
     env_logger::init();
 
     // Pull environment variables.
@@ -86,20 +160,15 @@ async fn main() -> Result<(), SquadOvError> {
     };
 
     let shared_ref = &shared;
-    let closure = move |event: Value, ctx: Context| async move {
+    let closure = move |event: Value, _ctx: Context| async move {
         log::info!("Handling Kinesis Record: {:?}", event);
-        log::info!("Do SQL Query: {}",
-            sqlx::query!(
-                r#"
-                SELECT 1 AS "test!" 
-                "#
-            )
-                .fetch_one(&*shared_ref.pool)
-                .await?
-                .test
-        );
-        log::info!("Execution Context: {:?}", &ctx);
-        Ok::<(), Error>(())
+        
+        let payload = serde_json::from_value::<Payload>(event)?;
+        for record in payload.records {
+            shared_ref.handle_kinesis_data(record.kinesis).await?;
+        }
+
+        Ok::<(), SquadOvError>(())
     };
 
     log::info!("Starting Runtime...");

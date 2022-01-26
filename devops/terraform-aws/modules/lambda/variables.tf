@@ -13,3 +13,7 @@ variable "lambda_subnets" {
 variable "lambda_security_groups" {
     type = list(string)
 }
+
+variable "ff14_stream" {
+    type = string
+}

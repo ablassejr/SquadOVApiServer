@@ -414,7 +414,7 @@ impl ApiApplication {
                 .idle_timeout(std::time::Duration::from_secs(3*60*60))
                 .connect_with(conn)
                 .await
-                .unwrap());
+                .unwrap())
         };
 
         let heavy_pool = {

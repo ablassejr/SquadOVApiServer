@@ -732,26 +732,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "brotli-sys"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4445dea95f4c2b41cde57cc9fee236ae4dbae88d8fcbdb4750fc1bb5d86aaecd"
-dependencies = [
- "cc",
- "libc",
-]
-
-[[package]]
-name = "brotli2"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0cb036c3eade309815c15ddbacec5b22c4d1f3983a774ab2eac2e3e9ea85568e"
-dependencies = [
- "brotli-sys",
- "libc",
-]
-
-[[package]]
 name = "bson"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1411,7 +1391,10 @@ dependencies = [
 name = "ff14_combat_log_parser"
 version = "0.1.0"
 dependencies = [
+ "base64 0.13.0",
  "env_logger 0.7.1",
+ "flate2",
+ "futures",
  "lambda_runtime",
  "log",
  "rusoto_core",
@@ -3771,7 +3754,7 @@ dependencies = [
  "async-trait",
  "base64 0.13.0",
  "bitvec",
- "brotli2",
+ "brotli",
  "byteorder",
  "bytes 0.6.0",
  "bzip2",

@@ -43,6 +43,11 @@ module "db" {
     redis_instance_type = "cache.t4g.micro"
 }
 
+
+module "combatlog" {
+    source = "../modules/combatlog"
+}
+
 module "lambda" {
     source = "../modules/lambda"
 
@@ -51,6 +56,8 @@ module "lambda" {
 
     lambda_subnets = module.network.lambda_subnets
     lambda_security_groups = module.network.lambda_security_groups
+
+    ff14_stream = module.combatlog.ff14_stream
 }
 
 module "storage" {
@@ -64,8 +71,4 @@ module "iam" {
     source = "../modules/iam"
     resource_suffix = "-dev-mike"
     api_gateway_id = module.combatlog.api_gateway_id
-}
-
-module "combatlog" {
-    source = "../modules/combatlog"
 }
