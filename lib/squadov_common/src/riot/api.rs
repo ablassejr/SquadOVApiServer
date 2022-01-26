@@ -117,12 +117,12 @@ impl RiotApiHandler {
     // the number of requests to the max amount; this resulted in a problem where we'd go over
     // the rate limit due to the fact that we can use more than the rate limit amount within
     // a given time period (especially if the time period is low).
-    async fn tick_burst_threshold(&self) {
+    async fn tick_burst_threshold(&self) -> Result<(), SquadOvError> {
         if !self.api_key.burst_limit.enabled {
-            return;
+            return Ok(());
         }
 
-        let permit = self.burst_threshold.acquire().await;
+        let permit = self.burst_threshold.acquire().await?;
         permit.forget();
 
         let api_key = self.api_key.clone();
@@ -131,14 +131,15 @@ impl RiotApiHandler {
             async_std::task::sleep(std::time::Duration::from_secs(api_key.burst_limit.seconds)).await;
             threshold.add_permits(1);
         });
+        Ok(())
     }
 
-    async fn tick_bulk_threshold(&self) {
+    async fn tick_bulk_threshold(&self) -> Result<(), SquadOvError> {
         if !self.api_key.bulk_limit.enabled {
-            return;
+            return Ok(());
         }
 
-        let permit = self.bulk_threshold.acquire().await;
+        let permit = self.bulk_threshold.acquire().await?;
         permit.forget();
 
         let api_key = self.api_key.clone();
@@ -147,11 +148,14 @@ impl RiotApiHandler {
             async_std::task::sleep(std::time::Duration::from_secs(api_key.bulk_limit.seconds)).await;
             threshold.add_permits(1);
         });
+
+        Ok(())
     }
 
-    async fn tick_thresholds(&self) {
-        self.tick_burst_threshold().await;
-        self.tick_bulk_threshold().await;
+    async fn tick_thresholds(&self) -> Result<(), SquadOvError> {
+        self.tick_burst_threshold().await?;
+        self.tick_bulk_threshold().await?;
+        Ok(())
     }
 
     fn build_api_endpoint(region: &str, endpoint: &str) -> String {

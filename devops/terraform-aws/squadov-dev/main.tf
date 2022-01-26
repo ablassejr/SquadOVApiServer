@@ -28,29 +28,6 @@ module "network" {
     domain_prefix = "mikedev."
 }
 
-module "lambda" {
-    source = "../modules/lambda"
-
-    primary_vpc = module.network.primary_vpc
-}
-
-module "combatlog" {
-    source = "../modules/combatlog"
-}
-
-module "iam" {
-    source = "../modules/iam"
-    resource_suffix = "-dev-mike"
-    api_gateway_id = module.combatlog.api_gateway_id
-}
-
-module "storage" {
-    source = "../modules/storage"
-
-    bucket_suffix = "-dev-mike"
-    cloudfront_suffix = "-dev-mike"
-}
-
 module "db" {
     source = "../modules/db"
 
@@ -64,4 +41,34 @@ module "db" {
     postgres_db_security_groups = module.network.database_security_groups
 
     redis_instance_type = "cache.t4g.micro"
+}
+
+
+module "combatlog" {
+    source = "../modules/combatlog"
+}
+
+module "lambda" {
+    source = "../modules/lambda"
+
+    db_secret = module.db.db_secret
+    db_host = module.db.db_host
+
+    lambda_subnets = module.network.lambda_subnets
+    lambda_security_groups = module.network.lambda_security_groups
+
+    ff14_stream = module.combatlog.ff14_stream
+}
+
+module "storage" {
+    source = "../modules/storage"
+
+    bucket_suffix = "-dev-mike"
+    cloudfront_suffix = "-dev-mike"
+}
+
+module "iam" {
+    source = "../modules/iam"
+    resource_suffix = "-dev-mike"
+    api_gateway_id = module.combatlog.api_gateway_id
 }

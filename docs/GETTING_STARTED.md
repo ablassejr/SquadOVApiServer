@@ -10,7 +10,7 @@ From here on out, the `SquadOVApiServer` folder will be referred to as `$SRC`.
 * Install [Docker Compose](https://docs.docker.com/compose/install/) (follow the instructions for Linux).
 * Install [Rust](https://www.rust-lang.org/tools/install).
 
-After installing Rust, run `rustup default 1.51.0`.
+After installing Rust, run `rustup default 1.58.1`.
 
 You will also need to install additional dependencies in the `deps` folder.
 
