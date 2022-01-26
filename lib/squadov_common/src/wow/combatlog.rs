@@ -779,7 +779,7 @@ pub fn parse_raw_wow_combat_log_payload(uuid: &Uuid, alt_id: i64, user_id: i64, 
         parse_advanced_cvars_and_event_from_wow_combat_log(state, payload, user_id).unwrap_or((None, WoWCombatLogEventType::Unknown, None)
     }).map_err(|e| {
         crate::SquadOvError::InternalError(
-            format!("Unable to Parse WoW Combat Log Line: {:?} - {:?}", e, payload)
+            format!("Unable to Parse WoW Combat Log Line: {:?} - Payload {:?} - User ID {} - UUID {}", e, payload, user_id, uuid)
         )
     })?;
     if event == WoWCombatLogEventType::Unknown {
