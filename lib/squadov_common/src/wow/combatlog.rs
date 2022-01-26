@@ -538,7 +538,7 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                     
                     match payload.parts[0].as_str() {
                         "SPELL_DAMAGE" | "SPELL_PERIODIC_DAMAGE" => Ok({
-                            let advanced = if state.advanced_log {
+                            let advanced = if state.advanced_log && (payload.parts.len() >= (idx+advanced_cvar_offset)) {
                                 Some(WoWCombatLogAdvancedCVars::new(&payload.parts[idx..idx+advanced_cvar_offset], payload.parts[0].as_str() == "SPELL_DAMAGE")?)
                             } else {
                                 None
@@ -552,7 +552,7 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                             }, None)
                         }),
                         "SPELL_HEAL" | "SPELL_PERIODIC_HEAL" => Ok({
-                            let advanced = if state.advanced_log {
+                            let advanced = if state.advanced_log && (payload.parts.len() >= (idx+advanced_cvar_offset)) {
                                 Some(WoWCombatLogAdvancedCVars::new(&payload.parts[idx..idx+advanced_cvar_offset], true)?)
                             } else {
                                 None
@@ -663,7 +663,7 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
             "SWING_DAMAGE_LANDED" => if payload.parts.len() >= 9 {
                 Ok({
                     let mut idx = 9;
-                    let advanced = if state.advanced_log {
+                    let advanced = if state.advanced_log && (payload.parts.len() >= (idx+advanced_cvar_offset)) {
                         Some(WoWCombatLogAdvancedCVars::new(&payload.parts[idx..idx+advanced_cvar_offset], false)?)
                     } else {
                         None
