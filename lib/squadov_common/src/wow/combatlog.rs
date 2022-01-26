@@ -27,7 +27,7 @@ pub struct FullWoWCombatLogState {
     pub state: WoWCombatLogState,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct RawWoWCombatLogPayload {
     pub timestamp: DateTime<Utc>,
     pub parts: Vec<String>,
