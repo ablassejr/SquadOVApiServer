@@ -545,11 +545,19 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                             };
                             idx += advanced_cvar_offset;
         
-                            (advanced, WoWCombatLogEventType::DamageDone{
-                                damage: WoWDamageType::SpellDamage(spell_info),
-                                amount: payload.parts[idx].parse()?,
-                                overkill: payload.parts[idx+1].parse()?,    
-                            }, None)
+                            (
+                                advanced,
+                                if payload.parts.len() >= (idx+2) { 
+                                    WoWCombatLogEventType::DamageDone{
+                                        damage: WoWDamageType::SpellDamage(spell_info),
+                                        amount: payload.parts[idx].parse()?,
+                                        overkill: payload.parts[idx+1].parse()?,    
+                                    }
+                                } else {
+                                    WoWCombatLogEventType::Unknown
+                                },
+                                None
+                            )
                         }),
                         "SPELL_HEAL" | "SPELL_PERIODIC_HEAL" => Ok({
                             let advanced = if state.advanced_log && (payload.parts.len() >= (idx+advanced_cvar_offset)) {
@@ -559,12 +567,19 @@ pub fn parse_advanced_cvars_and_event_from_wow_combat_log(state: &WoWCombatLogSt
                             };
                             idx += advanced_cvar_offset;
         
-                            (advanced, WoWCombatLogEventType::Healing{
-                                spell: spell_info,
-                                amount: payload.parts[idx+1].parse()?,
-                                overheal: payload.parts[idx+2].parse()?,
-                                absorbed: payload.parts[idx+3].parse()?,
-                            }, None)
+                            (
+                                advanced,
+                                if payload.parts.len() >= (idx+4) { 
+                                    WoWCombatLogEventType::Healing{
+                                        spell: spell_info,
+                                        amount: payload.parts[idx+1].parse()?,
+                                        overheal: payload.parts[idx+2].parse()?,
+                                        absorbed: payload.parts[idx+3].parse()?,
+                                    }
+                                } else {
+                                    WoWCombatLogEventType::Unknown
+                                },
+                            None)
                         }),
                         "SPELL_RESURRECT" => Ok((None, WoWCombatLogEventType::Resurrect(spell_info), None)),
                         "SPELL_AURA_APPLIED" => Ok((None, WoWCombatLogEventType::SpellAura{
