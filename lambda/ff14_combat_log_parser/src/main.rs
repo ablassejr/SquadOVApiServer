@@ -43,33 +43,11 @@ struct SharedClient {
 }
 
 impl SharedClient {
-    async fn handle_kinesis_data(&self, data: KinesisData) -> Result<(), SquadOvError> {
-        // Ensure that the partition key is for ff14.
-        // Note that our partition keys will be of the form GAME_MATCHUUID.
-        if !data.partition_key.starts_with("ff14_") {
-            log::warn!("...Invalid Game Partition Key: {}", &data.partition_key);
-            return Err(SquadOvError::BadRequest);
-        }
-
-        // The inner data is base64 encoded - note that we're expecting a JSON structure of FF14 combat logs.
-        // The data that we get is BASE64(GZIP(JSON)) so we need to reverse those operations to
-        // properly decode the packet.
-        let decoded = serde_json::from_slice::<CombatLogData>(&{
-            let mut uncompressed_data: Vec<u8> = Vec::new();
-            {
-                let raw_data = base64::decode(&data.data)?;
-                let mut decoder = flate2::read::GzDecoder::new(&*raw_data);
-                decoder.read_to_end(&mut uncompressed_data)?;
-            }
-            uncompressed_data
-        })?;
-
-        // We do a best effort parsing of all the combat log lines. If any one line fails to parse,
-        // that doesn't prevent the entire batch from being parsed. We ignore that line and move on.
-        let parsed_logs = decoded.logs.into_iter()
+    fn parse_logs(partition_key: &str, decoded: CombatLogData) -> Vec<(String, Ff14CombatLogPacket)> {
+        decoded.logs.into_iter()
             .map(|x| {
                 let result = std::panic::catch_unwind(|| {
-                    combatlog::parse_ff14_combat_log_line(data.partition_key.clone(), x.clone())
+                    combatlog::parse_ff14_combat_log_line(partition_key.to_string(), x.clone())
                 });
 
                 // Note that result is of type Result<(String, Result<Ff14CombatLogPacket, SquadOverror>), Err>
@@ -95,22 +73,56 @@ impl SharedClient {
             .map(|x| {
                 (x.0, x.1.unwrap())
             })
-            .collect::<Vec<(String, Ff14CombatLogPacket)>>();
+            .collect()
+    }
 
-        // Stream the raw and parsed data into AWS Firehose to dump that data out into S3.
-        let raw_logs = parsed_logs.iter().map(|x| {
+    fn split_raw_parsed(data: Vec<(String, Ff14CombatLogPacket)>) -> (Vec<Ff14CombatLogPacket>, Vec<Ff14CombatLogPacket>) {
+        let raw_logs = data.iter().map(|x| {
             Ff14CombatLogPacket{
                 data: Ff14PacketData::Raw(x.0.clone()),
                 ..x.1.clone()
             }
         }).collect::<Vec<Ff14CombatLogPacket>>();
 
-        let parsed_logs = parsed_logs.into_iter().map(|x| { x.1 }).collect::<Vec<Ff14CombatLogPacket>>();
+        let parsed_logs = data.into_iter().map(|x| { x.1 }).collect::<Vec<Ff14CombatLogPacket>>();
+        (raw_logs, parsed_logs)
+    }
+
+    async fn handle_kinesis_data(&self, data: KinesisData) -> Result<(), SquadOvError> {
+        // Ensure that the partition key is for ff14.
+        // Note that our partition keys will be of the form GAME_MATCHUUID.
+        if !data.partition_key.starts_with("ff14_") {
+            log::warn!("...Invalid Game Partition Key: {}", &data.partition_key);
+            return Err(SquadOvError::BadRequest);
+        }
+
+        // The inner data is base64 encoded - note that we're expecting a JSON structure of FF14 combat logs.
+        // The data that we get is BASE64(GZIP(JSON)) so we need to reverse those operations to
+        // properly decode the packet.
+        let decoded = serde_json::from_slice::<CombatLogData>(&{
+            let mut uncompressed_data: Vec<u8> = Vec::new();
+            {
+                let raw_data = base64::decode(&data.data)?;
+                let mut decoder = flate2::read::GzDecoder::new(&*raw_data);
+                decoder.read_to_end(&mut uncompressed_data)?;
+            }
+            uncompressed_data
+        })?;
+        let generate_reports = decoded.generate_reports;
+
+        // We do a best effort parsing of all the combat log lines. If any one line fails to parse,
+        // that doesn't prevent the entire batch from being parsed. We ignore that line and move on.
+        let parsed_logs = Self::parse_logs(&data.partition_key, decoded);
+
+        // Stream the raw and parsed data into AWS Firehose to dump that data out into S3.
+        let (raw_logs, parsed_logs) = Self::split_raw_parsed(parsed_logs);
+        
 
         // Generate reports. Note that this is a flag sent by the client if this is the last batch of combat
         // log lines for the current partition key. We don't generate the reports here but we stick a message
-        // on a queue and let someone else take care of it.
-        if decoded.generate_reports {
+        // on a queue and let someone else take care of it. Note that we need to delay this a bit since it takes
+        // time for Firehose to flush out the data to S3.
+        if generate_reports {
 
         }
 
