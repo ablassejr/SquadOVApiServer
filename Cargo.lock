@@ -754,6 +754,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e8c087f005730276d1096a652e92a8bacee2e2472bcc9715a74d2bec38b5820"
 
 [[package]]
+name = "byte-unit"
+version = "4.0.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "956ffc5b0ec7d7a6949e3f21fd63ba5af4cffdc2ba1e0b7bf62b481458c4ae7f"
+dependencies = [
+ "utf8-width",
+]
+
+[[package]]
 name = "bytemuck"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1392,13 +1401,16 @@ name = "ff14_combat_log_parser"
 version = "0.1.0"
 dependencies = [
  "base64 0.13.0",
+ "byte-unit",
+ "bytes 1.1.0",
+ "chrono",
  "env_logger 0.7.1",
  "flate2",
  "futures",
  "lambda_runtime",
  "log",
  "rusoto_core",
- "rusoto_secretsmanager",
+ "rusoto_firehose",
  "serde",
  "serde_json",
  "sqlx",
@@ -3215,6 +3227,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusoto_firehose"
+version = "0.47.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f77cd539a7f1916f3eee0ea5ed7ac5ede35a1b962db694cc1fafcb1ffa63b708"
+dependencies = [
+ "async-trait",
+ "bytes 1.1.0",
+ "futures",
+ "rusoto_core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "rusoto_s3"
 version = "0.47.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3225,20 +3251,6 @@ dependencies = [
  "futures",
  "rusoto_core",
  "xml-rs",
-]
-
-[[package]]
-name = "rusoto_secretsmanager"
-version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71bb6e46b93dd9a5bb67ff2939a8e99dec611a532c3643f627f83d123628d85f"
-dependencies = [
- "async-trait",
- "bytes 1.1.0",
- "futures",
- "rusoto_core",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -4259,6 +4271,12 @@ dependencies = [
  "matches",
  "percent-encoding",
 ]
+
+[[package]]
+name = "utf8-width"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cf7d77f457ef8dfa11e4cd5933c5ddb5dc52a94664071951219a97710f0a32b"
 
 [[package]]
 name = "uuid"

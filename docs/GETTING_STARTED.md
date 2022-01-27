@@ -82,15 +82,7 @@ There's a couple of environment variables that need to be set:
 1. `cd $SRC`
 2. `$env:CMAKE_TOOLCHAIN_FILE="$VCPKG\scripts\buildsystems\vcpkg.cmake"; cargo build --bin squadov_api_server`
 
-In the off-chance SQLx complains about `gen_random_uuid` not being defined you will have to re-create the `pgcrypto` extension in the PostgreSQL database:
-
+Modify your database with the following command: 
 ```
-DROP EXTENSION pgcrypto CASCADE;
-CREATE EXTENSION pgcrypto;
-
-ALTER TABLE squadov.users
-ALTER COLUMN uuid SET DEFAULT gen_random_uuid();
-
-ALTER TABLE squadov.squad_membership_invites
-ALTER COLUMN invite_uuid SET DEFAULT gen_random_uuid();
+ALTER ROLE squadovroot SET search_path = "$user", squadov, public
 ```

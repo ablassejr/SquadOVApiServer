@@ -449,7 +449,7 @@ async fn main() -> Result<(), SquadOvError> {
         additional_queues: Some(vec![
             opts.queue.clone(),
         ])
-    }, dst_pool.clone(), true).await.unwrap();
+    }, Some(dst_pool.clone()), true).await.unwrap();
 
     let handler_itf = Arc::new(WowTaskHandler::new(src_pool.clone(), dst_pool.clone(), opts.encounter, opts.characters));
 

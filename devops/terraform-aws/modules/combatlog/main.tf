@@ -152,6 +152,6 @@ resource "aws_kinesis_firehose_delivery_stream" "combat_log_s3_stream" {
     }
 }
 
-output "combatlog_buffer_delay" {
-    value = aws_kinesis_firehose_delivery_stream.combat_log_s3_stream.extended_s3_configuration[0].buffer_interval
+output "combatlog_firehose" {
+    value = aws_kinesis_firehose_delivery_stream.combat_log_s3_stream.name
 }

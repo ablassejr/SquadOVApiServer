@@ -155,7 +155,7 @@ async fn main() -> Result<(), SquadOvError> {
         let mut listener = PgListener::connect_with(&*pool).await.unwrap();
         listener.listen_all(vec![PG_TOPIC_RABBITMQ_DELAY]).await.unwrap();
 
-        let rabbitmq = RabbitMqInterface::new(&config.rabbitmq, pool.clone(), true).await.unwrap();
+        let rabbitmq = RabbitMqInterface::new(&config.rabbitmq, Some(pool.clone()), true).await.unwrap();
         let worker = Worker::new(pool, listener, rabbitmq);
         worker.initialize().await.unwrap();
         worker.run().await.unwrap();

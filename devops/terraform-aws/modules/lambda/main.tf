@@ -79,9 +79,8 @@ resource "aws_lambda_function" "ff14_combat_log_lambda" {
     environment {
         variables = {
             "SQUADOV_LAMBDA_REGION" = "us-east-2"
-            "SQUADOV_LAMBDA_DB_SECRET" = var.db_secret
-            "SQUADOV_LAMBDA_DBHOST" = var.db_host
-            "SQUADOV_COMBATLOG_BUFFER_DURATION_SECONDS" = "${var.combatlog_buffer_delay}"
+            "SQUADOV_FIREHOSE_DELIVERY_STREAM" = var.combatlog_firehose
+            "SQUADOV_RABBITMQ_URL" = var.rabbitmq_url
         }
     }
 

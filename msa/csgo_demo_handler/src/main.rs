@@ -64,7 +64,7 @@ async fn main() -> Result<(), SquadOvError> {
             .await
             .unwrap());
 
-        let rabbitmq = RabbitMqInterface::new(&config.rabbitmq, pool.clone(), true).await.unwrap();
+        let rabbitmq = RabbitMqInterface::new(&config.rabbitmq, Some(pool.clone()), true).await.unwrap();
         let steam_api = Arc::new(SteamApiClient::new(&config.steam));
 
         let steam_itf = Arc::new(SteamApiRabbitmqInterface::new(steam_api.clone(), &config.rabbitmq, rabbitmq.clone(), pool.clone()));

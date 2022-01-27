@@ -25,7 +25,7 @@ const SQUADOV_MESSAGE_MAX_AGE_HEADER: &'static str = "x-squadov-max-age";
 const DEFAULT_MAX_AGE_SECONDS: i64 = 3600; // 1 hour
 const INFITE_MAX_AGE: i64 = -1;
 
-#[derive(Deserialize,Debug,Clone)]
+#[derive(Deserialize,Debug,Clone,Default)]
 pub struct RabbitMqConfig {
     pub amqp_url: String,
     pub prefetch_count: u16,
@@ -51,6 +51,23 @@ pub struct RabbitMqConfig {
     pub additional_queues: Option<Vec<String>>,
 }
 
+impl RabbitMqConfig {
+    pub fn set_url(mut self, url: &str) -> Self {
+        self.amqp_url = url.to_string();
+        self
+    }
+
+    pub fn add_queue(mut self, q: &str) -> Self {
+        let q = q.to_string();
+        if let Some(queues) = self.additional_queues.as_mut() {
+            queues.push(q);
+        } else {
+            self.additional_queues = Some(vec![q]);
+        }
+        self
+    }
+}
+
 #[async_trait]
 pub trait RabbitMqListener: Send + Sync {
     async fn handle(&self, data: &[u8]) -> Result<(), SquadOvError>;
@@ -59,7 +76,7 @@ pub trait RabbitMqListener: Send + Sync {
 pub struct RabbitMqConnectionBundle {
     channels: Vec<Channel>,
     listeners: Arc<RwLock<HashMap<String, Vec<Arc<dyn RabbitMqListener>>>>>,
-    db: Arc<PgPool>,
+    db: Option<Arc<PgPool>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -76,7 +93,7 @@ pub struct RabbitMqPacket {
 pub struct RabbitMqInterface {
     pub config: RabbitMqConfig,
     publish_queue: Arc<RwLock<VecDeque<RabbitMqPacket>>>,
-    db: Arc<PgPool>,
+    db: Option<Arc<PgPool>>,
 }
 
 type RequeueCallbackFn = fn(&RabbitMqInterface, RabbitMqPacket);
@@ -86,7 +103,7 @@ impl RabbitMqConnectionBundle {
         self.channels.len()
     }
 
-    pub async fn connect(config: &RabbitMqConfig, db: Arc<PgPool>, num_channels: i32) -> Result<Self, SquadOvError> {
+    pub async fn connect(config: &RabbitMqConfig, db: Option<Arc<PgPool>>, num_channels: i32) -> Result<Self, SquadOvError> {
         let connection = Connection::connect(
             &config.amqp_url,
             ConnectionProperties::default()
@@ -254,23 +271,27 @@ impl RabbitMqConnectionBundle {
     }
 
     async fn add_delayed_rabbitmq_message(&self, msg: RabbitMqPacket, total_delay_ms: i64) -> Result<(), SquadOvError> {
-        let execute_time = Utc::now() + chrono::Duration::milliseconds(total_delay_ms);
-        sqlx::query!(
-            "
-            INSERT INTO squadov.deferred_rabbitmq_messages (
+        if let Some(db) = self.db.as_ref() {
+            let execute_time = Utc::now() + chrono::Duration::milliseconds(total_delay_ms);
+            sqlx::query!(
+                "
+                INSERT INTO squadov.deferred_rabbitmq_messages (
+                    execute_time,
+                    message
+                )
+                VALUES (
+                    $1,
+                    $2
+                )
+                ",
                 execute_time,
-                message
+                serde_json::to_vec(&msg)?,
             )
-            VALUES (
-                $1,
-                $2
-            )
-            ",
-            execute_time,
-            serde_json::to_vec(&msg)?,
-        )
-            .execute(&*self.db)
-            .await?;
+                .execute(&**db)
+                .await?;
+        } else {
+            log::warn!("Trying to delay message without a DB connection?");
+        }
         Ok(())
     }
 
@@ -390,7 +411,7 @@ impl RabbitMqConnectionBundle {
 }
 
 impl RabbitMqInterface {
-    pub async fn new(config: &RabbitMqConfig, db: Arc<PgPool>, enabled: bool) -> Result<Arc<Self>, SquadOvError> {
+    pub async fn new(config: &RabbitMqConfig, db: Option<Arc<PgPool>>, enabled: bool) -> Result<Arc<Self>, SquadOvError> {
         log::info!("Connecting to RabbitMQ...");
         let publish_queue = Arc::new(RwLock::new(VecDeque::new()));
 

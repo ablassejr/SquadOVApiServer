@@ -1,11 +1,3 @@
-variable "db_secret" {
-    type = string
-}
-
-variable "db_host" {
-    type = string
-}
-
 variable "lambda_subnets" {
     type = list(string)
 }
@@ -14,10 +6,14 @@ variable "lambda_security_groups" {
     type = list(string)
 }
 
-variable "combatlog_buffer_delay" {
-    type = number
+variable "combatlog_firehose" {
+    type = string
 }
 
 variable "ff14_stream" {
+    type = string
+}
+
+variable "rabbitmq_url" {
     type = string
 }

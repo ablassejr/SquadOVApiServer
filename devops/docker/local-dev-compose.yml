@@ -1,20 +1,5 @@
 version: "3.8"
 services:
-    postgres:
-        image: postgres:12.4
-        volumes:
-            - type: volume
-              source: db-data
-              target: /var/lib/postgresql/data
-        environment:
-            - "POSTGRES_USER=${POSTGRES_USER}"
-            - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
-            - "POSTGRES_DB=squadov"
-        ports:
-            - "5432:5432"
-        networks:
-            c3p0:
-                ipv4_address: "172.22.0.2"
     fusionauth:
         image: "fusionauth/fusionauth-app:1.27.2"
         volumes:
@@ -22,7 +7,7 @@ services:
               source: fa-config
               target: /usr/local/fusionauth/config
         environment:
-            - "DATABASE_URL=jdbc:postgresql://172.22.0.2:5432/fusionauth?timezone=UTC"
+            - "DATABASE_URL=jdbc:postgresql://${POSTGRES_HOST}/fusionauth?timezone=UTC"
             - "DATABASE_ROOT_USER=${POSTGRES_USER}"
             - "DATABASE_ROOT_PASSWORD=${POSTGRES_PASSWORD}"
             - "DATABASE_USERNAME=${FUSIONAUTH_DB_USER}"
@@ -36,8 +21,6 @@ services:
         networks:
             c3p0:
                 ipv4_address: "172.22.0.3"
-        depends_on:
-            - postgres
 volumes:
     db-data:
     fa-config:

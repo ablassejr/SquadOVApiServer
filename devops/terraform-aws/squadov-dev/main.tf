@@ -60,13 +60,10 @@ module "combatlog" {
 module "lambda" {
     source = "../modules/lambda"
 
-    db_secret = module.db.db_secret
-    db_host = module.db.db_host
-
     lambda_subnets = module.network.lambda_subnets
     lambda_security_groups = module.network.lambda_security_groups
-
-    combatlog_buffer_delay = module.combatlog.combatlog_buffer_delay
+    combatlog_firehose = module.combatlog.combatlog_firehose
+    rabbitmq_url = var.rabbitmq_url
     ff14_stream = module.combatlog.ff14_stream
 }
 

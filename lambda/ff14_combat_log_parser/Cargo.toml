@@ -14,7 +14,10 @@ squadov_common = { path="../../lib/squadov_common" }
 log = "0.4.0"
 env_logger = "0.7.1"
 rusoto_core = "0.47.0"
-rusoto_secretsmanager = "0.47.0"
+rusoto_firehose = "0.47.0"
 futures = "0.3.13"
 base64 = "0.13.0"
 flate2 = "1.0"
+chrono = { version = "0.4.19", features = ["serde"] }
+bytes = "1.1.0"
+byte-unit = "4.0.13"

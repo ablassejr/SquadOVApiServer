@@ -48,6 +48,7 @@ pub mod config;
 pub mod discord;
 pub mod redis;
 pub mod ff14;
+pub mod combatlog;
 
 pub use error::*;
 pub use parse::*;

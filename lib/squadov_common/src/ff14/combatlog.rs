@@ -227,6 +227,7 @@ pub enum Ff14CombatLogEvent {
 pub enum Ff14PacketData {
     Raw(String),
     Parsed(Ff14CombatLogEvent),
+    Flush,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]

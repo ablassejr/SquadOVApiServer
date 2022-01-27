@@ -154,7 +154,7 @@ async fn main() -> Result<(), SquadOvError> {
         additional_queues: Some(vec![
             opts.queue.clone(),
         ])
-    }, pool.clone(), true).await.unwrap();
+    }, Some(pool.clone()), true).await.unwrap();
 
     let handler_itf = Arc::new(WowTaskHandler::new(pool.clone()));
     for _i in 0..opts.threads {
