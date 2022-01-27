@@ -16,7 +16,13 @@ use std::{
     io::Read,
     str::FromStr
 };
-use squadov_common::SquadOvError;
+use squadov_common::{
+    SquadOvError,
+    ff14::combatlog::{
+        self,
+        Ff14ParsedCombatLog,
+    },
+};
 
 #[derive(Deserialize)]
 struct Payload {
@@ -72,13 +78,36 @@ impl SharedClient {
 
         // We do a best effort parsing of all the combat log lines. If any one line fails to parse,
         // that doesn't prevent the entire batch from being parsed. We ignore that line and move on.
-        for line in decoded.logs {
-            log::info!("...Handle Line: {}", &line);
-        }
+        let parsed_logs = decoded.logs.into_iter()
+            .map(|x| {
+                let result = std::panic::catch_unwind(|| {
+                    combatlog::parse_ff14_combat_log_line(data.partition_key.clone(), x.clone())
+                });
 
-        // Store all the lines in DynamoDB. We chose DynamoDB because it can scale up easily to handle
-        // a shit ton of writes and the only thing we'll need to do at the end is to scoop up all the parsed
-        // events and create reports.
+                // Note that result is of type Result<Result<(String, Ff14ParsedCombatLog), (String, SquadOvError)>, Err>.
+                // We want to boil this down to just the inner type.
+                match result {
+                    Ok(y) => y,
+                    Err(e) => Err((
+                        x,
+                        SquadOvError::InternalError(
+                            format!("FF14 Parse Panic: {:?}", e)
+                        ),
+                    ))
+                }
+            })
+            .filter(|x| {
+                if let Err((ln, err)) = &x {
+                    log::warn!("Failed to parse FF14 Combat Log Line: {:?} - {}", err, ln);
+                }
+                x.is_ok()
+            })
+            .map(|x| {
+                x.unwrap()
+            })
+            .collect::<Vec<(String, Ff14ParsedCombatLog)>>();
+
+        // Stream the raw and parsed data into AWS Firehose to dump that data out into S3.
 
         // Generate reports. Note that this is a flag sent by the client if this is the last batch of combat
         // log lines for the current partition key. We don't generate the reports here but we stick a message
