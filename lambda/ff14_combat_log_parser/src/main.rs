@@ -120,7 +120,7 @@ impl SharedClient {
 
 #[tokio::main]
 async fn main() -> Result<(), SquadOvError> {
-    std::env::set_var("RUST_LOG", "info,ff14_combat_log_parser=info,sqlx=info");
+    std::env::set_var("RUST_LOG", "info,ff14_combat_log_parser=info");
     env_logger::init();
 
     // Pull environment variables.
