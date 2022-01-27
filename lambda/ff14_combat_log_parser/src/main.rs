@@ -1,26 +1,15 @@
 use lambda_runtime::{handler_fn, Context};
 use serde::Deserialize;
 use serde_json::{Value};
-use sqlx::{
-    ConnectOptions,
-    postgres::{PgPool, PgPoolOptions, PgConnectOptions},
-};
-use std::sync::Arc;
-use rusoto_core::{Region};
-use rusoto_secretsmanager::{
-    SecretsManagerClient,
-    SecretsManager,
-    GetSecretValueRequest,
-};
 use std::{
     io::Read,
-    str::FromStr
 };
 use squadov_common::{
     SquadOvError,
     ff14::combatlog::{
         self,
-        Ff14ParsedCombatLog,
+        Ff14CombatLogPacket,
+        Ff14PacketData,
     },
 };
 
@@ -51,7 +40,6 @@ struct CombatLogData {
 }
 
 struct SharedClient {
-    pool: Arc<PgPool>
 }
 
 impl SharedClient {
@@ -84,30 +72,40 @@ impl SharedClient {
                     combatlog::parse_ff14_combat_log_line(data.partition_key.clone(), x.clone())
                 });
 
-                // Note that result is of type Result<Result<(String, Ff14ParsedCombatLog), (String, SquadOvError)>, Err>.
+                // Note that result is of type Result<(String, Result<Ff14CombatLogPacket, SquadOverror>), Err>
                 // We want to boil this down to just the inner type.
                 match result {
                     Ok(y) => y,
-                    Err(e) => Err((
+                    Err(e) => (
                         x,
-                        SquadOvError::InternalError(
-                            format!("FF14 Parse Panic: {:?}", e)
-                        ),
-                    ))
+                        Err(
+                            SquadOvError::InternalError(
+                                format!("FF14 Parse Panic: {:?}", e)
+                            ),
+                        )
+                    ),
                 }
             })
             .filter(|x| {
-                if let Err((ln, err)) = &x {
-                    log::warn!("Failed to parse FF14 Combat Log Line: {:?} - {}", err, ln);
+                if let Err(err) = &x.1 {
+                    log::warn!("Failed to parse FF14 Combat Log Line: {:?} - {}", err, &x.0);
                 }
-                x.is_ok()
+                x.1.is_ok()
             })
             .map(|x| {
-                x.unwrap()
+                (x.0, x.1.unwrap())
             })
-            .collect::<Vec<(String, Ff14ParsedCombatLog)>>();
+            .collect::<Vec<(String, Ff14CombatLogPacket)>>();
 
         // Stream the raw and parsed data into AWS Firehose to dump that data out into S3.
+        let raw_logs = parsed_logs.iter().map(|x| {
+            Ff14CombatLogPacket{
+                data: Ff14PacketData::Raw(x.0.clone()),
+                ..x.1.clone()
+            }
+        }).collect::<Vec<Ff14CombatLogPacket>>();
+
+        let parsed_logs = parsed_logs.into_iter().map(|x| { x.1 }).collect::<Vec<Ff14CombatLogPacket>>();
 
         // Generate reports. Note that this is a flag sent by the client if this is the last batch of combat
         // log lines for the current partition key. We don't generate the reports here but we stick a message
@@ -126,64 +124,8 @@ async fn main() -> Result<(), SquadOvError> {
     env_logger::init();
 
     // Pull environment variables.
-    let aws_region = std::env::var("SQUADOV_LAMBDA_REGION").unwrap();
-    let secret_id = std::env::var("SQUADOV_LAMBDA_DB_SECRET").unwrap();
-    let db_host = std::env::var("SQUADOV_LAMBDA_DBHOST").unwrap();
-    log::info!("AWS Region: {}", &aws_region);
-    log::info!("Secret ID: {}", &secret_id);
-    log::info!("DB Host: {}", &db_host);
-
-    // Get database secret AWS secret manager. This should have
-    // already been created for the RDS proxy so it should exist.
-    log::info!("Creating Secret Manager...");
-    let secrets_client = SecretsManagerClient::new(
-        Region::from_str(&aws_region)?
-    );
-
-    log::info!("Getting DB Secret...");
-    let secret_object = secrets_client.get_secret_value(GetSecretValueRequest{
-        secret_id,
-        ..GetSecretValueRequest::default()
-    }).await?;
-
-    // Secret string contains a JSON structure of the form:
-    // (it technically has more fields but these are the ones we care about)
-    #[derive(Deserialize)]
-    struct DbSecret {
-        username: String,
-        password: String,
-    }
-
-    let creds = if let Some(secret_string) = secret_object.secret_string {
-        log::info!("...Found Creds.");
-        serde_json::from_str::<DbSecret>(&secret_string)?
-    } else {
-        return Err(SquadOvError::BadRequest);
-    };
-
     log::info!("Creating Shared Client...");
-    // Create shared state that can be frozen between invocations.
-    // Note that for the database, I don't think we will
-    // need more than a single connection in the pool since the Lambda
-    // will only ever handle one request at a time.
-    let mut conn = PgConnectOptions::new()
-        .host(&db_host)
-        .username(&creds.username)
-        .password(&creds.password)
-        .port(5432)
-        .application_name("ff14_combat_log_parser")
-        .database("squadov")
-        .statement_cache_capacity(0);
-    conn.log_statements(log::LevelFilter::Trace);
     let shared = SharedClient{
-        pool: Arc::new(PgPoolOptions::new()
-            .min_connections(1)
-            .max_connections(1)
-            .max_lifetime(std::time::Duration::from_secs(6*60*60))
-            .idle_timeout(std::time::Duration::from_secs(3*60*60))
-            .connect_with(conn)
-            .await?
-        ),
     };
 
     let shared_ref = &shared;

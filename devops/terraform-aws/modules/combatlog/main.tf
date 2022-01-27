@@ -125,7 +125,7 @@ resource "aws_kinesis_firehose_delivery_stream" "combat_log_s3_stream" {
         buffer_interval = 60
         compression_format = "GZIP"
 
-        prefix = "data/partition=!{partitionKeyFromQuery:partition}/"
+        prefix = "data/partition=!{partitionKeyFromQuery:partition}/form=!{partitionKeyFromQuery:form}/"
         error_output_prefix = "errors/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/!{firehose:error-output-type}"
 
         processing_configuration {
@@ -136,7 +136,7 @@ resource "aws_kinesis_firehose_delivery_stream" "combat_log_s3_stream" {
 
                 parameters {
                     parameter_name  = "MetadataExtractionQuery"
-                    parameter_value = "{partition:.partition_id}"
+                    parameter_value = "{partition:.partition_id,form:.data.form}"
                 }
 
                 parameters {

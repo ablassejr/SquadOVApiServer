@@ -223,14 +223,19 @@ pub enum Ff14CombatLogEvent {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
-pub struct Ff14ParsedCombatLog {
-    partition_id: String,
-    time: DateTime<Utc>,
-
-    #[serde(flatten)]
-    event: Ff14CombatLogEvent,
+#[serde(tag="form")]
+pub enum Ff14PacketData {
+    Raw(String),
+    Parsed(Ff14CombatLogEvent),
 }
 
-pub fn parse_ff14_combat_log_line(line: String) -> Result<(String, Ff14ParsedCombatLog), (String, SquadOvError)> {
-    Err((line, SquadOvError::NotFound))
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
+pub struct Ff14CombatLogPacket {
+    pub partition_id: String,
+    pub time: DateTime<Utc>,
+    pub data: Ff14PacketData,
+}
+
+pub fn parse_ff14_combat_log_line(partition_id: String, line: String) -> (String, Result<Ff14CombatLogPacket, SquadOvError>) {
+    (line, Err(SquadOvError::NotFound))
 }
