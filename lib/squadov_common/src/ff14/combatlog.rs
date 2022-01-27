@@ -226,9 +226,11 @@ pub enum Ff14CombatLogEvent {
 pub struct Ff14ParsedCombatLog {
     partition_id: String,
     time: DateTime<Utc>,
+
+    #[serde(flatten)]
     event: Ff14CombatLogEvent,
 }
 
-pub fn parse_ff14_combat_log_line(partition_id: String, line: String) -> Result<(String, Ff14ParsedCombatLog), (String, SquadOvError)> {
+pub fn parse_ff14_combat_log_line(line: String) -> Result<(String, Ff14ParsedCombatLog), (String, SquadOvError)> {
     Err((line, SquadOvError::NotFound))
 }

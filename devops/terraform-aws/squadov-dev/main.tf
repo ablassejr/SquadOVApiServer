@@ -44,8 +44,17 @@ module "db" {
 }
 
 
+module "storage" {
+    source = "../modules/storage"
+
+    bucket_suffix = "-dev-mike"
+    cloudfront_suffix = "-dev-mike"
+}
+
 module "combatlog" {
     source = "../modules/combatlog"
+
+    combatlog_bucket = module.storage.combatlog_bucket
 }
 
 module "lambda" {
@@ -57,14 +66,8 @@ module "lambda" {
     lambda_subnets = module.network.lambda_subnets
     lambda_security_groups = module.network.lambda_security_groups
 
+    combatlog_buffer_delay = module.combatlog.combatlog_buffer_delay
     ff14_stream = module.combatlog.ff14_stream
-}
-
-module "storage" {
-    source = "../modules/storage"
-
-    bucket_suffix = "-dev-mike"
-    cloudfront_suffix = "-dev-mike"
 }
 
 module "iam" {

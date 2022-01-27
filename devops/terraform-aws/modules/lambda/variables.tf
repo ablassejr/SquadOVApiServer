@@ -14,6 +14,10 @@ variable "lambda_security_groups" {
     type = list(string)
 }
 
+variable "combatlog_buffer_delay" {
+    type = number
+}
+
 variable "ff14_stream" {
     type = string
 }

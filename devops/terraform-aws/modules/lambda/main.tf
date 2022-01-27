@@ -81,6 +81,7 @@ resource "aws_lambda_function" "ff14_combat_log_lambda" {
             "SQUADOV_LAMBDA_REGION" = "us-east-2"
             "SQUADOV_LAMBDA_DB_SECRET" = var.db_secret
             "SQUADOV_LAMBDA_DBHOST" = var.db_host
+            "SQUADOV_COMBATLOG_BUFFER_DURATION_SECONDS" = "${var.combatlog_buffer_delay}"
         }
     }
 
