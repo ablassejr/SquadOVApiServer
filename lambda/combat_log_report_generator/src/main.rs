@@ -228,7 +228,7 @@ impl SharedClient {
                     Self::create_report_generator(&game, &id, &self.efs_directory)?,
                     self.load_merge_combat_log_data_to_disk(&data.bucket.name, &partition).await?
                 ).await?;
-                combatlog::store_combat_log_reports(gen, &data.bucket.name, &partition, self.s3.clone()).await?;
+                combatlog::store_static_combat_log_reports(gen, &data.bucket.name, &partition, self.s3.clone()).await?;
                 Ok(())
             } else {
                 log::error!("Invalid game partition ID format: {}", &data.object.key);

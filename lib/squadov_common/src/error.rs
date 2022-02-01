@@ -355,3 +355,9 @@ impl From<tokio::task::JoinError> for SquadOvError {
         return Self::InternalError(format!("Tokio JoinError {:?}", err))
     }
 }
+
+impl From<avro_rs::DeError> for SquadOvError {
+    fn from(err: avro_rs::DeError) -> Self {
+        return Self::InternalError(format!("Avro Deserialize Error {:?}", err))
+    }
+}

@@ -22,25 +22,25 @@ use rand::{
     SeedableRng,
 };
 
-pub struct RawCombatLogReport {
+pub struct RawStaticCombatLogReport {
     // Name of the file we store into S3.
-    key_name: String,
+    pub key_name: String,
     // The file that contains the data on disk.
-    raw_file: File,
+    pub raw_file: File,
     // The 'type' of the report. This number depends on the game we're generating the report for.
-    canonical_type: i64,
+    pub canonical_type: i32,
 }
 
 pub trait CombatLogReportGenerator {
     fn handle(&mut self, data: &str) -> Result<(), SquadOvError>;
     fn finalize(&mut self) -> Result<(), SquadOvError>;
     fn initialize_work_dir(&mut self, dir: &str) -> Result<(), SquadOvError>;
-    fn get_reports(&mut self) -> Vec<RawCombatLogReport>;
+    fn get_reports(&mut self) -> Result<Vec<RawStaticCombatLogReport>, SquadOvError>;
 }
 
 const MULTIPART_SEGMENT_SIZE_BYTES: u64 = 100 * 1024 * 1024;
 
-async fn store_single_report(mut report: RawCombatLogReport, bucket: &str, partition: &str, s3: Arc<S3Client>) -> Result<(), SquadOvError> {
+async fn store_single_static_report(mut report: RawStaticCombatLogReport, bucket: &str, partition: &str, s3: Arc<S3Client>) -> Result<(), SquadOvError> {
     let mut rng = rand::rngs::StdRng::from_entropy();
     let key = format!(
         "form=Report/partition={partition}/canonical={canonical}/{name}",
@@ -139,14 +139,14 @@ async fn store_single_report(mut report: RawCombatLogReport, bucket: &str, parti
     Ok(())
 }
 
-pub async fn store_combat_log_reports<'a>(mut gen: Box<dyn CombatLogReportGenerator>, bucket: &'a str, partition: &'a str, s3: Arc<S3Client>) -> Result<(), SquadOvError> {
-    let handles = gen.get_reports().into_iter()
+pub async fn store_static_combat_log_reports<'a>(mut gen: Box<dyn CombatLogReportGenerator>, bucket: &'a str, partition: &'a str, s3: Arc<S3Client>) -> Result<(), SquadOvError> {
+    let handles = gen.get_reports()?.into_iter()
         .map(|report| {
             let bucket = String::from(bucket);
             let partition = String::from(partition);
             let s3 = s3.clone();
             tokio::task::spawn(async move {
-                store_single_report(report, &bucket, &partition, s3).await?;
+                store_single_static_report(report, &bucket, &partition, s3).await?;
                 Ok::<(), SquadOvError>(())
             })
         })
