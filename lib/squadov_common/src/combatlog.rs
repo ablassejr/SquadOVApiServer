@@ -1,3 +1,5 @@
+pub mod io;
+
 use crate::SquadOvError;
 use rusoto_s3::{
     S3Client,
@@ -21,6 +23,7 @@ use rand::{
     Rng,
     SeedableRng,
 };
+use serde::{de::DeserializeOwned};
 
 pub struct RawStaticCombatLogReport {
     // Name of the file we store into S3.
@@ -31,11 +34,69 @@ pub struct RawStaticCombatLogReport {
     pub canonical_type: i32,
 }
 
-pub trait CombatLogReportGenerator {
-    fn handle(&mut self, data: &str) -> Result<(), SquadOvError>;
+pub trait CombatLogReportHandler {
+    type Data;
+
+    fn handle(&mut self, data: &Self::Data) -> Result<(), SquadOvError>;
+}
+
+pub trait CombatLogReportIO {
     fn finalize(&mut self) -> Result<(), SquadOvError>;
     fn initialize_work_dir(&mut self, dir: &str) -> Result<(), SquadOvError>;
     fn get_reports(&mut self) -> Result<Vec<RawStaticCombatLogReport>, SquadOvError>;
+}
+
+pub trait CombatLogReportParser {
+    fn handle(&mut self, data: &str) -> Result<(), SquadOvError>;
+}
+
+pub trait CombatLogReportGenerator: CombatLogReportParser + CombatLogReportIO {}
+
+pub struct CombatLogReportContainer<T> {
+    generator: T,
+}
+
+impl<T> CombatLogReportGenerator for CombatLogReportContainer<T>
+where
+    T: CombatLogReportHandler + CombatLogReportIO,
+    T::Data: DeserializeOwned,
+{}
+
+impl<T> CombatLogReportParser for CombatLogReportContainer<T>
+where
+    T: CombatLogReportHandler,
+    T::Data: DeserializeOwned,
+{
+    fn handle(&mut self, data: &str) -> Result<(), SquadOvError> {
+        let data = serde_json::from_str::<T::Data>(data)?;
+        self.generator.handle(&data)?;
+        Ok(())
+    }
+}
+
+impl<T> CombatLogReportIO for CombatLogReportContainer<T>
+where
+    T: CombatLogReportIO
+{
+    fn finalize(&mut self) -> Result<(), SquadOvError> {
+        self.generator.finalize()
+    }
+
+    fn initialize_work_dir(&mut self, dir: &str) -> Result<(), SquadOvError> {
+        self.generator.initialize_work_dir(dir)
+    }
+
+    fn get_reports(&mut self) -> Result<Vec<RawStaticCombatLogReport>, SquadOvError> {
+        self.generator.get_reports()
+    }
+}
+
+impl<T> CombatLogReportContainer<T> {
+    pub fn new(generator: T) -> Self {
+        Self {
+            generator,
+        }
+    }
 }
 
 const MULTIPART_SEGMENT_SIZE_BYTES: u64 = 100 * 1024 * 1024;
@@ -139,8 +200,8 @@ async fn store_single_static_report(mut report: RawStaticCombatLogReport, bucket
     Ok(())
 }
 
-pub async fn store_static_combat_log_reports<'a>(mut gen: Box<dyn CombatLogReportGenerator>, bucket: &'a str, partition: &'a str, s3: Arc<S3Client>) -> Result<(), SquadOvError> {
-    let handles = gen.get_reports()?.into_iter()
+pub async fn store_static_combat_log_reports<'a>(reports: Vec<RawStaticCombatLogReport>, bucket: &'a str, partition: &'a str, s3: Arc<S3Client>) -> Result<(), SquadOvError> {
+    let handles = reports.into_iter()
         .map(|report| {
             let bucket = String::from(bucket);
             let partition = String::from(partition);

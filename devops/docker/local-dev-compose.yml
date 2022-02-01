@@ -1,5 +1,20 @@
 version: "3.8"
 services:
+    postgres:
+        image: postgres:12.4
+        volumes:
+            - type: volume
+              source: db-data
+              target: /var/lib/postgresql/data
+        environment:
+            - "POSTGRES_USER=${POSTGRES_USER}"
+            - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+            - "POSTGRES_DB=squadov"
+        ports:
+            - "5432:5432"
+        networks:
+            c3p0:
+                ipv4_address: "172.22.0.2"
     fusionauth:
         image: "fusionauth/fusionauth-app:1.27.2"
         volumes:

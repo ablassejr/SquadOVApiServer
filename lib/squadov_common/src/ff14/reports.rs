@@ -3,7 +3,8 @@ mod death;
 use crate::{
     SquadOvError,
     combatlog::{
-        CombatLogReportGenerator,
+        CombatLogReportHandler,
+        CombatLogReportIO,
         RawStaticCombatLogReport,
     },
     ff14::combatlog::Ff14CombatLogPacket,
@@ -11,6 +12,7 @@ use crate::{
 use uuid::Uuid;
 use num_enum::TryFromPrimitive;
 
+#[derive(Default)]
 pub struct Ff14ReportsGenerator<'a> {
     view_id: Uuid,
     death_report: Option<death::Ff14DeathReportGenerator<'a>>,
@@ -23,12 +25,17 @@ pub enum Ff14ReportTypes {
     Deaths,
 }
 
-impl<'a> CombatLogReportGenerator for Ff14ReportsGenerator<'a> {
-    fn handle(&mut self, data: &str) -> Result<(), SquadOvError> {
-        let data: Ff14CombatLogPacket = serde_json::from_str(data)?;
-        self.handle_parsed(&data)
+impl<'a> CombatLogReportHandler for Ff14ReportsGenerator<'a> {
+    type Data = Ff14CombatLogPacket;
+    fn handle(&mut self, data: &Self::Data) -> Result<(), SquadOvError> {
+        if let Some(dr) = self.death_report.as_mut() {
+            dr.handle(data)?;
+        }
+        Ok(())
     }
+}
 
+impl<'a> CombatLogReportIO for Ff14ReportsGenerator<'a> {
     fn finalize(&mut self) -> Result<(), SquadOvError> {
         if let Some(dr) = self.death_report.as_mut() {
             dr.finalize()?;
@@ -41,7 +48,7 @@ impl<'a> CombatLogReportGenerator for Ff14ReportsGenerator<'a> {
 
         // Create game-wide reports here. Per player reports will be created when those players are introduced.
         {
-            let mut dr = death::Ff14DeathReportGenerator::new();
+            let mut dr = death::Ff14DeathReportGenerator::default();
             dr.initialize_work_dir(dir)?;
             self.death_report = Some(dr);
         }
@@ -64,16 +71,7 @@ impl<'a> Ff14ReportsGenerator<'a> {
     pub fn new(view_id: &str) -> Result<Self, SquadOvError> {
         Ok(Self{
             view_id: Uuid::parse_str(view_id)?,
-            death_report: None,
-            work_dir: None,
+            ..Ff14ReportsGenerator::default()
         })
-    }
-
-    fn handle_parsed(&mut self, data: &Ff14CombatLogPacket) -> Result<(), SquadOvError> {
-        if let Some(dr) = self.death_report.as_mut() {
-            dr.handle_parsed(data)?;
-        }
-
-        Ok(())
     }
 }

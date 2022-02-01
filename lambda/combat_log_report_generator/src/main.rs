@@ -9,7 +9,9 @@ use squadov_common::{
     encode,
     combatlog::{
         self,
+        CombatLogReportIO,
         CombatLogReportGenerator,
+        CombatLogReportContainer,
     },
     ff14::reports::Ff14ReportsGenerator,
 };
@@ -168,9 +170,9 @@ impl SharedClient {
         Ok(file)
     }
 
-    fn create_report_generator(game: &str, id: &str, work_dir: &str) -> Result<Box<dyn CombatLogReportGenerator>, SquadOvError> {
+    fn create_report_generator<'a>(game: &'a str, id: &'a str, work_dir: &'a str) -> Result<Box<dyn CombatLogReportGenerator>, SquadOvError> {
         let mut gen = match game {
-            "ff14" => Ff14ReportsGenerator::new(id)?,
+            "ff14" => CombatLogReportContainer::new(Ff14ReportsGenerator::new(id)?),
             _ => {
                 log::error!("Unsupported game for combat log generation: {}", &game);
                 return Err(SquadOvError::BadRequest);
@@ -181,7 +183,7 @@ impl SharedClient {
         Ok(Box::new(gen))
     }
 
-    async fn generate_reports(&self, mut gen: Box<dyn CombatLogReportGenerator>, mut file: File) -> Result<Box<dyn CombatLogReportGenerator>, SquadOvError> {
+    async fn generate_reports<'a>(&self, mut gen: Box<dyn CombatLogReportGenerator>, mut file: File) -> Result<Box<dyn CombatLogReportGenerator>, SquadOvError> {
         // Seek to beginning of file just because we were previously writing to the file so the stream offset is probably at the end.
         file.seek(std::io::SeekFrom::Start(0))?;
         let reader = BufReader::new(file);
@@ -224,11 +226,11 @@ impl SharedClient {
             if let Some(match_cap) = RE_MATCH.captures(&partition) {
                 let game = match_cap.name("game").map(|x| { String::from(x.as_str()) }).unwrap_or(String::new());
                 let id = match_cap.name("id").map(|x| { String::from(x.as_str()) }).unwrap_or(String::new());
-                let gen = self.generate_reports(
+                let mut gen = self.generate_reports(
                     Self::create_report_generator(&game, &id, &self.efs_directory)?,
                     self.load_merge_combat_log_data_to_disk(&data.bucket.name, &partition).await?
                 ).await?;
-                combatlog::store_static_combat_log_reports(gen, &data.bucket.name, &partition, self.s3.clone()).await?;
+                combatlog::store_static_combat_log_reports(gen.get_reports()?, &data.bucket.name, &partition, self.s3.clone()).await?;
                 Ok(())
             } else {
                 log::error!("Invalid game partition ID format: {}", &data.object.key);
