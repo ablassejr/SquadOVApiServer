@@ -54,17 +54,11 @@ module "storage" {
 module "combatlog" {
     source = "../modules/combatlog"
 
-    combatlog_bucket = module.storage.combatlog_bucket
-}
-
-module "lambda" {
-    source = "../modules/lambda"
+    combatlog_bucket_arn = module.storage.combatlog_bucket_arn
+    combatlog_bucket_id = module.storage.combatlog_bucket_id
 
     lambda_subnets = module.network.lambda_subnets
     lambda_security_groups = module.network.lambda_security_groups
-    combatlog_firehose = module.combatlog.combatlog_firehose
-    rabbitmq_url = var.rabbitmq_url
-    ff14_stream = module.combatlog.ff14_stream
 }
 
 module "iam" {

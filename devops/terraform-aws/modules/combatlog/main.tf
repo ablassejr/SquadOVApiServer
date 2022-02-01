@@ -95,8 +95,8 @@ resource "aws_iam_policy" "combatlog_firehose_policy" {
                 "s3:PutObject"
             ],      
             "Resource": [        
-                "${var.combatlog_bucket}",
-                "${var.combatlog_bucket}/*"		    
+                "${var.combatlog_bucket_arn}",
+                "${var.combatlog_bucket_arn}/*"		    
             ]
         }
     ]
@@ -119,13 +119,13 @@ resource "aws_kinesis_firehose_delivery_stream" "combat_log_s3_stream" {
 
     extended_s3_configuration {
         role_arn = aws_iam_role.combatlog_firehose_role.arn
-        bucket_arn = var.combatlog_bucket
+        bucket_arn = var.combatlog_bucket_arn
 
         buffer_size = 64
         buffer_interval = 60
         compression_format = "GZIP"
 
-        prefix = "data/partition=!{partitionKeyFromQuery:partition}/form=!{partitionKeyFromQuery:form}/"
+        prefix = "form=!{partitionKeyFromQuery:form}/partition=!{partitionKeyFromQuery:partition}/"
         error_output_prefix = "errors/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/!{firehose:error-output-type}"
 
         processing_configuration {
@@ -152,6 +152,16 @@ resource "aws_kinesis_firehose_delivery_stream" "combat_log_s3_stream" {
     }
 }
 
-output "combatlog_firehose" {
-    value = aws_kinesis_firehose_delivery_stream.combat_log_s3_stream.name
+resource "aws_s3_bucket_notification" "combat_log_bucket_notification" {
+    bucket = var.combatlog_bucket_id
+
+    lambda_function {
+        lambda_function_arn = aws_lambda_function.combat_log_reports_lambda.arn
+        events = ["s3:ObjectCreated:*"]
+        filter_prefix = "form%3DFlush/"
+    }
+
+    depends_on = [
+        aws_lambda_permission.lambda_combatlog_bucket_permissions
+    ]
 }

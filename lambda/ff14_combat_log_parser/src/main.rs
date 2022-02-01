@@ -16,14 +16,7 @@ use squadov_common::{
         Ff14CombatLogPacket,
         Ff14PacketData,
     },
-    rabbitmq::{
-        RabbitMqConfig,
-        RabbitMqInterface,
-        RABBITMQ_DEFAULT_PRIORITY,
-    },
-    combatlog::CombatLogTasks,
 };
-use chrono::Utc;
 use rusoto_core::Region;
 use rusoto_firehose::{
     KinesisFirehose,
@@ -55,17 +48,11 @@ struct KinesisData {
 #[serde(rename_all="camelCase")]
 struct CombatLogData {
     logs: Vec<String>,
-    #[serde(default)]
-    generate_reports: bool,
 }
-
-const COMBATLOG_MAX_AGE_SECONDS: i64 = 86400;
 
 struct SharedClient {
     firehose: Arc<KinesisFirehoseClient>,
     delivery_stream: String,
-    rmq: Arc<RabbitMqInterface>,
-    combatlog_report_queue: String,
 }
 
 impl SharedClient {
@@ -154,7 +141,9 @@ impl SharedClient {
     fn split_raw_parsed(data: Vec<(String, Ff14CombatLogPacket)>) -> (Vec<Ff14CombatLogPacket>, Vec<Ff14CombatLogPacket>) {
         let raw_logs = data.iter().map(|x| {
             Ff14CombatLogPacket{
-                data: Ff14PacketData::Raw(x.0.clone()),
+                data: Ff14PacketData::Raw{
+                    inner: x.0.clone(),
+                },
                 ..x.1.clone()
             }
         }).collect::<Vec<Ff14CombatLogPacket>>();
@@ -183,60 +172,39 @@ impl SharedClient {
             }
             uncompressed_data
         })?;
-        let generate_reports = decoded.generate_reports;
 
         // We do a best effort parsing of all the combat log lines. If any one line fails to parse,
         // that doesn't prevent the entire batch from being parsed. We ignore that line and move on.
+        log::info!("Parse Logs...");
         let parsed_logs = Self::parse_logs(&data.partition_key, decoded);
 
-        let (raw_logs, mut parsed_logs) = Self::split_raw_parsed(parsed_logs);
-        
-        if generate_reports {
-            // Write a "Flush" message to Firehose. This way we can wait for this End message to appear in S3 before trying to
-            // actually generate the report. Since this message is written AFTER the parsed logs, there's a reasonable(?) guarantee
-            // that once the End message gets flushed to disk, all the other messages have been flushed as well.
-            parsed_logs.push(Ff14CombatLogPacket{
-                partition_id: data.partition_key.clone(),
-                time: Utc::now(),
-                data: Ff14PacketData::Flush,
-            });
-        }
+        log::info!("Split Logs...");
+        let (raw_logs, parsed_logs) = Self::split_raw_parsed(parsed_logs);
 
         // Stream the raw and parsed data into AWS Firehose to dump that data out into S3.
+        // Note that to process this data we will rely on an S3 event notification to determine
+        // when the flushed object is written.
+        log::info!("Upload raw {}...", raw_logs.len());
         self.upload_to_firehose(raw_logs).await?;
+
+        log::info!("Upload parsed {}...", parsed_logs.len());
         self.upload_to_firehose(parsed_logs).await?;
 
-        // Generate reports. Note that this is a flag sent by the client if this is the last batch of combat
-        // log lines for the current partition key. We don't generate the reports here but we stick a message
-        // on a queue and let someone else take care of it. We don't delay here but rather let the handler put
-        // it onto a delay queue if it didn't detect the Flush message. This way in the best case scenario we
-        // are still generating the reports immediately.
-        if generate_reports {
-            self.rmq.publish(
-                &self.combatlog_report_queue,
-                serde_json::to_vec(&CombatLogTasks::Ff14Reports(data.partition_key.clone()))?,
-                RABBITMQ_DEFAULT_PRIORITY,
-                COMBATLOG_MAX_AGE_SECONDS,
-            ).await;
-        }
-
+        log::info!("...Finish!");
         Ok(())
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), SquadOvError> {
-    std::env::set_var("RUST_LOG", "info,ff14_combat_log_parser=info");
+    std::env::set_var("RUST_LOG", "info,squadov_common=info,ff14_combat_log_parser=info");
     env_logger::init();
 
     // Pull environment variables.
     let aws_region = std::env::var("SQUADOV_AWS_REGION").unwrap();
-    let rabbitmq_url = std::env::var("SQUADOV_RABBITMQ_URL").unwrap();
     let delivery_stream = std::env::var("SQUADOV_FIREHOSE_DELIVERY_STREAM").unwrap();
-    let combatlog_report_queue = std::env::var("SQUADOV_COMBATLOG_REPORT_QUEUE").unwrap();
     log::info!("AWS Region: {}", &aws_region);
     log::info!("AWS Firehose Delivery Stream: {}", &delivery_stream);
-    log::info!("Report Queue: {}", &combatlog_report_queue);
 
     log::info!("Creating Shared Client...");
     let shared = SharedClient{
@@ -244,19 +212,11 @@ async fn main() -> Result<(), SquadOvError> {
             Region::from_str(&aws_region)?
         )),
         delivery_stream,
-        rmq: RabbitMqInterface::new(
-            &RabbitMqConfig::default()
-                .set_url(&rabbitmq_url)
-                .add_queue(&combatlog_report_queue),
-            None,
-            true,
-        ).await?,
-        combatlog_report_queue,
     };
 
     let shared_ref = &shared;
-    let closure = move |event: Value, _ctx: Context| async move {
-        log::info!("Handling Kinesis Record: {:?}", event);
+    let closure = move |event: Value, ctx: Context| async move {
+        log::info!("Handling Kinesis Record from {:?}", ctx);
         
         let payload = serde_json::from_value::<Payload>(event)?;
         for record in payload.records {
@@ -266,7 +226,7 @@ async fn main() -> Result<(), SquadOvError> {
         Ok::<(), SquadOvError>(())
     };
 
-    log::info!("Starting Runtime...");
+    log::info!("Starting Runtime [FF14 Combat Log Parser]...");
     lambda_runtime::run(handler_fn(closure)).await?;
     Ok(())
 }

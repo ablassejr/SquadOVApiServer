@@ -343,3 +343,15 @@ impl From<tokio::sync::AcquireError> for SquadOvError {
         return Self::InternalError(format!("Tokio Sync AcquireError {:?}", err))
     }
 }
+
+impl From<chrono::ParseError> for SquadOvError {
+    fn from(err: chrono::ParseError) -> Self {
+        return Self::InternalError(format!("DateTime Parse Error {:?}", err))
+    }
+}
+
+impl From<tokio::task::JoinError> for SquadOvError {
+    fn from(err: tokio::task::JoinError) -> Self {
+        return Self::InternalError(format!("Tokio JoinError {:?}", err))
+    }
+}

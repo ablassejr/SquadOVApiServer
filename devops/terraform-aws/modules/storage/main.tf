@@ -182,8 +182,12 @@ resource "aws_s3_bucket" "combatlog_bucket" {
     }
 }
 
-output "combatlog_bucket" {
+output "combatlog_bucket_arn" {
     value = aws_s3_bucket.combatlog_bucket.arn
+}
+
+output "combatlog_bucket_id" {
+    value = aws_s3_bucket.combatlog_bucket.id
 }
 
 data "aws_iam_policy_document" "blob_access_policy" {

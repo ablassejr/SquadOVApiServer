@@ -224,7 +224,7 @@ impl RabbitMqConnectionBundle {
         })
     }
 
-    pub async fn publish(&self, msg: RabbitMqPacket, ch_idx: usize) -> Result<(), SquadOvError> {
+    pub async fn publish(&self, msg: &RabbitMqPacket, ch_idx: usize) -> Result<(), SquadOvError> {
         let ch = self.channels.get(ch_idx);
         if ch.is_none() {
             log::warn!("Invalid Channel Index: {}", ch_idx);
@@ -270,7 +270,7 @@ impl RabbitMqConnectionBundle {
         Ok(())
     }
 
-    async fn add_delayed_rabbitmq_message(&self, msg: RabbitMqPacket, total_delay_ms: i64) -> Result<(), SquadOvError> {
+    async fn add_delayed_rabbitmq_message(&self, msg: &RabbitMqPacket, total_delay_ms: i64) -> Result<(), SquadOvError> {
         if let Some(db) = self.db.as_ref() {
             let execute_time = Utc::now() + chrono::Duration::milliseconds(total_delay_ms);
             sqlx::query!(
@@ -454,7 +454,7 @@ impl RabbitMqInterface {
                                 let next_msg = queue_clone.pop_front();
                                 if next_msg.is_some() {
                                     let next_msg = next_msg.unwrap();
-                                    match publisher.publish(next_msg, publish_idx).await {
+                                    match publisher.publish(&next_msg, publish_idx).await {
                                         Ok(_) => (),
                                         Err(err) => {
                                             is_valid = false;
@@ -539,5 +539,41 @@ impl RabbitMqInterface {
             base_delay_ms: None,
             max_age_seconds,
         });
+    }
+
+    pub async fn publish_immediate(&self, queue: &str, data: Vec<u8>, priority: u8, max_age_seconds: i64) {
+        self.publish_direct_immediate(RabbitMqPacket{
+            queue: String::from(queue),
+            data,
+            priority,
+            timestamp: Utc::now(),
+            retry_count: 0,
+            base_delay_ms: None,
+            max_age_seconds,
+        }).await;
+    }
+
+    pub async fn publish_direct_immediate(&self, packet: RabbitMqPacket) {
+        for _i in 0..3 {
+            let publisher = match RabbitMqConnectionBundle::connect(&self.config, self.db.clone(), 1).await {
+                Ok(bundle) => bundle,
+                Err(err) => {
+                    log::warn!("Failed to connect to RabbitMQ publisher: {:?}", err);
+                    async_std::task::sleep(std::time::Duration::from_millis(16)).await;
+                    continue;
+                }
+            };
+    
+            match publisher.publish(&packet, 0).await {
+                Ok(_) => (),
+                Err(err) => {
+                    log::warn!("Failed to publish RabbitMQ message: {:?}", err);
+                    continue;
+                }
+            }
+
+            break;
+        }
+        
     }
 }
