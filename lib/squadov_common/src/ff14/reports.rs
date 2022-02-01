@@ -1,4 +1,5 @@
 mod death;
+mod limit_break;
 
 use crate::{
     SquadOvError,
@@ -9,13 +10,13 @@ use crate::{
     },
     ff14::combatlog::Ff14CombatLogPacket,
 };
-use uuid::Uuid;
 use num_enum::TryFromPrimitive;
+use chrono::{DateTime, Utc};
 
-#[derive(Default)]
 pub struct Ff14ReportsGenerator<'a> {
-    view_id: Uuid,
+    start_time: DateTime<Utc>,
     death_report: Option<death::Ff14DeathReportGenerator<'a>>,
+    limit_break_report: Option<limit_break::Ff14LimitBreakReportGenerator<'a>>,
     work_dir: Option<String>,
 }
 
@@ -23,6 +24,7 @@ pub struct Ff14ReportsGenerator<'a> {
 #[repr(i32)]
 pub enum Ff14ReportTypes {
     Deaths,
+    LimitBreak,
 }
 
 impl<'a> CombatLogReportHandler for Ff14ReportsGenerator<'a> {
@@ -53,6 +55,12 @@ impl<'a> CombatLogReportIO for Ff14ReportsGenerator<'a> {
             self.death_report = Some(dr);
         }
 
+        {
+            let mut lb = limit_break::Ff14LimitBreakReportGenerator::new(self.start_time);
+            lb.initialize_work_dir(dir)?;
+            self.limit_break_report = Some(lb);
+        }
+
         Ok(())
     }
 
@@ -68,10 +76,12 @@ impl<'a> CombatLogReportIO for Ff14ReportsGenerator<'a> {
 }
 
 impl<'a> Ff14ReportsGenerator<'a> {
-    pub fn new(view_id: &str) -> Result<Self, SquadOvError> {
+    pub fn new(start_time: DateTime<Utc>) -> Result<Self, SquadOvError> {
         Ok(Self{
-            view_id: Uuid::parse_str(view_id)?,
-            ..Ff14ReportsGenerator::default()
+            start_time,
+            death_report: None,
+            limit_break_report: None,
+            work_dir: None,
         })
     }
 }

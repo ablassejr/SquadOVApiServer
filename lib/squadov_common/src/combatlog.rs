@@ -1,4 +1,5 @@
 pub mod io;
+pub mod agg;
 
 use crate::SquadOvError;
 use rusoto_s3::{

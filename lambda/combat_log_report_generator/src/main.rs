@@ -34,8 +34,17 @@ use rusoto_s3::{
     ListObjectsV2Request,
     GetObjectRequest,
 };
+use rusoto_secretsmanager::{
+    SecretsManagerClient,
+    SecretsManager,
+    GetSecretValueRequest,
+};
 use chrono::{DateTime, Utc};
 use tokio::io::AsyncReadExt;
+use sqlx::{
+    ConnectOptions,
+    postgres::{PgPool, PgPoolOptions, PgConnectOptions},
+};
 
 #[derive(Deserialize)]
 struct Payload {
@@ -67,6 +76,7 @@ struct S3Object {
 struct SharedClient {
     s3: Arc<S3Client>,
     efs_directory: String,
+    pool: Arc<PgPool>,
 }
 
 impl SharedClient {
@@ -170,9 +180,23 @@ impl SharedClient {
         Ok(file)
     }
 
-    fn create_report_generator<'a>(game: &'a str, id: &'a str, work_dir: &'a str) -> Result<Box<dyn CombatLogReportGenerator>, SquadOvError> {
+    async fn create_report_generator<'a>(&self, game: &'a str, id: &'a str, work_dir: &'a str) -> Result<Box<dyn CombatLogReportGenerator>, SquadOvError> {
+        let report = sqlx::query!(
+            "
+            SELECT *
+            FROM squadov.combat_logs
+            WHERE partition_id = $1
+            ",
+            &format!("{}_{}", game, id)
+        )
+            .fetch_one(&*self.pool)
+            .await?;
+
         let mut gen = match game {
-            "ff14" => CombatLogReportContainer::new(Ff14ReportsGenerator::new(id)?),
+            "ff14" => CombatLogReportContainer::new(
+                // TODO: Pull actual start time from database
+                Ff14ReportsGenerator::new(report.start_time)?
+            ),
             _ => {
                 log::error!("Unsupported game for combat log generation: {}", &game);
                 return Err(SquadOvError::BadRequest);
@@ -227,7 +251,7 @@ impl SharedClient {
                 let game = match_cap.name("game").map(|x| { String::from(x.as_str()) }).unwrap_or(String::new());
                 let id = match_cap.name("id").map(|x| { String::from(x.as_str()) }).unwrap_or(String::new());
                 let mut gen = self.generate_reports(
-                    Self::create_report_generator(&game, &id, &self.efs_directory)?,
+                    self.create_report_generator(&game, &id, &self.efs_directory).await?,
                     self.load_merge_combat_log_data_to_disk(&data.bucket.name, &partition).await?
                 ).await?;
                 combatlog::store_static_combat_log_reports(gen.get_reports()?, &data.bucket.name, &partition, self.s3.clone()).await?;
@@ -250,8 +274,48 @@ async fn main() -> Result<(), SquadOvError> {
 
     let aws_region = std::env::var("SQUADOV_AWS_REGION").unwrap();
     let efs_directory = std::env::var("SQUADOV_EFS_DIRECTORY").unwrap();
+    let secret_id = std::env::var("SQUADOV_LAMBDA_DB_SECRET").unwrap();
+    let db_host = std::env::var("SQUADOV_LAMBDA_DBHOST").unwrap();
     log::info!("AWS Region: {}", &aws_region);
     log::info!("EFS Directory: {}", &efs_directory);
+    log::info!("Secret ID: {}", &secret_id);
+    log::info!("DB Host: {}", &db_host);
+
+    log::info!("Creating Secret Manager...");
+    let secrets_client = SecretsManagerClient::new(
+        Region::from_str(&aws_region)?
+    );
+
+    log::info!("Getting DB Secret...");
+    let secret_object = secrets_client.get_secret_value(GetSecretValueRequest{
+        secret_id,
+        ..GetSecretValueRequest::default()
+    }).await?;
+
+    // Secret string contains a JSON structure of the form:
+    // (it technically has more fields but these are the ones we care about)
+    #[derive(Deserialize)]
+    struct DbSecret {
+        username: String,
+        password: String,
+    }
+
+    let creds = if let Some(secret_string) = secret_object.secret_string {
+        log::info!("...Found Creds.");
+        serde_json::from_str::<DbSecret>(&secret_string)?
+    } else {
+        return Err(SquadOvError::BadRequest);
+    };
+
+    let mut conn = PgConnectOptions::new()
+        .host(&db_host)
+        .username(&creds.username)
+        .password(&creds.password)
+        .port(5432)
+        .application_name("ff14_combat_log_parser")
+        .database("squadov")
+        .statement_cache_capacity(0);
+    conn.log_statements(log::LevelFilter::Trace);
 
     log::info!("Creating Shared Client...");
     let shared = SharedClient{
@@ -259,6 +323,14 @@ async fn main() -> Result<(), SquadOvError> {
             Region::from_str(&aws_region)?
         )),
         efs_directory,
+        pool: Arc::new(PgPoolOptions::new()
+            .min_connections(1)
+            .max_connections(1)
+            .max_lifetime(std::time::Duration::from_secs(6*60*60))
+            .idle_timeout(std::time::Duration::from_secs(3*60*60))
+            .connect_with(conn)
+            .await?
+        ),
     };
 
     let shared_ref = &shared;

@@ -71,6 +71,7 @@ deadpool = "0.9.2"
 deadpool-redis = "0.10.2"
 redis = "0.21.5"
 avro-rs = { version = "0.13.0", features = ["snappy"] }
+num = "0.4.0"
 
 [build-dependencies]
 prost-build = "0.7.0"

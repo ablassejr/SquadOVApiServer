@@ -950,8 +950,8 @@ dependencies = [
  "log",
  "regex",
  "rusoto_core",
- "rusoto_firehose",
  "rusoto_s3",
+ "rusoto_secretsmanager",
  "serde",
  "serde_json",
  "sqlx",
@@ -1962,7 +1962,7 @@ dependencies = [
  "gif",
  "jpeg-decoder",
  "num-iter",
- "num-rational",
+ "num-rational 0.3.2",
  "num-traits",
  "png",
  "scoped_threadpool",
@@ -2435,6 +2435,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "num"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43db66d1170d347f9a065114077f7dccb00c1b9478c89384490a3425279a4606"
+dependencies = [
+ "num-bigint 0.4.3",
+ "num-complex",
+ "num-integer",
+ "num-iter",
+ "num-rational 0.4.0",
+ "num-traits",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2450,6 +2464,17 @@ name = "num-bigint"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f6f7833f2cbf2360a6cfd58cd41a53aa7a90bd4c202f5b1c7dd2ed73c57b2c3"
+dependencies = [
+ "autocfg 1.0.1",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f93ab6289c7b344a8a9f60f88d80aa20032336fe78da341afc91c8a2341fc75f"
 dependencies = [
  "autocfg 1.0.1",
  "num-integer",
@@ -2475,10 +2500,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "num-integer"
-version = "0.1.43"
+name = "num-complex"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d59457e662d541ba17869cf51cf177c0b5f0cbf476c66bdc90bf1edac4f875b"
+checksum = "26873667bbbb7c5182d4a37c1add32cdf09f841af72da53318fdb81543c15085"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "num-integer"
+version = "0.1.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2cc698a63b549a70bc047073d2949cce27cd1c7b0a4a862d08a8031bc2801db"
 dependencies = [
  "autocfg 1.0.1",
  "num-traits",
@@ -2507,10 +2541,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "num-traits"
-version = "0.2.12"
+name = "num-rational"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac267bcc07f48ee5f8935ab0d24f316fb722d7a1292e2913f0cc196b29ffd611"
+checksum = "d41702bd167c2df5520b384281bc111a4b5efcf7fbc4c9c222c815b07e0a6a6a"
+dependencies = [
+ "autocfg 1.0.1",
+ "num-bigint 0.4.3",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-traits"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
 dependencies = [
  "autocfg 1.0.1",
  "libm",
@@ -3339,6 +3385,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusoto_secretsmanager"
+version = "0.47.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71bb6e46b93dd9a5bb67ff2939a8e99dec611a532c3643f627f83d123628d85f"
+dependencies = [
+ "async-trait",
+ "bytes 1.1.0",
+ "futures",
+ "rusoto_core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "rusoto_signature"
 version = "0.47.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3890,6 +3950,7 @@ dependencies = [
  "log",
  "md-5",
  "nom",
+ "num",
  "num_enum",
  "openssl",
  "openssl-sys",

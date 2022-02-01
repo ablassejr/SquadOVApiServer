@@ -201,6 +201,7 @@ pub enum Ff14CombatLogEvent {
     // 36
     LimitBreak{
         value: i64,
+        // Maximum number of bars possible
         bars: i32,
     },
     // 37
