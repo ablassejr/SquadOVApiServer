@@ -247,3 +247,21 @@ where
             .exists
     )
 }
+
+pub async fn store_vod_md5<'a, T>(ex: T, video_uuid: &Uuid, hash: &str) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        UPDATE squadov.vods
+        SET md5 = $2
+        WHERE video_uuid = $1
+        ",
+        video_uuid,
+        hash,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}

@@ -244,7 +244,22 @@ pub async fn get_vod_track_segment_handler(data : web::Path<squadov_common::VodS
     let manager = app.get_vod_manager(&metadata.bucket).await?;
 
     let (response_string, expiration) = if let Some(_md5) = query.md5 {
-        (manager.get_vod_md5(&data).await?, None)
+        (
+            sqlx::query!(
+                "
+                SELECT md5
+                FROM squadov.vods
+                WHERE video_uuid = $1
+                ",
+                &data.video_uuid
+            )
+                .fetch_one(&*app.pool)
+                .await?
+                .md5
+                .unwrap_or(String::new())
+            ,
+            None,
+        )
     } else if data.segment_name != "preview.mp4" && db::check_if_vod_public(&*app.pool, &data.video_uuid).await? && manager.check_vod_segment_is_public(&data).await? {
         // If the VOD is public (shared), then we can return the public URL instead of the signed private one.
         (manager.get_public_segment_redirect_uri(&data).await?, None)
