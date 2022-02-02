@@ -49,7 +49,7 @@ pub trait VodManager {
     // Returns a session string that can be passed to get_segment_upload_uri
     async fn start_segment_upload(&self, segment: &VodSegmentId) -> Result<String, SquadOvError>;
     // User can request to get a separate URL for each uploaded segment (though it isn't necessarily guaranteed to be different for each segment).
-    async fn get_segment_upload_uri(&self, segment: &VodSegmentId, session_id: &str, part: i64) -> Result<String, SquadOvError>;
+    async fn get_segment_upload_uri(&self, segment: &VodSegmentId, session_id: &str, part: i64, accel: bool) -> Result<String, SquadOvError>;
     // At the end, the user may need to finish the segment upload by giving us the session id as well as a list of parts that were uploaded.
     async fn finish_segment_upload(&self, segment: &VodSegmentId, session_id: &str, parts: &[String]) -> Result<(), SquadOvError>;
 

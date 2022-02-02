@@ -8,6 +8,7 @@ use crate::{
     },
 };
 use std::sync::Arc;
+use rusoto_core::Region;
 use rusoto_s3::{
     S3,
     GetObjectRequest,
@@ -226,7 +227,7 @@ impl VodManager for S3VodManager {
         }
     }
     
-    async fn get_segment_upload_uri(&self, segment: &VodSegmentId, session_id: &str, part: i64) -> Result<String, SquadOvError> {
+    async fn get_segment_upload_uri(&self, segment: &VodSegmentId, session_id: &str, part: i64, accel: bool) -> Result<String, SquadOvError> {
         let req = UploadPartRequest{
             bucket: self.bucket.clone(),
             key: segment.get_fname(),
@@ -238,9 +239,19 @@ impl VodManager for S3VodManager {
         let creds = self.client().provider.credentials().await?;
         let region = self.client().region.clone();
 
-        Ok(req.get_presigned_url(&region, &creds, &PreSignedRequestOption{
-            expires_in: std::time::Duration::from_secs(43200)
-        }))
+        Ok(
+            req.get_presigned_url(
+                &if accel{
+                    Region::Custom("s3-accelerate.amazonaws.com")
+                } else {
+                    region
+                },
+                &creds,
+                &PreSignedRequestOption{
+                    expires_in: std::time::Duration::from_secs(43200)
+                }
+            )
+        )
     }
 
     async fn finish_segment_upload(&self, segment: &VodSegmentId, session_id: &str, parts: &[String]) -> Result<(), SquadOvError> {

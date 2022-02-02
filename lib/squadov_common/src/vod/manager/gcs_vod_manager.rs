@@ -192,7 +192,7 @@ impl VodManager for GCSVodManager {
         }
     }
 
-    async fn get_segment_upload_uri(&self, _segment: &VodSegmentId, session_id: &str, _part: i64) -> Result<String, SquadOvError> {
+    async fn get_segment_upload_uri(&self, _segment: &VodSegmentId, session_id: &str, _part: i64, _accel: bool) -> Result<String, SquadOvError> {
         Ok(session_id.to_string())
     }
 

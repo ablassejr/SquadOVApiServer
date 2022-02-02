@@ -146,7 +146,7 @@ impl api::ApiApplication {
             segment_name: format!("video.{}", &extension),
         };
         let session_id = manager.start_segment_upload(&vod_segment).await?;
-        let path = manager.get_segment_upload_uri(&vod_segment, &session_id, 1).await?;
+        let path = manager.get_segment_upload_uri(&vod_segment, &session_id, 1, false).await?;
         Ok(
             VodDestination{
                 url: path,

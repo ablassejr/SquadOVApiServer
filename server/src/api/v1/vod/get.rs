@@ -30,6 +30,7 @@ pub struct UploadPartQuery {
     pub part: Option<i64>,
     pub session: Option<String>,
     pub bucket: Option<String>,
+    pub accel: Option<bool>,
 }
 
 impl api::ApiApplication {
@@ -196,6 +197,7 @@ pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>,
         if let Some(session) = &query.session {
             if let Some(bucket) = &query.bucket {
                 let part = query.part.unwrap_or(1);
+                let accel = query.accel.unwrap_or(false);
                 if part > 1 {
                     // If we have a session, bucket, and > 1 part, that means we already started the upload so it's a matter
                     // of figuring out the next URL to upload parts to.
@@ -206,7 +208,7 @@ pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>,
                             video_uuid: data.video_uuid.clone(),
                             quality: String::from("source"),
                             segment_name: format!("video.{}", extension),
-                        }, session, part).await?,
+                        }, session, part, accel).await?,
                         bucket: bucket.clone(),
                         session: session.clone(),
                         loc: manager.manager_type(),
