@@ -242,7 +242,10 @@ impl VodManager for S3VodManager {
         Ok(
             req.get_presigned_url(
                 &if accel{
-                    Region::Custom("s3-accelerate.amazonaws.com")
+                    Region::Custom{
+                        name: String::from(region.name()),
+                        endpoint: String::from("s3-accelerate.amazonaws.com"),
+                    }
                 } else {
                     region
                 },
