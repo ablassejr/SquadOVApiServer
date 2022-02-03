@@ -63,6 +63,8 @@ resource "aws_lambda_function" "combat_log_reports_lambda" {
         variables = {
             "SQUADOV_AWS_REGION" = "us-east-2"
             "SQUADOV_EFS_DIRECTORY" = "/mnt/efs"
+            "SQUADOV_LAMBDA_DB_SECRET" = var.db_secret
+            "SQUADOV_LAMBDA_DBHOST" = var.db_host
         }
     }
 

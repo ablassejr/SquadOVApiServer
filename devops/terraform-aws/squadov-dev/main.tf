@@ -59,6 +59,9 @@ module "combatlog" {
 
     lambda_subnets = module.network.lambda_subnets
     lambda_security_groups = module.network.lambda_security_groups
+
+    db_host = module.db.db_host
+    db_secret = module.db.db_secret
 }
 
 module "iam" {

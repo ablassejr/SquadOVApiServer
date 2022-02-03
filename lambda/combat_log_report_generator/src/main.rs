@@ -312,7 +312,7 @@ async fn main() -> Result<(), SquadOvError> {
         .username(&creds.username)
         .password(&creds.password)
         .port(5432)
-        .application_name("ff14_combat_log_parser")
+        .application_name("combat_log_report_generator")
         .database("squadov")
         .statement_cache_capacity(0);
     conn.log_statements(log::LevelFilter::Trace);

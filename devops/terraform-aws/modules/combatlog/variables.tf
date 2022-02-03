@@ -13,3 +13,11 @@ variable "lambda_subnets" {
 variable "lambda_security_groups" {
     type = list(string)
 }
+
+variable "db_host" {
+    type = string
+}
+
+variable "db_secret" {
+    type = string
+}
