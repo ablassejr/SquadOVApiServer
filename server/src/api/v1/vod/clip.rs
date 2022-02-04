@@ -589,7 +589,7 @@ impl api::ApiApplication {
 #[derive(Deserialize)]
 pub struct ClipCreateQuery {
     #[serde(default)]
-    accel: bool,
+    accel: i64,
 }
 
 pub async fn create_clip_for_vod_handler(pth: web::Path<CreateClipPathInput>, data : web::Json<ClipBodyInput>, app : web::Data<Arc<api::ApiApplication>>, query: web::Query<ClipCreateQuery>, request : HttpRequest) -> Result<HttpResponse, SquadOvError> {
@@ -599,7 +599,7 @@ pub async fn create_clip_for_vod_handler(pth: web::Path<CreateClipPathInput>, da
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    let resp = app.create_clip_for_vod(&pth.video_uuid, session.user.id, &data.title, &data.description, data.game, query.accel).await?;
+    let resp = app.create_clip_for_vod(&pth.video_uuid, session.user.id, &data.title, &data.description, data.game, query.accel == 1).await?;
     Ok(HttpResponse::Ok().json(&resp))
 }
 

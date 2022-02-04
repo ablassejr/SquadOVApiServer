@@ -30,7 +30,7 @@ pub struct UploadPartQuery {
     pub part: Option<i64>,
     pub session: Option<String>,
     pub bucket: Option<String>,
-    pub accel: Option<bool>,
+    pub accel: Option<i64>,
 }
 
 impl api::ApiApplication {
@@ -193,7 +193,7 @@ pub async fn get_vod_handler(data : web::Path<VodFindFromVideoUuid>, app : web::
 pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>, query: web::Query<UploadPartQuery>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
     let mut assocs = app.find_vod_associations(&[data.video_uuid.clone()]).await?;
     let vod = assocs.remove(&data.video_uuid).ok_or(SquadOvError::NotFound)?;
-    let accel = query.accel.unwrap_or(false);
+    let accel = query.accel.unwrap_or(0) == 1;
 
     Ok(HttpResponse::Ok().json(&
         if let Some(session) = &query.session {

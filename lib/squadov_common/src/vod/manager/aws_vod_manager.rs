@@ -231,14 +231,6 @@ impl VodManager for S3VodManager {
     }
     
     async fn get_segment_upload_uri(&self, segment: &VodSegmentId, session_id: &str, part: i64, accel: bool) -> Result<String, SquadOvError> {
-        let req = UploadPartRequest{
-            bucket: self.bucket.clone(),
-            key: segment.get_fname(),
-            part_number: part,
-            upload_id: session_id.to_string(),
-            ..UploadPartRequest::default()
-        };
-
         let creds = self.client().provider.credentials().await?;
         let region = self.client().region.clone();
 
