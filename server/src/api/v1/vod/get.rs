@@ -193,11 +193,13 @@ pub async fn get_vod_handler(data : web::Path<VodFindFromVideoUuid>, app : web::
 pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>, query: web::Query<UploadPartQuery>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
     let mut assocs = app.find_vod_associations(&[data.video_uuid.clone()]).await?;
     let vod = assocs.remove(&data.video_uuid).ok_or(SquadOvError::NotFound)?;
+    let accel = query.accel.unwrap_or(false);
+
     Ok(HttpResponse::Ok().json(&
         if let Some(session) = &query.session {
             if let Some(bucket) = &query.bucket {
                 let part = query.part.unwrap_or(1);
-                let accel = query.accel.unwrap_or(false);
+                
                 if part > 1 {
                     // If we have a session, bucket, and > 1 part, that means we already started the upload so it's a matter
                     // of figuring out the next URL to upload parts to.
@@ -221,7 +223,7 @@ pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>,
                 return Err(SquadOvError::BadRequest);
             }
         } else {
-            app.create_vod_destination(&data.video_uuid, &vod.raw_container_format).await?
+            app.create_vod_destination(&data.video_uuid, &vod.raw_container_format, accel).await?
         }
     ))
 }

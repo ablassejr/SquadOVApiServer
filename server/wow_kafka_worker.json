@@ -1148,6 +1148,11 @@
           "ordinal": 7,
           "name": "is_local",
           "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "md5",
+          "type_info": "Varchar"
         }
       ],
       "parameters": {
@@ -1164,7 +1169,8 @@
         true,
         false,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -3297,6 +3303,11 @@
           "ordinal": 7,
           "name": "is_local",
           "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "md5",
+          "type_info": "Varchar"
         }
       ],
       "parameters": {
@@ -3312,7 +3323,8 @@
         true,
         false,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -4657,6 +4669,11 @@
           "ordinal": 7,
           "name": "is_local",
           "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "md5",
+          "type_info": "Varchar"
         }
       ],
       "parameters": {
@@ -4673,7 +4690,8 @@
         true,
         false,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -5519,6 +5537,26 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "b0dc2640493bc4eac00dd00e0561573ea558c8ff60e4672fad0a65e3a15085e2": {
+    "query": "\n                SELECT md5\n                FROM squadov.vods\n                WHERE video_uuid = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "md5",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        true
+      ]
     }
   },
   "b10ab669bd320998efdddeffcb38c2bf313169cf7f9e18966299351d4fc20511": {

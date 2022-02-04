@@ -8,7 +8,10 @@ use crate::{
     },
 };
 use std::sync::Arc;
-use rusoto_core::Region;
+use rusoto_core::{
+    Region,
+    signature::SignedRequest,
+};
 use rusoto_s3::{
     S3,
     GetObjectRequest,
@@ -239,22 +242,30 @@ impl VodManager for S3VodManager {
         let creds = self.client().provider.credentials().await?;
         let region = self.client().region.clone();
 
-        Ok(
-            req.get_presigned_url(
-                &if accel{
-                    Region::Custom{
-                        name: String::from(region.name()),
-                        endpoint: String::from("s3-accelerate.amazonaws.com"),
+        // Create the request ourself since Rusoto doesn't support the virtual host style which is necessary
+        // to use transfer acceleration.
+        let mut req = SignedRequest::new(
+            "PUT",
+            "s3",
+            &Region::Custom{
+                name: String::from(region.name()),
+                endpoint: format!(
+                    "{bucket}.{region}.amazonaws.com",
+                    bucket=&self.bucket,
+                    region=&if accel {
+                        String::from("s3-accelerate")
+                    } else {
+                        format!("s3.{}", region.name())
                     }
-                } else {
-                    region
-                },
-                &creds,
-                &PreSignedRequestOption{
-                    expires_in: std::time::Duration::from_secs(43200)
-                }
-            )
-        )
+                ),
+            },
+            &format!("/{}", &segment.get_fname())
+        );
+
+        req.add_param("partNumber", &part.to_string());
+        req.add_param("uploadId", &session_id);
+            
+        Ok(req.generate_presigned_url(&creds, &std::time::Duration::from_secs(43200), false))
     }
 
     async fn finish_segment_upload(&self, segment: &VodSegmentId, session_id: &str, parts: &[String]) -> Result<(), SquadOvError> {
