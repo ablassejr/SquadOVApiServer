@@ -6,4 +6,5 @@ export TF_VAR_postgres_password=$POSTGRES_PASSWORD
 export TF_VAR_postgres_instance_name=$POSTGRES_INSTANCE_NAME
 
 terraform init
+terraform apply -target="module.network"
 terraform apply
