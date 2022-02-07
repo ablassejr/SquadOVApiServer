@@ -45,8 +45,7 @@ impl Default for UserActivityState {
 #[derive(Message)]
 #[rtype(result="()")]
 struct UserActivityChange {
-    pub user_id: i64,
-    pub state: UserActivityState,
+    pub states: HashMap<i64, UserActivityState>,
 }
 
 // Request message for when the user wants to subscribe to the status of another user (can be denied).
@@ -166,17 +165,22 @@ impl UserActivityStatusTracker {
         }).collect::<Result<Vec<UserActivityState>, SquadOvError>>()?)
     }
 
-    async fn notify_single_session_user_state(&self, session_id: &Uuid, user_id: i64, state: UserActivityState) -> Result<(), SquadOvError> {
+    async fn notify_single_session_bulk_user_state(&self, session_id: &Uuid, states: HashMap<i64, UserActivityState>) -> Result<(), SquadOvError> {
         let sessions = self.sessions.read().await;
         if let Some(addr) = sessions.get(session_id) {
             addr.do_send(UserActivityChange{
-                user_id,
-                state,
+                states,
             }).map_err(|x| {
-                SquadOvError::InternalError(format!("Failed to notify user of state change: {:?}", x))
+                SquadOvError::InternalError(format!("Failed to notify user of bulk state change: {:?}", x))
             })?;
         }
         Ok(())
+    }
+
+    async fn notify_single_session_user_state(&self, session_id: &Uuid, user_id: i64, state: UserActivityState) -> Result<(), SquadOvError> {
+        let mut states = HashMap::new();
+        states.insert(user_id, state);
+        self.notify_single_session_bulk_user_state(session_id, states).await
     }
 
     async fn notify_user_state(&self, user_id: i64, state: Option<UserActivityState>) -> Result<(), SquadOvError> {
@@ -229,6 +233,7 @@ impl UserActivityStatusTracker {
     async fn add_subscriptions(&self, id: &Uuid, user_ids: &[i64]) -> Result<(), SquadOvError> {
         let mut subs = self.per_user_sessions.write().await;
         let user_states = self.batch_get_multiple_user_states(user_ids).await?;
+        let mut user_state_map: HashMap<i64, UserActivityState> = HashMap::new();
         for (idx, uid) in user_ids.iter().enumerate() {
             if !subs.contains_key(uid) {
                 subs.insert(*uid, HashSet::new());
@@ -238,8 +243,9 @@ impl UserActivityStatusTracker {
                 listeners.insert(id.clone());
             }
 
-            self.notify_single_session_user_state(id, *uid, user_states[idx].clone()).await?;
+            user_state_map.insert(*uid, user_states[idx].clone());
         }
+        self.notify_single_session_bulk_user_state(id, user_state_map).await?;
 
         Ok(())
     }
@@ -534,10 +540,9 @@ where
             return;
         }
         
-        let mut resp = UserActivitySubscribeResponse{
-            status: HashMap::new(),
+        let resp = UserActivitySubscribeResponse{
+            status: msg.states,
         };
-        resp.status.insert(msg.user_id, msg.state);
         ctx.text(serde_json::to_string(&resp).unwrap_or(String::from("ERROR")))
     }
 }

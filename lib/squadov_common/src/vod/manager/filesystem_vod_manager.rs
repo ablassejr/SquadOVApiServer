@@ -5,8 +5,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use std::path::{Path,PathBuf};
-use std::{fs, io};
-use md5::{Md5, Digest};
+use std::{fs};
 use chrono::{DateTime, Utc};
 
 pub struct FilesystemVodManager {
@@ -69,7 +68,7 @@ impl VodManager for FilesystemVodManager {
         Ok(String::from(self.segment_id_to_path(segment).to_str().unwrap_or("")))
     }
 
-    async fn get_segment_upload_uri(&self, _segment: &VodSegmentId, session_id: &str, _part: i64) -> Result<String, SquadOvError> {
+    async fn get_segment_upload_uri(&self, _segment: &VodSegmentId, session_id: &str, _part: i64, _accel: bool) -> Result<String, SquadOvError> {
         Ok(session_id.to_string())
     }
 
@@ -96,12 +95,5 @@ impl VodManager for FilesystemVodManager {
 
     async fn check_vod_segment_is_public(&self, _segment: &VodSegmentId) -> Result<bool, SquadOvError> {
         Ok(false)
-    }
-
-    async fn get_vod_md5(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
-        let mut file = fs::File::open(self.segment_id_to_path(segment))?;
-        let mut hasher = Md5::default();
-        let _n = io::copy(&mut file, &mut hasher);
-        Ok(base64::encode(hasher.finalize()))
     }
 }

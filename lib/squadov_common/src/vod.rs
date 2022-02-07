@@ -21,10 +21,11 @@ use crate::{
     storage::StorageManager,
 };
 use std::sync::{Arc};
-use std::io::BufReader;
+use std::io::{self, BufReader};
 use tempfile::NamedTempFile;
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
+use md5::{Md5, Digest};
 
 const VOD_MAX_AGE_SECONDS: i64 = 21600; // 6 hours
 
@@ -64,6 +65,7 @@ pub struct VodAssociation {
     pub is_clip: bool,
     #[serde(rename = "isLocal", default)]
     pub is_local: bool,
+    pub md5: Option<String>,
 }
 
 #[derive(Serialize,Deserialize,Clone,Debug)]
@@ -390,6 +392,17 @@ impl VodProcessingInterface {
             let thumbnail_dims = image.into_dimensions()?;
             db::add_vod_thumbnail(&mut tx, vod_uuid, &metadata.bucket, &thumbnail_id, thumbnail_dims.0 as i32, thumbnail_dims.1 as i32).await?;
         }
+
+        log::info!("Computing VOD MD5 - {}", vod_uuid);
+        let md5_hash = {
+            let mut file = std::fs::File::open(&fastify_filename)?;
+            let mut hasher = Md5::default();
+            let _n = io::copy(&mut file, &mut hasher);
+            base64::encode(hasher.finalize())
+        };
+
+        log::info!("Store VOD MD5 - {}", vod_uuid);
+        db::store_vod_md5(&mut tx, vod_uuid, &md5_hash).await?;
 
         log::info!("Process VOD TX (Commit) - {}", vod_uuid);
         tx.commit().await?;

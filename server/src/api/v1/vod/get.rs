@@ -30,6 +30,7 @@ pub struct UploadPartQuery {
     pub part: Option<i64>,
     pub session: Option<String>,
     pub bucket: Option<String>,
+    pub accel: Option<i64>,
 }
 
 impl api::ApiApplication {
@@ -192,10 +193,13 @@ pub async fn get_vod_handler(data : web::Path<VodFindFromVideoUuid>, app : web::
 pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>, query: web::Query<UploadPartQuery>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
     let mut assocs = app.find_vod_associations(&[data.video_uuid.clone()]).await?;
     let vod = assocs.remove(&data.video_uuid).ok_or(SquadOvError::NotFound)?;
+    let accel = query.accel.unwrap_or(0) == 1;
+
     Ok(HttpResponse::Ok().json(&
         if let Some(session) = &query.session {
             if let Some(bucket) = &query.bucket {
                 let part = query.part.unwrap_or(1);
+                
                 if part > 1 {
                     // If we have a session, bucket, and > 1 part, that means we already started the upload so it's a matter
                     // of figuring out the next URL to upload parts to.
@@ -206,7 +210,7 @@ pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>,
                             video_uuid: data.video_uuid.clone(),
                             quality: String::from("source"),
                             segment_name: format!("video.{}", extension),
-                        }, session, part).await?,
+                        }, session, part, accel).await?,
                         bucket: bucket.clone(),
                         session: session.clone(),
                         loc: manager.manager_type(),
@@ -219,7 +223,7 @@ pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>,
                 return Err(SquadOvError::BadRequest);
             }
         } else {
-            app.create_vod_destination(&data.video_uuid, &vod.raw_container_format).await?
+            app.create_vod_destination(&data.video_uuid, &vod.raw_container_format, accel).await?
         }
     ))
 }
@@ -244,7 +248,22 @@ pub async fn get_vod_track_segment_handler(data : web::Path<squadov_common::VodS
     let manager = app.get_vod_manager(&metadata.bucket).await?;
 
     let (response_string, expiration) = if let Some(_md5) = query.md5 {
-        (manager.get_vod_md5(&data).await?, None)
+        (
+            sqlx::query!(
+                "
+                SELECT md5
+                FROM squadov.vods
+                WHERE video_uuid = $1
+                ",
+                &data.video_uuid
+            )
+                .fetch_one(&*app.pool)
+                .await?
+                .md5
+                .unwrap_or(String::new())
+            ,
+            None,
+        )
     } else if data.segment_name != "preview.mp4" && db::check_if_vod_public(&*app.pool, &data.video_uuid).await? && manager.check_vod_segment_is_public(&data).await? {
         // If the VOD is public (shared), then we can return the public URL instead of the signed private one.
         (manager.get_public_segment_redirect_uri(&data).await?, None)

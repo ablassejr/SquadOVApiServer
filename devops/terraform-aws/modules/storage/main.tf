@@ -36,6 +36,8 @@ resource "aws_s3_bucket" "vod_storage_bucket" {
         }
     }
 
+    acceleration_status = "Enabled"
+
     tags = {
         "s3" = "vods"
         "vods" = "raw_s3"

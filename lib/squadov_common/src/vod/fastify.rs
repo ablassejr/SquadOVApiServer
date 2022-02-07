@@ -16,6 +16,10 @@ pub async fn fastify_mp4(input_fname: &str, container_format: &str, output_fname
         .arg("-y")
         .arg("-f")
         .arg(container_format)
+        .arg("-probesize")
+        .arg("100M")
+        .arg("-analyzeduration")
+        .arg("100M")
         .arg("-i")
         .arg(input_fname)
         // The general use case of this function is to take an already encoded video (mp4) that

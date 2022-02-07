@@ -8,6 +8,10 @@ use crate::{
     },
 };
 use std::sync::Arc;
+use rusoto_core::{
+    Region,
+    signature::SignedRequest,
+};
 use rusoto_s3::{
     S3,
     GetObjectRequest,
@@ -19,7 +23,6 @@ use rusoto_s3::{
     CreateMultipartUploadRequest,
     UploadPartRequest,
     CompleteMultipartUploadRequest, CompletedMultipartUpload, CompletedPart,
-    HeadObjectRequest,
     Tagging,
     Tag,
     util::{
@@ -230,21 +233,34 @@ impl VodManager for S3VodManager {
         }
     }
     
-    async fn get_segment_upload_uri(&self, segment: &VodSegmentId, session_id: &str, part: i64) -> Result<String, SquadOvError> {
-        let req = UploadPartRequest{
-            bucket: self.bucket.clone(),
-            key: segment.get_fname(),
-            part_number: part,
-            upload_id: session_id.to_string(),
-            ..UploadPartRequest::default()
-        };
-
+    async fn get_segment_upload_uri(&self, segment: &VodSegmentId, session_id: &str, part: i64, accel: bool) -> Result<String, SquadOvError> {
         let creds = self.client().provider.credentials().await?;
         let region = self.client().region.clone();
 
-        Ok(req.get_presigned_url(&region, &creds, &PreSignedRequestOption{
-            expires_in: std::time::Duration::from_secs(43200)
-        }))
+        // Create the request ourself since Rusoto doesn't support the virtual host style which is necessary
+        // to use transfer acceleration.
+        let mut req = SignedRequest::new(
+            "PUT",
+            "s3",
+            &Region::Custom{
+                name: String::from(region.name()),
+                endpoint: format!(
+                    "{bucket}.{region}.amazonaws.com",
+                    bucket=&self.bucket,
+                    region=&if accel {
+                        String::from("s3-accelerate")
+                    } else {
+                        format!("s3.{}", region.name())
+                    }
+                ),
+            },
+            &format!("/{}", &segment.get_fname())
+        );
+
+        req.add_param("partNumber", &part.to_string());
+        req.add_param("uploadId", &session_id);
+            
+        Ok(req.generate_presigned_url(&creds, &std::time::Duration::from_secs(43200), false))
     }
 
     async fn finish_segment_upload(&self, segment: &VodSegmentId, session_id: &str, parts: &[String]) -> Result<(), SquadOvError> {
@@ -374,18 +390,5 @@ impl VodManager for S3VodManager {
                 false
             }
         )
-    }
-
-    async fn get_vod_md5(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
-        // Note that this isn't entirely accurate - the AWS S3 object's ETag isn't necessarily
-        // the MD5 hash if the file is uploaded using multipart upload. Thus we really do need
-        // to verify on the client side that the VOD is fastified first before trying to download.
-        let req = HeadObjectRequest{
-            bucket: self.bucket.clone(),
-            key: segment.get_fname(),
-            ..HeadObjectRequest::default()
-        };
-        let resp = self.client().s3.head_object(req).await?;
-        Ok(resp.e_tag.unwrap_or(String::new()).replace("\"", ""))
     }
 }

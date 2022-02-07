@@ -70,7 +70,7 @@ pub struct ClipCommentPathInput {
 }
 
 impl api::ApiApplication {
-    async fn create_clip_for_vod(&self, vod_uuid: &Uuid, user_id: i64, title: &str, description: &str, game: SquadOvGames) -> Result<ClipResponse, SquadOvError> {
+    async fn create_clip_for_vod(&self, vod_uuid: &Uuid, user_id: i64, title: &str, description: &str, game: SquadOvGames, accel: bool) -> Result<ClipResponse, SquadOvError> {
         let clip_uuid = Uuid::new_v4();
 
         let mut tx = self.pool.begin().await?;
@@ -110,7 +110,7 @@ impl api::ApiApplication {
 
         Ok(ClipResponse{
             uuid: clip_uuid.clone(),
-            destination: self.create_vod_destination(&clip_uuid, "mp4").await?,
+            destination: self.create_vod_destination(&clip_uuid, "mp4", accel).await?,
         })
     }
 
@@ -586,14 +586,20 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn create_clip_for_vod_handler(pth: web::Path<CreateClipPathInput>, data : web::Json<ClipBodyInput>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, SquadOvError> {
+#[derive(Deserialize)]
+pub struct ClipCreateQuery {
+    #[serde(default)]
+    accel: i64,
+}
+
+pub async fn create_clip_for_vod_handler(pth: web::Path<CreateClipPathInput>, data : web::Json<ClipBodyInput>, app : web::Data<Arc<api::ApiApplication>>, query: web::Query<ClipCreateQuery>, request : HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = request.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    let resp = app.create_clip_for_vod(&pth.video_uuid, session.user.id, &data.title, &data.description, data.game).await?;
+    let resp = app.create_clip_for_vod(&pth.video_uuid, session.user.id, &data.title, &data.description, data.game, query.accel == 1).await?;
     Ok(HttpResponse::Ok().json(&resp))
 }
 
