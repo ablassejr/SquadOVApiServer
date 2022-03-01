@@ -35,7 +35,7 @@ wowMatchViews = glueContext.create_dynamic_frame.from_catalog(
     database='squadov-glue-database',
     table_name='squadov_squadov_wow_match_view',
     transformation_ctx='wowMatchViews',
-    additional_options = {"jobBookmarkKeys":['start_tm'],'jobBookmarkKeysSortOrder':'asc'}
+    additional_options = {"jobBookmarkKeys":['alt_id'],'jobBookmarkKeysSortOrder':'asc'}
 ).toDF()
 
 print('Get WoW Arena Views...')

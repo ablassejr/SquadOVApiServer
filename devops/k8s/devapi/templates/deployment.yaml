@@ -58,7 +58,7 @@ spec:
                       valueFrom:
                         secretKeyRef:
                             name: redshift-secret
-                            key: username
+                            key: password
                   ports:
                     - containerPort: 8080
                   livenessProbe:
@@ -66,14 +66,14 @@ spec:
                         path: /healthz
                         port: 8080
                     initialDelaySeconds: 10
-                    periodSeconds: 20
+                    periodSeconds: 60
                     timeoutSeconds: 10
                   readinessProbe:
                     httpGet:
                         path: /healthz
                         port: 8080
                     initialDelaySeconds: 10
-                    periodSeconds: 20
+                    periodSeconds: 60
                     timeoutSeconds: 10
                   resources:
                     requests:
