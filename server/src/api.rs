@@ -78,6 +78,7 @@ use squadov_common::{
     },
     share::rabbitmq::SharingRabbitmqInterface,
     redis::RedisConfig,
+    zendesk::{ZendeskConfig, ZendeskClient},
 };
 use url::Url;
 use std::vec::Vec;
@@ -234,6 +235,7 @@ pub struct ApiConfig {
     pub sentry: SentryConfig,
     pub discord: DiscordConfig,
     pub redis: RedisConfig,
+    pub zendesk: ZendeskConfig,
 }
 
 impl CommonConfig for DatabaseConfig {
@@ -286,6 +288,7 @@ pub struct ApiApplication {
     pub ip: Arc<IpstackClient>,
     pub segment: Arc<SegmentClient>,
     pub twitch_api: Arc<TwitchApiClient>,
+    pub zendesk: Arc<ZendeskClient>,
 }
 
 impl ApiApplication {
@@ -520,6 +523,7 @@ impl ApiApplication {
                 TwitchTokenType::App,
                 pool.clone(),
             )),
+            zendesk: Arc::new(ZendeskClient::new(config.zendesk.clone())),
         };
 
         app.create_vod_manager(&config.storage.vods.global).await.unwrap();

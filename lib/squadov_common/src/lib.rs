@@ -50,6 +50,7 @@ pub mod image;
 pub mod config;
 pub mod discord;
 pub mod redis;
+pub mod zendesk;
 
 pub use error::*;
 pub use parse::*;
