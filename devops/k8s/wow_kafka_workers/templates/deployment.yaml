@@ -5,7 +5,7 @@ metadata:
     labels:
         task: wowkafka
 spec:
-    replicas: 1
+    replicas: {{ .Values.replicas }}
     selector:
         matchLabels:
             task: wowkafka
@@ -40,7 +40,7 @@ spec:
                             key: password
                   resources:
                     requests:
-                        cpu: "2000m"
-                        memory: "3Gi"
+                        cpu: "500m"
+                        memory: "1Gi"
             imagePullSecrets:
                 - name: regcred
