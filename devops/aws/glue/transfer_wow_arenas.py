@@ -72,13 +72,13 @@ validArenaMatchViews = wowMatchViews.join(
 #   - 'id' -> 'id'
 #   - 'start_tm' -> 'tm'
 #   - 'build_version' -> 'build'
-#   - {'instance_id', 'arena_type', 'winning_team_id', 'match_duration_seconds'} -> 'info'
+#   - {'instance_id', 'arena_type', 'winning_team_id', 'match_duration_seconds', 'new_ratings'} -> 'info'
 print('Transform Arena Matches to Output...')
 outputMatchData = validArenaMatchViews.select(
     'id',
     'start_tm',
     'build_version',
-    to_json(struct('instance_id', 'arena_type', 'winning_team_id', 'match_duration_seconds')).alias('info')
+    to_json(struct('instance_id', 'arena_type', 'winning_team_id', 'match_duration_seconds', 'new_ratings')).alias('info')
 ).withColumnRenamed(
     'build_version',
     'build'

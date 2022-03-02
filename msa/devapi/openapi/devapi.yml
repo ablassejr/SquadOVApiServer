@@ -307,6 +307,11 @@ components:
         matchDurationSeconds:
           type: number
           description: How long the match lasted in seconds.
+        newRatings:
+          description: The new ratings for each team in the arena (will be 0 for skirmishes). Use the team ID to index into this array.
+          type: array
+          items:
+            type: integer
       required:
         - instanceId
         - arenaType
