@@ -4,6 +4,8 @@ metadata:
     name: internal-api-service
     labels:
         task: api
+    annotations:
+        alb.ingress.kubernetes.io/healthcheck-path: /healthz
 spec:
     type: NodePort
     ports:
