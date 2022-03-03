@@ -1,7 +1,9 @@
+use crate::SquadOvError;
 use serde::{Serialize, Deserialize};
-use chrono::{DateTime, Utc};
+use bytes::Bytes;
+use reqwest::{header};
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct ZendeskConfig {
     email: String, 
     api_key: String,
@@ -31,11 +33,11 @@ pub struct ZendeskTicketComment {
 }
 
 impl ZendeskTicketComment {
-    fn new(desc: String) -> Self {
+    pub fn new(desc: String) -> Self {
         Self {
             uploads: None,
             body: Some(desc),
-            via: Option(ZendeskTicketVia{
+            via: Some(ZendeskTicketVia{
                 channel: "web_service".to_string(),
             }),
         }
@@ -68,7 +70,7 @@ pub struct ZendeskTicket {
 }
 
 impl ZendeskTicket {
-    fn new(subject: String, comment: ZendeskTicketComment, username: String, email: String) -> Self {
+    pub fn new(subject: String, comment: ZendeskTicketComment, username: String, email: String) -> Self {
         Self {
             email_ccs: Some(vec![email.clone()]),
             subject: Some(subject),
@@ -79,7 +81,7 @@ impl ZendeskTicket {
                 name: username.clone(),
                 email: email.clone(),
             }),
-            custom_fields: Option(vec![
+            custom_fields: Some(vec![
                 // SquadOV username custom field.
                 ZendeskCustomField{
                     id: 4497278910235,
@@ -90,7 +92,7 @@ impl ZendeskTicket {
     }
 } 
 impl ZendeskClient {
-    fn new(config: ZendeskConfig) -> Self {
+    pub fn new(config: ZendeskConfig) -> Self {
         Self {
             config,
         }
@@ -107,7 +109,11 @@ impl ZendeskClient {
             .build()?)
     }
 
-    pub async fn create_ticket(ticket: ZendeskTicket) -> Result<(), SquadOvError> {
+    pub async fn create_ticket(&self, ticket: ZendeskTicket) -> Result<(), SquadOvError> {
         Ok(())
+    }
+
+    pub async fn upload_attachment(&self, filename: String, data: Bytes) -> Result<String, SquadOvError> {
+        Ok(String::new())
     }
 }
