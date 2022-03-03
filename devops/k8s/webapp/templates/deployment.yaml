@@ -14,6 +14,8 @@ spec:
             labels:
                 task: app
         spec:
+            nodeSelector:
+                eks.amazonaws.com/compute-type: fargate
             containers:
                 - name: app
                   image: registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/squadov_webapp:{{ .Values.commitHash }}

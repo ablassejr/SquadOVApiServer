@@ -167,6 +167,18 @@ resource "aws_subnet" "fargate_subnet_private_c" {
     cidr_block = "10.0.48.0/24"
 }
 
+resource "aws_subnet" "fargate_subnet_private_a_v2" {
+    vpc_id = aws_vpc.primary.id
+    availability_zone = "us-east-2a"
+    cidr_block = "10.0.17.0/24"
+}
+
+resource "aws_subnet" "fargate_subnet_private_c_v2" {
+    vpc_id = aws_vpc.primary.id
+    availability_zone = "us-east-2c"
+    cidr_block = "10.0.49.0/24"
+}
+
 resource "aws_route_table" "public_route_table" {
     vpc_id = aws_vpc.primary.id
 
@@ -265,6 +277,16 @@ resource "aws_route_table_association" "fargate_private_rt_subnet_c" {
     subnet_id = aws_subnet.fargate_subnet_private_c.id
 }
 
+resource "aws_route_table_association" "fargate_private_rt_subnet_a_v2" {
+    route_table_id = aws_route_table.private_route_table_a.id
+    subnet_id = aws_subnet.fargate_subnet_private_a_v2.id
+}
+
+resource "aws_route_table_association" "fargate_private_rt_subnet_c_v2" {
+    route_table_id = aws_route_table.private_route_table_c.id
+    subnet_id = aws_subnet.fargate_subnet_private_c_v2.id
+}
+
 output "database_subnets" {
     value = [aws_subnet.database_subnet_a.id, aws_subnet.database_subnet_c.id]
 }
@@ -290,7 +312,9 @@ output "private_k8s_subnets" {
 output "default_fargate_subnets" {
     value = [
         aws_subnet.fargate_subnet_private_a.id,
-        aws_subnet.fargate_subnet_private_c.id
+        aws_subnet.fargate_subnet_private_c.id,
+        aws_subnet.fargate_subnet_private_a_v2.id,
+        aws_subnet.fargate_subnet_private_c_v2.id
     ]
 }
 

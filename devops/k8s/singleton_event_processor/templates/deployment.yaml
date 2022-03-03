@@ -14,6 +14,8 @@ spec:
             labels:
                 task: event
         spec:
+            nodeSelector:
+                eks.amazonaws.com/compute-type: fargate
             containers:
                 - name: worker
                   image: "registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/singleton_event_processing:{{ .Values.commitHash }}"

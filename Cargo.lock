@@ -19,7 +19,7 @@ dependencies = [
  "log",
  "once_cell",
  "parking_lot 0.11.0",
- "pin-project 0.4.26",
+ "pin-project 0.4.29",
  "smallvec",
  "tokio 0.2.22",
  "tokio-util 0.3.1",
@@ -38,7 +38,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "log",
- "pin-project 0.4.26",
+ "pin-project 0.4.29",
  "tokio 0.2.22",
  "tokio-util 0.3.1",
 ]
@@ -333,7 +333,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0052435d581b5be835d11f4eb3bce417c8af18d87ddf8ace99f8e67e595882bb"
 dependencies = [
  "futures-util",
- "pin-project 0.4.26",
+ "pin-project 0.4.29",
 ]
 
 [[package]]
@@ -404,7 +404,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "log",
- "pin-project 0.4.26",
+ "pin-project 0.4.29",
  "slab",
 ]
 
@@ -510,7 +510,7 @@ dependencies = [
  "bytes 0.5.6",
  "futures-channel",
  "futures-core",
- "pin-project 0.4.26",
+ "pin-project 0.4.29",
 ]
 
 [[package]]
@@ -2548,7 +2548,7 @@ dependencies = [
  "httparse",
  "httpdate 0.3.2",
  "itoa 0.4.6",
- "pin-project 0.4.26",
+ "pin-project 0.4.29",
  "socket2 0.3.19",
  "tokio 0.2.22",
  "tower-service",
@@ -3612,11 +3612,11 @@ dependencies = [
 
 [[package]]
 name = "pin-project"
-version = "0.4.26"
+version = "0.4.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13fbdfd6bdee3dc9be46452f86af4a4072975899cf8592466668620bebfbcc17"
+checksum = "9615c18d31137579e9ff063499264ddc1278e7b1982757ebc111028c4d1dc909"
 dependencies = [
- "pin-project-internal 0.4.26",
+ "pin-project-internal 0.4.29",
 ]
 
 [[package]]
@@ -3630,9 +3630,9 @@ dependencies = [
 
 [[package]]
 name = "pin-project-internal"
-version = "0.4.26"
+version = "0.4.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c82fb1329f632c3552cf352d14427d57a511b1cf41db93b3a7d77906a82dcc8e"
+checksum = "044964427019eed9d49d9d5bbce6047ef18f37100ea400912a9fa4a3523ab12a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4315,7 +4315,7 @@ dependencies = [
  "log",
  "md5",
  "percent-encoding",
- "pin-project 0.4.26",
+ "pin-project 0.4.29",
  "rusoto_credential",
  "rusoto_signature",
  "rustc_version",
@@ -4336,7 +4336,7 @@ dependencies = [
  "dirs 2.0.2",
  "futures 0.3.13",
  "hyper 0.13.8",
- "pin-project 0.4.26",
+ "pin-project 0.4.29",
  "regex",
  "serde",
  "serde_json",
@@ -4374,7 +4374,7 @@ dependencies = [
  "log",
  "md5",
  "percent-encoding",
- "pin-project 0.4.26",
+ "pin-project 0.4.29",
  "rusoto_credential",
  "rustc_version",
  "serde",

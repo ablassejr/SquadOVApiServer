@@ -14,6 +14,8 @@ spec:
             labels:
                 task: devapi
         spec:
+            nodeSelector:
+                eks.amazonaws.com/compute-type: fargate
             containers:
                 - name: devapi
                   image: registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/devapi:{{ .Values.commitHash }}
