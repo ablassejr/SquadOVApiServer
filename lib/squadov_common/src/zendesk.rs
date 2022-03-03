@@ -60,8 +60,15 @@ pub struct ZendeskCustomField {
 }
 
 #[derive(Serialize)]
+pub struct ZendeskEmailCc {
+    user_email: String,
+    user_name: String,
+    action: String,
+}
+
+#[derive(Serialize)]
 pub struct ZendeskTicket {
-    email_ccs: Option<Vec<String>>,
+    email_ccs: Option<Vec<ZendeskEmailCc>>,
     subject: Option<String>,
     tags: Option<Vec<String>>,
     comment: ZendeskTicketComment,
@@ -72,7 +79,7 @@ pub struct ZendeskTicket {
 impl ZendeskTicket {
     pub fn new(subject: String, comment: ZendeskTicketComment, username: String, email: String) -> Self {
         Self {
-            email_ccs: Some(vec![email.clone()]),
+            email_ccs: None,
             subject: Some(subject),
             tags: None,
             comment,
@@ -110,9 +117,16 @@ impl ZendeskClient {
     }
 
     pub async fn create_ticket(&self, ticket: ZendeskTicket) -> Result<(), SquadOvError> {
+        #[derive(Serialize)]
+        pub struct Request {
+            ticket: ZendeskTicket,
+        }
+
         self.create_http_client()?
-            .post("/api/v2/tickets")
-            .json(&ticket)
+            .post("https://squadov.zendesk.com/api/v2/tickets")
+            .json(&Request{
+                ticket,
+            })
             .send()
             .await?;
         Ok(())
@@ -130,7 +144,7 @@ impl ZendeskClient {
         }
 
         let resp = self.create_http_client()?
-            .post(&format!("/api/v2/uploads?filename={}", &filename))
+            .post(&format!("https://squadov.zendesk.com/api/v2/uploads?filename={}", &filename))
             .header("content-type", "application/binary")
             .body(data)
             .send()
