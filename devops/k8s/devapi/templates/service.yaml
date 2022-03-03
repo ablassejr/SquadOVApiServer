@@ -4,6 +4,8 @@ metadata:
     name: internal-devapi-service
     labels:
         task: devapi
+    annotations:
+        alb.ingress.kubernetes.io/healthcheck-path: /healthz
 spec:
     type: NodePort
     ports:
