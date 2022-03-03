@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-    name: wow-kafka-workers-v2
+    name: wow-kafka-workers-v3
     labels:
         task: wowkafka
 spec:

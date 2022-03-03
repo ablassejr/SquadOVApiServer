@@ -14,6 +14,8 @@ spec:
             labels:
                 task: rabbitmq-delay
         spec:
+            nodeSelector:
+                eks.amazonaws.com/compute-type: fargate
             containers:
                 - name: delay
                   image: "registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/rabbitmq_delay_handler:{{ .Values.commitHash }}"
