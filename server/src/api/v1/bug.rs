@@ -4,7 +4,7 @@ use squadov_common::{
         ZendeskTicket,
         ZendeskTicketComment,
     },
-    SquadOVUser,
+    user::SquadOVUser,
 };
 use actix_web::{web, web::BufMut, HttpResponse, HttpRequest};
 use actix_multipart::Multipart;
@@ -12,17 +12,12 @@ use crate::api;
 use crate::api::auth::SquadOVSession;
 use std::sync::Arc;
 use futures::{StreamExt, TryStreamExt};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize};
 use chrono::Utc;
-use reqwest::header;
-
-#[derive(Deserialize)]
-struct GitlabUploadFileResult {
-    markdown: String
-}
 
 impl api::ApiApplication {
-    async fn submit_bug_report(&self, title: &str, description: &str, log_bytes: bytes::Bytes, user: &SquadOVUser) -> Result<(), SquadOvError> {
+    async fn submit_bug_report(&self, title: &str, description: &str, log_bytes: web::Bytes, user: &SquadOVUser) -> Result<(), SquadOvError> {
+        let timestamp = Utc::now().to_rfc3339();
         let fname = format!("logs-{}-{}.zip", user.id, &timestamp);
         let attachment_id = self.zendesk.upload_attachment(fname, log_bytes).await?;
 
@@ -49,7 +44,7 @@ pub async fn create_bug_report_handler(app : web::Data<Arc<api::ApiApplication>>
     
     let mut title = web::BytesMut::new();
     let mut description = web::BytesMut::new();
-    let mut logs = bytes::BytesMut::new();
+    let mut logs = web::BytesMut::new();
 
     while let Some(mut field) = payload.try_next().await? {
         let content_type = field.content_disposition();
@@ -78,7 +73,7 @@ pub async fn create_bug_report_handler(app : web::Data<Arc<api::ApiApplication>>
         std::str::from_utf8(&*title)?,
         std::str::from_utf8(&*description)?,
         logs.freeze(),
-        session.user.id,
+        &session.user,
     ).await?;
     Ok(HttpResponse::Ok().finish())
 }

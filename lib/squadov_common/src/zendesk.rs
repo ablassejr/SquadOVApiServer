@@ -1,6 +1,6 @@
 use crate::SquadOvError;
 use serde::{Serialize, Deserialize};
-use bytes::Bytes;
+use actix_web::web::Bytes;
 use reqwest::{header};
 
 #[derive(Deserialize, Clone, Debug)]
@@ -110,10 +110,32 @@ impl ZendeskClient {
     }
 
     pub async fn create_ticket(&self, ticket: ZendeskTicket) -> Result<(), SquadOvError> {
+        self.create_http_client()?
+            .post("/api/v2/tickets")
+            .json(&ticket)
+            .send()
+            .await?;
         Ok(())
     }
 
     pub async fn upload_attachment(&self, filename: String, data: Bytes) -> Result<String, SquadOvError> {
-        Ok(String::new())
+        #[derive(Deserialize)]
+        pub struct UploadField {
+            token: String,
+        }
+
+        #[derive(Deserialize)]
+        pub struct Response {
+            upload: UploadField
+        }
+
+        let resp = self.create_http_client()?
+            .post(&format!("/api/v2/uploads?filename={}", &filename))
+            .header("content-type", "application/binary")
+            .body(data)
+            .send()
+            .await?
+            .json::<Response>().await?;
+        Ok(resp.upload.token)
     }
 }
