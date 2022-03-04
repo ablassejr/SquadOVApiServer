@@ -138,6 +138,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .app_data(web::Data::new(app.clone()))
                     .service(api_service::create_service(config.server.graphql_debug))
                 })
+                .workers(config2.server.workers)
                 .server_hostname(&config2.server.domain)
                 .bind("0.0.0.0:8080")
                 .unwrap()

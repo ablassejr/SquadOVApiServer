@@ -42,6 +42,7 @@ async fn main() -> std::io::Result<()> {
         .unwrap()
         .try_deserialize()
         .unwrap();
+    let config2 = config.clone();
 
     let app = Arc::new(shared::SharedApp::new(config.clone()).await);
 
@@ -76,6 +77,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/", web::get().to(landing_page))
             )
     })
+        .workers(config2.workers)
         .bind("0.0.0.0:8080")?
         .run()
         .await

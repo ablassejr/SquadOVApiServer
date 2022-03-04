@@ -166,7 +166,8 @@ pub struct CorsConfig {
 #[derive(Deserialize,Debug,Clone)]
 pub struct ServerConfig {
     pub domain: String,
-    pub graphql_debug: bool
+    pub graphql_debug: bool,
+    pub workers: usize,
 }
 
 #[derive(Deserialize,Debug,Clone)]

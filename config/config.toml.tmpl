@@ -20,6 +20,7 @@ service_account_key = "gcp/squadov.json"
 [server]
 domain = "api.${DEPLOYMENT_DOMAIN}"
 graphql_debug = false
+workers = 8
 
 [gitlab]
 access_token = "${GITLAB_ACCESS_TOKEN}"

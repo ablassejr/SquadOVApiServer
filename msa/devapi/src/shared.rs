@@ -24,6 +24,7 @@ pub struct DevApiConfig {
     redshift_endpoint: String,
     redshift_username: String,
     redshift_password: String,
+    pub workers: usize,
 }
 
 impl DevApiConfig {
