@@ -107,6 +107,7 @@ pub struct RawWowRequest {
     release: WowRelease,
     patch: Option<String>,
     bracket: Option<WowArenaBracket>,
+    page: Option<usize>,
 }
 
 #[derive(Serialize)]
@@ -165,13 +166,18 @@ pub async fn raw_wow_handler(payload: web::Json<RawWowRequest>, app: web::Data<A
                     JSON_SERIALIZE(wmc.items),
                     JSON_SERIALIZE(wmc.talents),
                     JSON_SERIALIZE(wmc.covenant)
-                FROM wow_matches wm
+                FROM (
+                    SELECT *
+                    FROM wow_matches wm
+                    WHERE wm.tm >= $1 AND wm.tm < $2
+                        AND wm.match_type = 'arena'
+                        AND (wm.build ~ $3 OR wm.build ~ $4)
+                        AND wm.info.arena_type::VARCHAR = $5
+                    ORDER BY wm.tm ASC
+                    LIMIT 1000 OFFSET $6
+                ) wm
                 LEFT JOIN wow_match_combatants wmc
                     ON wmc.match_id = wm.id
-                WHERE wm.tm >= $1 AND wm.tm < $2
-                    AND wm.match_type = 'arena'
-                    AND (wm.build ~ $3 OR wm.build ~ $4)
-                    AND wm.info.arena_type::VARCHAR = $5
             "#).await.unwrap();
 
             let rows = client.query(&stmt, &[
@@ -180,6 +186,7 @@ pub async fn raw_wow_handler(payload: web::Json<RawWowRequest>, app: web::Data<A
                 &payload.release.to_patch_filter(),
                 &payload.patch.clone().unwrap_or(".*".to_string()),
                 &payload.bracket.as_ref().unwrap().to_string(),
+                &(payload.page.unwrap_or(0) as i32 * 1000i32),
             ]).await.unwrap();
 
             for x in rows {

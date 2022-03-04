@@ -75,6 +75,12 @@ components:
           description: >
             The RFC 3339 formatted date-time at which to stop pulling data.
             Must be less than 24 hours after the start time.
+        page:
+          type: integer
+          description: >
+            For pagination purposes, each request to the raw endpoints will return up to 1,000 matches at a time.
+            You should increase the page number from 0 after each request to get the next 1,000 matches.
+            You have reached the last page when the number of returned matches is less than 1,000.
       required:
         - startTm
         - endTm

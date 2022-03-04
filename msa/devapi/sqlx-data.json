@@ -3159,26 +3159,6 @@
       ]
     }
   },
-  "2f4d0cd24a0586c1eb1c3afb5ea468ef646b385a47c3702eb4c80620839f30a8": {
-    "query": "\n                    SELECT EXISTS(\n                        SELECT 1\n                        FROM squadov.devapi_keys\n                        WHERE api_key = $1\n                    ) AS val\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "val",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "3089c7722b7ec3db389026e8d59e40efd79574a2d5583d5c28773036471109c1": {
     "query": "\n                SELECT match_uuid\n                FROM squadov.new_wow_challenges AS wc\n                CROSS JOIN (\n                    SELECT wmv.start_tm, wcv.instance_id, wcv.keystone_level\n                    FROM squadov.wow_match_view AS wmv\n                    INNER JOIN squadov.wow_challenge_view AS wcv\n                        ON wcv.view_id = wmv.id\n                    WHERE wmv.id = $2\n                ) AS wmv(start_tm, instance_id, keystone_level)\n                WHERE wc.tr && tstzrange(wmv.start_tm, $3, '[]')\n                    AND wc.combatants_key = $1\n                    AND wc.instance_id = wmv.instance_id\n                    AND wc.keystone_level = wmv.keystone_level\n                ",
     "describe": {
@@ -3839,19 +3819,6 @@
         false,
         true
       ]
-    }
-  },
-  "3af293b60b18ac60064830e0c94f1dcdf5fdbb48916f7930c7bd2314767d9503": {
-    "query": "\n                INSERT INTO squadov.deferred_rabbitmq_messages (\n                    execute_time,\n                    message\n                )\n                VALUES (\n                    $1,\n                    $2\n                )\n                ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Timestamptz",
-          "Bytea"
-        ]
-      },
-      "nullable": []
     }
   },
   "3b7ac82dedfe913e40b48142952cfc7c50bf66d536b853bb88f0272d19052df6": {
