@@ -29,8 +29,7 @@ async fn health_check() -> Result<HttpResponse> {
     Ok(HttpResponse::Ok().finish())
 }
 
-#[tokio::main]
-async fn main() -> std::io::Result<()> {
+fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "info,devapi=debug,actix_web=debug,actix_http=debug");
     env_logger::init();
 
@@ -42,43 +41,51 @@ async fn main() -> std::io::Result<()> {
         .unwrap()
         .try_deserialize()
         .unwrap();
-    let config2 = config.clone();
 
-    let app = Arc::new(shared::SharedApp::new(config.clone()).await);
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(config.workers)
+        .build()
+        .unwrap()
+        .block_on(async move {
+            let config2 = config.clone();
+            let app = Arc::new(shared::SharedApp::new(config.clone()).await);
 
-    HttpServer::new(move || {
-        App::new()
-            .wrap(Compress::default())
-            .wrap(Logger::default())
-            .app_data(web::Data::new(app.clone()))
-            .service(
-                // User-facing protected endpoint.
-                // Login via OAuth.
-                web::scope("/dashboard")
-                    .wrap(auth::oauth::OAuth{config: config.clone()})
-                    .route("/", web::get().to(docs_page))
-            )
-            .service(
-                // Machine-facing protected endpoint.
-                // Authenticate using API key.
-                web::scope("/api")
-                    .wrap(auth::api::ApiAuth{app: app.clone()})
+            HttpServer::new(move || {
+                App::new()
+                    .wrap(Compress::default())
+                    .wrap(Logger::default())
+                    .app_data(web::Data::new(app.clone()))
                     .service(
-                        web::scope("/raw")
-                            .route("/wow", web::post().to(api::raw::wow::raw_wow_handler))
+                        // User-facing protected endpoint.
+                        // Login via OAuth.
+                        web::scope("/dashboard")
+                            .wrap(auth::oauth::OAuth{config: config.clone()})
+                            .route("/", web::get().to(docs_page))
                     )
-            )
-            .service(
-                // Publicly facing landing page.
-                web::scope("")
-                    .route("/swagger/v3/openapi.yml", web::get().to(openapi::openapi_v3))
-                    .route("/oauth", web::get().to(auth::oauth::oauth_handler))
-                    .route("/healthz", web::get().to(health_check))
-                    .route("/", web::get().to(landing_page))
-            )
-    })
-        .workers(config2.workers)
-        .bind("0.0.0.0:8080")?
-        .run()
-        .await
+                    .service(
+                        // Machine-facing protected endpoint.
+                        // Authenticate using API key.
+                        web::scope("/api")
+                            .wrap(auth::api::ApiAuth{app: app.clone()})
+                            .service(
+                                web::scope("/raw")
+                                    .route("/wow", web::post().to(api::raw::wow::raw_wow_handler))
+                            )
+                    )
+                    .service(
+                        // Publicly facing landing page.
+                        web::scope("")
+                            .route("/swagger/v3/openapi.yml", web::get().to(openapi::openapi_v3))
+                            .route("/oauth", web::get().to(auth::oauth::oauth_handler))
+                            .route("/healthz", web::get().to(health_check))
+                            .route("/", web::get().to(landing_page))
+                    )
+            })
+                .workers(config2.workers)
+                .bind("0.0.0.0:8080")?
+                .run()
+                .await
+        })
+    
 }

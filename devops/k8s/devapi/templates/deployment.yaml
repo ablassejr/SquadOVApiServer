@@ -32,6 +32,8 @@ spec:
                             key: password
                     - name: SQUADOV_DB_CONNECTIONS
                       value: "16"
+                    - name: SQUADOV_WORKERS
+                      value: "8"
                     - name: SQUADOV_DB_ENDPOINT
                       value: "squadov-postgres-primary.ccy90hcqnqbc.us-east-2.rds.amazonaws.com"
                     - name: SQUADOV_FA_URL
