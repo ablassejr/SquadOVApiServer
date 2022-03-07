@@ -12,7 +12,6 @@ use crate::api;
 use crate::api::auth::SquadOVSession;
 use std::sync::Arc;
 use futures::{StreamExt, TryStreamExt};
-use serde::{Deserialize};
 use chrono::Utc;
 
 impl api::ApiApplication {
