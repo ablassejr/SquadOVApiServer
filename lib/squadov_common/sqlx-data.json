@@ -3253,6 +3253,20 @@
       "nullable": []
     }
   },
+  "32288c8f4ddaf1349d259ec03137f2726cbb76143a39a98920c1ec797eb514b2": {
+    "query": "\n        INSERT INTO squadov.valorant_match_uuid_link (\n            match_uuid,\n            match_id,\n            shard\n        )\n        VALUES (\n            $1,\n            $2,\n            $3\n        )\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Varchar",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "324162c4855772ef32c8f9017489c27cdaa28f145833d5e147827cc271acf466": {
     "query": "\n        SELECT ra.puuid, ra.game_name, ra.tag_line\n        FROM squadov.riot_accounts AS ra\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.puuid = ra.puuid\n        WHERE ral.user_id = $1\n            AND ra.game_name IS NOT NULL\n            AND ra.tag_line IS NOT NULL\n        ",
     "describe": {
@@ -13857,6 +13871,27 @@
         false,
         false,
         false,
+        false
+      ]
+    }
+  },
+  "f64e9493236e420785d02f53fbee440f1456a7862df4e99dc0b8009f7d14b16e": {
+    "query": "\n            SELECT down\n            FROM squadov.riot_api_outage_status\n            WHERE game = $1 AND region = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "down",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": [
         false
       ]
     }
