@@ -480,16 +480,22 @@ impl ApiApplication {
             }
 
             if config.rabbitmq.enable_valorant {
-                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.valorant_queue.clone(), valorant_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
-                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.misc_valorant_queue.clone(), valorant_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
+                for _ in 0..config.rabbitmq.valorant_workers {
+                    RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.valorant_queue.clone(), valorant_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
+                    RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.misc_valorant_queue.clone(), valorant_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
+                }
             }
 
             if config.rabbitmq.enable_lol {
-                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.lol_queue.clone(), lol_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
+                for _ in 0..config.rabbitmq.lol_workers {
+                    RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.lol_queue.clone(), lol_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
+                }
             }
 
             if config.rabbitmq.enable_tft {
-                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.tft_queue.clone(), tft_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
+                for _ in 0..config.rabbitmq.tft_workers {
+                    RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.tft_queue.clone(), tft_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
+                }
             }
 
             if config.rabbitmq.enable_steam {
