@@ -49,6 +49,7 @@ pub struct RiotApiHandler {
     api_key: RiotApiKeyConfig,
     burst_threshold: Arc<Semaphore>,
     bulk_threshold: Arc<Semaphore>,
+    db: Arc<PgPool>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -97,7 +98,7 @@ pub enum RiotApiTask {
 }
 
 impl RiotApiHandler {
-    pub fn new(api_key: RiotApiKeyConfig) -> Self {
+    pub fn new(api_key: RiotApiKeyConfig, db: Arc<PgPool>) -> Self {
         let burst_threshold = Arc::new(Semaphore::new(api_key.burst_limit.requests));
         let bulk_threshold = Arc::new(Semaphore::new(api_key.bulk_limit.requests));
 
@@ -108,6 +109,33 @@ impl RiotApiHandler {
             api_key,
             burst_threshold,
             bulk_threshold,
+            db,
+        }
+    }
+
+    // Force a defer if we've manually set a region as being "down".
+    pub async fn check_region_status(&self, game: &str, region: &str) -> Result<(), SquadOvError> {
+        let game = game.to_lowercase();
+        let region = region.to_lowercase();
+        let is_down = sqlx::query!(
+            "
+            SELECT down
+            FROM squadov.riot_api_outage_status
+            WHERE game = $1 AND region = $2
+            ",
+            &game,
+            &region,
+        )
+            .fetch_optional(&*self.db)
+            .await?
+            .map(|x| { x.down })
+            .unwrap_or(false);
+
+        if is_down {
+            // Delay for an hour
+            Err(SquadOvError::Defer(3600000))
+        } else {
+            Ok(())
         }
     }
 

@@ -17,6 +17,8 @@ const RIOT_MAX_AGE_SECONDS: i64 = 86400; // 1 day
 
 impl super::RiotApiHandler {
     pub async fn get_valorant_matches_for_user(&self, puuid: &str, shard: &str) -> Result<ValorantMatchlistDto, SquadOvError> {
+        self.check_region_status("val", shard).await?;
+
         let client = self.create_http_client()?;
         let endpoint = Self::build_api_endpoint(shard, &format!("val/match/v1/matchlists/by-puuid/{}", puuid));
         self.tick_thresholds().await?;
@@ -30,6 +32,8 @@ impl super::RiotApiHandler {
     }
 
     pub async fn get_valorant_match(&self, match_id: &str, shard: &str) -> Result<ValorantMatchDto, SquadOvError> {
+        self.check_region_status("val", shard).await?;
+
         let client = self.create_http_client()?;
         let endpoint = Self::build_api_endpoint(shard, &format!("val/match/v1/matches/{}", match_id));
         self.tick_thresholds().await?;
@@ -91,7 +95,7 @@ impl super::RiotApiApplicationInterface {
         for _i in 0..2i32 {
             let mut tx = self.db.begin().await?;
             log::info!("...Create or Get Val Match Uuid: {} [{}]", match_id, shard);
-            let match_uuid = match db::create_or_get_match_uuid_for_valorant_match(&mut tx, match_id).await {
+            let match_uuid = match db::create_or_get_match_uuid_for_valorant_match(&mut tx, match_id, shard).await {
                 Ok(x) => x,
                 Err(err) => match err {
                     SquadOvError::Duplicate => {

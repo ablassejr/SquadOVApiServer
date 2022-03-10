@@ -457,10 +457,10 @@ impl ApiApplication {
             }
         );
 
-        let rso_api = Arc::new(RiotApiHandler::new(config.riot.rso_api_key.clone()));
-        let valorant_api = Arc::new(RiotApiHandler::new(config.riot.valorant_api_key.clone()));
-        let lol_api = Arc::new(RiotApiHandler::new(config.riot.lol_api_key.clone()));
-        let tft_api = Arc::new(RiotApiHandler::new(config.riot.tft_api_key.clone()));
+        let rso_api = Arc::new(RiotApiHandler::new(config.riot.rso_api_key.clone(), pool.clone()));
+        let valorant_api = Arc::new(RiotApiHandler::new(config.riot.valorant_api_key.clone(), pool.clone()));
+        let lol_api = Arc::new(RiotApiHandler::new(config.riot.lol_api_key.clone(), pool.clone()));
+        let tft_api = Arc::new(RiotApiHandler::new(config.riot.tft_api_key.clone(), pool.clone()));
         let steam_api = Arc::new(SteamApiClient::new(&config.steam));
 
         let rabbitmq = RabbitMqInterface::new(&config.rabbitmq, Some(pool.clone()), !disable_rabbitmq).await.unwrap();
