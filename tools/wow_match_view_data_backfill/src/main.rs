@@ -119,7 +119,6 @@ struct Options {
 async fn main() -> Result<(), SquadOvError> {
     std::env::set_var("RUST_BACKTRACE", "1");
     std::env::set_var("RUST_LOG", "info,wow_match_view_data_backfill=debug");
-    std::env::set_var("SQLX_LOG", "0");
     env_logger::init();
 
     let opts = Options::from_args();
@@ -155,7 +154,7 @@ async fn main() -> Result<(), SquadOvError> {
         additional_queues: Some(vec![
             opts.queue.clone(),
         ])
-    }, pool.clone(), true).await.unwrap();
+    }, Some(pool.clone()), true).await.unwrap();
 
     let handler_itf = Arc::new(WowTaskHandler::new(pool.clone()));
     for _i in 0..opts.threads {

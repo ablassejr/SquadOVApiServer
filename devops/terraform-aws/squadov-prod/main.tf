@@ -30,6 +30,8 @@ module "network" {
 
 module "iam" {
     source = "../modules/iam"
+
+    resource_suffix = "-prod"
 }
 
 module "db" {

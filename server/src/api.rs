@@ -9,7 +9,10 @@ pub mod oembed;
 pub mod meta;
 
 use serde::{Deserialize};
-use sqlx::postgres::{PgPool};
+use sqlx::{
+    ConnectOptions,
+    postgres::{PgPool},
+};
 use actix_web::{HttpRequest};
 use squadov_common;
 use squadov_common::{
@@ -62,7 +65,6 @@ use squadov_common::{
         SegmentConfig,
         SegmentClient,
     },
-    user::SquadOVUser,
     twitch::{
         TwitchConfig,
         rabbitmq::TwitchApiRabbitmqInterface,
@@ -83,7 +85,10 @@ use squadov_common::{
 use url::Url;
 use std::vec::Vec;
 use std::sync::{Arc};
-use sqlx::postgres::{PgPoolOptions};
+use sqlx::postgres::{PgPoolOptions, PgConnectOptions};
+
+#[cfg(feature = "eventloop")]
+use squadov_common::user::SquadOVUser;
 
 // TODO: REMOVE THIS.
 #[macro_export]
@@ -153,7 +158,9 @@ pub fn construct_hal_pagination_response<T>(data : T, req: &HttpRequest, params:
 
 #[derive(Deserialize,Debug,Clone)]
 pub struct DatabaseConfig {
-    pub url: String,
+    pub host: String,
+    pub username: String,
+    pub password: String,
     pub connections: u32,
     pub heavy_connections: u32,
 }
@@ -214,6 +221,11 @@ pub struct SquadOvStorageConfig {
 }
 
 #[derive(Deserialize,Debug,Clone)]
+pub struct CombatLogConfig {
+    pub hostname: String,
+}
+
+#[derive(Deserialize,Debug,Clone)]
 pub struct ApiConfig {
     fusionauth: fusionauth::FusionAuthConfig,
     pub gcp: squadov_common::GCPConfig,
@@ -237,10 +249,15 @@ pub struct ApiConfig {
     pub discord: DiscordConfig,
     pub redis: RedisConfig,
     pub zendesk: ZendeskConfig,
+    pub combatlog: CombatLogConfig,
 }
 
 impl CommonConfig for DatabaseConfig {
     fn read_from_env(&mut self) {
+        if let Ok(value) = std::env::var("SQUADOV_DB_HOST") {
+            self.host = value;
+        }
+
         if let Ok(connections) = std::env::var("SQUADOV_DB_CONNECTIONS") {
             self.connections = connections.parse::<u32>().unwrap_or(self.connections);
         }
@@ -284,7 +301,7 @@ pub struct ApiApplication {
     pub twitch_itf: Arc<TwitchApiRabbitmqInterface>,
     pub sharing_itf: Arc<SharingRabbitmqInterface>,
     gcp: Arc<Option<GCPClient>>,
-    aws: Arc<Option<AWSClient>>,
+    pub aws: Arc<Option<AWSClient>>,
     pub hashid: Arc<harsh::Harsh>,
     pub ip: Arc<IpstackClient>,
     pub segment: Arc<SegmentClient>,
@@ -293,6 +310,7 @@ pub struct ApiApplication {
 }
 
 impl ApiApplication {
+    #[cfg(feature = "eventloop")]
     async fn mark_users_inactive(&self) -> Result<(), SquadOvError> {
         let inactive_users = sqlx::query_as!(
             SquadOVUser,
@@ -378,28 +396,50 @@ impl ApiApplication {
         Ok(())
     }
 
-    pub async fn new(config: &ApiConfig) -> ApiApplication {
+    pub async fn new(config: &ApiConfig, app_name: &str) -> ApiApplication {
         let disable_rabbitmq = std::env::var("DISABLE_RABBITMQ").is_ok();
 
         // Use TOML config to create application - e.g. for
         // database configuration, external API client configuration, etc.
-        let pool = Arc::new(PgPoolOptions::new()
-            .min_connections(1)
-            .max_connections(config.database.connections)
-            .max_lifetime(std::time::Duration::from_secs(6*60*60))
-            .idle_timeout(std::time::Duration::from_secs(3*60*60))
-            .connect(&config.database.url)
-            .await
-            .unwrap());
+        let pool = {
+            let mut conn = PgConnectOptions::new()
+                .host(&config.database.host)
+                .username(&config.database.username)
+                .password(&config.database.password)
+                .port(5432)
+                .application_name(&format!("squadov_{}_normal_pool", app_name))
+                .database("squadov")
+                .statement_cache_capacity(0);
+            conn.log_statements(log::LevelFilter::Trace);
+            Arc::new(PgPoolOptions::new()
+                .min_connections(1)
+                .max_connections(config.database.connections)
+                .max_lifetime(std::time::Duration::from_secs(6*60*60))
+                .idle_timeout(std::time::Duration::from_secs(3*60*60))
+                .connect_with(conn)
+                .await
+                .unwrap())
+        };
 
-        let heavy_pool = Arc::new(PgPoolOptions::new()
-            .min_connections(1)
-            .max_connections(config.database.heavy_connections)
-            .max_lifetime(std::time::Duration::from_secs(3*60*60))
-            .idle_timeout(std::time::Duration::from_secs(1*60*60))
-            .connect(&config.database.url)
-            .await
-            .unwrap());
+        let heavy_pool = {
+            let mut conn = PgConnectOptions::new()
+                .host(&config.database.host)
+                .username(&config.database.username)
+                .password(&config.database.password)
+                .port(5432)
+                .application_name(&format!("squadov_{}_heavy_pool", app_name))
+                .database("squadov")
+                .statement_cache_capacity(0);
+            conn.log_statements(log::LevelFilter::Trace);
+            Arc::new(PgPoolOptions::new()
+                .min_connections(1)
+                .max_connections(config.database.heavy_connections)
+                .max_lifetime(std::time::Duration::from_secs(3*60*60))
+                .idle_timeout(std::time::Duration::from_secs(1*60*60))
+                .connect_with(conn)
+                .await
+                .unwrap())
+        };
 
         let gcp = Arc::new(
             if config.gcp.enabled {
@@ -423,7 +463,7 @@ impl ApiApplication {
         let tft_api = Arc::new(RiotApiHandler::new(config.riot.tft_api_key.clone()));
         let steam_api = Arc::new(SteamApiClient::new(&config.steam));
 
-        let rabbitmq = RabbitMqInterface::new(&config.rabbitmq, pool.clone(), !disable_rabbitmq).await.unwrap();
+        let rabbitmq = RabbitMqInterface::new(&config.rabbitmq, Some(pool.clone()), !disable_rabbitmq).await.unwrap();
 
         let rso_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, rso_api.clone(), rabbitmq.clone(), pool.clone()));
         let valorant_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, valorant_api.clone(), rabbitmq.clone(), pool.clone()));
@@ -543,6 +583,7 @@ impl ApiApplication {
     }
 }
 
+#[cfg(feature = "eventloop")]
 pub fn start_event_loop(app: Arc<ApiApplication>) {
     tokio::task::spawn(async move {
         loop {
@@ -561,7 +602,7 @@ pub fn start_event_loop(app: Arc<ApiApplication>) {
             };
 
             // Doing this once per day should be sufficient...
-            tokio::time::delay_for(tokio::time::Duration::from_secs(86400)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(86400)).await;
         }
     });
 }

@@ -18,8 +18,7 @@ struct Options {
 #[tokio::main]
 pub async fn main() -> Result<(), SquadOvError> {
     std::env::set_var("RUST_BACKTRACE", "1");
-    std::env::set_var("RUST_LOG", "info,singleton_event_processing_worker=debug,actix_web=debug,actix_http=debug,librdkafka=info,rdkafka::client=info");
-    std::env::set_var("SQLX_LOG", "0");
+    std::env::set_var("RUST_LOG", "info,singleton_event_processing_worker=debug,actix_web=debug,actix_http=debug,librdkafka=info,rdkafka::client=info,sqlx=info");
     env_logger::init();
 
     let opts = Options::from_args();
@@ -40,7 +39,7 @@ pub async fn main() -> Result<(), SquadOvError> {
 
     // Only use the provided config to connect to things.
     let _ = tokio::task::spawn(async move {
-        let app = Arc::new(api::ApiApplication::new(&config).await);
+        let app = Arc::new(api::ApiApplication::new(&config, "singleton_event").await);
         api::start_event_loop(app.clone());
 
         loop {

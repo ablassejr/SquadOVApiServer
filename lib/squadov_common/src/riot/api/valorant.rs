@@ -19,7 +19,7 @@ impl super::RiotApiHandler {
     pub async fn get_valorant_matches_for_user(&self, puuid: &str, shard: &str) -> Result<ValorantMatchlistDto, SquadOvError> {
         let client = self.create_http_client()?;
         let endpoint = Self::build_api_endpoint(shard, &format!("val/match/v1/matchlists/by-puuid/{}", puuid));
-        self.tick_thresholds().await;
+        self.tick_thresholds().await?;
 
         let resp = client.get(&endpoint)
             .send()
@@ -32,7 +32,7 @@ impl super::RiotApiHandler {
     pub async fn get_valorant_match(&self, match_id: &str, shard: &str) -> Result<ValorantMatchDto, SquadOvError> {
         let client = self.create_http_client()?;
         let endpoint = Self::build_api_endpoint(shard, &format!("val/match/v1/matches/{}", match_id));
-        self.tick_thresholds().await;
+        self.tick_thresholds().await?;
 
         let resp = client.get(&endpoint)
             .send()

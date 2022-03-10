@@ -405,7 +405,6 @@ fn get_bound(bnd: &Bound<DateTime<Utc>>) -> DateTime<Utc> {
 async fn main() -> Result<(), SquadOvError> {
     std::env::set_var("RUST_BACKTRACE", "1");
     std::env::set_var("RUST_LOG", "info,wow_match_transfer=debug");
-    std::env::set_var("SQLX_LOG", "0");
     env_logger::init();
 
     let opts = Options::from_args();
@@ -450,7 +449,7 @@ async fn main() -> Result<(), SquadOvError> {
         additional_queues: Some(vec![
             opts.queue.clone(),
         ])
-    }, dst_pool.clone(), true).await.unwrap();
+    }, Some(dst_pool.clone()), true).await.unwrap();
 
     let handler_itf = Arc::new(WowTaskHandler::new(src_pool.clone(), dst_pool.clone(), opts.encounter, opts.characters));
 
