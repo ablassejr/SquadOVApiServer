@@ -35,6 +35,14 @@ resource "aws_default_security_group" "primary_sg" {
         self = true
     }
 
+    ingress {
+        description = "Redis"
+        from_port = 6379
+        to_port = 6379
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
     egress {
         from_port = 0
         to_port = 0
