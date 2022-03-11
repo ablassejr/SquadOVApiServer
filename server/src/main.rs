@@ -27,25 +27,29 @@ struct Options {
     config: std::path::PathBuf,
     #[structopt(short, long)]
     mode: Option<String>,
+    #[structopt(short, long)]
+    workers: usize,
 }
 
 fn main() {
+    let opts = Options::from_args();
     actix_rt::System::with_tokio_rt(|| {
         Builder::new_multi_thread()
             .enable_all()
+            .worker_threads(opts.workers)
             .build()
             .unwrap()
     })
-        .block_on(async_main());
+        .block_on(async_main(opts));
 }
 
-async fn async_main() {
+async fn async_main(opts: Options) {
     std::env::set_var("RUST_BACKTRACE", "1");
     std::env::set_var("RUST_LOG", "info,squadov_api_server=debug,actix_web=debug,actix_http=debug,librdkafka=info,rdkafka::client=info,sqlx=info");
     env_logger::init();
 
     log::info!("Start SquadOV Api Server.");
-    let opts = Options::from_args();
+    
     let raw_cfg = fs::read_to_string(opts.config).unwrap();
     let mut config : api::ApiConfig = toml::from_str(&raw_cfg).unwrap();
     config.read_from_env();
