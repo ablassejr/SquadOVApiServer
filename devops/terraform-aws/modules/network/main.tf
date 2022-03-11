@@ -10,13 +10,6 @@ resource "aws_default_security_group" "primary_sg" {
     vpc_id = aws_vpc.primary.id
 
     ingress {
-        protocol = -1
-        self = true
-        from_port = 0
-        to_port = 0
-    }
-
-    ingress {
         protocol = "tcp"
         from_port = 5432
         to_port = 5432
