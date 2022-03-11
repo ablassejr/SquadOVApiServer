@@ -13,11 +13,11 @@ use super::RiotApiTask;
 use crate::riot::db;
 use uuid::Uuid;
 
-const RIOT_MAX_AGE_SECONDS: i64 = 86400; // 1 day
+const RIOT_MAX_AGE_SECONDS: i64 = 172800; // 2 day
 
 impl super::RiotApiHandler {
     pub async fn get_valorant_matches_for_user(&self, puuid: &str, shard: &str) -> Result<ValorantMatchlistDto, SquadOvError> {
-        self.check_region_status("val", shard).await?;
+        self.check_region_status("val", shard, false).await?;
 
         let client = self.create_http_client()?;
         let endpoint = Self::build_api_endpoint(shard, &format!("val/match/v1/matchlists/by-puuid/{}", puuid));
@@ -31,8 +31,8 @@ impl super::RiotApiHandler {
         Ok(resp.json::<ValorantMatchlistDto>().await?)
     }
 
-    pub async fn get_valorant_match(&self, match_id: &str, shard: &str) -> Result<ValorantMatchDto, SquadOvError> {
-        self.check_region_status("val", shard).await?;
+    pub async fn get_valorant_match(&self, match_id: &str, shard: &str, allow_failover: bool) -> Result<ValorantMatchDto, SquadOvError> {
+        self.check_region_status("val", shard, allow_failover).await?;
 
         let client = self.create_http_client()?;
         let endpoint = Self::build_api_endpoint(shard, &format!("val/match/v1/matches/{}", match_id));
@@ -76,7 +76,7 @@ impl super::RiotApiApplicationInterface {
         Ok(())
     }
 
-    pub async fn obtain_valorant_match_info(&self, match_id: &str, shard: &str) -> Result<(), SquadOvError> {
+    pub async fn obtain_valorant_match_info(&self, match_id: &str, shard: &str, allow_failover: bool) -> Result<(), SquadOvError> {
         // Check to make sure that we haven't already retrieved match details for this particular match.
         // This case could happen when multiple SquadOV users are in the same match and thus all submit
         // request for obtaining match details at the same time. Since this process is currently effectively single
@@ -88,7 +88,7 @@ impl super::RiotApiApplicationInterface {
         }
         log::info!("Obtaining Valorant Match Details: {} [{}]", match_id, shard);
 
-        let valorant_match = self.api.get_valorant_match(match_id, shard).await?;
+        let valorant_match = self.api.get_valorant_match(match_id, shard, allow_failover).await?;
 
         // There are two cases here: either 1) we're coming from the user created match endpoint in which case a match UUID already probably exists
         // or 2) we're coming from the backfill where the match UUID doesn't exist. We need to handle case #2 by creating the match UUID.

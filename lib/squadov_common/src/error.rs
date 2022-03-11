@@ -39,6 +39,10 @@ pub enum SquadOvError {
     TwoFactor(String),
     #[display(fmt = "[SquadovError] Forbidden")]
     Forbidden,
+    #[display(fmt = "[SquadovError] Failover")]
+    Failover,
+    #[display(fmt = "[SquadovError] Switch Queue")]
+    SwitchQueue(String),
 }
 
 impl std::error::Error for SquadOvError {}
@@ -60,7 +64,7 @@ impl error::ResponseError for SquadOvError {
             SquadOvError::NotFound => StatusCode::NOT_FOUND,
             SquadOvError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             SquadOvError::Duplicate => StatusCode::BAD_REQUEST,
-            SquadOvError::Defer(_) => StatusCode::SERVICE_UNAVAILABLE,
+            SquadOvError::Defer(_) | SquadOvError::Failover | SquadOvError::SwitchQueue(_) => StatusCode::SERVICE_UNAVAILABLE,
             SquadOvError::RateLimit => StatusCode::TOO_MANY_REQUESTS,
             SquadOvError::TwoFactor(_) => StatusCode::ACCEPTED,
             SquadOvError::Forbidden => StatusCode::FORBIDDEN,

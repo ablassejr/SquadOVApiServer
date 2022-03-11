@@ -106,6 +106,12 @@ pub enum RiotApiTask {
     }
 }
 
+#[derive(Default)]
+struct RiotApiStatus {
+    down: bool,
+    failover: bool,
+}
+
 impl RiotApiHandler {
     pub fn new(api_key: RiotApiKeyConfig, db: Arc<PgPool>) -> Self {
         let burst_threshold = Arc::new(Semaphore::new(api_key.burst_limit.requests));
@@ -123,12 +129,13 @@ impl RiotApiHandler {
     }
 
     // Force a defer if we've manually set a region as being "down".
-    pub async fn check_region_status(&self, game: &str, region: &str) -> Result<(), SquadOvError> {
+    pub async fn check_region_status(&self, game: &str, region: &str, allow_failover: bool) -> Result<(), SquadOvError> {
         let game = game.to_lowercase();
         let region = region.to_lowercase();
-        let is_down = sqlx::query!(
+        let status: RiotApiStatus = sqlx::query_as!(
+            RiotApiStatus,
             "
-            SELECT down
+            SELECT down, failover
             FROM squadov.riot_api_outage_status
             WHERE game = $1 AND region = $2
             ",
@@ -137,10 +144,11 @@ impl RiotApiHandler {
         )
             .fetch_optional(&*self.db)
             .await?
-            .map(|x| { x.down })
-            .unwrap_or(false);
+            .unwrap_or(RiotApiStatus::default());
 
-        if is_down {
+        if status.failover && allow_failover {
+            Err(SquadOvError::Failover)
+        } else if status.down {
             // Delay for an hour
             Err(SquadOvError::Defer(3600000))
         } else {
@@ -262,8 +270,8 @@ impl RiotApiApplicationInterface {
 
 #[async_trait]
 impl RabbitMqListener for RiotApiApplicationInterface {
-    async fn handle(&self, data: &[u8]) -> Result<(), SquadOvError> {
-        log::info!("Handle Riot RabbitMQ Task: {}", std::str::from_utf8(data).unwrap_or("failure"));
+    async fn handle(&self, data: &[u8], queue: &str) -> Result<(), SquadOvError> {
+        log::info!("Handle Riot RabbitMQ Task: {} [{}]", std::str::from_utf8(data).unwrap_or("failure"), queue);
         let task: RiotApiTask = serde_json::from_slice(data)?;
         match task {
             RiotApiTask::UnverifiedAccountLink{game_name, tag_line, summoner_name, platform_id, user_id} => {
@@ -279,9 +287,10 @@ impl RabbitMqListener for RiotApiApplicationInterface {
             RiotApiTask::AccountMe{access_token, refresh_token, expiration, user_id} => self.obtain_riot_account_from_access_token(&access_token, &refresh_token, &expiration, user_id).await.and(Ok(()))?,
             RiotApiTask::Account{puuid} => self.obtain_riot_account_from_puuid(&puuid).await?,
             RiotApiTask::ValorantBackfill{puuid} => self.backfill_user_valorant_matches(&puuid).await?,
-            RiotApiTask::ValorantMatch{match_id, shard} => match self.obtain_valorant_match_info(&match_id, &shard).await {
+            RiotApiTask::ValorantMatch{match_id, shard} => match self.obtain_valorant_match_info(&match_id, &shard, queue == self.mqconfig.valorant_queue).await {
                 Ok(_) => (),
                 Err(err) => match err {
+                    SquadOvError::Failover => return Err(SquadOvError::SwitchQueue(self.mqconfig.failover_valorant_queue.clone())),
                     // Remap not found to defer because Rito's api might not be that fast to give us the info right as the game finishes.
                     SquadOvError::NotFound => return Err(SquadOvError::Defer(60 * 1000)),
                     _ => return Err(err)

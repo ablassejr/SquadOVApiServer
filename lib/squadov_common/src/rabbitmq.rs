@@ -34,6 +34,8 @@ pub struct RabbitMqConfig {
     pub enable_valorant: bool,
     pub valorant_queue: String,
     pub valorant_workers: u32,
+    pub failover_valorant_queue: String,
+    pub failover_valorant_workers: u32,
     pub enable_lol: bool,
     pub lol_queue: String,
     pub lol_workers: u32,
@@ -73,7 +75,7 @@ impl RabbitMqConfig {
 
 #[async_trait]
 pub trait RabbitMqListener: Send + Sync {
-    async fn handle(&self, data: &[u8]) -> Result<(), SquadOvError>;
+    async fn handle(&self, data: &[u8], queue: &str) -> Result<(), SquadOvError>;
 }
 
 pub struct RabbitMqConnectionBundle {
@@ -138,6 +140,14 @@ impl RabbitMqConnectionBundle {
             if !config.valorant_queue.is_empty() {
                 ch.queue_declare(
                     &config.valorant_queue,
+                    queue_opts.clone(),
+                    default_table.clone(),
+                ).await?;
+            }
+
+            if !config.failover_valorant_queue.is_empty() {
+                ch.queue_declare(
+                    &config.failover_valorant_queue,
                     queue_opts.clone(),
                     default_table.clone(),
                 ).await?;
@@ -328,6 +338,7 @@ impl RabbitMqConnectionBundle {
 
             let expired = (current_timestamp - og_timestamp) > (max_age_seconds as u64) && max_age_seconds != INFITE_MAX_AGE;
             let mut requeue_ms: Option<i64> = None;
+            let mut change_queue: Option<String> = None;
 
             if !expired {
                 let current_listeners = listeners.read().await.clone();
@@ -335,11 +346,12 @@ impl RabbitMqConnectionBundle {
                 if topic_listeners.is_some() {
                     let topic_listeners = topic_listeners.unwrap();
                     for l in topic_listeners {
-                        match l.handle(&msg.data).await {
+                        match l.handle(&msg.data, &queue).await {
                             Ok(_) => (),
                             Err(err) => {
                                 log::warn!("Failure in processing RabbitMQ message: {:?}", err);
                                 match err {
+                                    SquadOvError::SwitchQueue(queue) => { change_queue = Some(queue) },
                                     SquadOvError::Defer(ms) => { requeue_ms = Some(ms); },
                                     SquadOvError::RateLimit => { requeue_ms = Some(100); },
                                     _ => (),
@@ -379,6 +391,16 @@ impl RabbitMqConnectionBundle {
                     priority: msg.properties.priority().unwrap_or(RABBITMQ_DEFAULT_PRIORITY),
                     timestamp: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(og_timestamp as i64, 0), Utc),
                     retry_count: retry_count + 1,
+                    base_delay_ms: requeue_ms,
+                    max_age_seconds,
+                });
+            } else if let Some(new_queue) = change_queue {
+                requeue_callback(&*itf, RabbitMqPacket{
+                    queue: new_queue.clone(),
+                    data: msg.data.clone(),
+                    priority: msg.properties.priority().unwrap_or(RABBITMQ_DEFAULT_PRIORITY),
+                    timestamp: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(og_timestamp as i64, 0), Utc),
+                    retry_count: 0,
                     base_delay_ms: requeue_ms,
                     max_age_seconds,
                 });

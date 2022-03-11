@@ -484,6 +484,10 @@ impl ApiApplication {
                     RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.valorant_queue.clone(), valorant_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
                     RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.misc_valorant_queue.clone(), valorant_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
                 }
+
+                for _ in 0..config.rabbitmq.failover_valorant_workers {
+                    RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.failover_valorant_queue.clone(), valorant_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
+                }
             }
 
             if config.rabbitmq.enable_lol {
