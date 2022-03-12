@@ -241,18 +241,19 @@ impl super::RiotApiApplicationInterface {
         Ok(())
     }
 
-    pub async fn request_unverified_account_link(&self, game_name: &str, tag_line: &str, user_id: i64) -> Result<(), SquadOvError> {
+    pub async fn request_unverified_account_link(&self, game_name: &str, tag_line: &str, raw_puuid: &str, user_id: i64) -> Result<(), SquadOvError> {
         self.rmq.publish(&self.mqconfig.valorant_queue, serde_json::to_vec(&RiotApiTask::UnverifiedAccountLink{
             game_name: Some(game_name.to_string()),
             tag_line: Some(tag_line.to_string()),
             summoner_name: None,
             platform_id: None,
             user_id,
+            raw_puuid: raw_puuid.to_string(),
         })?, RABBITMQ_DEFAULT_PRIORITY, RIOT_MAX_AGE_SECONDS).await;
         Ok(())
     }
 
-    pub async fn perform_unverified_account_link(&self, game_name: &str, tag_line: &str, user_id: i64) -> Result<(), SquadOvError> {
+    pub async fn perform_unverified_account_link(&self, game_name: &str, tag_line: &str, raw_puuid: &str, user_id: i64) -> Result<(), SquadOvError> {
         log::info!("Performing Unverified Account Link for User {} - {}#{}", user_id, game_name, tag_line);
         let account = self.api.get_account_by_game_name_tag_line(game_name, tag_line).await?;
         let shard = self.api.get_active_shard_by_game_for_puuid(VALORANT_SHORTHAND, &account.puuid).await?;
@@ -261,23 +262,25 @@ impl super::RiotApiApplicationInterface {
         let mut tx = self.db.begin().await?;
         db::store_riot_account(&mut tx, &account).await?;
         db::set_user_account_shard(&mut tx, &account.puuid, VALORANT_SHORTHAND, &shard).await?;
+        db::associate_raw_puuid_with_puuid(&mut tx, &account.puuid, raw_puuid).await?;
         db::link_riot_account_to_user(&mut tx, &account.puuid, user_id).await?;
         tx.commit().await?;
         Ok(())
     }
 
-    pub async fn request_unverified_summoner_link(&self, summoner_name: &str, platform_id: &str, user_id: i64) -> Result<(), SquadOvError> {
+    pub async fn request_unverified_summoner_link(&self, summoner_name: &str, platform_id: &str, raw_puuid: &str, user_id: i64) -> Result<(), SquadOvError> {
         self.rmq.publish(&self.mqconfig.lol_queue, serde_json::to_vec(&RiotApiTask::UnverifiedAccountLink{
             game_name: None,
             tag_line: None,
             summoner_name: Some(summoner_name.to_string()),
             platform_id: Some(platform_id.to_string()),
             user_id,
+            raw_puuid: raw_puuid.to_string(),
         })?, RABBITMQ_DEFAULT_PRIORITY, RIOT_MAX_AGE_SECONDS).await;
         Ok(())
     }
 
-    pub async fn perform_unverified_summoner_link(&self, summoner_name: &str, platform_id: &str, user_id: i64) -> Result<(), SquadOvError> {
+    pub async fn perform_unverified_summoner_link(&self, summoner_name: &str, platform_id: &str, raw_puuid: &str, user_id: i64) -> Result<(), SquadOvError> {
         log::info!("Performing Unverified Summoner Link for User {} - {}#{}", user_id, summoner_name, platform_id);
 
         let summoner = self.api.get_summoner_from_name(summoner_name, platform_id).await?;
@@ -291,6 +294,7 @@ impl super::RiotApiApplicationInterface {
             last_backfill_lol_time: None,
             last_backfill_tft_time: None,
         }).await?;
+        db::associate_raw_puuid_with_puuid(&mut tx, &summoner.puuid, raw_puuid).await?;
         db::link_riot_account_to_user(&mut tx, &summoner.puuid, user_id).await?;
         tx.commit().await?;
         Ok(())

@@ -99,7 +99,7 @@ pub async fn verify_valorant_account_ownership_handler(app : web::Data<Arc<api::
         app.valorant_itf.request_riot_account_from_puuid(&account.puuid).await?;
     } else {
         // No account! In this case, we want to force an unverified link to their account.
-        app.valorant_itf.request_unverified_account_link(&data.game_name, &data.tag_line, path.user_id).await?;
+        app.valorant_itf.request_unverified_account_link(&data.game_name, &data.tag_line, &data.puuid, path.user_id).await?;
     }
     Ok(HttpResponse::NoContent().finish())
 }
@@ -113,7 +113,7 @@ pub async fn verify_lol_summoner_ownership_handler(app : web::Data<Arc<api::ApiA
         app.resync_riot_account_rso(&summoner.puuid, path.user_id).await?;
     } else {
         // No account! In this case, we want to force an unverified link to their account.
-        app.lol_itf.request_unverified_summoner_link(&data.summoner_name, &data.platform_id, path.user_id).await?;
+        app.lol_itf.request_unverified_summoner_link(&data.summoner_name, &data.platform_id, &data.puuid, path.user_id).await?;
     }
     Ok(HttpResponse::NoContent().finish())
 }

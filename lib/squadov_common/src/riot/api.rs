@@ -63,6 +63,7 @@ pub enum RiotApiTask {
         summoner_name: Option<String>,
         platform_id: Option<String>,
         user_id: i64,
+        raw_puuid: String,
     },
     AccountMe{
         access_token: String,
@@ -274,11 +275,11 @@ impl RabbitMqListener for RiotApiApplicationInterface {
         log::info!("Handle Riot RabbitMQ Task: {} [{}]", std::str::from_utf8(data).unwrap_or("failure"), queue);
         let task: RiotApiTask = serde_json::from_slice(data)?;
         match task {
-            RiotApiTask::UnverifiedAccountLink{game_name, tag_line, summoner_name, platform_id, user_id} => {
+            RiotApiTask::UnverifiedAccountLink{game_name, tag_line, summoner_name, platform_id, raw_puuid, user_id} => {
                 if game_name.is_some() && tag_line.is_some() {
-                    self.perform_unverified_account_link(game_name.unwrap().as_str(), tag_line.unwrap().as_str(), user_id).await?;
+                    self.perform_unverified_account_link(game_name.unwrap().as_str(), tag_line.unwrap().as_str(), &raw_puuid, user_id).await?;
                 } else if summoner_name.is_some() && platform_id.is_some() {
-                    self.perform_unverified_summoner_link(summoner_name.unwrap().as_str(), platform_id.unwrap().as_str(), user_id).await?;
+                    self.perform_unverified_summoner_link(summoner_name.unwrap().as_str(), platform_id.unwrap().as_str(), &raw_puuid, user_id).await?;
                 } else {
                     log::warn!("...Invalid attempt at performing an unverified account link.");
                     return Err(SquadOvError::BadRequest);
