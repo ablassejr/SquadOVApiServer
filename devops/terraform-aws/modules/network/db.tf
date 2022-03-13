@@ -25,6 +25,14 @@ resource "aws_security_group" "database_security_group" {
         cidr_blocks = ["0.0.0.0/0"]
     }
 
+    ingress {
+        description = "Redshift connections."
+        from_port = 5439
+        to_port = 5439
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
     egress {
         from_port = 0
         to_port = 0

@@ -43,9 +43,9 @@ spec:
                     - name: FFMPEG_BINARY_PATH
                       value: ffmpeg
                     - name: SQUADOV_DB_CONNECTIONS
-                      value: "1024"
-                    - name: SQUADOV_DB_HEAVY_CONNECTIONS
                       value: "512"
+                    - name: SQUADOV_DB_HEAVY_CONNECTIONS
+                      value: "256"
                     - name: "WORKERS"
                       value: "16"
             imagePullSecrets:

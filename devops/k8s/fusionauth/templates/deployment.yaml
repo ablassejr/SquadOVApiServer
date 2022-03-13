@@ -54,9 +54,9 @@ spec:
                     - name: DATABASE_MAXIMUM_POOL_SIZE
                       value: "128"
                     - name: DATABASE_CONNECTION_TIMEOUT
-                      value: "20000"
+                      value: "60000"
                     - name: DATABASE_CONNECTION_HEALTHCHECK_99PERCENT_MS
-                      value: "5000"
+                      value: "15000"
                     - name: DATABASE_ROOT_USER
                       valueFrom:
                         secretKeyRef:
