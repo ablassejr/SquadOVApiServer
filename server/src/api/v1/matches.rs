@@ -1,6 +1,9 @@
 mod create;
+mod events;
 
 pub use create::*;
+pub use events::*;
+
 use uuid::Uuid;
 use crate::api;
 use crate::api::auth::SquadOVSession;

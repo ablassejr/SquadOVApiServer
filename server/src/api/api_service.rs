@@ -230,6 +230,15 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("/favorite", web::post().to(v1::favorite_match_handler))
                         .route("/favorite", web::get().to(v1::check_favorite_match_handler))
                         .route("/favorite", web::delete().to(v1::remove_favorite_match_handler))
+                        .service(
+                            web::scope("/events")
+                                .route("", web::get().to(v1::get_accessible_match_custom_events_handler))
+                        )
+                )
+                .service(
+                    web::scope("/events/{event_id}")
+                        .route("", web::put().to(v1::edit_match_custom_event_handler))
+                        .route("", web::delete().to(v1::delete_match_custom_event_handler))
                 )
                 .service(
                     web::scope("/users")
@@ -296,6 +305,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .service(
                                     web::scope("/analytics")
                                         .route("/vod/{video_uuid}", web::post().to(v1::create_user_vod_watch_analytics_handler))
+                                )
+                                .service(
+                                    web::scope("/events")
+                                        .route("", web::post().to(v1::create_new_custom_match_event_handler))
                                 )
                         )
                         .service(
