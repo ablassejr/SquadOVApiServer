@@ -40,6 +40,7 @@ pub struct StagedVodClip {
     pub end_offset_ms: i64,
     pub create_time: DateTime<Utc>,
     pub execute_time: Option<DateTime<Utc>>,
+    pub clip_uuid: Option<Uuid>,
 }
 
 #[derive(Serialize,Deserialize, Clone)]
@@ -60,7 +61,7 @@ pub struct VodThumbnail {
     pub height: i32,
 }
 
-#[derive(Serialize,Deserialize, Clone, Debug)]
+#[derive(Serialize,Deserialize, Clone, Debug, Default)]
 pub struct VodAssociation {
     #[serde(rename = "matchUuid")]
     pub match_uuid: Option<Uuid>,
@@ -480,7 +481,7 @@ impl VodProcessingInterface {
         self.request_generate_thumbnail(&clip_uuid).await?;
 
         log::info!("[Clip] Mark Executed - {}", request.id);
-        db::mark_staged_clip_executed(&mut tx, request.id).await?;
+        db::mark_staged_clip_executed(&mut tx, request.id, &clip_uuid).await?;
 
         log::info!("[Clip] TX (Commit) - {}", request.id);
         tx.commit().await?;

@@ -987,6 +987,13 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         )
                 )
                 .service(
+                    web::scope("/stage")
+                        .wrap(access::ApiAccess::new(
+                            Box::new(access::DenyShareTokenAccess{}),
+                        ))
+                        .route("/{stage_id}/status", web::get().to(v1::get_staged_clip_status_handler))
+                )
+                .service(
                     web::scope("/clip")
                         .route("", web::post().to(v1::list_clips_for_user_handler))
                         .route("/bulkDelete", web::post().to(v1::bulk_delete_vods_handler))
@@ -1026,6 +1033,18 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                             web::scope("/{comment_id}")
                                                 .route("", web::delete().to(v1::delete_clip_comment_handler))
                                         )
+                                )
+                                .service(
+                                    web::scope("/admin")
+                                        .wrap(access::ApiAccess::new(
+                                            Box::new(access::VodAccessChecker{
+                                                must_be_vod_owner: true,
+                                                obtainer: access::VodPathObtainer{
+                                                    video_uuid_key: "clip_uuid"
+                                                },
+                                            }),
+                                        ))
+                                        .route("/publish", web::post().to(v1::publish_clip_handler))
                                 )
                                 .service(
                                     web::scope("")

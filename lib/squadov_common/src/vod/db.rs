@@ -8,17 +8,19 @@ use sqlx::{Executor, Transaction, Postgres};
 use uuid::Uuid;
 use std::collections::HashMap;
 
-pub async fn mark_staged_clip_executed<'a, T>(ex: T, id: i64) -> Result<(), SquadOvError>
+pub async fn mark_staged_clip_executed<'a, T>(ex: T, id: i64, clip_uuid: &Uuid) -> Result<(), SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
 {
     sqlx::query!(
         "
         UPDATE squadov.staged_clips
-        SET execute_time = NOW()
+        SET execute_time = NOW(),
+            clip_uuid = $2
         WHERE id = $1
         ",
         id,
+        clip_uuid,
     )
         .execute(ex)
         .await?;

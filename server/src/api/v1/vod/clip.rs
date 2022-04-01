@@ -21,6 +21,9 @@ use squadov_common::{
     vod::{
         self,
         RawVodTag,
+        StagedVodClip,
+        VodAssociation,
+        VodSegmentId,
         db as vdb,
     }
 };
@@ -580,13 +583,15 @@ pub async fn create_clip_for_vod_handler(pth: web::Path<CreateClipPathInput>, da
 pub struct StagedClipInput {
     start: i64,
     end: i64,
+    execute: bool,
 }
 
 pub async fn create_staged_clip_for_vod_handler(pth: web::Path<CreateClipPathInput>, data: web::Json<StagedClipInput>, app: web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
-    sqlx::query!(
+    let svc = sqlx::query_as!(
+        StagedVodClip,
         r#"
         INSERT INTO squadov.staged_clips (
             video_uuid,
@@ -601,16 +606,21 @@ pub async fn create_staged_clip_for_vod_handler(pth: web::Path<CreateClipPathInp
             $4,
             NOW()
         )
+        RETURNING *
         "#,
         &pth.video_uuid,
         session.user.id,
         data.start,
         data.end,
     )
-        .execute(&*app.pool)
+        .fetch_one(&*app.pool)
         .await?;
 
-    Ok(HttpResponse::NoContent().finish())
+    if data.execute {
+        app.vod_itf.request_generate_staged_clip(&svc).await?;
+    }
+
+    Ok(HttpResponse::Ok().json(&svc.id))
 }
 
 async fn get_recent_clips_for_user(user_id: i64, app : web::Data<Arc<api::ApiApplication>>, req: &HttpRequest, page: web::Query<api::PaginationParameters>, query: web::Query<ClipQuery>, mut filter: web::Json<RecentMatchQuery>, needs_profile: bool) -> Result<HttpResponse, SquadOvError> {
@@ -769,5 +779,84 @@ pub async fn delete_clip_comment_handler(app : web::Data<Arc<api::ApiApplication
     };
     
     app.delete_clip_comment(pth.comment_id, session.user.id).await?;    
+    Ok(HttpResponse::NoContent().finish())
+}
+
+
+#[derive(Deserialize)]
+pub struct StagedClipPath {
+    stage_id: i64,
+}
+
+pub async fn get_staged_clip_status_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<StagedClipPath>) -> Result<HttpResponse, SquadOvError> {
+    let some_clip_uuid = sqlx::query!(
+        r#"
+        SELECT clip_uuid AS "clip_uuid!"
+        FROM squadov.staged_clips
+        WHERE id = $1
+            AND execute_time IS NOT NULL
+            AND clip_uuid IS NOT NULL
+        "#,
+        path.stage_id,
+    )
+        .fetch_optional(&*app.pool)
+        .await?
+        .map(|x| { x.clip_uuid });
+
+    if let Some(clip_uuid) = some_clip_uuid {
+        #[derive(Serialize)]
+        pub struct Status {
+            url: String,
+            uuid: Uuid,
+        }
+
+        let metadata = vdb::get_vod_metadata(&*app.pool, &clip_uuid, "source").await?;
+        let manager = app.get_vod_manager(&metadata.bucket).await?;
+
+        Ok(HttpResponse::Ok().json(Status{
+            url: manager.get_segment_redirect_uri(&VodSegmentId{
+                video_uuid: clip_uuid.clone(),
+                quality: String::from("source"),
+                segment_name: String::from("fastify.mp4"),
+            }).await?.0,
+            uuid: clip_uuid.clone(),
+        }))
+    } else {
+        Ok(HttpResponse::Ok().json(serde_json::value::Value::Null))
+    }
+}
+
+#[derive(Deserialize)]
+pub struct PublishClipInput {
+    title: Option<String>,
+    description: Option<String>,
+}
+
+pub async fn publish_clip_handler(app : web::Data<Arc<api::ApiApplication>>, pth: web::Path<ClipPathInput>, data: web::Json<PublishClipInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
+    let mut tx = app.pool.begin().await?;
+    sqlx::query!(
+        "
+        UPDATE squadov.vod_clips
+        SET published = TRUE,
+            title = COALESCE($2, title),
+            description = COALESCE($3, description)
+        WHERE clip_uuid = $1
+        ",
+        pth.clip_uuid,
+        data.title,
+        data.description,
+    )
+        .execute(&mut tx)
+        .await?;
+    
+    app.handle_vod_share(&mut tx, session.user.id, &VodAssociation{
+        video_uuid: pth.clip_uuid.clone(),
+        is_clip: true,
+        ..VodAssociation::default()
+    }).await?;
+    tx.commit().await?;
     Ok(HttpResponse::NoContent().finish())
 }
