@@ -21,6 +21,7 @@ use squadov_common::{
     vod::{
         self,
         RawVodTag,
+        db as vdb,
     }
 };
 use std::sync::Arc;
@@ -74,38 +75,8 @@ impl api::ApiApplication {
         let clip_uuid = Uuid::new_v4();
 
         let mut tx = self.pool.begin().await?;
-        self.reserve_vod_uuid(&mut tx, &clip_uuid, "mp4", user_id, true).await?;
-
-        sqlx::query!(
-            "
-            INSERT INTO squadov.vod_clips (
-                clip_uuid,
-                parent_vod_uuid,
-                clip_user_id,
-                title,
-                description,
-                game,
-                tm
-            )
-            VALUES (
-                $1,
-                $2,
-                $3,
-                $4,
-                $5,
-                $6,
-                NOW()
-            )
-            ",
-            clip_uuid,
-            vod_uuid,
-            user_id,
-            title,
-            description,
-            game as i32,
-        )
-            .execute(&mut tx)
-            .await?;
+        vdb::reserve_vod_uuid(&mut tx, &clip_uuid, "mp4", user_id, true).await?;
+        vdb::create_clip(&mut tx, &clip_uuid, vod_uuid, user_id, title, description, game, true).await?;
         tx.commit().await?;
 
         Ok(ClipResponse{
@@ -147,7 +118,7 @@ impl api::ApiApplication {
             LEFT JOIN squadov.view_vod_tags AS vvt
                 ON vvt.video_uuid = vc.clip_uuid
             WHERE vc.clip_uuid = ANY($1)
-            GROUP BY vc.clip_uuid, vc.parent_vod_uuid, vc.clip_user_id, vc.title, vc.description, vc.game, vc.tm, u.username, rc.count, cc.count, cv.count, ufv.reason, uwv.video_uuid
+            GROUP BY vc.clip_uuid, vc.parent_vod_uuid, vc.clip_user_id, vc.title, vc.description, vc.game, vc.tm, vc.published, u.username, rc.count, cc.count, cv.count, ufv.reason, uwv.video_uuid
             ORDER BY vc.tm DESC
             "#,
             uuids,
@@ -178,6 +149,7 @@ impl api::ApiApplication {
                 is_watchlist: x.is_watchlist,
                 access_token: None,
                 tags: vod::condense_raw_vod_tags(serde_json::from_value::<Vec<RawVodTag>>(x.tags)?, user_id)?,
+                published: x.published,
             })
         }).collect::<Result<Vec<VodClip>, SquadOvError>>()?)
     }
@@ -249,6 +221,7 @@ impl api::ApiApplication {
                 )
             )
                 AND ($4::UUID IS NULL OR m.uuid = $4)
+                AND (vc.published OR vc.clip_user_id = $1)
                 AND (CARDINALITY($5::INTEGER[]) = 0 OR m.game = ANY($5))
                 AND (CARDINALITY($7::BIGINT[]) = 0 OR vc.clip_user_id = ANY($7))
                 AND COALESCE(v.end_time >= $8, TRUE)
@@ -601,6 +574,43 @@ pub async fn create_clip_for_vod_handler(pth: web::Path<CreateClipPathInput>, da
 
     let resp = app.create_clip_for_vod(&pth.video_uuid, session.user.id, &data.title, &data.description, data.game, query.accel == 1).await?;
     Ok(HttpResponse::Ok().json(&resp))
+}
+
+#[derive(Deserialize)]
+pub struct StagedClipInput {
+    start: i64,
+    end: i64,
+}
+
+pub async fn create_staged_clip_for_vod_handler(pth: web::Path<CreateClipPathInput>, data: web::Json<StagedClipInput>, app: web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
+    sqlx::query!(
+        r#"
+        INSERT INTO squadov.staged_clips (
+            video_uuid,
+            user_id,
+            start_offset_ms,
+            end_offset_ms,
+            create_time
+        ) VALUES (
+            $1,
+            $2,
+            $3,
+            $4,
+            NOW()
+        )
+        "#,
+        &pth.video_uuid,
+        session.user.id,
+        data.start,
+        data.end,
+    )
+        .execute(&*app.pool)
+        .await?;
+
+    Ok(HttpResponse::NoContent().finish())
 }
 
 async fn get_recent_clips_for_user(user_id: i64, app : web::Data<Arc<api::ApiApplication>>, req: &HttpRequest, page: web::Query<api::PaginationParameters>, query: web::Query<ClipQuery>, mut filter: web::Json<RecentMatchQuery>, needs_profile: bool) -> Result<HttpResponse, SquadOvError> {

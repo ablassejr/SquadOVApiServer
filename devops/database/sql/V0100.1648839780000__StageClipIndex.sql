@@ -1,0 +1,1 @@
+CREATE INDEX ON staged_clips(user_id);

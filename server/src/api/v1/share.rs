@@ -16,6 +16,7 @@ use squadov_common::{
         MatchVideoSharePermissions,
     },
     VodAssociation,
+    matches,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -51,7 +52,7 @@ impl api::ApiApplication {
             // 1) Get all the auto-sharing settings the user has that matches the game being played.
             //    This will get us information on which users and/or squads to continue to share to.
             let auto_connections = share::auto::get_auto_share_connections_for_user(&mut *tx, user_id).await?;
-            let game = self.get_game_for_match(match_uuid).await?;
+            let game = matches::get_game_for_match(&*self.pool, match_uuid).await?;
 
             // Doing the safe thing here and explicitly checking for unknown.
             // I'm a little worried that somewhere contains a thing that'll demonstrate

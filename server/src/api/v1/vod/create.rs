@@ -4,7 +4,7 @@ use crate::api::auth::SquadOVSession;
 use std::sync::Arc;
 use serde::{Deserialize};
 use uuid::Uuid;
-use sqlx::{Transaction, Postgres, Executor};
+use sqlx::{Transaction, Postgres};
 use squadov_common::{
     SquadOvError,
     vod::{
@@ -12,6 +12,7 @@ use squadov_common::{
         VodDestination,
         VodSegmentId,
         container_format_to_extension,
+        db as vdb,
     },
     storage::CloudStorageLocation,
 };
@@ -39,101 +40,6 @@ pub struct VodAssociateBodyInput {
 }
 
 impl api::ApiApplication {
-    pub async fn associate_vod(&self, tx : &mut Transaction<'_, Postgres>, assoc : &VodAssociation) -> Result<(), SquadOvError> {
-        tx.execute(
-            sqlx::query!(
-                "
-                UPDATE squadov.vods
-                SET match_uuid = $1,
-                    user_uuid = $2,
-                    start_time = $3,
-                    end_time = $4,
-                    is_local = $5
-                WHERE video_uuid = $6
-                ",
-                assoc.match_uuid,
-                assoc.user_uuid,
-                assoc.start_time,
-                assoc.end_time,
-                assoc.is_local,
-                assoc.video_uuid,
-            )
-        ).await?;
-        Ok(())
-    }
-
-    pub async fn reserve_vod_uuid<'a, T>(&self, ex: T, vod_uuid: &Uuid, container_format: &str, user_id: i64, is_clip: bool) -> Result<(), SquadOvError>
-    where
-        T: Executor<'a, Database = Postgres>
-    {
-        sqlx::query!(
-            "
-            INSERT INTO squadov.vods (video_uuid, raw_container_format, user_uuid, is_clip)
-            SELECT $1, $2, u.uuid, $4
-            FROM squadov.users AS u
-            WHERE u.id = $3
-            ",
-            vod_uuid,
-            container_format,
-            user_id,
-            is_clip,
-        )
-            .execute(ex)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn bulk_add_video_metadata(&self, tx : &mut Transaction<'_, Postgres>, vod_uuid: &Uuid, data: &[squadov_common::VodMetadata]) -> Result<(), SquadOvError> {
-        let mut sql : Vec<String> = Vec::new();
-        sql.push(String::from("
-            INSERT INTO squadov.vod_metadata (
-                video_uuid,
-                res_x,
-                res_y,
-                min_bitrate,
-                avg_bitrate,
-                max_bitrate,
-                id,
-                fps,
-                bucket,
-                session_id
-            )
-            VALUES
-        "));
-
-        for (idx, m) in data.iter().enumerate() {
-            sql.push(format!("(
-                '{video_uuid}',
-                {res_x},
-                {res_y},
-                {min_bitrate},
-                {avg_bitrate},
-                {max_bitrate},
-                '{id}',
-                {fps},
-                '{bucket}',
-                {session_id}
-            )",
-                video_uuid=vod_uuid,
-                res_x=m.res_x,
-                res_y=m.res_y,
-                min_bitrate=m.min_bitrate,
-                avg_bitrate=m.avg_bitrate,
-                max_bitrate=m.max_bitrate,
-                id=m.id,
-                fps=m.fps,
-                bucket=m.bucket,
-                session_id=squadov_common::sql::sql_format_option_string(&m.session_id),
-            ));
-
-            if idx != data.len() - 1 {
-                sql.push(String::from(","))
-            }
-        }
-        sqlx::query(&sql.join("")).execute(tx).await?;
-        Ok(())
-    }
-
     pub async fn create_vod_destination(&self, video_uuid: &Uuid, container_format: &str, use_accel: bool) -> Result<VodDestination, SquadOvError> {
         let extension = squadov_common::container_format_to_extension(container_format);
 
@@ -201,12 +107,12 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
     }
 
     let mut tx = app.pool.begin().await?;
-    app.associate_vod(&mut tx, &data.association).await?;
+    vdb::associate_vod(&mut tx, &data.association).await?;
 
     let metadata_id = data.metadata.id.clone();
     let bucket = data.metadata.bucket.clone();
     if !data.association.is_local {
-        app.bulk_add_video_metadata(&mut tx, &data.association.video_uuid, &[data.metadata]).await?;
+        vdb::bulk_add_video_metadata(&mut tx, &data.association.video_uuid, &[data.metadata]).await?;
     }
 
     // Need to store the session id for the VOD upload just in case we need it later on.
@@ -263,7 +169,7 @@ pub async fn create_vod_destination_handler(data : web::Json<VodCreateDestinatio
     };
     
     let mut tx = app.pool.begin().await?;
-    app.reserve_vod_uuid(&mut tx, &data.video_uuid, &data.container_format, session.user.id, false).await?;
+    vdb::reserve_vod_uuid(&mut tx, &data.video_uuid, &data.container_format, session.user.id, false).await?;
     tx.commit().await?;
 
     Ok(HttpResponse::Ok().json(app.create_vod_destination(&data.video_uuid, &data.container_format, false).await?))

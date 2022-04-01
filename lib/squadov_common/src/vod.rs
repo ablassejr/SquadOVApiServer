@@ -2,6 +2,7 @@ pub mod fastify;
 pub mod preview;
 pub mod manager;
 pub mod db;
+pub mod clip;
 
 use async_trait::async_trait;
 use serde::{Serialize,Deserialize};
@@ -19,6 +20,7 @@ use crate::{
         RabbitMqListener,
     },
     storage::StorageManager,
+    matches,
 };
 use std::sync::{Arc};
 use std::io::{self, BufReader};
@@ -28,6 +30,17 @@ use std::collections::HashMap;
 use md5::{Md5, Digest};
 
 const VOD_MAX_AGE_SECONDS: i64 = 21600; // 6 hours
+
+#[derive(Serialize,Deserialize, Clone)]
+pub struct StagedVodClip {
+    pub id: i64,
+    pub video_uuid: Uuid,
+    pub user_id: i64,
+    pub start_offset_ms: i64,
+    pub end_offset_ms: i64,
+    pub create_time: DateTime<Utc>,
+    pub execute_time: Option<DateTime<Utc>>,
+}
 
 #[derive(Serialize,Deserialize, Clone)]
 pub struct VodDestination {
@@ -191,6 +204,7 @@ pub struct VodClip {
     pub is_watchlist: bool,
     pub access_token: Option<String>,
     pub tags: Vec<VodTag>,
+    pub published: bool,
 }
 
 #[derive(Serialize,Deserialize,Clone)]
@@ -260,6 +274,9 @@ pub enum VodProcessingTask {
     GenerateThumbnail{
         vod_uuid: Uuid,
     },
+    GenerateStagedClip{
+        request: StagedVodClip,
+    }
 }
 
 #[async_trait]
@@ -275,6 +292,7 @@ impl RabbitMqListener for VodProcessingInterface {
             ).await?,
             VodProcessingTask::GeneratePreview{vod_uuid} => self.generate_preview(&vod_uuid).await?,
             VodProcessingTask::GenerateThumbnail{vod_uuid} => self.generate_thumbnail(&vod_uuid).await?,
+            VodProcessingTask::GenerateStagedClip{request} => self.generate_staged_clip(&request).await?,
         };
         Ok(())
     }
@@ -313,6 +331,13 @@ impl VodProcessingInterface {
         Ok(())
     }
 
+    pub async fn request_generate_staged_clip(&self, request: &StagedVodClip) -> Result<(), SquadOvError> {
+        self.rmq.publish(&self.queue, serde_json::to_vec(&VodProcessingTask::GenerateStagedClip{
+            request: request.clone(),
+        })?, RABBITMQ_DEFAULT_PRIORITY, VOD_MAX_AGE_SECONDS).await;
+        Ok(())
+    }
+
     async fn download_vod_locally(&self, vod_uuid: &Uuid, context: &str) -> Result<(VodAssociation, VodMetadata, TempPath), SquadOvError> {
         log::info!("[{}] Get VOD Association {}", context, vod_uuid);
         let vod = db::get_vod_association(&*self.db, vod_uuid).await?;
@@ -329,7 +354,7 @@ impl VodProcessingInterface {
             video_uuid: vod_uuid.clone(),
             quality: String::from("source"),
             segment_name: String::from("fastify.mp4"),
-        };      
+        };
         manager.download_vod_to_path(&source_segment_id, &input_filename).await?;
         Ok((vod, metadata, input_filename))
     }
@@ -358,6 +383,106 @@ impl VodProcessingInterface {
         log::info!("[Preview] Mark DB Preview (Query) - {}", vod_uuid);
         db::mark_vod_with_preview(&mut tx, vod_uuid).await?;
         log::info!("[Preview] Process VOD TX (Commit) - {}", vod_uuid);
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn generate_staged_clip(&self, request: &StagedVodClip) -> Result<(), SquadOvError> {
+        log::info!("[Clip] Get VOD Association {}", request.id);
+        let vod = db::get_vod_association(&*self.db, &request.video_uuid).await?;
+
+        log::info!("[Clip] Generate Preview for VOD {}", request.id);
+        let metadata = db::get_vod_metadata(&*self.db, &request.video_uuid, "source").await?;
+
+        log::info!("[Clip] Get Fastify URL {}", request.id);
+        let source_segment_id = VodSegmentId{
+            video_uuid: request.video_uuid.clone(),
+            quality: String::from("source"),
+            segment_name: String::from("fastify.mp4"),
+        };
+
+        log::info!("[Clip] Get VOD Manager {}", request.id);
+        let manager = self.vod.get_bucket(&metadata.bucket).await.ok_or(SquadOvError::InternalError(format!("Invalid bucket: {}", &metadata.bucket)))?;
+
+        // Note that we should use the raw URI and don't route the request through a CDN here.
+        log::info!("[Clip] Get Raw VOD URL {}", request.id);
+        let uri = manager.get_segment_redirect_uri(&source_segment_id).await?.0;
+
+        log::info!("[Clip] Generating Clip {}", request.id);
+        let clip_filename = NamedTempFile::new()?.into_temp_path();
+        clip::generate_clip(&uri, &clip_filename, request.start_offset_ms, request.end_offset_ms).await?;
+
+        log::info!("[Clip] Computing VOD MD5 - {}", request.id);
+        let md5_hash = {
+            let mut file = std::fs::File::open(&clip_filename)?;
+            let mut hasher = Md5::default();
+            let _n = io::copy(&mut file, &mut hasher);
+            base64::encode(hasher.finalize())
+        };
+
+        log::info!("[Clip] - Uploading {}", request.id);
+        let clip_uuid = Uuid::new_v4();
+        let clip_id = VodSegmentId{
+            video_uuid: clip_uuid.clone(),
+            quality: String::from("source"),
+            segment_name: String::from("fastify.mp4"),
+        };
+        manager.upload_vod_from_file(&clip_id, &clip_filename).await?;
+
+        log::info!("[Clip] Inferring Metadata {}", request.id);
+        let mut clip_metadata = metadata.clone();
+        clip_metadata.session_id = None;
+        clip_metadata.id = String::from("source");
+        clip_metadata.video_uuid = clip_uuid.clone();
+
+        log::info!("[Clip] TX (Begin) - {}", request.id);
+        let mut tx = self.db.begin().await?;
+
+        log::info!("[Clip] Reserving Clip UUID - {}", request.id);
+        db::reserve_vod_uuid(&mut tx, &clip_uuid, "mp4", request.user_id, true).await?;
+
+        log::info!("[Clip] Creating Clip (DB) - {}", request.id);
+        db::create_clip(
+            &mut tx,
+            &clip_uuid,
+            &request.video_uuid,
+            request.user_id,
+            "Instantly Clipped by SquadOV!",
+            "",
+            matches::get_game_for_match(&*self.db, &vod.match_uuid.ok_or(SquadOvError::BadRequest)?).await?,
+            false,
+        ).await?;
+
+        log::info!("[Clip] Associating VOD (DB) - {}", request.id);
+        db::associate_vod(&mut tx, &VodAssociation{
+            match_uuid: vod.match_uuid.clone(),
+            user_uuid: vod.user_uuid.clone(),
+            video_uuid: clip_uuid.clone(),
+            start_time: None,
+            end_time: None,
+            raw_container_format: "mp4".to_string(),
+            is_clip: true,
+            is_local: false,
+            md5: None,
+        }).await?;
+
+        log::info!("[Clip] Add Video Metadata - {}", request.id);
+        db::bulk_add_video_metadata(&mut tx, &clip_uuid, &[clip_metadata]).await?;
+
+        log::info!("[Clip] Mark Fastify (Query) - {}", request.id);
+        db::mark_vod_as_fastify(&mut tx, &clip_uuid).await?;
+
+        log::info!("[Clip] Store VOD MD5 - {}", request.id);
+        db::store_vod_md5(&mut tx, &clip_uuid, &md5_hash).await?;
+
+        log::info!("[Clip] Dispatch Jobs - {}", request.id);
+        self.request_generate_preview(&clip_uuid).await?;
+        self.request_generate_thumbnail(&clip_uuid).await?;
+
+        log::info!("[Clip] Mark Executed - {}", request.id);
+        db::mark_staged_clip_executed(&mut tx, request.id).await?;
+
+        log::info!("[Clip] TX (Commit) - {}", request.id);
         tx.commit().await?;
         Ok(())
     }
@@ -495,9 +620,15 @@ impl VodProcessingInterface {
             manager.make_segment_public(&fastify_segment).await?;
         }
 
+        log::info!("[Fastify] Getting Staged Clips - {}", vod_uuid);
+        let staged_clips = db::get_staged_clips_for_vod(&*self.db, vod_uuid).await?;
+
         log::info!("[Fastify] Dispatch Jobs - {}", vod_uuid);
         self.request_generate_preview(vod_uuid).await?;
         self.request_generate_thumbnail(vod_uuid).await?;
+        for sc in staged_clips {
+            self.request_generate_staged_clip(&sc).await?;
+        }
 
         log::info!("[Fastify] Finish Fastifying {:?}", vod_uuid);
         Ok(())

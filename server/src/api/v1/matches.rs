@@ -225,27 +225,6 @@ pub struct RecentMatchHandle {
 }
 
 impl api::ApiApplication {
-
-    pub async fn get_game_for_match(&self, match_uuid: &Uuid) -> Result<SquadOvGames, SquadOvError> {
-        Ok(
-            sqlx::query!(
-                "
-                SELECT game
-                FROM squadov.matches
-                WHERE uuid = $1
-                ",
-                match_uuid
-            )
-                .fetch_one(&*self.pool)
-                .await?
-                .game
-                .map(|x| {
-                    SquadOvGames::try_from(x).unwrap_or(SquadOvGames::Unknown)
-                })
-                .unwrap_or(SquadOvGames::Unknown)
-        )
-    }
-
     pub async fn get_recent_base_matches(&self, handles: &[RecentMatchHandle], user_id: i64) -> Result<Vec<RawRecentMatchData>, SquadOvError> {
         let mut match_uuids: Vec<Uuid> = vec![];
         let mut user_uuids: Vec<Uuid> = vec![];

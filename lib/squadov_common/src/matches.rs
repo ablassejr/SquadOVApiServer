@@ -23,6 +23,7 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use std::convert::TryFrom;
 
 #[derive(Debug)]
 pub struct MatchPlayerPair {
@@ -47,6 +48,29 @@ where
         .await?;
 
     Ok(uuid)
+}
+
+pub async fn get_game_for_match<'a, T>(ex: T, match_uuid: &Uuid) -> Result<SquadOvGames, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT game
+            FROM squadov.matches
+            WHERE uuid = $1
+            ",
+            match_uuid
+        )
+            .fetch_one(ex)
+            .await?
+            .game
+            .map(|x| {
+                SquadOvGames::try_from(x).unwrap_or(SquadOvGames::Unknown)
+            })
+            .unwrap_or(SquadOvGames::Unknown)
+    )
 }
 
 #[derive(Serialize, Debug)]

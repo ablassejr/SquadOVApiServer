@@ -1,0 +1,3 @@
+ALTER TABLE staged_clips
+ADD COLUMN create_time TIMESTAMPTZ NOT NULL,
+ADD COLUMN execute_time TIMESTAMPTZ;
