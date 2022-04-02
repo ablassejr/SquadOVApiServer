@@ -1378,6 +1378,21 @@
       ]
     }
   },
+  "29f8dfc2aff89b1d86997cf0df3754f3f5e8581690e01b31c1626b6f98026cdc": {
+    "query": "\n        INSERT INTO squadov.vods (video_uuid, raw_container_format, user_uuid, is_clip)\n        SELECT $1, $2, u.uuid, $4\n        FROM squadov.users AS u\n        WHERE u.id = $3\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Varchar",
+          "Int8",
+          "Bool"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "2a3008e2c36132e2421d946c792854cb0ecdca0a15ef4dd83297ec3ba5db9a94": {
     "query": "\n        INSERT INTO squadov.valorant_match_pov_computed_data (\n            match_uuid,\n            user_id,\n            pov_agent,\n            rank,\n            key_events,\n            winner\n        ) VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            $5,\n            $6\n        ) ON CONFLICT (match_uuid, user_id) DO UPDATE SET\n            pov_agent = EXCLUDED.pov_agent,\n            rank = EXCLUDED.rank,\n            key_events = EXCLUDED.key_events,\n            winner = EXCLUDED.winner\n        ",
     "describe": {
@@ -3114,6 +3129,68 @@
       ]
     }
   },
+  "699e0f8e8e504ea6dbf3787588f18794f4e96f6c97d11c7b7aa08a6e1c6952d7": {
+    "query": "\n            SELECT *\n            FROM squadov.staged_clips\n            WHERE video_uuid = $1\n                AND execute_time IS NULL\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "start_offset_ms",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "end_offset_ms",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "create_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "execute_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 7,
+          "name": "clip_uuid",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true
+      ]
+    }
+  },
   "6a054270f2bc3a87e913891942f436e70f6c793e24148717293cf22f17c14b86": {
     "query": "\n            SELECT ral.user_id\n            FROM squadov.valorant_match_players AS vmp\n            INNER JOIN squadov.riot_account_links AS ral\n                ON ral.puuid = vmp.puuid\n            WHERE vmp.match_uuid = $1\n            ",
     "describe": {
@@ -3132,6 +3209,19 @@
       "nullable": [
         false
       ]
+    }
+  },
+  "6a3aff866bea414decffb217667edcc132003c5052858075fa29fc3a5e9ee608": {
+    "query": "\n        UPDATE squadov.staged_clips\n        SET execute_time = NOW(),\n            clip_uuid = $2\n        WHERE id = $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Uuid"
+        ]
+      },
+      "nullable": []
     }
   },
   "6d0d3d4c9b2f816e0ae67472ee9f1eeb03ddf8e43f02e0e35f999379c4077510": {
@@ -3199,6 +3289,26 @@
       },
       "nullable": [
         null
+      ]
+    }
+  },
+  "6ded1a97ddff8951f9d27dc21289efc0363019f84cb3b06e6dc41bf00b13aa5d": {
+    "query": "\n            SELECT game\n            FROM squadov.matches\n            WHERE uuid = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "game",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        true
       ]
     }
   },
@@ -5693,6 +5803,23 @@
       ]
     }
   },
+  "ccfc35e88290900f0f333519363176f4a267028ef568163e3f2d7617dd2e5429": {
+    "query": "\n        UPDATE squadov.vods\n        SET match_uuid = $1,\n            user_uuid = $2,\n            start_time = $3,\n            end_time = $4,\n            is_local = $5\n        WHERE video_uuid = $6\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid",
+          "Timestamptz",
+          "Timestamptz",
+          "Bool",
+          "Uuid"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "cd44a39b93faa9acc827c3d85aa59149ddf9a85253d98721ff1968e71307ed6c": {
     "query": "\n        SELECT lmb.*\n        FROM squadov.lol_match_bans AS lmb\n        WHERE lmb.match_uuid = $1\n        ",
     "describe": {
@@ -6568,6 +6695,24 @@
       "nullable": [
         false
       ]
+    }
+  },
+  "e68548bdc5931fe70c318f7dc1cc2f9fd533512ae5b1858d4402c72ea5a7dd37": {
+    "query": "\n        INSERT INTO squadov.vod_clips (\n            clip_uuid,\n            parent_vod_uuid,\n            clip_user_id,\n            title,\n            description,\n            game,\n            tm,\n            published\n        )\n        VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            $5,\n            $6,\n            NOW(),\n            $7\n        )\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid",
+          "Int8",
+          "Varchar",
+          "Varchar",
+          "Int4",
+          "Bool"
+        ]
+      },
+      "nullable": []
     }
   },
   "e6ff1b15a2b1149d4a3948b572dbad450de3bb80cd8cb55e28db4d6299fcf105": {
