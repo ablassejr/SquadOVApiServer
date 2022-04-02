@@ -590,6 +590,21 @@ pub async fn create_staged_clip_for_vod_handler(pth: web::Path<CreateClipPathInp
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
+    // Must be less than 3 minutes.
+    if (data.end - data.start) >= (3 * 60 * 1000) {
+        return Err(SquadOvError::BadRequest);
+    }
+
+    // Must be some valid clipping time.
+    if data.start >= data.end {
+        return Err(SquadOvError::BadRequest);
+    }
+
+    // Can't be before the start of the VOD.
+    if data.start < 0 || data.end < 0 { 
+        return Err(SquadOvError::BadRequest);
+    }
+
     let svc = sqlx::query_as!(
         StagedVodClip,
         r#"
