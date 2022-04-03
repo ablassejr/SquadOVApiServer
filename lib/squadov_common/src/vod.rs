@@ -389,29 +389,15 @@ impl VodProcessingInterface {
     }
 
     pub async fn generate_staged_clip(&self, request: &StagedVodClip) -> Result<(), SquadOvError> {
-        log::info!("[Clip] Get VOD Association {}", request.id);
-        let vod = db::get_vod_association(&*self.db, &request.video_uuid).await?;
-
-        log::info!("[Clip] Generate Preview for VOD {}", request.id);
-        let metadata = db::get_vod_metadata(&*self.db, &request.video_uuid, "source").await?;
-
-        log::info!("[Clip] Get Fastify URL {}", request.id);
-        let source_segment_id = VodSegmentId{
-            video_uuid: request.video_uuid.clone(),
-            quality: String::from("source"),
-            segment_name: String::from("fastify.mp4"),
-        };
+        log::info!("[Clip] Downloading VOD {}", request.id);
+        let (vod, metadata, input_filename) = self.download_vod_locally(&request.video_uuid, "Clip").await?;
 
         log::info!("[Clip] Get VOD Manager {}", request.id);
         let manager = self.vod.get_bucket(&metadata.bucket).await.ok_or(SquadOvError::InternalError(format!("Invalid bucket: {}", &metadata.bucket)))?;
 
-        // Note that we should use the raw URI and don't route the request through a CDN here.
-        log::info!("[Clip] Get Raw VOD URL {}", request.id);
-        let uri = manager.get_segment_redirect_uri(&source_segment_id).await?.0;
-
         log::info!("[Clip] Generating Clip {}", request.id);
         let clip_filename = NamedTempFile::new()?.into_temp_path();
-        clip::generate_clip(&uri, &clip_filename, request.start_offset_ms, request.end_offset_ms).await?;
+        clip::generate_clip(&input_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &clip_filename, request.start_offset_ms, request.end_offset_ms).await?;
 
         log::info!("[Clip] Computing VOD MD5 - {}", request.id);
         let md5_hash = {
