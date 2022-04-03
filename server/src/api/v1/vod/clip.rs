@@ -605,6 +605,23 @@ pub async fn create_staged_clip_for_vod_handler(pth: web::Path<CreateClipPathInp
         return Err(SquadOvError::BadRequest);
     }
 
+    let can_instant_clip = sqlx::query!(
+        "
+        SELECT can_instant_clip
+        FROM squadov.user_feature_flags
+        WHERE user_id = $1
+        ",
+        session.user.id,
+    )
+        .fetch_one(&*app.pool)
+        .await?
+        .can_instant_clip;
+
+    // Returns a 200 to prevent client crashing.
+    if !data.execute && !can_instant_clip {
+        return Ok(HttpResponse::Ok().finish())
+    }
+
     let svc = sqlx::query_as!(
         StagedVodClip,
         r#"
