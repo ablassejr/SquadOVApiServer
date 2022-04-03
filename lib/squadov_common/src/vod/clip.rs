@@ -24,19 +24,9 @@ pub async fn generate_clip(input_fname: &str, output_fname: &std::path::Path, st
         .arg("-to")
         .arg(format!("{}ms", end))
         .arg("-c:v")
-        .arg(if cfg!(unix) {
-            "libx264"
-        } else {
-            "libopenh264"
-        })
-        .arg("-crf")
-        .arg("28")
-        .arg("-preset")
-        .arg("medium")
-        .arg("-profile")
-        .arg("high")
+        .arg("copy")
         .arg("-c:a")
-        .arg("aac")
+        .arg("copy")
         .arg("-max_muxing_queue_size")
         .arg("9999")
         .arg("-movflags")
