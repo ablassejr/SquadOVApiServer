@@ -4335,6 +4335,11 @@
           "ordinal": 7,
           "name": "max_bitrate_kbps",
           "type_info": "Int4"
+        },
+        {
+          "ordinal": 8,
+          "name": "can_instant_clip",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
@@ -4343,6 +4348,7 @@
         ]
       },
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -5586,6 +5592,26 @@
       "nullable": [
         true,
         null
+      ]
+    }
+  },
+  "ac8be2f3ec7acfbc62109fbae19ff785e59370ebd4e9ccf28a833e54fef8c260": {
+    "query": "\n        SELECT can_instant_clip\n        FROM squadov.user_feature_flags\n        WHERE user_id = $1\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "can_instant_clip",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
       ]
     }
   },

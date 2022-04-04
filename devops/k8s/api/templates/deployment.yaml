@@ -16,6 +16,12 @@ spec:
         spec:
             nodeSelector:
                 eks.amazonaws.com/compute-type: fargate
+            dnsConfig:
+                options:
+                    - name: ndots
+                      value: "2"
+                    - name: attempts
+                      value: "3"
             containers:
                 - name: api
                   image: registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/squadov_api_server:{{ .Values.commitHash }}
