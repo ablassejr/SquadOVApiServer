@@ -525,7 +525,7 @@ impl api::ApiApplication {
             &filter.filters.wow.instances.instance_types.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x as i32 }).collect::<Vec<i32>>(),
             &filter.filters.wow.instances.all_instance_ids(),
             // Valorant
-            filter.filters.valorant.is_ranked,
+            filter.filters.valorant.is_ranked.unwrap_or(false),
             &filter.filters.valorant.maps.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<String>>(),
             &filter.filters.valorant.modes.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<String>>(),
             &filter.filters.valorant.agent_povs.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone().to_lowercase() }).collect::<Vec<String>>(),

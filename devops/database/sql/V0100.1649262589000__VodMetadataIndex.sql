@@ -1,1 +1,1 @@
-CREATE UNIQUE INDEX CONCURRENTLY ON vod_metadata(video_uuid, id);
+CREATE INDEX CONCURRENTLY ON vod_metadata(video_uuid, id);
