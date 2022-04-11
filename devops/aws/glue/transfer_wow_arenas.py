@@ -13,7 +13,8 @@ import json
 args = getResolvedOptions(sys.argv, ['JOB_NAME', 'TempDir', 'IamRole', 'AwsRegion' , 'DbEndpoint', 'DbSecret'])
 sc = SparkContext.getOrCreate()
 spark = SparkSession(sc)
-spark.conf.set("spark.sql.shuffle.partitions",128)
+spark.conf.set("spark.sql.shuffle.partitions", 128)
+spark.conf.set("spark.sql.broadcastTimeout", 7200)
 
 glueContext = GlueContext(sc)
 print('JOB_NAME: ', args['JOB_NAME'])
