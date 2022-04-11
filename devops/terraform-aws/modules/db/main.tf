@@ -94,7 +94,7 @@ resource "aws_db_instance" "primary_db" {
     deletion_protection = true
     enabled_cloudwatch_logs_exports = [ "postgresql", "upgrade" ]
     engine = "postgres"
-    engine_version = "12.7"
+    engine_version = "12.8"
     identifier = var.postgres_instance_name
     instance_class = var.postgres_instance_type
     name = "squadov"
