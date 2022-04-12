@@ -220,19 +220,22 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 )
                 .service(
                     web::scope("/match/{match_uuid}")
-                        .wrap(access::ApiAccess::new(
-                            Box::new(access::DenyShareTokenAccess{}),
-                        ))
-                        .route("/share/internal", web::get().to(v1::get_match_share_connections_handler))
-                        .route("/share/public", web::delete().to(v1::delete_match_share_link_handler))
-                        .route("/share/public", web::get().to(v1::get_match_share_link_handler))
-                        .route("/share/public", web::post().to(v1::create_match_share_signature_handler))
-                        .route("/favorite", web::post().to(v1::favorite_match_handler))
-                        .route("/favorite", web::get().to(v1::check_favorite_match_handler))
-                        .route("/favorite", web::delete().to(v1::remove_favorite_match_handler))
                         .service(
                             web::scope("/events")
                                 .route("", web::get().to(v1::get_accessible_match_custom_events_handler))
+                        )
+                        .service(
+                            web::scope("")
+                                .wrap(access::ApiAccess::new(
+                                    Box::new(access::DenyShareTokenAccess{}),
+                                ))
+                                .route("/share/internal", web::get().to(v1::get_match_share_connections_handler))
+                                .route("/share/public", web::delete().to(v1::delete_match_share_link_handler))
+                                .route("/share/public", web::get().to(v1::get_match_share_link_handler))
+                                .route("/share/public", web::post().to(v1::create_match_share_signature_handler))
+                                .route("/favorite", web::post().to(v1::favorite_match_handler))
+                                .route("/favorite", web::get().to(v1::check_favorite_match_handler))
+                                .route("/favorite", web::delete().to(v1::remove_favorite_match_handler))
                         )
                 )
                 .service(
