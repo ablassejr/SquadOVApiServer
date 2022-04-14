@@ -840,6 +840,7 @@ pub async fn get_vod_recent_match_handler(app : web::Data<Arc<api::ApiApplicatio
 }
 
 async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiApplication>>, req: &HttpRequest, query: web::Query<api::PaginationParameters>, mut filter: web::Json<RecentMatchQuery>, needs_access_tokens: bool) -> Result<HttpResponse, SquadOvError> {
+    /*
     if needs_access_tokens {
         filter.users = Some(vec![user_id]);
     }
@@ -859,6 +860,9 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
 
     let expected_total = query.end - query.start;  
     Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(&matches, req, &query, expected_total == got_total)?)) 
+    */
+    let matches: Vec<RecentMatch> = vec![];
+    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(&matches, req, &query, true)?)) 
 }
 
 pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, query: web::Query<api::PaginationParameters>, filter: web::Json<RecentMatchQuery>) -> Result<HttpResponse, SquadOvError> {
