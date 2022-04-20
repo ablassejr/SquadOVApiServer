@@ -10,10 +10,15 @@ enable_rso = false
 rso_queue = "riot_rso"
 enable_valorant = false
 valorant_queue = "valorant_api"
+valorant_workers = 0
+failover_valorant_queue = "failover_valorant_api"
+failover_valorant_workers = 0
 enable_lol = false
 lol_queue = "lol_api"
+lol_workers = 0
 enable_tft = false
 tft_queue = "tft_api"
+tft_workers = 0
 enable_vod = false
 vod_queue = "squadov_vods"
 wow_combatlog_queue = "wow_combatlog"
@@ -26,8 +31,18 @@ twitch_queue = "twitch_api"
 misc_valorant_queue = "misc_valorant"
 enable_sharing = false
 sharing_queue = "squadov_sharing"
+enable_elasticsearch = false
+elasticsearch_queue = "squadov_elasticsearch"
+elasticsearch_workers = 0
 
 [steam]
 api_key = "${STEAM_API_KEY}"
 requests = 100000
 seconds = 86400
+
+[elasticsearch]
+host = "${ES_HOSTNAME}"
+username = "${ES_USERNAME}"
+password = "${ES_PASSWORD}"
+vod_index_read = "vod-index-read"
+vod_index_write = "vod-index-write"

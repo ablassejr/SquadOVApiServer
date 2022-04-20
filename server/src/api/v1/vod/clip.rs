@@ -483,7 +483,12 @@ async fn get_recent_clips_for_user(user_id: i64, app : web::Data<Arc<api::ApiApp
         filter.matches = Some(vec![match_uuid.clone()]);
     }
     
-    let mut clips = app.list_user_accessible_clips(user_id, page.start, page.end, &filter).await?;
+    let has_access = app.is_user_allowed_to_es_search(user_id).await?;
+    let mut clips = if has_access {
+        app.list_user_accessible_clips(user_id, page.start, page.end, &filter).await?
+    } else {
+        vec![]
+    };
 
     if needs_profile {
         for c in &mut clips {

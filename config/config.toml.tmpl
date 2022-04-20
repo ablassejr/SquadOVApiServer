@@ -134,6 +134,9 @@ twitch_queue = "twitch_api"
 misc_valorant_queue = "misc_valorant"
 enable_sharing = true
 sharing_queue = "squadov_sharing"
+enable_elasticsearch = true
+elasticsearch_queue = "squadov_elasticsearch"
+elasticsearch_workers = 16
 
 [email]
 postmark_api_key = "${POSTMARK_API_KEY}"
@@ -209,3 +212,10 @@ api_key = "${ZENDESK_API_KEY}"
 
 [combatlog]
 hostname = "${COMBAT_LOG_HOSTNAME}"
+
+[elasticsearch]
+host = "${ES_HOSTNAME}"
+username = "${ES_USERNAME}"
+password = "${ES_PASSWORD}"
+vod_index_read = "vod-index-read"
+vod_index_write = "vod-index-write"

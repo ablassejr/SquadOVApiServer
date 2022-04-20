@@ -367,6 +367,22 @@ pub struct RecentMatchHandle {
 }
 
 impl api::ApiApplication {
+    pub async fn is_user_allowed_to_es_search(&self, user_id: i64) -> Result<bool, SquadOvError> {
+        Ok(
+            !sqlx::query!(
+                r#"
+                SELECT disable_es_search AS "disable_es_search!"
+                FROM squadov.user_feature_flags
+                WHERE user_id = $1
+                "#,
+                user_id
+            )
+                .fetch_one(&*self.pool)
+                .await?
+                .disable_es_search
+        )
+    }
+
     pub async fn get_recent_base_matches(&self, handles: &[RecentMatchHandle], user_id: i64) -> Result<Vec<RawRecentMatchData>, SquadOvError> {
         let mut match_uuids: Vec<Uuid> = vec![];
         let mut user_uuids: Vec<Uuid> = vec![];
@@ -1015,7 +1031,8 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
     let mut existing_video_uuids: HashSet<Uuid> = HashSet::new();
     let mut no_videos_left = false;
 
-    while matches.len() < expected_total {
+    let has_access = app.is_user_allowed_to_es_search(session.user.id).await?;
+    while has_access && matches.len() < expected_total {
         let query_size = current_end - current_start;
         // Convert the query and filter into an ElasticSearch query.
         let es_search = filter.to_es_search(session.user.id, false)
@@ -1056,7 +1073,7 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
         current_end += ((expected_total - matches.len()) * 10) as i64;
     }
 
-    if !no_videos_left && filter.vods.is_none() {
+    if has_access && !no_videos_left && filter.vods.is_none() {
         // At this point we have found all the matches we want to return to the user - all we need to do now is to find all the remaining VODs that match the query
         // for the matches we've already found. Note that the client will be responsible for stripping out duplicates from future queries.
         filter.matches = Some(matches.keys().cloned().collect());

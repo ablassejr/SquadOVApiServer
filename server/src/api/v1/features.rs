@@ -16,6 +16,7 @@ pub struct FeatureFlags {
     disable_sentry: bool,
     max_bitrate_kbps: i32,
     can_instant_clip: bool,
+    disable_es_search: bool,
 }
 
 impl Default for FeatureFlags {
@@ -30,6 +31,7 @@ impl Default for FeatureFlags {
             disable_sentry: false,
             max_bitrate_kbps: 9000,
             can_instant_clip: true,
+            disable_es_search: false,
         }
     }
 }
