@@ -196,6 +196,65 @@ impl ESVodDocument {
     }
 } 
 
+pub async fn build_es_vod_clip<'a, T>(ex: T, video_uuid: &Uuid) -> Result<Option<ESVodClip>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
+    Ok(
+        sqlx::query_as!(
+            ESVodClip,
+            r#"
+            SELECT
+                title,
+                description,
+                published
+            FROM squadov.vod_clips
+            WHERE clip_uuid = $1
+            "#,
+            video_uuid,
+        )
+            .fetch_optional(ex)
+            .await?
+    )
+}
+
+
+pub async fn build_es_vod_document_sharing<'a, T>(ex: T, video_uuid: &Uuid) -> Result<ESVodSharing, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
+    Ok(
+        ESVodSharing{
+            squads: vdb::get_vod_shared_to_squads(ex, video_uuid).await?,
+            users: vdb::get_vod_shared_to_users(ex, video_uuid).await?,
+        }
+    )
+}
+
+pub async fn build_es_vod_document_lists<'a, T>(ex: T, video_uuid: &Uuid, assoc: &VodAssociation) -> Result<ESVodParentLists, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
+    Ok(
+        ESVodParentLists {
+            watchlist: vdb::get_vod_watchlist_ids(ex, video_uuid).await?,
+            favorites: if assoc.is_clip {
+                vdb::get_vod_favorites(ex, video_uuid).await?
+            } else if let Some(match_uuid) = assoc.match_uuid.as_ref() {
+                matches::get_match_favorites(ex, match_uuid).await?
+            } else {
+                vec![]
+            }.into_iter().map(|x| {
+                ESFavorite{
+                    user_id: x.0,
+                    reason: x.1,
+                }
+            }).collect(),
+            profiles: vdb::get_vod_profiles(ex, video_uuid).await?,
+        }
+    )
+}
+
 pub async fn build_es_vod_document<'a, T>(ex: T, video_uuid: &Uuid) -> Result<ESVodDocument, SquadOvError>
 where
     T: Executor<'a, Database = Postgres> + Copy
@@ -215,29 +274,9 @@ where
         ]
     });
     let owner = user::get_squadov_user_from_uuid(ex, assoc.user_uuid.as_ref().unwrap()).await?;
-    let clip = vdb::get_vod_clip_from_assoc_manifest(ex, assoc.clone(), manifest.clone(), owner.id).await?;
     let tags = vdb::get_raw_vod_tags(ex, video_uuid).await?;
-    let sharing = ESVodSharing{
-        squads: vdb::get_vod_shared_to_squads(ex, video_uuid).await?,
-        users: vdb::get_vod_shared_to_users(ex, video_uuid).await?,
-    };
-
-    let lists = ESVodParentLists {
-        watchlist: vdb::get_vod_watchlist_ids(ex, video_uuid).await?,
-        favorites: if assoc.is_clip {
-            vdb::get_vod_favorites(ex, video_uuid).await?
-        } else if let Some(match_uuid) = assoc.match_uuid.as_ref() {
-            matches::get_match_favorites(ex, match_uuid).await?
-        } else {
-            vec![]
-        }.into_iter().map(|x| {
-            ESFavorite{
-                user_id: x.0,
-                reason: x.1,
-            }
-        }).collect(),
-        profiles: vdb::get_vod_profiles(ex, video_uuid).await?,
-    };
+    let sharing = build_es_vod_document_sharing(ex, video_uuid).await?;
+    let lists = build_es_vod_document_lists(ex, video_uuid, &assoc).await?;
 
     let mut data = ESVodCachedMatch{
         match_uuid: assoc.match_uuid.clone(),
@@ -421,13 +460,7 @@ where
             tags,
             manifest,
             vod: assoc,
-            clip: clip.map(|x| {
-                ESVodClip{
-                    title: x.title,
-                    description: x.description,
-                    published: x.published,
-                }
-            }),
+            clip: build_es_vod_clip(ex, video_uuid).await?,
         }
     )
 }

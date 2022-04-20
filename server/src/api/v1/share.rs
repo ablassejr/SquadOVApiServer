@@ -146,6 +146,37 @@ impl api::ApiApplication {
     }
 }
 
+async fn find_associated_video_uuids_for_connection(app : web::Data<Arc<api::ApiApplication>>, conn: &MatchVideoShareConnection, user_id: i64, user_uuid: Uuid) -> Result<Vec<Uuid>, SquadOvError> {
+    Ok(
+        if let Some(match_uuid) = &conn.match_uuid {
+            // If we're creating a share connection for a match, then we actually need to create a connection for every VOD
+            // the user has *SHARE* access to. The only way we can do this is to first get a list of all the acccesible VODs in
+            // the match and then filter that based on the permissions. Note that each VOD will require a separate DB query
+            // to obtain whether or not we can share that particular VOD since I don't believe the SQL query to do a proper
+            // permission check can be created easily.
+            let mut filtered_video_uuids: Vec<Uuid> = vec![];
+            let raw_vods = app.find_accessible_vods_in_match_for_user(match_uuid, user_id).await?;
+
+            for vod in raw_vods {
+                if vod.user_uuid.unwrap_or(Uuid::nil()) != user_uuid {
+                    let perms = share::get_match_vod_share_permissions_for_user(&*app.pool, conn.match_uuid.as_ref(), Some(&vod.video_uuid), user_id).await?;
+                    if !perms.can_share {
+                        continue;
+                    }
+                }
+
+                filtered_video_uuids.push(vod.video_uuid.clone());
+            }
+
+            filtered_video_uuids
+        } else if let Some(video_uuid) = &conn.video_uuid {
+            vec![video_uuid.clone()]
+        } else {
+            return Err(SquadOvError::BadRequest);
+        }
+    )
+}
+
 pub async fn create_new_share_connection_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<ShareConnectionNewData>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
@@ -162,33 +193,7 @@ pub async fn create_new_share_connection_handler(app : web::Data<Arc<api::ApiApp
         return Err(SquadOvError::InternalError(String::from("Not implemented just yet.")));
     }
 
-    let associated_video_uuids: Vec<Uuid> = if let Some(match_uuid) = &data.conn.match_uuid {
-        // If we're creating a share connection for a match, then we actually need to create a connection for every VOD
-        // the user has *SHARE* access to. The only way we can do this is to first get a list of all the acccesible VODs in
-        // the match and then filter that based on the permissions. Note that each VOD will require a separate DB query
-        // to obtain whether or not we can share that particular VOD since I don't believe the SQL query to do a proper
-        // permission check can be created easily.
-        let mut filtered_video_uuids: Vec<Uuid> = vec![];
-        let raw_vods = app.find_accessible_vods_in_match_for_user(match_uuid, session.user.id).await?;
-
-        for vod in raw_vods {
-            if vod.user_uuid.unwrap_or(Uuid::nil()) != session.user.uuid {
-                let perms = share::get_match_vod_share_permissions_for_user(&*app.pool, data.conn.match_uuid.as_ref(), Some(&vod.video_uuid), session.user.id).await?;
-                if !perms.can_share {
-                    continue;
-                }
-            }
-
-            filtered_video_uuids.push(vod.video_uuid.clone());
-        }
-
-        filtered_video_uuids
-    } else if let Some(video_uuid) = &data.conn.video_uuid {
-        vec![video_uuid.clone()]
-    } else {
-        return Err(SquadOvError::BadRequest);
-    };
-
+    let associated_video_uuids = find_associated_video_uuids_for_connection(app.clone(), &data.conn, session.user.id, session.user.uuid.clone()).await?;
     let pending_conns: Vec<MatchVideoShareConnection> = if associated_video_uuids.is_empty() {
         vec![MatchVideoShareConnection{
             video_uuid: None,
@@ -248,7 +253,17 @@ pub async fn create_new_share_connection_handler(app : web::Data<Arc<api::ApiApp
 pub async fn delete_share_connection_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<ShareConnectionPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
+    let associated_video_uuids = find_associated_video_uuids_for_connection(
+        app.clone(),
+        &share::get_match_vod_share_connection(&*app.pool, path.connection_id).await?,
+        session.user.id,
+        session.user.uuid.clone(),
+    ).await?;
     share::delete_share_connection(&*app.pool, path.connection_id, session.user.id).await?;
+    for video_uuid in associated_video_uuids {
+        app.es_itf.request_update_vod_sharing(video_uuid).await?;
+    }
     Ok(HttpResponse::NoContent().finish())
 }
 

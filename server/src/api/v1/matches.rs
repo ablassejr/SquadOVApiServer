@@ -211,8 +211,20 @@ impl RecentMatchQuery {
             q = q.filter(Query::terms("tags.tag", tags.clone()));
         }
 
-        if let Some(squads) = self.squads.as_ref() {
-            q = q.filter(Query::terms("sharing.squads", squads.clone()));
+        {
+            let mut sharing_query = Query::bool()
+                .minimum_should_match("1")
+                .should(Query::term("owner.userId", user_id));
+
+            if let Some(squads) = self.squads.as_ref() {
+                sharing_query = sharing_query.should(
+                    Query::bool()
+                        .filter(Query::terms("sharing.squads", squads.clone()))
+                        .filter(Query::term("vod.isLocal", false))
+                );
+            }
+
+            q = q.filter(sharing_query);
         }
 
         if let Some(users) = self.users.as_ref() {

@@ -1,7 +1,7 @@
 pub mod vod;
 pub mod rabbitmq;
 
-use serde::{Deserialize, de::DeserializeOwned};
+use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use crate::{
     SquadOvError,
 };
@@ -34,6 +34,11 @@ pub struct ESSearchResponseHits<T> {
 #[derive(Deserialize)]
 pub struct ESSearchResponse<T> {
     hits: ESSearchResponseHits<T>
+}
+
+#[derive(Serialize)]
+pub struct ElasticSearchDocUpdate<T> {
+    doc: T
 }
 
 impl ElasticSearchClient {
@@ -121,5 +126,20 @@ impl ElasticSearchClient {
 
         let data = resp.json::<ESSearchResponse<T>>().await?;
         Ok(data.hits.hits.into_iter().map(|x| { x.source }).collect())
+    }
+
+    pub async fn update_document<T: Serialize>(&self, index: &str, id: &str, update: ElasticSearchDocUpdate<T>) -> Result<(), SquadOvError> {
+        let client = self.create_http_client()?;
+        let endpoint = self.build_endpoint(&format!("{}/_update/{}", index, id));
+
+        let resp = client.post(&endpoint)
+            .json(&update)
+            .send()
+            .await?;
+
+        if resp.status().as_u16() >= 300 {
+            return Err(SquadOvError::InternalError(format!("Failed to update ES document {} - {}", resp.status().as_u16(), resp.text().await?)));
+        }
+        Ok(())
     }
 }

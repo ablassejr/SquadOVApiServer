@@ -11,7 +11,21 @@ use crate::{
     elastic::{
         ElasticSearchConfig,
         ElasticSearchClient,
+        ElasticSearchDocUpdate,
+        vod::{
+            ESVodSharing,
+            ESVodParentLists,
+            ESVodClip,
+        },
         self,
+    },
+    vod::{
+        VodAssociation,
+        VodManifest,
+        VodMetadata,
+        VodTrack,
+        RawVodTag,
+        db as vdb,
     },
 };
 use std::{
@@ -78,6 +92,34 @@ impl ElasticSearchJobInterface {
     }
 
     async fn update_vod_data(&self, video_uuid: &Uuid) -> Result<(), SquadOvError> {
+        let assoc = vdb::get_vod_association(&*self.db, video_uuid).await?;
+        let manifest = vdb::get_vod_manifest(&*self.db, &assoc).await.unwrap_or(VodManifest{
+            video_tracks: vec![
+                VodTrack{
+                    metadata: VodMetadata{
+                        video_uuid: video_uuid.clone(),
+                        ..VodMetadata::default()
+                    },
+                    segments: vec![],
+                    preview: None,
+                }
+            ]
+        });
+
+        #[derive(Serialize)]
+        struct Update {
+            vod: VodAssociation,
+            manifest: VodManifest,
+        }
+
+        let update = ElasticSearchDocUpdate{
+            doc: Update{
+                vod: assoc,
+                manifest,
+            }
+        };
+
+        self.es_client.update_document(&self.esconfig.vod_index_write, video_uuid.to_string().as_str(), update).await?;
         Ok(())
     }
 
@@ -89,6 +131,18 @@ impl ElasticSearchJobInterface {
     }
 
     async fn update_vod_sharing(&self, video_uuid: &Uuid) -> Result<(), SquadOvError> {
+        #[derive(Serialize)]
+        struct Update {
+            sharing: ESVodSharing,
+        }
+
+        let update = ElasticSearchDocUpdate{
+            doc: Update{
+                sharing: elastic::vod::build_es_vod_document_sharing(&*self.db, video_uuid).await?,
+            }
+        };
+
+        self.es_client.update_document(&self.esconfig.vod_index_write, video_uuid.to_string().as_str(), update).await?;
         Ok(())
     }
 
@@ -100,6 +154,19 @@ impl ElasticSearchJobInterface {
     }
 
     async fn update_vod_lists(&self, video_uuid: &Uuid) -> Result<(), SquadOvError> {
+        #[derive(Serialize)]
+        struct Update {
+            lists: ESVodParentLists,
+        }
+
+        let assoc = vdb::get_vod_association(&*self.db, video_uuid).await?;
+        let update = ElasticSearchDocUpdate{
+            doc: Update{
+                lists: elastic::vod::build_es_vod_document_lists(&*self.db, video_uuid, &assoc).await?,
+            }
+        };
+
+        self.es_client.update_document(&self.esconfig.vod_index_write, video_uuid.to_string().as_str(), update).await?;
         Ok(())
     }
 
@@ -111,6 +178,18 @@ impl ElasticSearchJobInterface {
     }
 
     async fn update_vod_tags(&self, video_uuid: &Uuid) -> Result<(), SquadOvError> {
+        #[derive(Serialize)]
+        struct Update {
+            tags: Vec<RawVodTag>,
+        }
+
+        let update = ElasticSearchDocUpdate{
+            doc: Update{
+                tags: vdb::get_raw_vod_tags(&*self.db, video_uuid).await?,
+            }
+        };
+
+        self.es_client.update_document(&self.esconfig.vod_index_write, video_uuid.to_string().as_str(), update).await?;
         Ok(())
     }
 
@@ -122,6 +201,18 @@ impl ElasticSearchJobInterface {
     }
 
     async fn update_vod_clip(&self, video_uuid: &Uuid) -> Result<(), SquadOvError> {
+        #[derive(Serialize)]
+        struct Update {
+            clip: Option<ESVodClip>,
+        }
+
+        let update = ElasticSearchDocUpdate{
+            doc: Update{
+                clip: elastic::vod::build_es_vod_clip(&*self.db, video_uuid).await?,
+            }
+        };
+
+        self.es_client.update_document(&self.esconfig.vod_index_write, video_uuid.to_string().as_str(), update).await?;
         Ok(())
     }
 
