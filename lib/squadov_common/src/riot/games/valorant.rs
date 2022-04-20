@@ -54,6 +54,34 @@ pub struct ValorantMatchInfoDto {
     pub season_id: Option<String>,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ValorantMatchInfoDtoCanonical {
+    pub match_id: String,
+    pub map_id: Option<String>,
+    pub game_length_millis: i32,
+    pub server_start_time_utc: Option<DateTime<Utc>>,
+    pub provisioning_flow_id: Option<String>,
+    pub game_mode: Option<String>,
+    pub is_ranked: Option<bool>,
+    pub season_id: Option<String>,
+}
+
+impl From<ValorantMatchInfoDto> for ValorantMatchInfoDtoCanonical {
+    fn from(o: ValorantMatchInfoDto) -> Self {
+        Self {
+            match_id: o.match_id,
+            map_id: o.map_id,
+            game_length_millis: o.game_length_millis,
+            server_start_time_utc: o.server_start_time_utc,
+            provisioning_flow_id: o.provisioning_flow_id,
+            game_mode: o.game_mode,
+            is_ranked: o.is_ranked,
+            season_id: o.season_id,
+        }
+    }   
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ValorantMatchPlayerDto {
     pub puuid: String,

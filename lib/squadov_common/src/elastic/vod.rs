@@ -10,7 +10,7 @@ use crate::{
         games::{
             lol::{LolParticipantDto, LolTeamDto, LolPlayerMatchSummary},
             tft::{TftPlayerMatchSummary, TftParticipantDto},
-            valorant::{ValorantPlayerMatchSummary, ValorantMatchInfoDto, ValorantMatchTeamDto, ValorantMatchPlayerDto, ValorantMatchFilterEvents},
+            valorant::{ValorantPlayerMatchSummary, ValorantMatchInfoDtoCanonical, ValorantMatchTeamDto, ValorantMatchPlayerDto, ValorantMatchFilterEvents},
         },
         db as rdb,
     },
@@ -122,7 +122,7 @@ pub struct ESVodCachedTft {
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct ESVodCachedValorant {
-    pub data: ValorantMatchInfoDto,
+    pub data: ValorantMatchInfoDtoCanonical,
     pub region: String,
     pub pov_events: Vec<ValorantMatchFilterEvents>,
     pub teams: Vec<ESCachedTeam<ValorantMatchTeamDto, ValorantMatchPlayerDto>>,
@@ -358,7 +358,7 @@ where
             SquadOvGames::Valorant => {
                 let riot_accounts = rdb::list_riot_accounts_for_user(ex, owner.id).await?;
                 data.valorant = Some(ESVodCachedValorant{
-                    data: rdb::get_valorant_match_info_dto(ex, &match_uuid).await?,
+                    data: rdb::get_valorant_match_info_dto(ex, &match_uuid).await?.into(),
                     region: rdb::get_valorant_match_shard(ex, &match_uuid).await?,
                     pov_events: rdb::compute_valorant_player_pov_events(ex, &match_uuid, owner.id).await?,
                     teams: {

@@ -20,6 +20,9 @@ if __name__ == '__main__':
         for row in reader:
             if 'video_uuid' not in row or 'game' not in row:
                 continue
+
+            if row['game'] == 'NULL':
+                continue
             data.append((row['video_uuid'], row['game']))
 
     def process(data):

@@ -36,6 +36,7 @@ fn main() -> std::io::Result<()> {
     config.rabbitmq.enable_steam = true;
     config.rabbitmq.enable_twitch = true;
     config.rabbitmq.enable_sharing = false;
+    config.rabbitmq.enable_elasticsearch = false;
     config.rabbitmq.prefetch_count = 2;
 
     tokio::runtime::Builder::new_multi_thread()
