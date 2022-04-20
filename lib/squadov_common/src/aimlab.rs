@@ -46,3 +46,22 @@ where
             .exists
     )
 }
+
+pub async fn list_aimlab_matches_for_uuids<'a, T>(ex: T, uuids: &[Uuid]) -> Result<Vec<AimlabTask>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            AimlabTask,
+            "
+            SELECT *
+            FROM squadov.aimlab_tasks
+            WHERE match_uuid = ANY($1)
+            ",
+            uuids
+        )
+            .fetch_all(ex)
+            .await?
+    )
+}

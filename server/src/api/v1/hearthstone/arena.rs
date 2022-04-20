@@ -7,7 +7,7 @@ use sqlx::{Transaction, Postgres};
 use std::sync::Arc;
 use uuid::Uuid;
 use chrono::{DateTime,Utc};
-use squadov_common::hearthstone::{HearthstoneArenaRun, HearthstoneDeck};
+use squadov_common::hearthstone::{HearthstoneArenaRun, HearthstoneDeck, db as hdb};
 
 #[derive(Deserialize)]
 pub struct CreateHearthstoneArenaDeckInput {
@@ -180,7 +180,7 @@ impl api::ApiApplication {
 
         let matches = self.list_matches_for_arena_run(collection_uuid, user_id, &super::HearthstoneListQuery::default()).await?;
         if !matches.is_empty() {
-            let match_players = self.get_hearthstone_players_for_match(&matches[0], user_id).await?;
+            let match_players = hdb::get_hearthstone_players_for_match(&*self.pool, &matches[0], user_id).await?;
             for (_, player) in match_players {
                 if player.local {
                     wins = player.arena_wins;

@@ -597,6 +597,48 @@ pub async fn cache_valorant_match_information(ex: &mut Transaction<'_, Postgres>
     Ok(())
 }
 
+pub async fn compute_valorant_player_pov_events<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64) -> Result<Vec<ValorantMatchFilterEvents>, SquadOvError> 
+where
+    T: Executor<'a, Database = Postgres>
+{
+    let cached_per_round_data = sqlx::query!(
+        r#"
+        SELECT
+            vmk.round_num,
+            COALESCE(COUNT(vmk.victim_puuid), 0) AS "kills!"
+        FROM squadov.valorant_match_players AS vmp
+        INNER JOIN squadov.riot_account_links AS ral
+            ON ral.puuid = vmp.puuid
+        LEFT JOIN squadov.valorant_match_kill AS vmk
+            ON vmk.match_uuid = vmp.match_uuid
+                AND vmk.killer_puuid = vmp.puuid
+        WHERE vmp.match_uuid = $1
+            AND ral.user_id = $2
+            AND vmk.round_num IS NOT NULL
+        GROUP BY vmk.round_num
+        "#,
+        match_uuid,
+        user_id
+    )
+        .fetch_all(ex)
+        .await?;
+
+    let mut events: HashSet<ValorantMatchFilterEvents> = HashSet::new();
+    for round in cached_per_round_data {
+        if round.kills >= 5 {
+            events.insert(ValorantMatchFilterEvents::PentaKill);
+        } else if round.kills >= 4 {
+            events.insert(ValorantMatchFilterEvents::QuadraKill);
+        } else if round.kills >= 3 {
+            events.insert(ValorantMatchFilterEvents::TripleKill);
+        } else if round.kills >= 2 {
+            events.insert(ValorantMatchFilterEvents::DoubleKill);
+        }
+    }
+
+    Ok(events.into_iter().collect())
+}
+
 pub async fn cache_valorant_player_pov_information(ex: &mut Transaction<'_, Postgres>, match_uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
     let cached_data = sqlx::query!(
         "
@@ -618,40 +660,7 @@ pub async fn cache_valorant_player_pov_information(ex: &mut Transaction<'_, Post
         .fetch_one(&mut *ex)
         .await?;
 
-    let cached_per_round_data = sqlx::query!(
-        r#"
-        SELECT
-            vmk.round_num,
-            COALESCE(COUNT(vmk.victim_puuid), 0) AS "kills!"
-        FROM squadov.valorant_match_players AS vmp
-        INNER JOIN squadov.riot_account_links AS ral
-            ON ral.puuid = vmp.puuid
-        LEFT JOIN squadov.valorant_match_kill AS vmk
-            ON vmk.match_uuid = vmp.match_uuid
-                AND vmk.killer_puuid = vmp.puuid
-        WHERE vmp.match_uuid = $1
-            AND ral.user_id = $2
-            AND vmk.round_num IS NOT NULL
-        GROUP BY vmk.round_num
-        "#,
-        match_uuid,
-        user_id
-    )
-        .fetch_all(&mut *ex)
-        .await?;
-
-    let mut events: HashSet<ValorantMatchFilterEvents> = HashSet::new();
-    for round in cached_per_round_data {
-        if round.kills >= 5 {
-            events.insert(ValorantMatchFilterEvents::PentaKill);
-        } else if round.kills >= 4 {
-            events.insert(ValorantMatchFilterEvents::QuadraKill);
-        } else if round.kills >= 3 {
-            events.insert(ValorantMatchFilterEvents::TripleKill);
-        } else if round.kills >= 2 {
-            events.insert(ValorantMatchFilterEvents::DoubleKill);
-        }
-    }
+    let events = compute_valorant_player_pov_events(&mut *ex, match_uuid, user_id).await?;
 
     sqlx::query!(
         "

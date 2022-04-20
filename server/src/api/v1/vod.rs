@@ -250,6 +250,8 @@ impl api::ApiApplication {
         )
             .execute(&*self.pool)
             .await?;
+
+        self.es_itf.request_update_vod_lists(video_uuid.clone()).await?;
         Ok(())
     }
 
@@ -264,6 +266,8 @@ impl api::ApiApplication {
         )
             .execute(&*self.pool)
             .await?;
+
+        self.es_itf.request_update_vod_lists(video_uuid.clone()).await?;
         Ok(())
     }
 
@@ -303,6 +307,8 @@ impl api::ApiApplication {
         )
             .execute(&*self.pool)
             .await?;
+
+        self.es_itf.request_update_vod_lists(video_uuid.clone()).await?;
         Ok(())
     }
 
@@ -317,6 +323,8 @@ impl api::ApiApplication {
         )
             .execute(&*self.pool)
             .await?;
+
+        self.es_itf.request_update_vod_lists(video_uuid.clone()).await?;
         Ok(())
     }
 

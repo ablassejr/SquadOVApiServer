@@ -146,7 +146,7 @@ impl std::default::Default for HearthstoneGameAction {
     }
 }
 
-#[derive(Clone,Display,Debug,Serialize)]
+#[derive(Clone,Display,Debug,Serialize,Deserialize)]
 #[display(fmt="HearthstoneEntity[EntityId: {}\tTags: {:#?}\tAttributes: {:#?}]", entity_id, tags, attributes)]
 pub struct HearthstoneEntity {
     #[serde(rename = "entityId")]
@@ -168,7 +168,7 @@ impl HearthstoneEntity {
     }
 }
 
-#[derive(Clone,Display,Debug,Serialize)]
+#[derive(Clone,Display,Debug,Serialize,Deserialize)]
 #[display(fmt="HearthstoneGameSnapshotAuxData[]")]
 pub struct HearthstoneGameSnapshotAuxData {
     #[serde(rename = "currentTurn")]
@@ -180,7 +180,7 @@ pub struct HearthstoneGameSnapshotAuxData {
     pub last_action_index: usize
 }
 
-#[derive(Clone,Display,Serialize)]
+#[derive(Clone,Display,Serialize,Deserialize)]
 #[display(fmt="HearthstoneGameSnapshot[Uuid: {}\tTime: {:?}\tGameEntityId: {}\tNameToPlayerId: {:#?}\tPlayerIdToEntityId: {:#?}\tEntities: {:#?}\tAux Data {:?}]", uuid, tm, game_entity_id, player_name_to_player_id, player_id_to_entity_id, entities, aux_data)]
 pub struct HearthstoneGameSnapshot {
     pub uuid: Uuid,

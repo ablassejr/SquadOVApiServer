@@ -217,9 +217,12 @@ pub async fn create_match_clip_profile_share_handler(app : web::Data<Arc<ApiAppl
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
     if let Some(match_uuid) = data.match_uuid.as_ref() {
+        let v = vdb::get_vod_id_from_match_user(&*app.pool, match_uuid, session.user.id).await?;
         profile::data::add_match_to_user_profile(&*app.pool, match_uuid, session.user.id).await?;
+        app.es_itf.request_update_vod_lists(v).await?;    
     } else if let Some(clip_uuid) = data.clip_uuid.as_ref() {
         profile::data::add_clip_to_user_profile(&*app.pool, clip_uuid, session.user.id).await?;
+        app.es_itf.request_update_vod_lists(clip_uuid.clone()).await?;
     } else {
         return Err(SquadOvError::BadRequest);
     }
@@ -232,9 +235,12 @@ pub async fn delete_match_clip_profile_share_handler(app : web::Data<Arc<ApiAppl
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
     
     if let Some(match_uuid) = data.match_uuid.as_ref() {
+        let v = vdb::get_vod_id_from_match_user(&*app.pool, match_uuid, session.user.id).await?;
         profile::data::remove_match_from_user_profile(&*app.pool, match_uuid, session.user.id).await?;
+        app.es_itf.request_update_vod_lists(v).await?;    
     } else if let Some(clip_uuid) = data.clip_uuid.as_ref() {
         profile::data::remove_clip_from_user_profile(&*app.pool, clip_uuid, session.user.id).await?;
+        app.es_itf.request_update_vod_lists(clip_uuid.clone()).await?;
     } else {
         return Err(SquadOvError::BadRequest);
     }

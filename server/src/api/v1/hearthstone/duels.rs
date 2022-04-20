@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse, HttpRequest};
 use crate::api;
 use chrono::{DateTime, Utc};
 use squadov_common::SquadOvError;
-use squadov_common::hearthstone::{HearthstoneDuelRun, GameType};
+use squadov_common::hearthstone::{HearthstoneDuelRun, GameType, db as hdb};
 use uuid::Uuid;
 use sqlx::{Transaction, Postgres};
 use std::sync::Arc;
@@ -160,7 +160,7 @@ impl api::ApiApplication {
         // then we fall back to the deck's hero card.
         let matches = self.list_matches_for_duel_run(collection_uuid, user_id, &super::HearthstoneListQuery::default()).await?;
         let hero_card = if matches.len() > 0 {
-            let snapshot_ids = self.get_hearthstone_snapshots_for_match(&matches[0], user_id).await?;
+            let snapshot_ids = hdb::get_hearthstone_snapshots_for_match(&*self.pool, &matches[0], user_id).await?;
             let player_entity = match snapshot_ids.last() {
                 Some(x) => Some(self.get_player_hero_entity_from_hearthstone_snapshot(x, user_id).await?),
                 None => None

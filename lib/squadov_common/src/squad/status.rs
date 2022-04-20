@@ -168,7 +168,7 @@ impl UserActivityStatusTracker {
     async fn notify_single_session_bulk_user_state(&self, session_id: &Uuid, states: HashMap<i64, UserActivityState>) -> Result<(), SquadOvError> {
         let sessions = self.sessions.read().await;
         if let Some(addr) = sessions.get(session_id) {
-            addr.do_send(UserActivityChange{
+            addr.try_send(UserActivityChange{
                 states,
             }).map_err(|x| {
                 SquadOvError::InternalError(format!("Failed to notify user of bulk state change: {:?}", x))

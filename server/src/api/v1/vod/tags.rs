@@ -32,7 +32,7 @@ impl api::ApiApplication {
         )
             .fetch_all(&*self.pool)
             .await?;
-        Ok(vod::condense_raw_vod_tags(tags, user_id)?)
+        Ok(vod::condense_raw_vod_tags(tags, user_id))
     }
 
     pub async fn create_tags(&self, tx: &mut Transaction<'_, Postgres>, tags: &[String]) -> Result<(), SquadOvError> {
@@ -91,7 +91,7 @@ impl api::ApiApplication {
         )
             .fetch_all(tx)
             .await?;
-        Ok(vod::condense_raw_vod_tags(tags, user_id)?)
+        Ok(vod::condense_raw_vod_tags(tags, user_id))
     }
 
     pub async fn remove_tag_from_video_for_user(&self, tag_id: i64, video_uuid: &Uuid, user_id: i64) -> Result<(), SquadOvError> {
@@ -128,6 +128,8 @@ pub async fn add_tags_for_vod_handler(data : web::Path<super::GenericVodPathInpu
     app.create_tags(&mut tx, &tags).await?;
     let ret_tags = app.add_tags_to_video(&mut tx, &data.video_uuid, &tags, session.user.id).await?;
     tx.commit().await?;
+
+    app.es_itf.request_update_vod_tags(data.video_uuid.clone()).await?;
     Ok(HttpResponse::Ok().json(&ret_tags))
 }
 
@@ -141,5 +143,6 @@ pub async fn delete_tag_for_vod_handler(data : web::Path<VodTagInput>, app : web
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
     app.remove_tag_from_video_for_user(data.tag_id, &data.video_uuid, session.user.id).await?;
+    app.es_itf.request_update_vod_tags(data.video_uuid.clone()).await?;
     Ok(HttpResponse::NoContent().finish())
 }

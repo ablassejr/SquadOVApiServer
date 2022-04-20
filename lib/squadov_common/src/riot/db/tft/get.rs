@@ -10,22 +10,33 @@ use crate::{
         TftTraitDto,
     }
 };
-use sqlx::PgPool;
+use sqlx::{Executor, Postgres, PgPool};
 use uuid::Uuid;
 use std::collections::HashMap;
 
-pub async fn get_tft_match(ex: &PgPool, match_uuid: &Uuid) -> Result<WrappedTftMatch, SquadOvError> {
-    let match_info = sqlx::query!(
-        "
-        SELECT *
-        FROM squadov.tft_match_info
-        WHERE match_uuid = $1
-        ",
-        match_uuid
+pub async fn get_tft_match_region<'a, T>(ex: T, match_uuid: &Uuid) -> Result<String, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
+    Ok(
+        sqlx::query!(
+            r#"
+            SELECT region
+            FROM squadov.tft_matches
+            WHERE match_uuid = $1
+            "#,
+            match_uuid
+        )
+            .fetch_one(ex)
+            .await?
+            .region
     )
-        .fetch_one(&*ex)
-        .await?;
+}
 
+pub async fn get_tft_match_participants<'a, T>(ex: T, match_uuid: &Uuid) -> Result<(Vec<TftParticipantDto>, HashMap<String, String>), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
     let match_participants = sqlx::query!(
         "
         SELECT tmp.*, ra.summoner_name
@@ -36,7 +47,7 @@ pub async fn get_tft_match(ex: &PgPool, match_uuid: &Uuid) -> Result<WrappedTftM
         ",
         match_uuid
     )
-        .fetch_all(&*ex)
+        .fetch_all(ex)
         .await?;
     
     let mut unit_map: HashMap<String, Vec<TftUnitDto>> = HashMap::new();
@@ -48,7 +59,7 @@ pub async fn get_tft_match(ex: &PgPool, match_uuid: &Uuid) -> Result<WrappedTftM
         ",
         match_uuid
     )
-        .fetch_all(&*ex)
+        .fetch_all(ex)
         .await?
         .into_iter()
         .for_each(|x| {
@@ -75,7 +86,7 @@ pub async fn get_tft_match(ex: &PgPool, match_uuid: &Uuid) -> Result<WrappedTftM
         ",
         match_uuid
     )
-        .fetch_all(&*ex)
+        .fetch_all(ex)
         .await?
         .into_iter()
         .for_each(|x| {
@@ -92,6 +103,46 @@ pub async fn get_tft_match(ex: &PgPool, match_uuid: &Uuid) -> Result<WrappedTftM
             });
         });
 
+    let participants = match_participants.iter().map(|x| {
+        TftParticipantDto {
+            gold_left: x.gold_left,
+            last_round: x.last_round,
+            level: x.level,
+            placement: x.placement,
+            players_eliminated: x.players_eliminated,
+            puuid: x.puuid.clone(),
+            time_eliminated: x.time_eliminated,
+            total_damage_to_players: x.total_damage_to_players,
+            units: unit_map.remove(&x.puuid).unwrap_or(vec![]),
+            traits: trait_map.remove(&x.puuid).unwrap_or(vec![]),
+            companion: TftCompanionDto{
+                content_id: x.companion_content_id.clone(),
+                skin_id: x.companion_skin_id,
+                species: x.companion_species.clone(),
+            },
+        }
+    }).collect();
+
+    let puuid_to_name = match_participants.iter().map(|x| {
+        (x.puuid.clone(), x.summoner_name.as_ref().unwrap_or(&String::new()).clone())
+    }).collect();
+
+    Ok((participants, puuid_to_name))
+}
+
+pub async fn get_tft_match(ex: &PgPool, match_uuid: &Uuid) -> Result<WrappedTftMatch, SquadOvError> {
+    let match_info = sqlx::query!(
+        "
+        SELECT *
+        FROM squadov.tft_match_info
+        WHERE match_uuid = $1
+        ",
+        match_uuid
+    )
+        .fetch_one(&*ex)
+        .await?;
+
+    let (participants, puuid_to_name) = get_tft_match_participants(&*ex, match_uuid).await?;
     Ok(
         WrappedTftMatch {
             data: TftMatchDto{
@@ -102,30 +153,10 @@ pub async fn get_tft_match(ex: &PgPool, match_uuid: &Uuid) -> Result<WrappedTftM
                     game_version: match_info.game_version,
                     queue_id: match_info.queue_id,
                     tft_set_number: match_info.tft_set_number,
-                    participants: match_participants.iter().map(|x| {
-                        TftParticipantDto {
-                            gold_left: x.gold_left,
-                            last_round: x.last_round,
-                            level: x.level,
-                            placement: x.placement,
-                            players_eliminated: x.players_eliminated,
-                            puuid: x.puuid.clone(),
-                            time_eliminated: x.time_eliminated,
-                            total_damage_to_players: x.total_damage_to_players,
-                            units: unit_map.remove(&x.puuid).unwrap_or(vec![]),
-                            traits: trait_map.remove(&x.puuid).unwrap_or(vec![]),
-                            companion: TftCompanionDto{
-                                content_id: x.companion_content_id.clone(),
-                                skin_id: x.companion_skin_id,
-                                species: x.companion_species.clone(),
-                            },
-                        }
-                    }).collect(),
+                    participants,
                 },
             },
-            puuid_to_name: match_participants.iter().map(|x| {
-                (x.puuid.clone(), x.summoner_name.as_ref().unwrap_or(&String::new()).clone())
-            }).collect()
+            puuid_to_name,
         }
     )
 }

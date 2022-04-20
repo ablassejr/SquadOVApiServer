@@ -53,6 +53,9 @@ pub struct RabbitMqConfig {
     pub misc_valorant_queue: String,
     pub enable_sharing: bool,
     pub sharing_queue: String,
+    pub enable_elasticsearch: bool,
+    pub elasticsearch_queue: String,
+    pub elasticsearch_workers: i32,
     pub additional_queues: Option<Vec<String>>,
 }
 
@@ -225,6 +228,14 @@ impl RabbitMqConnectionBundle {
                         default_table.clone(),
                     ).await?;
                 }
+            }
+
+            if !config.elasticsearch_queue.is_empty() {
+                ch.queue_declare(
+                    &config.elasticsearch_queue,
+                    queue_opts.clone(),
+                    default_table.clone(),
+                ).await?;
             }
 
             channels.push(ch);

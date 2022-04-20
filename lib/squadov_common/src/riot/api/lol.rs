@@ -122,6 +122,8 @@ impl super::RiotApiApplicationInterface {
                 db::store_lol_match_timeline_info(&mut tx, &match_uuid, &match_timeline.as_ref().unwrap().info).await?;
             }
             tx.commit().await?;
+
+            self.es_itf.request_sync_match(match_uuid).await?;
             break;
         }
 

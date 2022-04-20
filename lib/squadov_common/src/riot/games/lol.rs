@@ -52,7 +52,7 @@ pub struct LolMatchDto {
     pub info: LolMatchInfoDto,
 }
 
-#[derive(Serialize,Deserialize,Default)]
+#[derive(Serialize,Deserialize,Default,Clone)]
 #[serde(rename_all="camelCase")]
 pub struct LolTeamDto {
     pub team_id: i32,
@@ -61,14 +61,14 @@ pub struct LolTeamDto {
     pub objectives: LolObjectivesDto,
 }
 
-#[derive(Serialize,Deserialize,Default)]
+#[derive(Serialize,Deserialize,Default,Clone)]
 #[serde(rename_all="camelCase")]
 pub struct LolBanDto {
     pub champion_id: i32,
     pub pick_turn: i32,
 }
 
-#[derive(Serialize,Deserialize,Default)]
+#[derive(Serialize,Deserialize,Default,Clone)]
 #[serde(rename_all="camelCase")]
 pub struct LolObjectivesDto {
     pub baron: LolSingleObjectiveDto,
@@ -79,14 +79,14 @@ pub struct LolObjectivesDto {
     pub tower: LolSingleObjectiveDto,
 }
 
-#[derive(Serialize,Deserialize,Default)]
+#[derive(Serialize,Deserialize,Default,Clone)]
 #[serde(rename_all="camelCase")]
 pub struct LolSingleObjectiveDto {
     pub first: bool,
     pub kills: i32,
 }
 
-#[derive(Serialize,Deserialize,Default)]
+#[derive(Serialize,Deserialize,Default,Clone)]
 #[serde(rename_all="camelCase")]
 pub struct LolParticipantDto {
     #[serde(default)]
@@ -300,14 +300,14 @@ pub struct LolParticipantDto {
     pub win: bool,
 }
 
-#[derive(Serialize,Deserialize,Default)]
+#[derive(Serialize,Deserialize,Default,Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LolPerksDto {
     pub stat_perks: LolPerkStatsDto,
     pub styles: Vec<LolPerkStyleDto>,
 }
 
-#[derive(Serialize,Deserialize,Default)]
+#[derive(Serialize,Deserialize,Default,Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LolPerkStatsDto {
     pub defense: i32,
@@ -315,7 +315,7 @@ pub struct LolPerkStatsDto {
     pub offense: i32,
 }
 
-#[derive(Serialize,Deserialize,Default)]
+#[derive(Serialize,Deserialize,Default,Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LolPerkStyleDto {
     pub description: String,
@@ -323,7 +323,7 @@ pub struct LolPerkStyleDto {
     pub style: i32,
 }
 
-#[derive(Serialize,Deserialize,Default)]
+#[derive(Serialize,Deserialize,Default,Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LolPerkStyleSelectionDto {
     pub perk: i32,
@@ -401,7 +401,7 @@ pub struct LolMatchEventDto {
     pub victim_id: Option<i32>,
 }
 
-#[derive(Serialize, Clone, Debug,Default)]
+#[derive(Serialize, Deserialize, Clone, Debug,Default)]
 #[serde(rename_all = "camelCase")]
 pub struct LolMiniParticipantStats {
     pub participant_id: i32,
@@ -418,7 +418,7 @@ pub struct LolMiniParticipantStats {
     pub win: bool,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LolPlayerMatchSummary {
     pub match_uuid: Uuid,

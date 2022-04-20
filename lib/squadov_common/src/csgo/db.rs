@@ -603,6 +603,25 @@ where
     )
 }
 
+pub async fn find_csgo_match_user_from_view_id<'a, T>(ex: T, view_uuid: &Uuid) -> Result<(Uuid, i64), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    let data = sqlx::query!(
+        r#"
+        SELECT match_uuid AS "match_uuid!", user_id
+        FROM squadov.csgo_match_views
+        WHERE view_uuid = $1
+            AND match_uuid IS NOT NULL
+        "#,
+        view_uuid,
+    )
+        .fetch_one(ex)
+        .await?;
+
+    Ok((data.match_uuid, data.user_id))
+}
+
 pub async fn find_existing_csgo_match<'a, T>(ex: T, server: &str, start_time: &DateTime<Utc>, end_time: &DateTime<Utc>) -> Result<Option<Uuid>, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>

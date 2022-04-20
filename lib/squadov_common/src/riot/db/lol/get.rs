@@ -18,7 +18,7 @@ use crate::{
         LolMatchTimelineInfoDto,
     },
 };
-use sqlx::PgPool;
+use sqlx::{Executor, Postgres, PgPool};
 use uuid::Uuid;
 use std::collections::{BTreeSet, HashMap};
 
@@ -153,7 +153,29 @@ async fn get_lol_match_timeline(ex: &PgPool, match_uuid: &Uuid) -> Result<LolMat
     )
 }
 
-async fn get_lol_match_teams(ex: &PgPool, match_uuid: &Uuid) -> Result<Vec<LolTeamDto>, SquadOvError> {
+pub async fn get_lol_match_region<'a, T>(ex: T, match_uuid: &Uuid) -> Result<String, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            r#"
+            SELECT platform_id
+            FROM squadov.lol_match_info
+            WHERE match_uuid = $1
+            "#,
+            match_uuid,
+        )
+            .fetch_one(ex)
+            .await?
+            .platform_id
+    )
+}
+
+pub async fn get_lol_match_teams<'a, T>(ex: T, match_uuid: &Uuid) -> Result<Vec<LolTeamDto>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
     let mut bans_per_team: HashMap<i32, Vec<LolBanDto>> = HashMap::new();
     sqlx::query!(
         "
@@ -163,7 +185,7 @@ async fn get_lol_match_teams(ex: &PgPool, match_uuid: &Uuid) -> Result<Vec<LolTe
         ",
         match_uuid
     )
-        .fetch_all(&*ex)
+        .fetch_all(ex)
         .await?
         .into_iter()
         .for_each(|x| {
@@ -186,7 +208,7 @@ async fn get_lol_match_teams(ex: &PgPool, match_uuid: &Uuid) -> Result<Vec<LolTe
             ",
             match_uuid
         )
-            .fetch_all(&*ex)
+            .fetch_all(ex)
             .await?
             .into_iter()
             .map(|x| {
@@ -226,7 +248,10 @@ async fn get_lol_match_teams(ex: &PgPool, match_uuid: &Uuid) -> Result<Vec<LolTe
     )
 }
 
-async fn get_lol_match_participants(ex: &PgPool, match_uuid: &Uuid) -> Result<Vec<LolParticipantDto>, SquadOvError> {
+pub async fn get_lol_match_participants<'a, T>(ex: T, match_uuid: &Uuid) -> Result<Vec<LolParticipantDto>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
     Ok(
         sqlx::query!(
             "
@@ -239,7 +264,7 @@ async fn get_lol_match_participants(ex: &PgPool, match_uuid: &Uuid) -> Result<Ve
             ",
             match_uuid,
         )
-            .fetch_all(&*ex)
+            .fetch_all(ex)
             .await?
             .into_iter()
             .map(|x| {

@@ -195,9 +195,9 @@ pub async fn create_new_share_connection_handler(app : web::Data<Arc<api::ApiApp
             ..data.conn
         }]
     } else {
-        associated_video_uuids.into_iter().map(|x| {
+        associated_video_uuids.iter().map(|x| {
             MatchVideoShareConnection{
-                video_uuid: Some(x),
+                video_uuid: Some(x.clone()),
                 ..data.conn
             }
         }).collect()
@@ -238,6 +238,10 @@ pub async fn create_new_share_connection_handler(app : web::Data<Arc<api::ApiApp
         }
     }
     tx.commit().await?;
+
+    for video_uuid in associated_video_uuids {
+        app.es_itf.request_update_vod_sharing(video_uuid).await?;
+    }
     Ok(HttpResponse::Ok().json(ret_conns))
 }
 
@@ -251,6 +255,17 @@ pub async fn delete_share_connection_handler(app : web::Data<Arc<api::ApiApplica
 pub async fn edit_share_connection_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<ShareConnectionPath>, data: web::Json<ShareConnectionEditData>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
+    let conn = share::get_match_vod_share_connection(&*app.pool, path.connection_id).await?;
+    if let Some(match_uuid) = conn.match_uuid {
+        let raw_vods = app.find_accessible_vods_in_match_for_user(&match_uuid, session.user.id).await?;
+        for v in raw_vods {
+            app.es_itf.request_update_vod_sharing(v.video_uuid).await?;
+        }
+    } else if let Some(video_uuid) = conn.video_uuid {
+        app.es_itf.request_update_vod_sharing(video_uuid).await?;
+    }
+
     share::edit_share_connection(&*app.pool, path.connection_id, session.user.id, data.can_share, data.can_clip).await?;
     Ok(HttpResponse::NoContent().finish())
 }

@@ -7,7 +7,6 @@ use crate::api::auth::SquadOVSession;
 use actix_web::{web, HttpResponse, HttpRequest, HttpMessage};
 use serde::Deserialize;
 use std::sync::Arc;
-use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct AimlabUserTaskListInput {
@@ -54,22 +53,6 @@ impl api::ApiApplication {
             .fetch_all(&*self.pool)
             .await?;
         return Ok(matches);
-    }
-
-    pub async fn list_aimlab_matches_for_uuids(&self, uuids: &[Uuid]) -> Result<Vec<AimlabTask>, SquadOvError> {
-        Ok(
-            sqlx::query_as!(
-                AimlabTask,
-                "
-                SELECT *
-                FROM squadov.aimlab_tasks
-                WHERE match_uuid = ANY($1)
-                ",
-                uuids
-            )
-                .fetch_all(&*self.pool)
-                .await?
-        )
     }
 }
 

@@ -20,15 +20,40 @@ use crate::{
         WowInstance,
     },
     csgo::summary::CsgoPlayerMatchSummary,
+    elastic::vod::ESVodDocument,
+    vod,
 };
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use std::convert::TryFrom;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MatchPlayerPair {
     pub match_uuid: Uuid,
     pub player_uuid: Uuid,
+}
+
+pub async fn get_match_favorites<'a, T>(ex: T, match_uuid: &Uuid) -> Result<Vec<(i64, String)>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT DISTINCT user_id, reason
+            FROM squadov.user_favorite_matches
+            WHERE match_uuid = $1
+            ",
+            match_uuid
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                (x.user_id, x.reason)
+            })
+            .collect()
+    )
 }
 
 pub async fn create_new_match<'a, T>(ex: T, game: SquadOvGames) -> Result<Uuid, SquadOvError>
@@ -295,4 +320,29 @@ where
             SquadOvGames::Unknown => false,
         }   
     )
+}
+
+pub fn vod_document_to_match_pov_for_user(doc: ESVodDocument, user_id: i64) -> RecentMatchPov {
+    let fav = doc.find_favorite_reason(user_id);
+    let watchlist = doc.is_on_user_watchlist(user_id);
+    RecentMatchPov {
+        vod: doc.manifest.clone(),
+        tm: doc.vod.end_time.unwrap_or(Utc::now()),
+        username: doc.owner.username,
+        user_id: doc.owner.user_id,
+        favorite_reason: fav,
+        is_watchlist: watchlist,
+        is_local: doc.vod.is_local,
+        tags: vod::condense_raw_vod_tags(doc.tags, user_id),
+        access_token: None,
+        aimlab_task: doc.data.aimlab.map(|x| { x.task }),
+        lol_match: doc.data.lol.map(|x| { x.summary }).flatten(),
+        tft_match: doc.data.tft.map(|x| { x.summary }).flatten(),
+        valorant_match: doc.data.valorant.map(|x| { x.summary }).flatten(),
+        wow_challenge: doc.data.wow.as_ref().map(|x| { x.challenge.clone() }).flatten(),
+        wow_encounter: doc.data.wow.as_ref().map(|x| { x.encounter.clone() }).flatten(),
+        wow_arena: doc.data.wow.as_ref().map(|x| { x.arena.clone() }).flatten(),
+        wow_instance: doc.data.wow.as_ref().map(|x| { x.instance.clone() }).flatten(),
+        csgo_match: doc.data.csgo.map(|x| { x.pov }),
+    }
 }

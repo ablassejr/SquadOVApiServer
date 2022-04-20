@@ -13,8 +13,11 @@ use squadov_common::{
     SquadOvGames,
     SquadOvWowRelease,
     games,
-    matches::{RecentMatch, RecentMatchPov, MatchPlayerPair},
-    aimlab::AimlabTask,
+    matches::{RecentMatch, RecentMatchPov, MatchPlayerPair, self},
+    aimlab::{
+        self,
+        AimlabTask,
+    },
     riot::{
         db as riot_db,
         games::{
@@ -29,6 +32,7 @@ use squadov_common::{
         WoWChallenge,
         WoWArena,
         WowInstance,
+        matches as wm,
     },
     access::{
         AccessTokenRequest,
@@ -59,11 +63,13 @@ use squadov_common::{
         self,
         VodTag,
         RawVodTag,
+        db as vdb,
     },
+    elastic::vod::ESVodDocument,
 };
 use std::sync::Arc;
 use chrono::{DateTime, Utc, TimeZone, Duration};
-use std::collections::{HashMap};
+use std::collections::{HashMap, HashSet};
 use serde::{Serialize, Deserialize};
 use crate::api::v1::{
     FavoriteResponse,
@@ -71,6 +77,7 @@ use crate::api::v1::{
     wow::WowListQuery,
 };
 use std::convert::TryFrom;
+use elasticsearch_dsl::{Search, Sort, SortOrder, Query};
 
 pub struct Match {
     pub uuid : Uuid
@@ -147,13 +154,19 @@ pub struct RecentMatchQuery {
     pub games: Option<Vec<SquadOvGames>>,
     pub wow_releases: Option<Vec<SquadOvWowRelease>>,
     pub tags: Option<Vec<String>>,
+    // Shared to squads
     pub squads: Option<Vec<i64>>,
+    // Recorded by user
     pub users: Option<Vec<i64>>,
     pub time_start: Option<i64>,
     pub time_end: Option<i64>,
     pub only_favorite: bool,
     pub only_watchlist: bool,
+    #[serde(default)]
+    pub only_profile: bool,
     pub vods: Option<Vec<Uuid>>,
+    pub not_vods: Option<Vec<Uuid>>,
+    pub matches: Option<Vec<Uuid>>,
     pub filters: RecentMatchGameQuery,
 }
 
@@ -171,6 +184,120 @@ impl RecentMatchQuery {
             vec![]
         }
     }
+
+    pub fn to_es_search(&self, user_id: i64, is_clip_term: bool) -> Search {
+        let mut q = Query::bool();
+        if let Some(games) = self.games.as_ref() {
+            q = q.filter(Query::terms("data.game", games.iter().map(|x| *x as i32).collect::<Vec<i32>>()));
+        }
+
+        if let Some(wow_releases) = self.wow_releases.as_ref() {
+            if !wow_releases.is_empty() {
+                let mut wr_query = Query::bool();
+
+                if !wow_releases.is_empty() {
+                    wr_query = wr_query.minimum_should_match("1");
+                }
+
+                for wr in wow_releases {
+                    wr_query = wr_query.should(Query::regexp("data.wow.buildVersion", games::wow_release_to_regex_expression(*wr)));
+                }
+
+                q = q.filter(wr_query);
+            }
+        }
+
+        if let Some(tags) = self.tags.as_ref() {
+            q = q.filter(Query::terms("tags.tag", tags.clone()));
+        }
+
+        if let Some(squads) = self.squads.as_ref() {
+            q = q.filter(Query::terms("sharing.squads", squads.clone()));
+        }
+
+        if let Some(users) = self.users.as_ref() {
+            q = q.filter(Query::terms("owner.userId", users.clone()));
+        }
+
+        if self.time_start.is_some() || self.time_end.is_some() {
+            let mut r = Query::range("vod.endTime");
+            if let Some(ts) = self.time_start {
+                r = r.gte(ts);
+            }
+
+            if let Some(te) = self.time_end {
+                r = r.lte(te);
+            }
+            q = q.filter(r);
+        }
+
+        if self.only_favorite {
+            q = q.filter(Query::nested(
+                "lists.favorites",
+                Query::term("lists.favorites.userId", user_id),
+            ));
+        }
+
+        if self.only_watchlist {
+            q = q.filter(Query::term("lists.watchlist", user_id));
+        }
+
+        if self.only_profile {
+            q = q.filter(Query::term("lists.profiles", user_id));
+        }
+
+        if let Some(vods) = self.vods.as_ref() {
+            q = q.filter(Query::terms("_id", vods.iter().map(|x| { x.to_hyphenated().to_string() }).collect::<Vec<_>>()));
+        }
+
+        if let Some(not_vods) = self.not_vods.as_ref() {
+            q = q.must_not(Query::terms("_id", not_vods.iter().map(|x| { x.to_hyphenated().to_string() }).collect::<Vec<_>>()));
+        }
+
+        if let Some(matches) = self.matches.as_ref() {
+            q = q.filter(Query::terms("data.matchUuid", matches.iter().map(|x| { x.to_hyphenated().to_string() }).collect::<Vec<_>>()));
+        }
+
+        let game_filters = vec![
+            self.filters.valorant.build_es_query(),
+            if self.filters.wow.encounters.enabled {
+                self.filters.wow.encounters.build_es_query()
+            } else {
+                Query::bool()
+                    .must_not(Query::exists("data.wow.encounter"))
+            },
+            if self.filters.wow.arenas.enabled {
+                self.filters.wow.arenas.build_es_query()
+            } else {
+                Query::bool()
+                    .must_not(Query::exists("data.wow.arena"))
+            },
+            if self.filters.wow.keystones.enabled {
+                self.filters.wow.keystones.build_es_query()
+            } else {
+                Query::bool()
+                    .must_not(Query::exists("data.wow.challenge"))
+            },
+            if self.filters.wow.instances.enabled {
+                self.filters.wow.instances.build_es_query()
+            } else {
+                Query::bool()
+                    .must_not(Query::exists("data.wow.challenge"))
+            },
+        ];
+
+        {
+            let mut gquery = Query::bool();
+            for f in game_filters {
+                gquery = gquery.filter(f);
+            }
+
+            q = q.filter(gquery);
+        }
+        
+        q = q.filter(Query::term("vod.isClip", is_clip_term));
+        Search::new().query(q)
+    }
 }
 
 impl Default for RecentMatchQuery {
@@ -185,7 +312,10 @@ impl Default for RecentMatchQuery {
             time_end: None,
             only_favorite: false,
             only_watchlist: false,
+            only_profile: false,
+            not_vods: None,
             vods: None,
+            matches: None,
             filters: RecentMatchGameQuery::default(),
         }
     }
@@ -299,7 +429,7 @@ impl api::ApiApplication {
                 user_id: d.user_id,
                 favorite_reason: d.favorite_reason,
                 is_watchlist: d.is_watchlist,
-                tags: vod::condense_raw_vod_tags(serde_json::from_value::<Vec<RawVodTag>>(d.tags)?, user_id)?,
+                tags: vod::condense_raw_vod_tags(serde_json::from_value::<Vec<RawVodTag>>(d.tags)?, user_id),
             });
         }
 
@@ -582,6 +712,10 @@ impl api::ApiApplication {
         )
             .execute(&*self.pool)
             .await?;
+
+        for v in vdb::find_accessible_vods_in_match_for_user(&*self.pool, match_uuid, user_id).await? {
+            self.es_itf.request_update_vod_lists(v.video_uuid).await?;
+        }
         Ok(())
     }
 
@@ -596,6 +730,10 @@ impl api::ApiApplication {
         )
             .execute(&*self.pool)
             .await?;
+        
+        for v in vdb::find_accessible_vods_in_match_for_user(&*self.pool, match_uuid, user_id).await? {
+            self.es_itf.request_update_vod_lists(v.video_uuid).await?;
+        }
         Ok(())
     }
 
@@ -613,7 +751,7 @@ impl api::ApiApplication {
             let recent = filter_recent_match_data_by_game(&raw_base_matches, SquadOvGames::AimLab);
 
             if !recent.is_empty() {
-                self.list_aimlab_matches_for_uuids(&recent_match_data_uuids(&recent)).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, AimlabTask>>()
+                aimlab::list_aimlab_matches_for_uuids(&*self.pool, &recent_match_data_uuids(&recent)).await?.into_iter().map(|x| { (x.match_uuid.clone(), x)}).collect::<HashMap<Uuid, AimlabTask>>()
             } else {
                 HashMap::new()
             }
@@ -630,7 +768,7 @@ impl api::ApiApplication {
         let mut wow_encounters = {
             let recent = filter_recent_match_data_by_game(&raw_base_matches, SquadOvGames::WorldOfWarcraft);
             if !recent.is_empty() {
-                self.list_wow_encounter_for_uuids(&recent_match_data_uuid_pairs(&recent)).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWEncounter>>()
+                wm::list_wow_encounter_for_uuids(&*self.heavy_pool, &recent_match_data_uuid_pairs(&recent)).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWEncounter>>()
             } else {
                 HashMap::new()
             }
@@ -638,7 +776,7 @@ impl api::ApiApplication {
         let mut wow_challenges = {
             let recent = filter_recent_match_data_by_game(&raw_base_matches, SquadOvGames::WorldOfWarcraft);
             if !recent.is_empty() {
-                self.list_wow_challenges_for_uuids(&recent_match_data_uuid_pairs(&recent)).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWChallenge>>()
+                wm::list_wow_challenges_for_uuids(&*self.heavy_pool, &recent_match_data_uuid_pairs(&recent)).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWChallenge>>()
             } else {
                 HashMap::new()
             }
@@ -646,7 +784,7 @@ impl api::ApiApplication {
         let mut wow_arenas = {
             let recent = filter_recent_match_data_by_game(&raw_base_matches, SquadOvGames::WorldOfWarcraft);
             if !recent.is_empty() {
-                self.list_wow_arenas_for_uuids(&recent_match_data_uuid_pairs(&recent)).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWArena>>()
+                wm::list_wow_arenas_for_uuids(&*self.heavy_pool, &recent_match_data_uuid_pairs(&recent)).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WoWArena>>()
             } else {
                 HashMap::new()
             }
@@ -654,7 +792,7 @@ impl api::ApiApplication {
         let mut wow_instances = {
             let recent = filter_recent_match_data_by_game(&raw_base_matches, SquadOvGames::WorldOfWarcraft);
             if !recent.is_empty() {
-                self.list_wow_instances_for_uuids(&recent_match_data_uuid_pairs(&recent)).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WowInstance>>()
+                wm::list_wow_instances_for_uuids(&*self.heavy_pool, &recent_match_data_uuid_pairs(&recent)).await?.into_iter().map(|x| { ((x.match_uuid.clone(), x.user_uuid.clone()), x)}).collect::<HashMap<(Uuid, Uuid), WowInstance>>()
             } else {
                 HashMap::new()
             }
@@ -840,14 +978,97 @@ pub async fn get_vod_recent_match_handler(app : web::Data<Arc<api::ApiApplicatio
 }
 
 async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiApplication>>, req: &HttpRequest, query: web::Query<api::PaginationParameters>, mut filter: web::Json<RecentMatchQuery>, needs_access_tokens: bool) -> Result<HttpResponse, SquadOvError> {
-    /*
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
     if needs_access_tokens {
         filter.users = Some(vec![user_id]);
     }
 
-    let raw_base_matches = app.get_recent_base_matches_for_user(user_id, query.start, query.end, &filter, needs_access_tokens).await?;
-    let got_total = raw_base_matches.len() as i64;
-    let mut matches = app.get_recent_matches_from_uuids(raw_base_matches).await?;
+    let available_user_squads: HashSet<i64> = app.get_user_squads(session.user.id).await?.into_iter().map(|x| { x.squad.id }).collect();
+    filter.squads = if let Some(squad_filter) = &filter.squads {
+        Some(squad_filter.iter().filter(|x| { available_user_squads.contains(x) }).map(|x| { *x }).collect())
+    } else {
+        Some(available_user_squads.into_iter().collect())
+    };
+
+    // We need to keep querying VODs until we receive the number of matches the user wants (or there's nothing left).
+    // I'm going to make the assumption here that querying ElasticSearch multiple times is better than running aggregation queries -
+    // in fact I'm not even sure we can even effectively use aggregation queries to accomplish what I want here anyway.
+    let mut matches: HashMap<Uuid, RecentMatch> = HashMap::new();
+    let expected_total = (query.end - query.start) as usize;
+    
+    let mut current_start = query.start;
+    let mut current_end = query.end;
+    let mut existing_video_uuids: HashSet<Uuid> = HashSet::new();
+    let mut no_videos_left = false;
+
+    while matches.len() < expected_total {
+        let query_size = current_end - current_start;
+        // Convert the query and filter into an ElasticSearch query.
+        let es_search = filter.to_es_search(session.user.id, false)
+            .from(current_start)
+            .size(current_end)
+            .sort(vec![
+                Sort::new("vod.endTime")
+                    .order(SortOrder::Desc)
+            ]);
+
+        // Get a vector of ESVodDocument which should easily be converted into the RecentMatchPov format (this is a bit of legacy here for having multiple data types).
+        let documents: Vec<ESVodDocument> = app.es_api.search_documents(&app.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?;
+        let total_documents = documents.len();
+        for d in documents {
+            if let Some(match_uuid) = d.data.match_uuid {
+                if !matches.contains_key(&match_uuid) {
+                    matches.insert(match_uuid.clone(), RecentMatch{
+                        match_uuid: match_uuid.clone(),
+                        game: d.data.game,
+                        povs: vec![]
+                    });
+                }
+
+                let parent_match = matches.get_mut(&match_uuid).unwrap();
+                existing_video_uuids.insert(d.vod.video_uuid.clone());
+
+                let new_pov = matches::vod_document_to_match_pov_for_user(d, session.user.id);
+                parent_match.povs.push(new_pov);
+            }
+        }
+
+        if total_documents < query_size as usize {
+            no_videos_left = true;
+            break;
+        }
+
+        current_start = current_end;
+        current_end += ((expected_total - matches.len()) * 10) as i64;
+    }
+
+    if !no_videos_left && filter.vods.is_none() {
+        // At this point we have found all the matches we want to return to the user - all we need to do now is to find all the remaining VODs that match the query
+        // for the matches we've already found. Note that the client will be responsible for stripping out duplicates from future queries.
+        filter.matches = Some(matches.keys().cloned().collect());
+        filter.not_vods = Some(existing_video_uuids.into_iter().collect());
+
+        let documents: Vec<ESVodDocument> = app.es_api.search_documents(&app.config.elasticsearch.vod_index_read, serde_json::to_value(filter.to_es_search(session.user.id, false))?).await?;
+        for d in documents {
+            if let Some(match_uuid) = d.data.match_uuid {
+                // This is an error if I've ever seen one sheeee.
+                if !matches.contains_key(&match_uuid) {
+                    continue;
+                }
+
+                let parent_match = matches.get_mut(&match_uuid).unwrap();
+                let new_pov = matches::vod_document_to_match_pov_for_user(d, session.user.id);
+                parent_match.povs.push(new_pov);
+            }
+        }
+    }
+
+    let mut matches = matches.into_values().collect::<Vec<_>>();
+    matches.sort_by(|a, b| {
+        b.povs.first().unwrap().tm.partial_cmp(&a.povs.first().unwrap().tm).unwrap()
+    });
 
     // In this case each match needs an access token that can be used to access data for that particular match (VODs, matches, etc.).
     if needs_access_tokens {
@@ -857,12 +1078,15 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
             }
         }
     }
-
-    let expected_total = query.end - query.start;  
-    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(&matches, req, &query, expected_total == got_total)?)) 
-    */
-    let matches: Vec<RecentMatch> = vec![];
-    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(&matches, req, &query, true)?)) 
+    
+    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response_with_next(&matches, req, &query, if no_videos_left {
+        None
+    } else {
+        Some(api::PaginationParameters{
+            start: current_end,
+            end: current_end + 20,
+        })
+    })?)) 
 }
 
 pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, query: web::Query<api::PaginationParameters>, filter: web::Json<RecentMatchQuery>) -> Result<HttpResponse, SquadOvError> {

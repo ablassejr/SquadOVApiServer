@@ -1,11 +1,11 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use crate::hearthstone::game_state::{HearthstoneGameSnapshot};
 use crate::hearthstone::{GameType, FormatType, HearthstoneDeck, HearthstonePlayer};
 use uuid::Uuid;
 use std::collections::HashMap;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct HearthstoneMatchMetadata {
     #[serde(rename = "gameType")]
     pub game_type: GameType,
@@ -21,7 +21,7 @@ pub struct HearthstoneMatchMetadata {
     pub players: HashMap<i32, HearthstonePlayer>
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct HearthstoneGamePacket {
     #[serde(rename = "matchUuid")]
     pub match_uuid: Uuid,

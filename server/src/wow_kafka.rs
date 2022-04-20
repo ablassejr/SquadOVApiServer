@@ -1,5 +1,11 @@
 use async_std::sync::{RwLock, Arc};
-use squadov_common::{RawWoWCombatLogPayload, SquadOvError, WoWCombatLogEvent, GenericWoWMatchView};
+use squadov_common::{
+    RawWoWCombatLogPayload,
+    SquadOvError,
+    WoWCombatLogEvent,
+    GenericWoWMatchView,
+    vod::db as vdb,
+};
 use rdkafka::consumer::stream_consumer::StreamConsumer;
 use rdkafka::consumer::{Consumer};
 use rdkafka::config::ClientConfig;
@@ -74,8 +80,10 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
             parsed_payload.redo_parts();
 
             let mut manual_handle_flags = false;
+            let is_view_complete;
             if parsed_payload.is_finish_token() {
                 log::info!("Detect Finish Token for WoW Match View: {}", &match_view_uuid);
+                is_view_complete = true;
             } else {
                 let parsed_event = squadov_common::parse_raw_wow_combat_log_payload(&match_view_uuid, match_view.alt_id, match_view.user_id, &match_view.combat_log_state(), &parsed_payload)?;
 
@@ -84,13 +92,15 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
                     // We want to flush logs on ENCOUNTER_END/COMBAT_CHALLENGE_END/ARENA_MATCH_END so that the entire
                     // match is available as soon as it's finished and not have to rely on more events
                     // being pushed onto the Kafka queue or waiting for the user to end the game.
-                    manual_handle_flags = match &new_event.event {
+                    manual_handle_flags = manual_handle_flags || match &new_event.event {
                         squadov_common::WoWCombatLogEventType::ChallengeModeEnd{..} | squadov_common::WoWCombatLogEventType::EncounterEnd{..} | squadov_common::WoWCombatLogEventType::ArenaEnd{..} => true,
                         _ => false
                     };
 
                     events.push(new_event);
                 }
+
+                is_view_complete = manual_handle_flags;
             }
 
             let handle_events = manual_handle_flags || parsed_payload.is_finish_token() ||{
@@ -109,6 +119,14 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
                 log::info!("Handling {} WoW Combat Log Events", events.len());
                 squadov_common::store_wow_combat_log_events(&mut tx, events).await?;
                 tx.commit().await?;
+            }
+
+            if is_view_complete {
+                if let Some(match_uuid) = match_view.match_uuid {
+                    if let Ok(video_uuid) = vdb::get_vod_id_from_match_user(&*opaque.app.pool, &match_uuid, match_view.user_id).await {
+                        opaque.app.es_itf.request_sync_vod(vec![video_uuid]).await?;
+                    }
+                }
             }
 
             Ok(handle_events)

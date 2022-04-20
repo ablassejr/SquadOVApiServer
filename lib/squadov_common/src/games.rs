@@ -31,6 +31,14 @@ pub fn wow_release_to_db_build_expression(r: SquadOvWowRelease) -> &'static str 
     }
 }
 
+pub fn wow_release_to_regex_expression(r: SquadOvWowRelease) -> &'static str {
+    match r {
+        SquadOvWowRelease::Retail => "9\\.\\d+",
+        SquadOvWowRelease::Vanilla => "1\\.\\d+",
+        SquadOvWowRelease::Tbc => "2\\.\\d+",
+    }
+}
+
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct FullSupportedGame {
     pub game: SquadOvGames,

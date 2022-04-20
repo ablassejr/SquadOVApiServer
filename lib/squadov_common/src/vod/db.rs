@@ -1,12 +1,217 @@
 use crate::{
     SquadOvError,
-    vod::{VodAssociation, VodMetadata, VodSegmentId, VodThumbnail, StagedVodClip},
+    vod::{
+        VodAssociation,
+        VodMetadata,
+        VodManifest,
+        VodTrack,
+        VodSegment,
+        VodSegmentId,
+        VodThumbnail,
+        VodClip,
+        StagedVodClip,
+        VodClipReactStats,
+        self,
+    },
     SquadOvGames,
     sql,
 };
 use sqlx::{Executor, Transaction, Postgres};
 use uuid::Uuid;
 use std::collections::HashMap;
+use std::convert::TryFrom;
+
+pub async fn find_accessible_vods_in_match_for_user<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64) -> Result<Vec<VodAssociation>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(sqlx::query_as!(
+        VodAssociation,
+        "
+        SELECT DISTINCT v.*
+        FROM squadov.vods AS v
+        INNER JOIN squadov.users AS u
+            ON u.uuid = v.user_uuid
+        LEFT JOIN squadov.view_share_connections_access_users AS vau
+            ON vau.video_uuid = v.video_uuid
+                AND vau.match_uuid = $1
+                AND vau.user_id = $2
+        WHERE v.match_uuid = $1 
+            AND (u.id = $2 OR vau.video_uuid IS NOT NULL)
+            AND v.is_clip = FALSE
+            AND (v.is_local = FALSE OR u.id = $2)
+        ",
+        match_uuid,
+        user_id,
+    )
+        .fetch_all(ex)
+        .await?)
+}
+
+pub async fn get_vod_id_from_match_user<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64) -> Result<Uuid, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            r#"
+            SELECT v.video_uuid
+            FROM squadov.vods AS v
+            INNER JOIN squadov.users AS u
+                ON u.uuid = v.user_uuid
+            WHERE v.match_uuid = $1
+                AND u.id = $2
+                AND v.is_clip = FALSE
+            "#,
+            match_uuid,
+            user_id,
+        )
+            .fetch_one(ex)
+            .await?
+            .video_uuid
+    )
+}
+
+pub async fn get_vod_game<'a, T>(ex: T, video_uuid: &Uuid) -> Result<SquadOvGames, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        SquadOvGames::try_from(
+            sqlx::query!(
+                r#"
+                SELECT m.game
+                FROM squadov.vods AS v
+                INNER JOIN squadov.matches AS m
+                    ON m.uuid = v.match_uuid
+                WHERE v.video_uuid = $1
+                "#,
+                video_uuid,
+            )
+                .fetch_one(ex)
+                .await?
+                .game
+                .unwrap_or(SquadOvGames::Unknown as i32)
+        )?
+    )
+}
+
+pub async fn get_vod_profiles<'a, T>(ex: T, video_uuid: &Uuid) -> Result<Vec<i64>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT user_id
+            FROM squadov.user_profile_vods
+            WHERE video_uuid = $1
+            ",
+            video_uuid
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                x.user_id
+            })
+            .collect()
+    )
+}
+
+pub async fn get_vod_favorites<'a, T>(ex: T, video_uuid: &Uuid) -> Result<Vec<(i64, String)>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT user_id, reason
+            FROM squadov.user_favorite_vods
+            WHERE video_uuid = $1
+            ",
+            video_uuid
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                (x.user_id, x.reason)
+            })
+            .collect()
+    )
+}
+
+pub async fn get_vod_watchlist_ids<'a, T>(ex: T, video_uuid: &Uuid) -> Result<Vec<i64>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT user_id
+            FROM squadov.user_watchlist_vods
+            WHERE video_uuid = $1
+            ",
+            video_uuid
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                x.user_id
+            })
+            .collect()
+    )
+}
+
+pub async fn get_vod_shared_to_squads<'a, T>(ex: T, video_uuid: &Uuid) -> Result<Vec<i64>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT DISTINCT dest_squad_id
+            FROM squadov.share_match_vod_connections
+            WHERE video_uuid = $1
+            AND dest_squad_id IS NOT NULL
+            ",
+            video_uuid
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                x.dest_squad_id.unwrap()
+            })
+            .collect()
+    )
+}
+
+pub async fn get_vod_shared_to_users<'a, T>(ex: T, video_uuid: &Uuid) -> Result<Vec<i64>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT DISTINCT dest_user_id
+            FROM squadov.share_match_vod_connections
+            WHERE video_uuid = $1
+                AND dest_user_id IS NOT NULL
+            ",
+            video_uuid
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                x.dest_user_id.unwrap()
+            })
+            .collect()
+    )
+}
 
 pub async fn mark_staged_clip_executed<'a, T>(ex: T, id: i64, clip_uuid: &Uuid) -> Result<(), SquadOvError>
 where
@@ -261,6 +466,55 @@ where
     )
 }
 
+pub async fn get_vod_manifest<'a, T>(ex: T, assoc: &VodAssociation) -> Result<VodManifest, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
+    let metadata = get_vod_metadata(ex, &assoc.video_uuid, "source").await?;
+    let preview = if metadata.has_preview {
+        Some(format!(
+            "/v1/vod/{video_uuid}/{quality}/preview.mp4",
+            video_uuid=&assoc.video_uuid,
+            quality="source",
+        ))
+    } else {
+        None
+    };
+    let container_format = String::from(if metadata.has_fastify {
+        "mp4"
+    } else {
+        &assoc.raw_container_format
+    });
+
+    Ok(
+        VodManifest{
+            video_tracks: vec![
+                VodTrack{
+                    metadata: metadata.clone(),
+                    segments: vec![VodSegment{
+                        uri: format!("/v1/vod/{video_uuid}/{quality}/{segment}.{extension}",
+                            video_uuid=assoc.video_uuid.clone(),
+                            quality=&metadata.id,
+                            segment=if metadata.has_fastify {
+                                "fastify"
+                            } else {
+                                "video"
+                            },
+                            extension=&vod::container_format_to_extension(&container_format),
+                        ),
+                        // Duration is a placeholder - not really needed but will be useful once we get
+                        // back to using semgnets.
+                        duration: 0.0,
+                        segment_start: 0.0,
+                        mime_type: vod::container_format_to_mime_type(&container_format),
+                    }],
+                    preview: preview,
+                }
+            ]
+        }
+    )
+}
+
 pub async fn get_bulk_vod_metadata<'a, T>(ex: T, pairs: &[(Uuid, &str)]) -> Result<HashMap<(Uuid, String), VodMetadata>, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
@@ -447,4 +701,123 @@ where
         .execute(ex)
         .await?;
     Ok(())
+}
+
+pub async fn get_vod_clip_from_assoc_manifest<'a, T>(ex: T, assoc: VodAssociation, manifest: VodManifest, user_id: i64) -> Result<Option<VodClip>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    let base_data = sqlx::query!(
+        r#"
+        SELECT
+            vc.*,
+            u.username AS "clipper",
+            COALESCE(rc.count, 0) AS "reacts!",
+            COALESCE(cc.count, 0) AS "comments!",
+            COALESCE(cv.count, 0) AS "views!",
+            ufv.reason AS "favorite_reason?",
+            uwv.video_uuid IS NOT NULL AS "is_watchlist!",
+            COALESCE(JSONB_AGG(vvt.*) FILTER(WHERE vvt.video_uuid IS NOT NULL), '[]'::JSONB)  AS "tags!"
+        FROM squadov.vod_clips AS vc
+        INNER JOIN squadov.users AS u
+            ON u.id = vc.clip_user_id
+        LEFT JOIN squadov.view_clip_react_count AS rc
+            ON rc.clip_uuid = vc.clip_uuid
+        LEFT JOIN squadov.view_clip_comment_count AS cc
+            ON cc.clip_uuid = vc.clip_uuid
+        LEFT JOIN squadov.view_clip_view_count AS cv
+            ON cv.clip_uuid = vc.clip_uuid
+        LEFT JOIN squadov.user_favorite_vods AS ufv
+            ON ufv.video_uuid = vc.clip_uuid
+                AND ufv.user_id = $2
+        LEFT JOIN squadov.user_watchlist_vods AS uwv
+            ON uwv.video_uuid = vc.clip_uuid
+                AND uwv.user_id = $2
+        LEFT JOIN squadov.view_vod_tags AS vvt
+            ON vvt.video_uuid = vc.clip_uuid
+        WHERE vc.clip_uuid = $1
+        GROUP BY vc.clip_uuid, vc.parent_vod_uuid, vc.clip_user_id, vc.title, vc.description, vc.game, vc.tm, vc.published, u.username, rc.count, cc.count, cv.count, ufv.reason, uwv.video_uuid
+        ORDER BY vc.tm DESC
+        "#,
+        &assoc.video_uuid,
+        user_id,
+    )
+        .fetch_optional(ex)
+        .await?;
+
+    Ok(
+        base_data.map(|x| {
+            VodClip{
+                clip: assoc,
+                manifest: manifest,
+                title: x.title,
+                description: x.description,
+                clipper: x.clipper,
+                game: SquadOvGames::try_from(x.game).unwrap(),
+                tm: x.tm,
+                views: x.views,
+                reacts: x.reacts,
+                comments: x.comments,
+                favorite_reason: x.favorite_reason,
+                is_watchlist: x.is_watchlist,
+                access_token: None,
+                tags: vod::condense_raw_vod_tags(serde_json::from_value::<Vec<vod::RawVodTag>>(x.tags).unwrap(), user_id),
+                published: x.published,
+            }
+        })
+    )
+}
+
+pub async fn get_raw_vod_tags<'a, T>(ex: T, video_uuid: &Uuid) -> Result<Vec<vod::RawVodTag>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    let tags = sqlx::query!(
+        r#"
+        SELECT COALESCE(JSONB_AGG(vvt.*) FILTER(WHERE vvt.video_uuid IS NOT NULL), '[]'::JSONB)  AS "tags!"
+        FROM squadov.view_vod_tags AS vvt
+        WHERE vvt.video_uuid = $1
+        "#,
+        video_uuid
+    )
+        .fetch_one(ex)
+        .await?
+        .tags;
+    
+    Ok(serde_json::from_value::<Vec<vod::RawVodTag>>(tags)?)
+}
+
+pub async fn get_vod_clip_react_stats<'a, T>(ex: T, video_uuids: &[Uuid]) -> Result<HashMap<Uuid, VodClipReactStats>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    let base_data = sqlx::query_as!(
+        VodClipReactStats,
+        r#"
+        SELECT
+            vc.clip_uuid AS "video_uuid!",
+            COALESCE(rc.count, 0) AS "reacts!",
+            COALESCE(cc.count, 0) AS "comments!",
+            COALESCE(cv.count, 0) AS "views!"
+        FROM squadov.vod_clips AS vc
+        INNER JOIN squadov.users AS u
+            ON u.id = vc.clip_user_id
+        LEFT JOIN squadov.view_clip_react_count AS rc
+            ON rc.clip_uuid = vc.clip_uuid
+        LEFT JOIN squadov.view_clip_comment_count AS cc
+            ON cc.clip_uuid = vc.clip_uuid
+        LEFT JOIN squadov.view_clip_view_count AS cv
+            ON cv.clip_uuid = vc.clip_uuid
+        WHERE vc.clip_uuid = ANY($1)
+        "#,
+        video_uuids,
+    )
+        .fetch_all(ex)
+        .await?;
+
+    Ok(
+        base_data.into_iter().map(|x| {
+            ( x.video_uuid.clone(), x)
+        }).collect()
+    )
 }

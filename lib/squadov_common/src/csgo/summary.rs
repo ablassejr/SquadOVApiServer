@@ -1,8 +1,8 @@
 use uuid::Uuid;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
-#[derive(Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct CsgoPlayerMatchSummary {
     pub match_uuid: Uuid,

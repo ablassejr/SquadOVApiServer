@@ -1,5 +1,17 @@
 version: "3.8"
 services:
+    elasticsearch:
+        image: elasticsearch:8.1.2
+        volumes:
+          - esdata01:/usr/share/elasticsearch/data
+        environment:
+            - "discovery.type=single-node"
+        ports:
+            - "9200:9200"
+            - "9300:9300"
+        networks:
+            c3p0:
+                ipv4_address: "172.22.0.4"
     postgres:
         image: postgres:12.4
         volumes:
@@ -39,6 +51,7 @@ services:
 volumes:
     db-data:
     fa-config:
+    esdata01:
 
 networks:
     c3p0:

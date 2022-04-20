@@ -12,6 +12,9 @@ use crate::{
     SquadOvError,
     rabbitmq::{RabbitMqInterface, RabbitMqListener, RabbitMqConfig},
     riot::db,
+    elastic::{
+        rabbitmq::ElasticSearchJobInterface,
+    },
 };
 use sqlx::postgres::{PgPool};
 use reqwest::header;
@@ -255,16 +258,18 @@ pub struct RiotApiApplicationInterface {
     mqconfig: RabbitMqConfig,
     rmq: Arc<RabbitMqInterface>,
     db: Arc<PgPool>,
+    es_itf: Arc<ElasticSearchJobInterface>,
 }
 
 impl RiotApiApplicationInterface {
-    pub fn new (config: RiotConfig, mqconfig: &RabbitMqConfig, api: Arc<RiotApiHandler>, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>) -> Self {
+    pub fn new (config: RiotConfig, mqconfig: &RabbitMqConfig, api: Arc<RiotApiHandler>, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>, es_itf: Arc<ElasticSearchJobInterface>) -> Self {
         Self {
             config,
             api,
             mqconfig: mqconfig.clone(),
             rmq,
             db,
+            es_itf,
         }
     }
 }

@@ -1,10 +1,15 @@
-use crate::SquadOvError;
+use crate::{
+    SquadOvError,
+    matches::MatchPlayerPair,
+};
 use serde::{Serialize, Deserialize};
 use serde_repr::{Serialize_repr, Deserialize_repr};
 use num_enum::TryFromPrimitive;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use sqlx::{Executor, Postgres};
+use std::convert::TryFrom;
+use itertools::izip;
 use super::WoWCombatLogState;
 
 #[derive(Deserialize)]
@@ -177,11 +182,33 @@ pub struct WowInstance {
 
 #[derive(Clone)]
 pub struct GenericWoWMatchView {
+    pub id: Uuid,
     pub alt_id: i64,
     pub user_id: i64,
-    combat_log_version: String,
-    advanced_log: bool,
-    build_version: String,
+    pub combat_log_version: String,
+    pub advanced_log: bool,
+    pub build_version: String,
+    pub match_uuid: Option<Uuid>,
+}
+
+pub async fn get_generic_wow_match_view_from_match_user<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64) -> Result<GenericWoWMatchView, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            GenericWoWMatchView,
+            "
+            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid
+            FROM squadov.wow_match_view
+            WHERE match_uuid = $1 AND user_id = $2
+            ",
+            match_uuid,
+            user_id,
+        )
+            .fetch_one(ex)
+            .await?
+    )
 }
 
 pub async fn get_generic_wow_match_view_from_id<'a, T>(ex: T, id: &Uuid) -> Result<GenericWoWMatchView, SquadOvError>
@@ -192,7 +219,7 @@ where
         sqlx::query_as!(
             GenericWoWMatchView,
             "
-            SELECT alt_id, user_id, combat_log_version, advanced_log, build_version
+            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid
             FROM squadov.wow_match_view
             WHERE id = $1
             ",
@@ -211,4 +238,298 @@ impl GenericWoWMatchView {
             build_version: self.build_version.clone(),
         }
     }
+}
+
+pub async fn filter_valid_wow_match_player_pairs<'a, T>(ex: T, uuids: &[MatchPlayerPair]) -> Result<(Vec<Uuid>, Vec<i64>), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    let match_uuids = uuids.iter().map(|x| { x.match_uuid.clone() }).collect::<Vec<Uuid>>();
+    let player_uuids = uuids.iter().map(|x| { x.player_uuid.clone() }).collect::<Vec<Uuid>>();
+    
+    let final_identifiers = sqlx::query!(
+        r#"
+        SELECT
+            inp.match_uuid AS "match_uuid!",
+            u.id AS "user_id!"
+        FROM UNNEST($1::UUID[], $2::UUID[]) AS inp(match_uuid, player_uuid)
+        INNER JOIN squadov.users AS u
+            ON u.uuid = inp.player_uuid
+        INNER JOIN squadov.wow_match_view AS wmv
+            ON wmv.user_id = u.id
+                AND wmv.match_uuid = inp.match_uuid
+        "#,
+        &match_uuids,
+        &player_uuids,
+    )
+        .fetch_all(ex)
+        .await?
+        .into_iter()
+        .map(|x| {
+            (x.match_uuid, x.user_id)
+        })
+        .collect::<Vec<(Uuid, i64)>>();
+    
+    let match_uuids = final_identifiers.iter().map(|x| { x.0.clone() }).collect::<Vec<Uuid>>();
+    let player_ids = final_identifiers.iter().map(|x| { x.1 }).collect::<Vec<i64>>();
+    Ok((match_uuids, player_ids))
+}
+
+pub async fn list_wow_encounter_for_uuids<'a, T>(ex: T, uuids: &[MatchPlayerPair]) -> Result<Vec<WoWEncounter>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
+    let (match_uuids, user_ids) = filter_valid_wow_match_player_pairs(ex, uuids).await?;
+
+    Ok(
+        sqlx::query!(
+            r#"
+            SELECT *
+            FROM (
+                SELECT DISTINCT ON (wmv.match_uuid, u.uuid)
+                    wmv.match_uuid AS "match_uuid!",
+                    wmv.start_tm AS "tm!",
+                    wmv.end_tm AS "finish_time", 
+                    wmv.build_version AS "build!",
+                    u.uuid AS "user_uuid!",
+                    wa.combatants_key,
+                    wav.encounter_id,
+                    wav.encounter_name,
+                    wav.difficulty,
+                    wav.num_players,
+                    wav.instance_id,
+                    COALESCE(wav.success, FALSE) AS "success!",
+                    ARRAY_AGG(web.name) AS "boss_names!: Vec<Option<String>>",
+                    ARRAY_AGG(web.npc_id) AS "boss_ids!: Vec<Option<i64>>",
+                    ARRAY_AGG(wcp.current_hp) AS "boss_hps!: Vec<Option<i64>>",
+                    ARRAY_AGG(wcp.max_hp) AS "boss_max_hps!: Vec<Option<i64>>",
+                    MAX(mmc.match_order) AS "pull_number"
+                FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
+                INNER JOIN squadov.wow_match_view AS wmv
+                    ON wmv.match_uuid = inp.match_uuid
+                        AND wmv.user_id = inp.user_id
+                INNER JOIN squadov.new_wow_encounters AS wa
+                    ON wa.match_uuid = wmv.match_uuid
+                INNER JOIN squadov.wow_encounter_view AS wav
+                    ON wav.view_id = wmv.id
+                INNER JOIN squadov.users AS u
+                    ON u.id = wmv.user_id
+                LEFT JOIN squadov.wow_encounter_bosses AS web
+                    ON web.encounter_id = wav.encounter_id
+                LEFT JOIN squadov.wow_match_view_character_presence AS wcp
+                    ON wcp.view_id = wmv.id
+                        AND wcp.creature_id = web.npc_id
+                LEFT JOIN squadov.match_to_match_collection AS mmc
+                    ON mmc.match_uuid = inp.match_uuid
+                GROUP BY
+                    wmv.match_uuid,
+                    wmv.start_tm,
+                    wmv.end_tm,
+                    wmv.build_version,
+                    u.uuid,
+                    wa.combatants_key,
+                    wav.encounter_id,
+                    wav.encounter_name,
+                    wav.difficulty,
+                    wav.num_players,
+                    wav.instance_id,
+                    wav.success
+                ORDER BY wmv.match_uuid, u.uuid
+            ) AS t
+            ORDER BY finish_time DESC
+            "#,
+            &match_uuids,
+            &user_ids,
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                WoWEncounter {
+                    match_uuid: x.match_uuid,
+                    tm: x.tm,
+                    combatants_key: x.combatants_key,
+                    encounter_id: x.encounter_id,
+                    encounter_name: x.encounter_name,
+                    difficulty: x.difficulty,
+                    num_players: x.num_players,
+                    instance_id: x.instance_id,
+                    finish_time: x.finish_time,
+                    success: x.success,
+                    user_uuid: x.user_uuid,
+                    build: x.build,
+                    boss: izip!(x.boss_names, x.boss_ids, x.boss_hps, x.boss_max_hps).map(|(name, id, hp, max)|{
+                        WowBossStatus{
+                            name,
+                            npc_id: id,
+                            current_hp: hp,
+                            max_hp: max,
+                        }
+                    })
+                        .filter(|x| {
+                            x.name.is_some() && x.npc_id.is_some()
+                        })
+                        .collect::<Vec<WowBossStatus>>(),
+                    pull_number: x.pull_number,
+                }
+            })
+            .collect::<Vec<WoWEncounter>>()
+    )
+}
+
+pub async fn list_wow_challenges_for_uuids<'a, T>(ex: T, uuids: &[MatchPlayerPair]) -> Result<Vec<WoWChallenge>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
+    let (match_uuids, user_ids) = filter_valid_wow_match_player_pairs(ex, uuids).await?;
+
+    Ok(
+        sqlx::query_as!(
+            WoWChallenge,
+            r#"
+            SELECT * FROM (
+                SELECT DISTINCT ON (wmv.match_uuid, u.uuid)
+                    wmv.match_uuid AS "match_uuid!",
+                    wmv.start_tm AS "tm!",
+                    wmv.end_tm AS "finish_time", 
+                    wmv.build_version AS "build!",
+                    u.uuid AS "user_uuid!",
+                    wa.combatants_key,
+                    wav.challenge_name,
+                    wav.instance_id,
+                    wav.keystone_level,
+                    COALESCE(wav.time_ms, 0) AS "time_ms!",
+                    COALESCE(wav.success, FALSE) AS "success!"
+                FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
+                INNER JOIN squadov.wow_match_view AS wmv
+                    ON wmv.match_uuid = inp.match_uuid
+                        AND wmv.user_id = inp.user_id
+                INNER JOIN squadov.new_wow_challenges AS wa
+                    ON wa.match_uuid = wmv.match_uuid
+                INNER JOIN squadov.wow_challenge_view AS wav
+                    ON wav.view_id = wmv.id
+                INNER JOIN squadov.users AS u
+                    ON u.id = wmv.user_id
+                ORDER BY wmv.match_uuid, u.uuid
+            ) AS t
+            ORDER BY finish_time DESC
+            "#,
+            &match_uuids,
+            &user_ids,
+        )
+            .fetch_all(ex)
+            .await?
+    )
+}
+
+pub async fn list_wow_arenas_for_uuids<'a, T>(ex: T, uuids: &[MatchPlayerPair]) -> Result<Vec<WoWArena>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
+    let (match_uuids, user_ids) = filter_valid_wow_match_player_pairs(ex, uuids).await?;
+
+    Ok(
+        sqlx::query_as!(
+            WoWArena,
+            r#"
+            SELECT * FROM (
+                SELECT DISTINCT ON (wmv.match_uuid, u.uuid)
+                    wmv.match_uuid AS "match_uuid!",
+                    wmv.start_tm AS "tm!",
+                    wmv.end_tm AS "finish_time", 
+                    wmv.build_version AS "build!",
+                    wa.combatants_key,
+                    wav.instance_id,
+                    wav.arena_type,
+                    wav.winning_team_id,
+                    wav.match_duration_seconds,
+                    wav.new_ratings,
+                    u.uuid AS "user_uuid",
+                    (
+                        CASE WHEN wvc.event_id IS NOT NULL THEN wvc.team = wav.winning_team_id
+                            ELSE FALSE
+                        END
+                    ) AS "success!"
+                FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
+                INNER JOIN squadov.wow_match_view AS wmv
+                    ON wmv.match_uuid = inp.match_uuid
+                        AND wmv.user_id = inp.user_id
+                INNER JOIN squadov.new_wow_arenas AS wa
+                    ON wa.match_uuid = wmv.match_uuid
+                INNER JOIN squadov.wow_arena_view AS wav
+                    ON wav.view_id = wmv.id
+                INNER JOIN squadov.wow_match_view_character_presence AS wcp
+                    ON wcp.view_id = wmv.id
+                LEFT JOIN squadov.wow_match_view_combatants AS wvc
+                    ON wvc.character_id = wcp.character_id
+                INNER JOIN squadov.wow_user_character_cache AS wucc
+                    ON wucc.unit_guid = wcp.unit_guid
+                        AND wucc.user_id = inp.user_id
+                INNER JOIN squadov.users AS u
+                    ON u.id = wmv.user_id
+                ORDER BY wmv.match_uuid, u.uuid
+            ) AS t
+            ORDER BY finish_time DESC
+            "#,
+            &match_uuids,
+            &user_ids,
+        )
+            .fetch_all(ex)
+            .await?
+    )
+}
+
+pub async fn list_wow_instances_for_uuids<'a, T>(ex: T, uuids: &[MatchPlayerPair]) -> Result<Vec<WowInstance>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
+    let (match_uuids, user_ids) = filter_valid_wow_match_player_pairs(ex, uuids).await?;
+
+    Ok(
+        sqlx::query!(
+            r#"
+            SELECT * FROM (
+                SELECT DISTINCT ON (wmv.match_uuid, wmv.user_id)
+                    wmv.match_uuid AS "match_uuid!",
+                    wmv.start_tm AS "tm!",
+                    wmv.end_tm AS "finish_time", 
+                    wmv.build_version AS "build!",
+                    '' AS "combatants_key!",
+                    FALSE AS "success!",
+                    nwi.instance_id,
+                    nwi.instance_type,
+                    u.uuid AS "user_uuid!"
+                FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
+                INNER JOIN squadov.wow_match_view AS wmv
+                    ON wmv.match_uuid = inp.match_uuid
+                        AND wmv.user_id = inp.user_id
+                INNER JOIN squadov.new_wow_instances AS nwi
+                    ON nwi.match_uuid = wmv.match_uuid
+                INNER JOIN squadov.users AS u
+                    ON u.id = inp.user_id
+                ORDER BY wmv.match_uuid, wmv.user_id
+            ) AS t
+            ORDER BY finish_time DESC
+            "#,
+            &match_uuids,
+            &user_ids,
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                Ok(WowInstance{
+                    match_uuid: x.match_uuid,
+                    tm: x.tm,
+                    finish_time: x.finish_time,
+                    build: x.build,
+                    combatants_key: x.combatants_key,
+                    success: x.success,
+                    instance_id: x.instance_id,
+                    instance_type: WowInstanceType::try_from(x.instance_type)?,
+                    user_uuid: x.user_uuid,
+                })
+            })
+            .collect::<Result<Vec<WowInstance>, SquadOvError>>()?
+    )
 }

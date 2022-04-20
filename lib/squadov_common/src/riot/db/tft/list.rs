@@ -11,7 +11,7 @@ use crate::{
     },
     matches::MatchPlayerPair,
 };
-use sqlx::PgPool;
+use sqlx::{Executor, Postgres, PgPool};
 use uuid::Uuid;
 use std::collections::HashMap;
 
@@ -33,7 +33,10 @@ pub async fn filter_tft_match_uuids(ex: &PgPool, uuids: &[Uuid]) -> Result<Vec<U
     )
 }
 
-pub async fn list_tft_match_summaries_for_uuids(ex: &PgPool, uuids: &[MatchPlayerPair]) -> Result<Vec<TftPlayerMatchSummary>, SquadOvError> {
+pub async fn list_tft_match_summaries_for_uuids<'a, T>(ex: T, uuids: &[MatchPlayerPair]) -> Result<Vec<TftPlayerMatchSummary>, SquadOvError> 
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
     let match_uuids = uuids.iter().map(|x| { x.match_uuid.clone() }).collect::<Vec<Uuid>>();
     let player_uuids = uuids.iter().map(|x| { x.player_uuid.clone() }).collect::<Vec<Uuid>>();
 

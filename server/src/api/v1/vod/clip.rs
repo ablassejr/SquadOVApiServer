@@ -25,11 +25,13 @@ use squadov_common::{
         VodAssociation,
         VodSegmentId,
         db as vdb,
-    }
+    },
+    elastic::vod::ESVodDocument,
 };
 use std::sync::Arc;
 use std::convert::TryFrom;
-use chrono::{Utc, TimeZone, Duration};
+use chrono::{Utc, Duration};
+use elasticsearch_dsl::{Sort, SortOrder};
 
 #[derive(Deserialize)]
 pub struct CreateClipPathInput {
@@ -151,229 +153,45 @@ impl api::ApiApplication {
                 favorite_reason: x.favorite_reason,
                 is_watchlist: x.is_watchlist,
                 access_token: None,
-                tags: vod::condense_raw_vod_tags(serde_json::from_value::<Vec<RawVodTag>>(x.tags)?, user_id)?,
+                tags: vod::condense_raw_vod_tags(serde_json::from_value::<Vec<RawVodTag>>(x.tags)?, user_id),
                 published: x.published,
             })
         }).collect::<Result<Vec<VodClip>, SquadOvError>>()?)
     }
 
-    async fn list_user_accessible_clips(&self, user_id: i64, start: i64, end: i64, match_uuid: Option<Uuid>, filter: &RecentMatchQuery, needs_profile: bool) -> Result<Vec<VodClip>, SquadOvError> {
-        let clips = sqlx::query!(
-            "
-            SELECT DISTINCT vc.clip_uuid, vc.tm
-            FROM squadov.vod_clips AS vc
-            INNER JOIN squadov.users AS u
-                ON u.id = vc.clip_user_id
-            INNER JOIN squadov.vods AS v
-                ON v.video_uuid = vc.clip_uuid
-            LEFT JOIN squadov.share_match_vod_connections AS svc
-                ON svc.video_uuid = v.video_uuid
-            INNER JOIN squadov.matches AS m
-                ON m.uuid = v.match_uuid
-            LEFT JOIN squadov.squad_role_assignments AS sra
-                ON sra.user_id = vc.clip_user_id
-            LEFT JOIN squadov.user_favorite_vods AS ufv
-                ON ufv.video_uuid = v.video_uuid
-                    AND ufv.user_id = $1
-            LEFT JOIN squadov.user_watchlist_vods AS uwv
-                ON uwv.video_uuid = v.video_uuid
-                    AND uwv.user_id = $1
-            LEFT JOIN squadov.view_share_connections_access_users AS vau
-                ON vau.video_uuid = v.video_uuid
-                    AND vau.user_id = $1
-            LEFT JOIN squadov.share_match_vod_connections AS svc2
-                ON svc2.id = vau.id
-            LEFT JOIN squadov.user_profile_vods AS upv
-                ON upv.video_uuid = vc.clip_uuid
-                    AND upv.user_id = vc.clip_user_id
-            LEFT JOIN squadov.wow_match_view AS wmv
-                ON wmv.match_uuid = v.match_uuid
-                    AND wmv.user_id = u.id
-            LEFT JOIN squadov.wow_encounter_view AS wev
-                ON wev.view_id = wmv.id
-            LEFT JOIN squadov.wow_challenge_view AS wcv
-                ON wcv.view_id = wmv.id
-            LEFT JOIN squadov.wow_arena_view AS wav
-                ON wav.view_id = wmv.id
-            LEFT JOIN squadov.wow_instance_view AS wiv
-                ON wiv.view_id = wmv.id
-            LEFT JOIN squadov.valorant_matches AS vm
-                ON vm.match_uuid = m.uuid
-            LEFT JOIN squadov.valorant_match_computed_data AS mcd
-                ON mcd.match_uuid = vm.match_uuid
-            LEFT JOIN squadov.valorant_match_pov_computed_data AS pcd
-                ON pcd.match_uuid = vm.match_uuid
-                    AND pcd.user_id = u.id
-            LEFT JOIN squadov.view_vod_tags AS vvt
-                ON v.video_uuid = vvt.video_uuid
-            WHERE (
-                (
-                    vc.clip_user_id = $1 
-                    AND
-                    (
-                        CARDINALITY($6::BIGINT[]) = 0 OR svc.dest_squad_id = ANY($6)
-                    )
-                )
-                OR
-                (
-                    vau.video_uuid IS NOT NULL
-                    AND
-                    (
-                        CARDINALITY($6::BIGINT[]) = 0 OR svc2.dest_squad_id = ANY($6)
-                    )
-                )
-            )
-                AND ($4::UUID IS NULL OR m.uuid = $4)
-                AND (vc.published OR vc.clip_user_id = $1)
-                AND (CARDINALITY($5::INTEGER[]) = 0 OR m.game = ANY($5))
-                AND (CARDINALITY($7::BIGINT[]) = 0 OR vc.clip_user_id = ANY($7))
-                AND COALESCE(v.end_time >= $8, TRUE)
-                AND COALESCE(v.end_time <= $9, TRUE)
-                AND (NOT $10::BOOLEAN OR ufv.video_uuid IS NOT NULL)
-                AND (NOT $11::BOOLEAN OR uwv.video_uuid IS NOT NULL)
-                AND (NOT $12::BOOLEAN OR upv.video_uuid IS NOT NULL)
-                AND (CARDINALITY($13::VARCHAR[]) = 0 OR wmv.build_version LIKE ANY ($13))
-                AND (wmv.id IS NULL OR wmv.build_version NOT LIKE '9.%' OR (
-                    wmv.build_version LIKE '9.%'
-                        AND ((
-                                wev.view_id IS NOT NULL
-                                    AND (CARDINALITY($14::INTEGER[]) = 0 OR wev.instance_id = ANY($14))
-                                    AND (CARDINALITY($15::INTEGER[]) = 0 OR wev.encounter_id = ANY($15))
-                                    AND ($16::BOOLEAN IS NULL OR wev.success = $16)
-                                    AND (CARDINALITY($17::INTEGER[]) = 0 OR wev.difficulty = ANY($17))
-                                    AND (CARDINALITY($18::INTEGER[]) = 0 OR wmv.player_spec = ANY($18))
-                                    AND (COALESCE(wmv.t0_specs, '') ~ $19 OR COALESCE(wmv.t1_specs, '') ~ $19)
-                                    AND $34
-                            )
-                            OR (
-                                wcv.view_id IS NOT NULL
-                                    AND (CARDINALITY($20::INTEGER[]) = 0 OR wcv.instance_id = ANY($20)) 
-                                    AND ($21::BOOLEAN IS NULL OR wcv.success = $21)
-                                    AND ($22::INTEGER IS NULL OR wcv.keystone_level >= $22)
-                                    AND ($23::INTEGER IS NULL OR wcv.keystone_level <= $23)
-                                    AND (CARDINALITY($24::INTEGER[]) = 0 OR wmv.player_spec = ANY($24))
-                                    AND (COALESCE(wmv.t0_specs, '') ~ $25 OR COALESCE(wmv.t1_specs, '') ~ $25)
-                                    AND $35
-                            )
-                            OR (
-                                wav.view_id IS NOT NULL
-                                    AND (CARDINALITY($26::INTEGER[]) = 0 OR wav.instance_id = ANY($26))
-                                    AND (CARDINALITY($27::VARCHAR[]) = 0 OR wav.arena_type = ANY($27))
-                                    AND ($28::BOOLEAN IS NULL OR ((wav.winning_team_id = wmv.player_team) = $28))
-                                    AND (CARDINALITY($29::INTEGER[]) = 0 OR wmv.player_spec = ANY($29))
-                                    AND ($30::INTEGER IS NULL OR wmv.player_rating >= $30)
-                                    AND ($31::INTEGER IS NULL OR wmv.player_rating <= $31)
-                                    AND (
-                                        (COALESCE(wmv.t0_specs, '') ~ $32 AND COALESCE(wmv.t1_specs, '') ~ $33)
-                                        OR
-                                        (COALESCE(wmv.t0_specs, '') ~ $33 AND COALESCE(wmv.t1_specs, '') ~ $32)
-                                    )
-                                    AND $36
-                            )
-                            OR (
-                                wiv.view_id IS NOT NULL
-                            )
-                        )
-                ))
-                AND (wiv.view_id IS NULL OR (
-                    $38
-                        AND (CARDINALITY($39::INTEGER[]) = 0 OR wiv.instance_type = ANY($39))
-                        AND (CARDINALITY($40::INTEGER[]) = 0 OR wiv.instance_id = ANY($40))
-                ))
-                AND (
-                    vm.match_uuid IS NULL OR (
-                        (NOT $41::BOOLEAN OR vm.is_ranked)
-                            AND (CARDINALITY($42::VARCHAR[]) = 0 OR vm.map_id = ANY($42))
-                            AND (CARDINALITY($43::VARCHAR[]) = 0 OR vm.game_mode = ANY($43))
-                            AND (CARDINALITY($44::VARCHAR[]) = 0 OR pcd.pov_agent = ANY($44))
-                            AND (NOT $45::BOOLEAN OR pcd.winner)
-                            AND ($46::INTEGER IS NULL OR pcd.rank >= $46)
-                            AND ($47::INTEGER IS NULL OR pcd.rank <= $47)
-                            AND (CARDINALITY($48::INTEGER[]) = 0 OR pcd.key_events && $48)
-                            AND (
-                                (mcd.t0_agents IS NULL AND mcd.t1_agents IS NULL)
-                                OR
-                                (mcd.t0_agents ~ $49 AND mcd.t1_agents ~ $50)
-                                OR
-                                (mcd.t0_agents ~ $50 AND mcd.t1_agents ~ $49)
-                            )
-                    )
-                )
-            GROUP BY vc.clip_uuid, vc.tm
-            HAVING CARDINALITY($37::VARCHAR[]) = 0 OR ARRAY_AGG(vvt.tag) @> $37::VARCHAR[]
-            ORDER BY vc.tm DESC
-            LIMIT $2 OFFSET $3
-            ",
-            user_id,
-            end - start,
-            start,
-            match_uuid,
-            &filter.games.as_ref().unwrap_or(&vec![]).iter().map(|x| {
-                *x as i32
-            }).collect::<Vec<i32>>(),
-            &filter.squads.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i64>>(),
-            &filter.users.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i64>>(),
-            filter.time_start.map(|x| {
-                Utc.timestamp_millis(x)
-            }),
-            filter.time_end.map(|x| {
-                Utc.timestamp_millis(x)
-            }),
-            filter.only_favorite,
-            filter.only_watchlist,
-            needs_profile,
-            &filter.get_wow_release_db_filter(),
-            // Wow retail encounter filters
-            &filter.filters.wow.encounters.raids.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            &filter.filters.wow.encounters.encounters.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            filter.filters.wow.encounters.is_winner,
-            &filter.filters.wow.encounters.encounter_difficulties.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            &filter.filters.wow.encounters.pov_spec.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            &filter.filters.wow.encounters.build_friendly_composition_filter()?,
-            // Wow retail keystone filters
-            &filter.filters.wow.keystones.dungeons.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            filter.filters.wow.keystones.is_winner,
-            filter.filters.wow.keystones.keystone_low,
-            filter.filters.wow.keystones.keystone_high,
-            &filter.filters.wow.keystones.pov_spec.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            &filter.filters.wow.keystones.build_friendly_composition_filter()?,
-            // Wow retail arena filters
-            &filter.filters.wow.arenas.arenas.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            &filter.filters.wow.arenas.brackets.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<String>>(),
-            filter.filters.wow.arenas.is_winner,
-            &filter.filters.wow.arenas.pov_spec.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            filter.filters.wow.arenas.rating_low,
-            filter.filters.wow.arenas.rating_high,
-            &filter.filters.wow.arenas.build_friendly_composition_filter()?,
-            &filter.filters.wow.arenas.build_enemy_composition_filter()?,
-            // Wow game mode filter
-            &filter.filters.wow.encounters.enabled,
-            &filter.filters.wow.keystones.enabled,
-            &filter.filters.wow.arenas.enabled,
-            // Tags
-            &filter.tags.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone().to_lowercase() }).collect::<Vec<String>>(),
-            // Wow instance filters
-            &filter.filters.wow.instances.enabled,
-            &filter.filters.wow.instances.instance_types.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x as i32 }).collect::<Vec<i32>>(),
-            &filter.filters.wow.instances.all_instance_ids(),
-            // Valorant
-            filter.filters.valorant.is_ranked,
-            &filter.filters.valorant.maps.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<String>>(),
-            &filter.filters.valorant.modes.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<String>>(),
-            &filter.filters.valorant.agent_povs.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone().to_lowercase() }).collect::<Vec<String>>(),
-            filter.filters.valorant.is_winner.unwrap_or(false),
-            filter.filters.valorant.rank_low,
-            filter.filters.valorant.rank_high,
-            &filter.filters.valorant.pov_events.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x as i32 }).collect::<Vec<i32>>(),
-            &filter.filters.valorant.build_friendly_composition_filter()?,
-            &filter.filters.valorant.build_enemy_composition_filter()?,
-        )
-            .fetch_all(&*self.pool)
-            .await?
-            .into_iter()
-            .map(|x| { x.clip_uuid })
-            .collect::<Vec<Uuid>>();
-        Ok(self.get_vod_clip_from_clip_uuids(&clips, user_id).await?)
+    async fn list_user_accessible_clips(&self, user_id: i64, start: i64, end: i64, filter: &RecentMatchQuery) -> Result<Vec<VodClip>, SquadOvError> {
+        let es_search = filter.to_es_search(user_id, true)
+            .from(start)
+            .size(end)
+            .sort(vec![
+                Sort::new("vod.endTime")
+                    .order(SortOrder::Desc)
+            ]);
+
+        let documents: Vec<ESVodDocument> = self.es_api.search_documents(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?;
+        let mut clips: Vec<_> = documents.into_iter()
+            .map(|x| {
+                vod::vod_document_to_vod_clip_for_user(x, user_id)
+            })
+            .filter(|x| {
+                x.is_some()
+            })
+            .map(|x| {
+                x.unwrap()
+            })
+            .collect();
+
+        // We don't store # of views/reacts/comments in ES - we need to do an additional query to the database to find this information.
+        let mut react_stats = vdb::get_vod_clip_react_stats(&*self.pool, &(clips.iter().map(|x| { x.clip.video_uuid }).collect::<Vec<Uuid>>()) ).await?;
+        for c in &mut clips {
+            if let Some(stats) = react_stats.remove(&c.clip.video_uuid) {
+                c.views = stats.views;
+                c.reacts = stats.reacts;
+                c.comments = stats.comments;
+            }
+        }
+
+        Ok(clips)
     }
 
     async fn mark_clip_view(&self, clip_uuid: &Uuid, user_id: Option<i64>) -> Result<(), SquadOvError> {
@@ -658,9 +476,14 @@ pub async fn create_staged_clip_for_vod_handler(pth: web::Path<CreateClipPathInp
 async fn get_recent_clips_for_user(user_id: i64, app : web::Data<Arc<api::ApiApplication>>, req: &HttpRequest, page: web::Query<api::PaginationParameters>, query: web::Query<ClipQuery>, mut filter: web::Json<RecentMatchQuery>, needs_profile: bool) -> Result<HttpResponse, SquadOvError> {
     if needs_profile {
         filter.users = Some(vec![user_id]);
+        filter.only_profile = true;
+    }
+
+    if let Some(match_uuid) = query.match_uuid.as_ref() {
+        filter.matches = Some(vec![match_uuid.clone()]);
     }
     
-    let mut clips = app.list_user_accessible_clips(user_id, page.start, page.end, query.match_uuid.clone(), &filter, needs_profile).await?;
+    let mut clips = app.list_user_accessible_clips(user_id, page.start, page.end, &filter).await?;
 
     if needs_profile {
         for c in &mut clips {
@@ -890,5 +713,9 @@ pub async fn publish_clip_handler(app : web::Data<Arc<api::ApiApplication>>, pth
         ..VodAssociation::default()
     }).await?;
     tx.commit().await?;
+
+    app.es_itf.request_update_vod_sharing(pth.clip_uuid).await?;
+    app.es_itf.request_update_vod_data(pth.clip_uuid).await?;
+    app.es_itf.request_update_vod_clip(pth.clip_uuid).await?;
     Ok(HttpResponse::NoContent().finish())
 }

@@ -5,7 +5,7 @@ metadata:
     labels:
         task: api
 spec:
-    replicas: 2
+    replicas: 4
     selector:
         matchLabels:
             task: api
@@ -44,7 +44,7 @@ spec:
                   resources:
                     requests:
                         cpu: "1000m"
-                        memory: "3Gi"
+                        memory: "5Gi"
                   env:
                     - name: FFMPEG_BINARY_PATH
                       value: ffmpeg
@@ -53,6 +53,6 @@ spec:
                     - name: SQUADOV_DB_HEAVY_CONNECTIONS
                       value: "256"
                     - name: "WORKERS"
-                      value: "16"
+                      value: "32"
             imagePullSecrets:
                 - name: regcred

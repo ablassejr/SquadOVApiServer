@@ -50,6 +50,7 @@ pub mod redis;
 pub mod zendesk;
 pub mod ff14;
 pub mod combatlog;
+pub mod elastic;
 
 pub use error::*;
 pub use parse::*;

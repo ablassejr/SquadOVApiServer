@@ -9,6 +9,10 @@ use crate::{
     games,
     SquadOvGames,
     VodAssociation,
+    elastic::{
+        rabbitmq::ElasticSearchJobInterface,
+    },
+    vod::db as vdb,
 };
 use sqlx::{
     Transaction,
@@ -23,6 +27,7 @@ pub struct SharingRabbitmqInterface {
     mqconfig: RabbitMqConfig,
     rmq: Arc<RabbitMqInterface>,
     db: Arc<PgPool>,
+    es_itf: Arc<ElasticSearchJobInterface>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -41,11 +46,12 @@ pub enum SharingTask {
 const MAX_AGE_SECONDS: i64 = 86400; // 1 day
 
 impl SharingRabbitmqInterface {
-    pub fn new (mqconfig: RabbitMqConfig, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>) -> Self {
+    pub fn new (mqconfig: RabbitMqConfig, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>, es_itf: Arc<ElasticSearchJobInterface>) -> Self {
         Self {
             mqconfig,
             rmq,
             db,
+            es_itf,
         }
     }
 
@@ -173,6 +179,15 @@ impl RabbitMqListener for SharingRabbitmqInterface {
                 let mut tx = self.db.begin().await?;
                 self.handle_vod_share_to_squad(&mut tx, user_id, &match_uuid, game, squad_id, &conn, parent_connection_id).await?;
                 tx.commit().await?;
+
+                if let Some(match_uuid) = conn.match_uuid {
+                    let vods = vdb::find_accessible_vods_in_match_for_user(&*self.db, &match_uuid, user_id).await?;
+                    for v in vods {
+                        self.es_itf.request_update_vod_sharing(v.video_uuid).await?;    
+                    }
+                } else if let Some(video_uuid) = conn.video_uuid {
+                    self.es_itf.request_update_vod_sharing(video_uuid).await?;
+                }
             },
         };
         Ok(())

@@ -1,6 +1,7 @@
 pub mod power_parser;
 pub mod game_state;
 pub mod game_packet;
+pub mod db;
 
 mod game_type;
 mod format_type;

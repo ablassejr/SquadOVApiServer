@@ -84,6 +84,26 @@ fn trace_edge_permission(start: &ShareEdge, graph: &HashMap<i64, ShareEdge>, cur
     }
 }
 
+pub async fn get_match_vod_share_connection<'a, T>(ex: T, connection_id: i64) -> Result<MatchVideoShareConnection, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            MatchVideoShareConnection,
+            r#"
+            SELECT id AS "id!", match_uuid, video_uuid, can_share AS "can_share!", can_clip AS "can_clip!", dest_user_id, dest_squad_id
+            FROM squadov.share_match_vod_connections
+            WHERE id = $1
+            "#,
+            connection_id
+        )
+            .fetch_one(ex)
+            .await?
+    )
+}
+
+
 pub async fn get_match_vod_share_connections_for_user<'a, T>(ex: T, match_uuid: Option<&Uuid>, video_uuid: Option<&Uuid>, user_id: i64) -> Result<Vec<MatchVideoShareConnection>, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>

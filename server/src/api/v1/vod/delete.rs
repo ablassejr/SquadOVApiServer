@@ -119,6 +119,7 @@ pub async fn delete_vod_handler(data : web::Path<VodDeleteFromUuid>, app : web::
     };
 
     app.bulk_delete_vods(&[data.video_uuid.clone()], session.user.id).await?;
+    app.es_itf.request_delete_vod(vec![data.video_uuid.clone()]).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 

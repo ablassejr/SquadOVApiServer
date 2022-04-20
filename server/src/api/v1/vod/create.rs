@@ -127,11 +127,13 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
 
     tx.commit().await?;
 
+    // At this point the VOD/clip should be ready for an initial sync to ES.
+    app.es_itf.request_sync_vod(vec![data.association.video_uuid.clone()]).await?;
+
     // Note that we don't want to spawn a task directly here to "fastify" the VOD
     // because it does take a significant amount of memory/disk space to do so.
     // So we toss it to the local job queue so we can better limit the amount of resources we end up using.
     if !data.association.is_local {
-
         if let Some(session_uri) = data.session_uri.as_ref() {
             let manager = app.get_vod_manager(&bucket).await?;
             let raw_extension = container_format_to_extension(&data.association.raw_container_format);

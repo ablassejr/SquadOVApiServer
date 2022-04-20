@@ -4,30 +4,6 @@ version = 3
 
 [[package]]
 name = "actix"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3720d0064a0ce5c0de7bd93bdb0a6caebab2a9b5668746145d7b3b0c5da02914"
-dependencies = [
- "actix-rt",
- "actix_derive",
- "bitflags",
- "bytes 1.1.0",
- "crossbeam-channel",
- "futures-core",
- "futures-sink",
- "futures-task",
- "futures-util",
- "log",
- "once_cell",
- "parking_lot 0.11.2",
- "pin-project-lite",
- "smallvec",
- "tokio",
- "tokio-util 0.6.9",
-]
-
-[[package]]
-name = "actix"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f728064aca1c318585bf4bb04ffcfac9e75e508ab4e8b1bd9ba5dfe04e2cbed5"
@@ -280,7 +256,7 @@ version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "31efe7896f3933ce03dd4710be560254272334bb321a18fd8ff62b1a557d9d19"
 dependencies = [
- "actix 0.12.0",
+ "actix",
  "actix-codec",
  "actix-http",
  "actix-web",
@@ -1546,6 +1522,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "elasticsearch-dsl"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c1271972344ab9cb0fdd8c392c5b9095585bc6c86a21f190618cf1a87739ed7"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -4265,7 +4252,7 @@ dependencies = [
 name = "squadov_api_server"
 version = "0.1.0"
 dependencies = [
- "actix 0.13.0",
+ "actix",
  "actix-cors",
  "actix-multipart",
  "actix-rt",
@@ -4281,6 +4268,7 @@ dependencies = [
  "deadpool",
  "deadpool-redis",
  "derive_more",
+ "elasticsearch-dsl",
  "env_logger 0.7.1",
  "flate2",
  "futures",
@@ -4289,7 +4277,6 @@ dependencies = [
  "hex",
  "hmac 0.11.0",
  "ipnetwork",
- "itertools 0.10.3",
  "jsonwebtoken",
  "juniper",
  "log",
@@ -4322,7 +4309,7 @@ dependencies = [
 name = "squadov_common"
 version = "0.1.0"
 dependencies = [
- "actix 0.12.0",
+ "actix",
  "actix-multipart",
  "actix-web",
  "actix-web-actors",
@@ -4343,6 +4330,7 @@ dependencies = [
  "deadpool",
  "deadpool-redis",
  "derive_more",
+ "elasticsearch-dsl",
  "env_logger 0.7.1",
  "funty",
  "futures",
@@ -4352,6 +4340,7 @@ dependencies = [
  "hmac 0.11.0",
  "image",
  "ipnetwork",
+ "itertools 0.10.3",
  "jsonwebtoken",
  "juniper",
  "lapin",

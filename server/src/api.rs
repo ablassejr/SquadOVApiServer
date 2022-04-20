@@ -81,6 +81,11 @@ use squadov_common::{
     share::rabbitmq::SharingRabbitmqInterface,
     redis::RedisConfig,
     zendesk::{ZendeskConfig, ZendeskClient},
+    elastic::{
+        ElasticSearchConfig,
+        ElasticSearchClient,
+        rabbitmq::ElasticSearchJobInterface,
+    },
 };
 use url::Url;
 use std::vec::Vec;
@@ -133,7 +138,7 @@ fn replace_pagination_parameters_in_url(url: &str, start : i64, end : i64) -> Re
     ))
 }
 
-pub fn construct_hal_pagination_response<T>(data : T, req: &HttpRequest, params: &PaginationParameters, has_next: bool) -> Result<HalResponse<T>, SquadOvError> {
+pub fn construct_hal_pagination_response_with_next<T>(data : T, req: &HttpRequest, params: &PaginationParameters, next: Option<PaginationParameters>) -> Result<HalResponse<T>, SquadOvError> {
     let conn = req.connection_info();
     let raw_url = format!("{}://{}{}", conn.scheme(), conn.host(), req.uri().to_string());
     let count = params.end - params.start;
@@ -141,10 +146,8 @@ pub fn construct_hal_pagination_response<T>(data : T, req: &HttpRequest, params:
     let mut response = HalResponse::new(data);
     response.add_link("self", &raw_url);
 
-    if has_next {
-        let next_start = params.end;
-        let next_end = params.end + count;
-        response.add_link("next", &replace_pagination_parameters_in_url(&raw_url, next_start, next_end)?);
+    if let Some(next) = next {
+        response.add_link("next", &replace_pagination_parameters_in_url(&raw_url, next.start, next.end)?);
     }
 
     if params.start != 0 {
@@ -154,6 +157,18 @@ pub fn construct_hal_pagination_response<T>(data : T, req: &HttpRequest, params:
     }
 
     Ok(response)
+}
+
+pub fn construct_hal_pagination_response<T>(data : T, req: &HttpRequest, params: &PaginationParameters, has_next: bool) -> Result<HalResponse<T>, SquadOvError> {
+    construct_hal_pagination_response_with_next(data, req, params, if has_next {
+        let count = params.end - params.start;
+        Some(PaginationParameters{
+            start: params.end,
+            end: params.end + count,
+        })
+    } else {
+        None
+    })
 }
 
 #[derive(Deserialize,Debug,Clone)]
@@ -250,6 +265,7 @@ pub struct ApiConfig {
     pub redis: RedisConfig,
     pub zendesk: ZendeskConfig,
     pub combatlog: CombatLogConfig,
+    pub elasticsearch: ElasticSearchConfig,
 }
 
 impl CommonConfig for DatabaseConfig {
@@ -300,6 +316,7 @@ pub struct ApiApplication {
     pub steam_itf: Arc<SteamApiRabbitmqInterface>,
     pub twitch_itf: Arc<TwitchApiRabbitmqInterface>,
     pub sharing_itf: Arc<SharingRabbitmqInterface>,
+    pub es_itf: Arc<ElasticSearchJobInterface>,
     gcp: Arc<Option<GCPClient>>,
     pub aws: Arc<Option<AWSClient>>,
     pub hashid: Arc<harsh::Harsh>,
@@ -307,6 +324,7 @@ pub struct ApiApplication {
     pub segment: Arc<SegmentClient>,
     pub twitch_api: Arc<TwitchApiClient>,
     pub zendesk: Arc<ZendeskClient>,
+    pub es_api: Arc<ElasticSearchClient>,
 }
 
 impl ApiApplication {
@@ -462,17 +480,19 @@ impl ApiApplication {
         let lol_api = Arc::new(RiotApiHandler::new(config.riot.lol_api_key.clone(), pool.clone()));
         let tft_api = Arc::new(RiotApiHandler::new(config.riot.tft_api_key.clone(), pool.clone()));
         let steam_api = Arc::new(SteamApiClient::new(&config.steam));
+        let es_api = Arc::new(ElasticSearchClient::new(config.elasticsearch.clone()));
 
         let rabbitmq = RabbitMqInterface::new(&config.rabbitmq, Some(pool.clone()), !disable_rabbitmq).await.unwrap();
 
-        let rso_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, rso_api.clone(), rabbitmq.clone(), pool.clone()));
-        let valorant_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, valorant_api.clone(), rabbitmq.clone(), pool.clone()));
-        let lol_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, lol_api.clone(), rabbitmq.clone(), pool.clone()));
-        let tft_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, tft_api.clone(), rabbitmq.clone(), pool.clone()));
+        let es_itf = Arc::new(ElasticSearchJobInterface::new(es_api.clone(), &config.elasticsearch, &config.rabbitmq, rabbitmq.clone(), pool.clone()));
+        let rso_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, rso_api.clone(), rabbitmq.clone(), pool.clone(), es_itf.clone()));
+        let valorant_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, valorant_api.clone(), rabbitmq.clone(), pool.clone(), es_itf.clone()));
+        let lol_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, lol_api.clone(), rabbitmq.clone(), pool.clone(), es_itf.clone()));
+        let tft_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, tft_api.clone(), rabbitmq.clone(), pool.clone(), es_itf.clone()));
         let steam_itf = Arc::new(SteamApiRabbitmqInterface::new(steam_api.clone(), &config.rabbitmq, rabbitmq.clone(), pool.clone()));
-        let csgo_itf = Arc::new(CsgoRabbitmqInterface::new(steam_itf.clone(), &config.rabbitmq, rabbitmq.clone(), pool.clone()));
+        let csgo_itf = Arc::new(CsgoRabbitmqInterface::new(steam_itf.clone(), &config.rabbitmq, rabbitmq.clone(), pool.clone(), es_itf.clone()));
         let twitch_itf = Arc::new(TwitchApiRabbitmqInterface::new(config.twitch.clone(), config.rabbitmq.clone(), rabbitmq.clone(), pool.clone()));
-        let sharing_itf = Arc::new(SharingRabbitmqInterface::new(config.rabbitmq.clone(), rabbitmq.clone(), pool.clone()));
+        let sharing_itf = Arc::new(SharingRabbitmqInterface::new(config.rabbitmq.clone(), rabbitmq.clone(), pool.clone(), es_itf.clone()));
 
         if !disable_rabbitmq {
             if config.rabbitmq.enable_rso {
@@ -517,6 +537,12 @@ impl ApiApplication {
             if config.rabbitmq.enable_sharing {
                 RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.sharing_queue.clone(), sharing_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
             }
+
+            if config.rabbitmq.enable_elasticsearch {
+                for _ in 0..config.rabbitmq.elasticsearch_workers {
+                    RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.elasticsearch_queue.clone(), es_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
+                }
+            }
         }
 
         let mut vod_manager = StorageManager::<Arc<dyn VodManager + Send + Sync>>::new(); 
@@ -532,10 +558,10 @@ impl ApiApplication {
         let blob = Arc::new(blob);
 
         // One VOD interface for publishing - individual interfaces for consuming.
-        let vod_itf = Arc::new(VodProcessingInterface::new(&config.rabbitmq.vod_queue, rabbitmq.clone(), pool.clone(), vod_manager.clone()));
+        let vod_itf = Arc::new(VodProcessingInterface::new(&config.rabbitmq.vod_queue, rabbitmq.clone(), pool.clone(), vod_manager.clone(), es_itf.clone()));
         if !disable_rabbitmq && config.rabbitmq.enable_vod {
             for _i in 0..config.vod.fastify_threads {
-                let process_itf = Arc::new(VodProcessingInterface::new(&config.rabbitmq.vod_queue, rabbitmq.clone(), pool.clone(), vod_manager.clone()));
+                let process_itf = Arc::new(VodProcessingInterface::new(&config.rabbitmq.vod_queue, rabbitmq.clone(), pool.clone(), vod_manager.clone(), es_itf.clone()));
                 RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.vod_queue.clone(), process_itf, config.rabbitmq.prefetch_count).await.unwrap();
             }
         }
@@ -563,6 +589,7 @@ impl ApiApplication {
             steam_itf,
             twitch_itf,
             sharing_itf,
+            es_itf,
             gcp,
             aws,
             hashid: Arc::new(harsh::Harsh::builder().salt(config.squadov.hashid_salt.as_str()).length(6).build().unwrap()),
@@ -575,6 +602,7 @@ impl ApiApplication {
                 pool.clone(),
             )),
             zendesk: Arc::new(ZendeskClient::new(config.zendesk.clone())),
+            es_api,
         };
 
         app.create_vod_manager(&config.storage.vods.global).await.unwrap();

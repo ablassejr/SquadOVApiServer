@@ -1,7 +1,7 @@
 mod combatlog;
-mod matches;
+pub mod matches;
 mod combatant;
-mod characters;
+pub mod characters;
 mod constants;
 mod serialized;
 mod death_recap;

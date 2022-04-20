@@ -1,0 +1,711 @@
+{
+    "mappings": {
+        "dynamic": false,
+        "properties": {
+            "owner": {
+                "properties": {
+                    "userId": {
+                        "type": "long"
+                    },
+                    "username": {
+                        "type": "text"
+                    }
+                }
+            },
+            "sharing": {
+                "properties": {
+                    "squads": {
+                        "type": "long"
+                    },
+                    "users": {
+                        "type": "long"
+                    }
+                }
+            },
+            "lists": {
+                "properties": {
+                    "watchlist": {
+                        "type": "long"
+                    },
+                    "favorites": {
+                        "type": "nested",
+                        "properties": {
+                            "userId": {
+                                "type": "long"
+                            },
+                            "reason": {
+                                "type": "text"
+                            }
+                        }
+                    },
+                    "profiles": {
+                        "type": "long"
+                    }
+                }
+            },
+            "data": {
+                "properties": {
+                    "matchUuid": {
+                        "type": "keyword"
+                    },
+                    "game": {
+                        "type": "integer"
+                    },
+                    "aimlab": {
+                        "properties": {
+                            "task": {
+                                "properties": {
+                                    "taskName": {
+                                        "type": "text"
+                                    },
+                                    "mode": {
+                                        "type": "integer"
+                                    },
+                                    "score": {
+                                        "type": "long"
+                                    },
+                                    "version": {
+                                        "type": "keyword"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "csgo": {
+                        "properties": {
+                            "pov": {
+                                "properties": {
+                                    "map": {
+                                        "type": "keyword"
+                                    },
+                                    "mode": {
+                                        "type": "keyword"
+                                    },
+                                    "winner": {
+                                        "type": "boolean"
+                                    },
+                                    "hasDemo": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "hearthstone": {
+                        "properties": {
+                            "packet": {
+                                "properties": {
+                                    "metadata": {
+                                        "properties": {
+                                            "gameType": {
+                                                "type": "integer"
+                                            },
+                                            "formatType": {
+                                                "type": "integer"
+                                            },
+                                            "scenarioId": {
+                                                "type": "integer"
+                                            },
+                                            "deck": {
+                                                "properties": {
+                                                    "name": {
+                                                        "type": "text"
+                                                    },
+                                                    "deckId": {
+                                                        "type": "long"
+                                                    },
+                                                    "heroCard": {
+                                                        "type": "keyword"
+                                                    },
+                                                    "heroPremium": {
+                                                        "type": "integer"
+                                                    },
+                                                    "deckType": {
+                                                        "type": "integer"
+                                                    },
+                                                    "createDate": {
+                                                        "type": "date"
+                                                    },
+                                                    "isWild": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "slots": {
+                                                        "type": "nested",
+                                                        "properties": {
+                                                            "index": {
+                                                                "type": "integer"
+                                                            },
+                                                            "cardId": {
+                                                                "type": "keyword"
+                                                            },
+                                                            "owned": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "count": {
+                                                                "properties": {
+                                                                    "normal": {
+                                                                        "type": "integer"
+                                                                    },
+                                                                    "golden": {
+                                                                        "type": "integer"
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "lol": {
+                        "properties": {
+                            "region": {
+                                "type": "keyword"
+                            },
+                            "summary": {
+                                "properties": {
+                                    "gameMode": {
+                                        "type": "keyword"
+                                    },
+                                    "gameType": {
+                                        "type": "keyword"
+                                    },
+                                    "gameVersion": {
+                                        "type": "keyword"
+                                    },
+                                    "mapId": {
+                                        "type": "integer"
+                                    },
+                                    "queueId": {
+                                        "type": "integer"
+                                    }
+                                }
+                            },
+                            "teams": {
+                                "type": "nested",
+                                "properties": {
+                                    "team": {
+                                        "properties": {
+                                            "win": {
+                                                "type": "boolean"
+                                            },
+                                            "bans": {
+                                                "properties": {
+                                                    "championId": {
+                                                        "type": "integer"
+                                                    }
+                                                }
+                                            },
+                                            "objectives": {
+                                                "properties": {
+                                                    "baron": {
+                                                        "properties": {
+                                                            "first": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "kills": {
+                                                                "type": "integer"
+                                                            }
+                                                        }
+                                                    },
+                                                    "champion": {
+                                                        "properties": {
+                                                            "first": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "kills": {
+                                                                "type": "integer"
+                                                            }
+                                                        }
+                                                    },
+                                                    "dragon": {
+                                                        "properties": {
+                                                            "first": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "kills": {
+                                                                "type": "integer"
+                                                            }
+                                                        }
+                                                    },
+                                                    "inhibitor": {
+                                                        "properties": {
+                                                            "first": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "kills": {
+                                                                "type": "integer"
+                                                            }
+                                                        }
+                                                    },
+                                                    "riftHerald": {
+                                                        "properties": {
+                                                            "first": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "kills": {
+                                                                "type": "integer"
+                                                            }
+                                                        }
+                                                    },
+                                                    "tower": {
+                                                        "properties": {
+                                                            "first": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "kills": {
+                                                                "type": "integer"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "players": {
+                                        "type": "nested",
+                                        "properties": {
+                                            "isPov": {
+                                                "type": "boolean"
+                                            },
+                                            "info": {
+                                                "properties": {
+                                                    "championId": {
+                                                        "type": "integer"
+                                                    },
+                                                    "lane": {
+                                                        "type": "keyword"
+                                                    },
+                                                    "summoner1Id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "summoner2Id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "item0": {
+                                                        "type": "integer"
+                                                    },
+                                                    "item1": {
+                                                        "type": "integer"
+                                                    },
+                                                    "item2": {
+                                                        "type": "integer"
+                                                    },
+                                                    "item3": {
+                                                        "type": "integer"
+                                                    },
+                                                    "item4": {
+                                                        "type": "integer"
+                                                    },
+                                                    "item5": {
+                                                        "type": "integer"
+                                                    },
+                                                    "item6": {
+                                                        "type": "integer"
+                                                    },
+                                                    "firstBlood": {
+                                                        "type": "boolean"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "tft": {
+                        "properties": {
+                            "region": {
+                                "type": "keyword"
+                            },
+                            "summary": {
+                                "properties": {
+                                    "gameVariation": {
+                                        "type": "keyword"
+                                    },
+                                    "gameVersion": {
+                                        "type": "keyword"
+                                    },
+                                    "queueId": {
+                                        "type": "integer"
+                                    },
+                                    "tftSetNumber": {
+                                        "type": "integer"
+                                    }
+                                }
+                            },
+                            "participants": {
+                                "type": "nested",
+                                "properties": {
+                                    "isPov": {
+                                        "type": "boolean"
+                                    },
+                                    "info": {
+                                        "properties": {
+                                            "placement": {
+                                                "type": "integer"
+                                            },
+                                            "goldLeft": {
+                                                "type": "integer"
+                                            },
+                                            "lastRound": {
+                                                "type": "integer"
+                                            },
+                                            "level": {
+                                                "type": "integer"
+                                            },
+                                            "traits": {
+                                                "type": "nested",
+                                                "properties": {
+                                                    "name": {
+                                                        "type": "keyword"
+                                                    },
+                                                    "numUnits": {
+                                                        "type": "integer"
+                                                    },
+                                                    "style": {
+                                                        "type": "integer"
+                                                    }
+                                                }
+                                            },
+                                            "units": {
+                                                "type": "nested",
+                                                "properties": {
+                                                    "characterId": {
+                                                        "type": "keyword"
+                                                    },
+                                                    "chosen": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "rarity": {
+                                                        "type": "integer"
+                                                    },
+                                                    "tier": {
+                                                        "type": "integer"
+                                                    },
+                                                    "items": {
+                                                        "type": "integer"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "valorant": {
+                        "properties": {
+                            "data": {
+                                "properties": {
+                                    "mapId": {
+                                        "type": "keyword"
+                                    },
+                                    "provisioningFlowId": {
+                                        "type": "keyword"
+                                    },
+                                    "gameMode": {
+                                        "type": "keyword"
+                                    },
+                                    "isRanked": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            },
+                            "region": {
+                                "type": "keyword"
+                            },
+                            "povEvents": {
+                                "type": "integer"
+                            },
+                            "teams": {
+                                "type": "nested",
+                                "properties": {
+                                    "team": {
+                                        "properties": {
+                                            "teamId": {
+                                                "type": "keyword"
+                                            },
+                                            "won": {
+                                                "type": "boolean"
+                                            },
+                                            "roundsWon": {
+                                                "type": "integer"
+                                            },
+                                            "numPoints": {
+                                                "type": "integer"
+                                            }
+                                        }
+                                    },
+                                    "players": {
+                                        "type": "nested",
+                                        "properties": {
+                                            "isPov": {
+                                                "type": "boolean"
+                                            },
+                                            "info": {
+                                                "properties": {
+                                                    "characterId": {
+                                                        "type": "keyword"
+                                                    },
+                                                    "competitiveTier": {
+                                                        "type": "integer"
+                                                    },
+                                                    "stats": {
+                                                        "properties": {
+                                                            "kills": {
+                                                                "type": "integer"
+                                                            },
+                                                            "deaths": {
+                                                                "type": "integer"
+                                                            },
+                                                            "assists": {
+                                                                "type": "integer"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "wow": {
+                        "properties": {
+                            "encounter": {
+                                "properties": {
+                                    "encounterId": {
+                                        "type": "integer"
+                                    },
+                                    "instanceId": {
+                                        "type": "integer"
+                                    },
+                                    "difficulty": {
+                                        "type": "integer"
+                                    },
+                                    "boss": {
+                                        "type": "nested",
+                                        "properties": {
+                                            "name": {
+                                                "type": "text"
+                                            },
+                                            "npcId": {
+                                                "type": "long"
+                                            },
+                                            "currentHp": {
+                                                "type": "long"
+                                            },
+                                            "maxHp": {
+                                                "type": "long"
+                                            }
+                                        }
+                                    },
+                                    "pullNumber": {
+                                        "type": "integer"
+                                    }
+                                }
+                            },
+                            "challenge": {
+                                "properties": {
+                                    "instanceId": {
+                                        "type": "integer"
+                                    },
+                                    "keystoneLevel": {
+                                        "type": "integer"
+                                    }
+                                }
+                            },
+                            "arena": {
+                                "properties": {
+                                    "instanceId": {
+                                        "type": "integer"
+                                    },
+                                    "type": {
+                                        "type": "keyword"
+                                    }
+                                }
+                            },
+                            "instance": {
+                                "properties": {
+                                    "instanceType": {
+                                        "type": "integer"
+                                    },
+                                    "instanceId": {
+                                        "type": "integer"
+                                    }
+                                }
+                            },
+                            "buildVersion": {
+                                "type": "keyword"
+                            },
+                            "combatLogVersion": {
+                                "type": "keyword"
+                            },
+                            "advancedLog": {
+                                "type": "boolean"
+                            },
+                            "teams": {
+                                "type": "nested",
+                                "properties": {
+                                    "team": {
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer"
+                                            },
+                                            "won": {
+                                                "type": "boolean"
+                                            }
+                                        }
+                                    },
+                                    "players": {
+                                        "type": "nested",
+                                        "properties": {
+                                            "isPov": {
+                                                "type": "boolean"
+                                            },
+                                            "info": {
+                                                "properties": {
+                                                    "data": {
+                                                        "properties": {
+                                                            "ilvl": {
+                                                                "type": "integer"
+                                                            },
+                                                            "specId": {
+                                                                "type": "integer"
+                                                            },
+                                                            "rating": {
+                                                                "type": "integer"
+                                                            },
+                                                            "classId": {
+                                                                "type": "integer"
+                                                            }
+                                                        }
+                                                    },
+                                                    "traits": {
+                                                        "properties": {
+                                                            "items": {
+                                                                "type": "nested",
+                                                                "properties": {
+                                                                    "itemId": {
+                                                                        "type": "long"
+                                                                    },
+                                                                    "ilvl": {
+                                                                        "type": "integer"
+                                                                    }
+                                                                }
+                                                            },
+                                                            "covenant": {
+                                                                "properties": {
+                                                                    "covenantId": {
+                                                                        "type": "integer"
+                                                                    },
+                                                                    "soulbindId": {
+                                                                        "type": "integer"
+                                                                    },
+                                                                    "soulbindTraits": {
+                                                                        "type": "integer"
+                                                                    },
+                                                                    "conduits": {
+                                                                        "type": "nested",
+                                                                        "properties": {
+                                                                            "itemId": {
+                                                                                "type": "long"
+                                                                            },
+                                                                            "ilvl": {
+                                                                                "type": "integer"
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            },
+                                                            "talents": {
+                                                                "type": "integer"
+                                                            },
+                                                            "pvpTalents": {
+                                                                "type": "integer"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "tags": {
+                "properties": {
+                    "tag": {
+                        "type": "text"
+                    }
+                }
+            },
+            "manifest": {
+                "properties": {
+                    "videoTracks": {
+                        "properties": {
+                            "metadata": {
+                                "properties": {
+                                    "resX": {
+                                        "type": "integer"
+                                    },
+                                    "resY": {
+                                        "type": "integer"
+                                    },
+                                    "fps": {
+                                        "type": "integer"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "vod": {
+                "properties": {
+                    "videoUuid": {
+                        "type": "keyword"
+                    },
+                    "matchUuid": {
+                        "type": "keyword"
+                    },
+                    "startTime": {
+                        "type": "date"
+                    },
+                    "endTime": {
+                        "type": "date"
+                    },
+                    "isClip": {
+                        "type": "boolean"
+                    },
+                    "isLocal": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "clip": {
+                "properties": {
+                    "title": {
+                        "type": "text"
+                    },
+                    "description": {
+                        "type": "text"
+                    },
+                    "published": {
+                        "type": "boolean"
+                    }
+                }   
+            }
+        }
+    }
+}

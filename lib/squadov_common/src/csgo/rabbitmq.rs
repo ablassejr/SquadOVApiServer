@@ -8,6 +8,10 @@ use crate::{
         parser::CsgoDemoParser,
     },
     steam::rabbitmq::SteamApiRabbitmqInterface,
+    elastic::{
+        rabbitmq::ElasticSearchJobInterface,
+    },
+    vod::db as vdb,
 };
 use sqlx::postgres::{PgPool};
 use serde::{Serialize, Deserialize};
@@ -33,15 +37,17 @@ pub struct CsgoRabbitmqInterface {
     rmq: Arc<RabbitMqInterface>,
     db: Arc<PgPool>,
     steam_itf: Arc<SteamApiRabbitmqInterface>,
+    es_itf: Arc<ElasticSearchJobInterface>,
 }
 
 impl CsgoRabbitmqInterface {
-    pub fn new (steam_itf: Arc<SteamApiRabbitmqInterface>, mqconfig: &RabbitMqConfig, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>) -> Self {
+    pub fn new (steam_itf: Arc<SteamApiRabbitmqInterface>, mqconfig: &RabbitMqConfig, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>, es_itf: Arc<ElasticSearchJobInterface>) -> Self {
         Self {
             steam_itf,
             mqconfig: mqconfig.clone(),
             rmq,
             db,
+            es_itf,
         }
     }
 
@@ -65,6 +71,12 @@ impl CsgoRabbitmqInterface {
         db::store_csgo_demo_events_for_view(&mut tx, view_uuid, &demo, timestamp).await?;
         log::info!("...Finished CSGO demo in database.");
         tx.commit().await?;
+
+        if let Ok((match_uuid, user_id)) = db::find_csgo_match_user_from_view_id(&*self.db, view_uuid).await {
+            if let Ok(video_uuid) = vdb::get_vod_id_from_match_user(&*self.db, &match_uuid, user_id).await {
+                self.es_itf.request_sync_vod(vec![video_uuid]).await?;
+            }
+        }
         Ok(())
     }
 

@@ -54,7 +54,7 @@ pub struct ValorantMatchInfoDto {
     pub season_id: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ValorantMatchPlayerDto {
     pub puuid: String,
     #[serde(rename="teamId")]
@@ -66,7 +66,7 @@ pub struct ValorantMatchPlayerDto {
     pub competitive_tier: i32,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ValorantMatchPlayerStatsDto {
     pub score: i32,
     #[serde(rename="roundsPlayed")]

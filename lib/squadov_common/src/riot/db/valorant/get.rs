@@ -18,11 +18,34 @@ use crate::{
         FlatValorantMatchPlayerRoundStatsDto,
     }
 };
-use sqlx::PgPool;
 use uuid::Uuid;
 use std::collections::HashMap;
+use sqlx::{Executor, Postgres, PgPool};
 
-async fn get_valorant_match_info_dto(ex: &PgPool, match_uuid: &Uuid) -> Result<ValorantMatchInfoDto, SquadOvError> {
+pub async fn get_valorant_match_shard<'a, T>(ex: T, match_uuid: &Uuid) -> Result<String, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT shard
+            FROM squadov.valorant_match_uuid_link
+            WHERE match_uuid = $1
+            ",
+            match_uuid,
+        )
+            .fetch_one(ex)
+            .await?
+            .shard
+            .unwrap_or(String::new())
+    )
+}
+
+pub async fn get_valorant_match_info_dto<'a, T>(ex: T, match_uuid: &Uuid) -> Result<ValorantMatchInfoDto, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
     Ok(
         sqlx::query_as!(
             ValorantMatchInfoDto,
@@ -48,7 +71,10 @@ async fn get_valorant_match_info_dto(ex: &PgPool, match_uuid: &Uuid) -> Result<V
     )
 }
 
-async fn get_valorant_match_players_dto(ex: &PgPool, match_uuid: &Uuid) -> Result<Vec<ValorantMatchPlayerDto>, SquadOvError> {
+pub async fn get_valorant_match_players_dto<'a, T>(ex: T, match_uuid: &Uuid) -> Result<Vec<ValorantMatchPlayerDto>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
     Ok(
         sqlx::query!(
             "
@@ -89,7 +115,10 @@ async fn get_valorant_match_players_dto(ex: &PgPool, match_uuid: &Uuid) -> Resul
     )
 }
 
-async fn get_valorant_match_teams_dto(ex: &PgPool, match_uuid: &Uuid) -> Result<Vec<ValorantMatchTeamDto>, SquadOvError> {
+pub async fn get_valorant_match_teams_dto<'a, T>(ex: T, match_uuid: &Uuid) -> Result<Vec<ValorantMatchTeamDto>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
     Ok(
         sqlx::query_as!(
             ValorantMatchTeamDto,

@@ -2,17 +2,11 @@ use squadov_common::{
     SquadOvError,
     blob,
 };
-use squadov_common::hearthstone::{HearthstonePlayer, HearthstonePlayerMedalInfo, FormatType, GameType};
 use squadov_common::hearthstone::game_state::{
-    HearthstoneGameSnapshot,
-    HearthstoneGameSnapshotAuxData,
     HearthstoneEntity,
     game_step::GameStep
 };
-use squadov_common::hearthstone::game_packet::{
-    HearthstoneMatchMetadata,
-    HearthstoneGamePacket,
-};
+use squadov_common::hearthstone::db as hdb;
 use squadov_common::vod::VodAssociation;
 use crate::api;
 use crate::api::auth::SquadOVSession;
@@ -71,81 +65,6 @@ impl api::ApiApplication {
             tags: serde_json::from_value(raw_entity.tags)?,
             attributes: serde_json::from_value(raw_entity.attributes)?
         })
-    }
-
-    pub async fn get_hearthstone_snapshot(&self, snapshot_uuid: &Uuid) -> Result<HearthstoneGameSnapshot, SquadOvError> {
-        let raw_metadata = sqlx::query!(
-            "
-            SELECT
-                tm,
-                game_entity_id,
-                current_turn,
-                step,
-                current_player_id,
-                last_action_id
-            FROM squadov.hearthstone_snapshots
-            WHERE snapshot_id = $1
-            ",
-            snapshot_uuid
-        )
-            .fetch_one(&*self.pool)
-            .await?;
-
-        let mut snapshot = HearthstoneGameSnapshot::new();
-        snapshot.uuid = snapshot_uuid.clone();
-        snapshot.tm = raw_metadata.tm;
-        snapshot.game_entity_id = raw_metadata.game_entity_id;
-        snapshot.aux_data = Some(HearthstoneGameSnapshotAuxData{
-            current_turn: raw_metadata.current_turn,
-            step: GameStep::try_from(raw_metadata.step)?,
-            current_player_id: raw_metadata.current_player_id,
-            last_action_index: raw_metadata.last_action_id as usize
-        });
-
-        let snapshot_players = sqlx::query!(
-            "
-            SELECT 
-                player_name,
-                player_id,
-                entity_id
-            FROM squadov.hearthstone_snapshots_player_map
-            WHERE snapshot_id = $1
-            ",
-            snapshot_uuid
-        )
-            .fetch_all(&*self.pool)
-            .await?;
-
-        for sp in snapshot_players {
-            snapshot.player_name_to_player_id.insert(sp.player_name, sp.player_id);
-            snapshot.player_id_to_entity_id.insert(sp.player_id, sp.entity_id);
-        }
-
-        let snapshot_entities = sqlx::query!(
-            "
-            SELECT
-                entity_id,
-                tags,
-                attributes
-            FROM squadov.hearthstone_snapshots_entities
-            WHERE snapshot_id = $1
-            ",
-            snapshot_uuid
-        )
-            .fetch_all(&*self.pool)
-            .await?;
-
-        for se in snapshot_entities {
-            let entity = HearthstoneEntity{
-                entity_id: se.entity_id,
-                tags: serde_json::from_value(se.tags)?,
-                attributes: serde_json::from_value(se.attributes)?
-            };
-
-            snapshot.entities.insert(se.entity_id, entity);
-        }
-
-        Ok(snapshot)
     }
 
     pub async fn get_bulk_hearthstone_serialized_snapshots(&self, snapshot_uuids: &[Uuid]) -> Result<Vec<HearthstoneSerializedGameSnapshot>, SquadOvError> {
@@ -254,174 +173,6 @@ impl api::ApiApplication {
         Ok(ret_snapshots)
     }
 
-    pub async fn get_hearthstone_players_for_match(&self, match_uuid: &Uuid, user_id: i64) -> Result<HashMap<i32, HearthstonePlayer>, SquadOvError> {
-        let raw_match_players = sqlx::query!(
-            "
-            SELECT
-                hmp.user_id,
-                hmp.player_match_id,
-                hmp.player_name,
-                hmp.card_back_id,
-                hmp.arena_wins,
-                hmp.arena_loss,
-                hmp.tavern_brawl_wins,
-                hmp.tavern_brawl_loss,
-                hmp.battlegrounds_rating,
-                hmp.duels_casual_rating,
-                hmp.duels_heroic_rating
-            FROM squadov.hearthstone_match_players AS hmp
-            INNER JOIN squadov.hearthstone_match_view AS hmv
-                ON hmv.view_uuid = hmp.view_uuid
-            WHERE hmv.match_uuid = $1 AND hmv.user_id = $2
-            ",
-            match_uuid,
-            user_id
-        )
-            .fetch_all(&*self.pool)
-            .await?;
-
-        let raw_match_player_medals = sqlx::query!(
-            "
-            SELECT
-                hmpm.player_match_id,
-                hmpm.league_id,
-                hmpm.earned_stars,
-                hmpm.star_level,
-                hmpm.best_star_level,
-                hmpm.win_streak,
-                hmpm.legend_index,
-                hmpm.is_standard
-            FROM squadov.hearthstone_match_player_medals AS hmpm
-            INNER JOIN squadov.hearthstone_match_view AS hmv
-                ON hmv.view_uuid = hmpm.view_uuid
-            WHERE hmv.match_uuid = $1 AND hmv.user_id = $2
-            ",
-            match_uuid,
-            user_id
-        )
-            .fetch_all(&*self.pool)
-            .await?;
-
-        let mut ret_map: HashMap<i32, HearthstonePlayer> = HashMap::new();
-        for rmp in raw_match_players {
-            let new_player = HearthstonePlayer{
-                name: rmp.player_name,
-                local: rmp.user_id.unwrap_or(-1) == user_id,
-                side: 0,
-                card_back_id: rmp.card_back_id,
-                arena_wins: rmp.arena_wins as u32,
-                arena_loss: rmp.arena_loss as u32,
-                tavern_brawl_wins: rmp.tavern_brawl_wins as u32,
-                tavern_brawl_loss: rmp.tavern_brawl_loss as u32,
-                medal_info: HearthstonePlayerMedalInfo::new(),
-                battlegrounds_rating: rmp.battlegrounds_rating,
-                duels_casual_rating: rmp.duels_casual_rating,
-                duels_heroic_rating: rmp.duels_heroic_rating,
-            };
-
-            ret_map.insert(rmp.player_match_id, new_player);
-        }
-
-        for medal in raw_match_player_medals {
-            let player = ret_map.get_mut(&medal.player_match_id);
-            if player.is_none() {
-                continue;
-            }
-            let player = player.unwrap();
-            let medal_info = if medal.is_standard {
-                &mut player.medal_info.standard
-            } else {
-                &mut player.medal_info.wild
-            };
-
-            medal_info.league_id = medal.league_id;
-            medal_info.earned_stars = medal.earned_stars;
-            medal_info.star_level = medal.star_level;
-            medal_info.best_star_level = medal.best_star_level;
-            medal_info.win_streak = medal.win_streak;
-            medal_info.legend_index = medal.legend_index;
-        }
-
-        Ok(ret_map)
-    }
-
-    pub async fn get_hearthstone_snapshots_for_match(&self, match_uuid: &Uuid, user_id: i64) -> Result<Vec<Uuid>, SquadOvError> {
-        Ok(sqlx::query_scalar(
-            "
-            SELECT hs.snapshot_id
-            FROM squadov.hearthstone_snapshots AS hs
-            WHERE hs.match_uuid = $1 AND hs.user_id = $2
-            ORDER BY hs.last_action_id ASC
-            ",
-        )
-            .bind(match_uuid)
-            .bind(user_id)
-            .fetch_all(&*self.pool)
-            .await?)
-    }
-
-    pub async fn get_hearthstone_match_for_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<HearthstoneGamePacket, SquadOvError> {
-        // Give users some summary data about the match and then just dump the latest snapshot on them and let them figure out what
-        // data they need from the snapshot on their own.
-        let raw_metadata = sqlx::query!(
-            "
-            SELECT
-                hmm.game_type,
-                hmm.format_type,
-                hmm.scenario_id,
-                hm.match_time,
-                COALESCE(EXTRACT(EPOCH FROM (
-                    SELECT tm
-                    FROM squadov.hearthstone_snapshots
-                    WHERE match_uuid = $1
-                    ORDER BY last_action_id DESC
-                    LIMIT 1
-                )) - EXTRACT(EPOCH FROM (
-                    SELECT tm
-                    FROM squadov.hearthstone_snapshots
-                    WHERE match_uuid = $1
-                    ORDER BY last_action_id ASC
-                    LIMIT 1
-                )), 0) AS \"elapsed_seconds!\"
-            FROM squadov.hearthstone_matches AS hm
-            INNER JOIN squadov.hearthstone_match_view AS hmv
-                ON hmv.match_uuid = hm.match_uuid
-            INNER JOIN squadov.hearthstone_match_metadata AS hmm
-                ON hmm.view_uuid = hmv.view_uuid
-            WHERE hm.match_uuid = $1 AND hmv.user_id = $2
-            ",
-            match_uuid,
-            user_id,
-        )
-            .fetch_one(&*self.pool)
-            .await?;
-
-        let metadata = HearthstoneMatchMetadata{
-            game_type: GameType::try_from(raw_metadata.game_type)?,
-            format_type: FormatType::try_from(raw_metadata.format_type)?,
-            scenario_id: raw_metadata.scenario_id,
-            match_time: raw_metadata.match_time,
-            elapsed_seconds: raw_metadata.elapsed_seconds,
-            deck: self.get_hearthstone_deck_for_match_user(match_uuid, user_id).await?,
-            players: self.get_hearthstone_players_for_match(match_uuid, user_id).await?
-        };
-        
-        let snapshot_ids = self.get_hearthstone_snapshots_for_match(match_uuid, user_id).await?;
-        let latest_snapshot = match snapshot_ids.last() {
-            Some(x) => Some(self.get_hearthstone_snapshot(x).await?),
-            None => None
-        };
-
-        // Also retrieve the last snapshot of the game and just send it to the user "raw" and let them
-        // parse it to retrieve some data about the final state of the game (e.g. this is what we're going
-        // to use to display the final board state of the game).
-        Ok(HearthstoneGamePacket{
-            match_uuid: match_uuid.clone(),
-            metadata: metadata,
-            latest_snapshot: latest_snapshot
-        })
-    }
-
     pub async fn did_user_win_hearthstone_match(&self, match_uuid: &Uuid, user_id: i64) -> Result<bool, SquadOvError> {
         let ret: Option<bool> = sqlx::query_scalar(
             "
@@ -519,7 +270,7 @@ impl api::ApiApplication {
         // It's tempting to write a single SQL query to grab this info but I don't think it's worth the complexity versus just using what already exists.
         let mut user_id_to_hero_card : HashMap<i64, String> = HashMap::new();
         for uid in view_user_ids {
-            let snapshot_ids = self.get_hearthstone_snapshots_for_match(match_uuid, *uid).await?;
+            let snapshot_ids = hdb::get_hearthstone_snapshots_for_match(&*self.pool, match_uuid, *uid).await?;
             let latest_snapshot = match snapshot_ids.last() {
                 Some(x) => x,
                 None => return Err(SquadOvError::NotFound)
@@ -534,7 +285,7 @@ impl api::ApiApplication {
 }
 
 pub async fn get_hearthstone_match_handler(path : web::Path<super::HearthstoneMatchGetInput>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
-    let packet = app.get_hearthstone_match_for_user(&path.match_uuid, path.user_id).await?;
+    let packet = hdb::get_hearthstone_game_packet(&*app.pool, &path.match_uuid, path.user_id).await?;
     Ok(HttpResponse::Ok().json(&packet))
 }
 

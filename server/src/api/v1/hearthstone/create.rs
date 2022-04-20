@@ -736,7 +736,10 @@ pub async fn upload_hearthstone_logs_handler(mut body : web::Payload, path : web
     // Do the log parsing in a separate thread because it's potentially a fairly lengthy process.
     tokio::task::spawn(async move {
         match app.parse_hearthstone_power_logs(&data, &path.match_uuid, user_id).await {
-            Ok(_) => Ok(()),
+            Ok(_) => {
+                app.es_itf.request_sync_match(path.match_uuid.clone()).await.unwrap();
+                Ok(())
+            },
             Err(err) => {
                 log::error!("Failed to parse Hearthstone logs: {:?}", err);
                 Err(err)

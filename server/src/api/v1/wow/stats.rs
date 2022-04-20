@@ -3,6 +3,7 @@ use crate::api;
 use std::sync::Arc;
 use squadov_common::{
     SquadOvError,
+    wow::characters,
 };
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
@@ -295,25 +296,25 @@ impl api::ApiApplication {
 }
 
 pub async fn get_wow_match_dps_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>, query: web::Query<WowStatsQueryParams>) -> Result<HttpResponse, SquadOvError> {
-    let chars: Vec<_> = app.list_wow_characters_for_match(&path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect();
+    let chars: Vec<_> = characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect();
     let stats = app.get_wow_match_dps(path.user_id, &path.match_uuid, &chars, &query).await?;
     Ok(HttpResponse::Ok().json(stats))
 }
 
 pub async fn get_wow_match_heals_per_second_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>, query: web::Query<WowStatsQueryParams>) -> Result<HttpResponse, SquadOvError> {
-    let chars: Vec<_> = app.list_wow_characters_for_match(&path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect();
+    let chars: Vec<_> = characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect();
     let stats = app.get_wow_match_heals_per_second(path.user_id, &path.match_uuid, &chars, &query).await?;
     Ok(HttpResponse::Ok().json(stats))
 }
 
 pub async fn get_wow_match_damage_received_per_second_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>, query: web::Query<WowStatsQueryParams>) -> Result<HttpResponse, SquadOvError> {
-    let chars: Vec<_> = app.list_wow_characters_for_match(&path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect();
+    let chars: Vec<_> = characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect();
     let stats = app.get_wow_match_damage_received_per_second(path.user_id, &path.match_uuid, &chars, &query).await?;
     Ok(HttpResponse::Ok().json(stats))
 }
 
 pub async fn get_wow_match_stat_summary_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>) -> Result<HttpResponse, SquadOvError> {
-    let chars: Vec<_> = app.list_wow_characters_for_match(&path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect();
+    let chars: Vec<_> = characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect();
     Ok(
         HttpResponse::Ok().json(&WowMatchStatSummaryData{
             damage_dealt: app.get_wow_summary_damage_dealt(path.user_id, &path.match_uuid, &chars).await?,

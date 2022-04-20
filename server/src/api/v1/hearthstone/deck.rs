@@ -1,32 +1,16 @@
 use squadov_common::SquadOvError;
 use crate::api;
 use sqlx::{Transaction, Executor, Postgres};
-use squadov_common::hearthstone::{HearthstoneDeck, HearthstoneDeckSlot, HearthstoneCardCount, are_deck_slots_equivalent};
+use squadov_common::hearthstone::{
+    HearthstoneDeck,
+    HearthstoneDeckSlot,
+    are_deck_slots_equivalent,
+    db as hdb,
+};
 use uuid::Uuid;
 use chrono::Utc;
 
 impl api::ApiApplication {
-    pub async fn get_hearthstone_deck_for_match_user(&self, match_uuid: &Uuid, user_id: i64) -> Result<Option<HearthstoneDeck>, SquadOvError> {
-        let data = sqlx::query!(
-            "
-            SELECT hmud.deck_version_id, hdv.deck_id
-            FROM squadov.hearthstone_match_user_deck AS hmud
-            INNER JOIN squadov.hearthstone_deck_versions AS hdv
-                ON hdv.version_id = hmud.deck_version_id
-            WHERE hmud.match_uuid = $1 AND hmud.user_id = $2
-            ",
-            match_uuid,
-            user_id
-        )
-            .fetch_optional(&*self.pool)
-            .await?;
-        
-        Ok(match data {
-            Some(x) => self.get_versioned_hearthstone_deck(x.deck_id, x.deck_version_id, user_id).await?,
-            None => None
-        })
-    }
-
     pub async fn get_hearthstone_deck_for_arena_run(&self, arena_uuid: &Uuid, user_id: i64) -> Result<Option<HearthstoneDeck>, SquadOvError> {
         let deck_id : Option<i64> = sqlx::query_scalar(
             "
@@ -46,51 +30,12 @@ impl api::ApiApplication {
         })
     }
 
-    pub async fn get_versioned_hearthstone_deck(&self, deck_id: i64, version_id: i64, user_id: i64) -> Result<Option<HearthstoneDeck>, SquadOvError> {
-        let raw_deck = sqlx::query!(
-            "
-            SELECT
-                deck_id,
-                hero_card,
-                hero_premium,
-                deck_type,
-                create_date,
-                is_wild,
-                deck_name AS \"name\"
-            FROM squadov.hearthstone_decks
-            WHERE deck_id = $1
-                AND user_id = $2
-            ",
-            deck_id,
-            user_id
-        )
-            .fetch_optional(&*self.pool)
-            .await?;
-
-        if raw_deck.is_none() {
-            return Ok(None);
-        }
-
-        let raw_deck = raw_deck.unwrap();
-
-        Ok(Some(HearthstoneDeck{
-            slots: self.get_hearthstone_deck_slots_for_version(version_id).await?,
-            name: raw_deck.name,
-            deck_id: raw_deck.deck_id,
-            hero_card: raw_deck.hero_card,
-            hero_premium: raw_deck.hero_premium,
-            deck_type: raw_deck.deck_type,
-            create_date: raw_deck.create_date,
-            is_wild: raw_deck.is_wild
-        }))
-    }
-
     pub async fn get_latest_hearthstone_deck(&self, deck_id: i64, user_id: i64) -> Result<Option<HearthstoneDeck>, SquadOvError> {
         let version = self.get_latest_deck_version_id(deck_id).await?;
         if version.is_none() {
             Ok(None)
         } else {
-            Ok(self.get_versioned_hearthstone_deck(deck_id, version.unwrap(), user_id).await?)
+            Ok(hdb::get_versioned_hearthstone_deck(&*self.pool, deck_id, version.unwrap(), user_id).await?)
         }
     }
 
@@ -125,39 +70,9 @@ impl api::ApiApplication {
     pub async fn get_latest_hearthstone_deck_slots_for_deck(&self, deck_id: i64) -> Result<Vec<HearthstoneDeckSlot>, SquadOvError> {
         let version_id = self.get_latest_deck_version_id(deck_id).await?;
         Ok(match version_id {
-            Some(id) => self.get_hearthstone_deck_slots_for_version(id).await?,
+            Some(id) => hdb::get_hearthstone_deck_slots_for_version(&*self.pool, id).await?,
             None => vec![],
         })
-    }
-    
-    pub async fn get_hearthstone_deck_slots_for_version(&self, version_id: i64) -> Result<Vec<HearthstoneDeckSlot>, SquadOvError> {
-        let raw_slots = sqlx::query!(
-            "
-            SELECT
-                index,
-                card_id,
-                owned,
-                normal_count,
-                golden_count
-            FROM squadov.hearthstone_deck_slots
-            WHERE deck_version_id = $1
-            ",
-            version_id,
-        )
-            .fetch_all(&*self.pool)
-            .await?;
-
-        Ok(raw_slots.into_iter().map(|x| {
-            HearthstoneDeckSlot {
-                index: x.index,
-                card_id: x.card_id,
-                owned: x.owned,
-                count: HearthstoneCardCount{
-                    normal: x.normal_count,
-                    golden: x.golden_count
-                },
-            }
-        }).collect())
     }
 
     pub async fn store_hearthstone_deck_slots(&self, tx : &mut Transaction<'_, Postgres>, deck_id: i64, slots: &[HearthstoneDeckSlot]) -> Result<(), SquadOvError> {

@@ -20,6 +20,10 @@ use crate::{
         RabbitMqListener,
     },
     storage::StorageManager,
+    elastic::{
+        vod::ESVodDocument,
+        rabbitmq::ElasticSearchJobInterface,
+    },
     matches,
 };
 use std::sync::{Arc};
@@ -80,6 +84,8 @@ pub struct VodAssociation {
     #[serde(rename = "isLocal", default)]
     pub is_local: bool,
     pub md5: Option<String>,
+    #[serde(skip)]
+    pub last_sync_elasticsearch: Option<DateTime<Utc>>
 }
 
 #[derive(Serialize,Deserialize,Clone,Debug)]
@@ -145,7 +151,7 @@ impl VodSegmentId {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct RawVodTag {
     pub video_uuid: Uuid,
     pub tag_id: i64,
@@ -167,7 +173,7 @@ pub struct VodTag {
     pub is_self: bool,
 }
 
-pub fn condense_raw_vod_tags(tags: Vec<RawVodTag>, self_user_id: i64) -> Result<Vec<VodTag>, SquadOvError> {
+pub fn condense_raw_vod_tags(tags: Vec<RawVodTag>, self_user_id: i64) -> Vec<VodTag> {
     let mut store: HashMap<String, VodTag> = HashMap::new();
     for t in tags {
         if !store.contains_key(&t.tag) {
@@ -185,7 +191,7 @@ pub fn condense_raw_vod_tags(tags: Vec<RawVodTag>, self_user_id: i64) -> Result<
             mt.is_self |= t.user_id == self_user_id;
         }
     }
-    Ok(store.values().cloned().collect())
+    store.values().cloned().collect()
 }
 
 #[derive(Serialize)]
@@ -208,6 +214,14 @@ pub struct VodClip {
     pub published: bool,
 }
 
+#[derive(Default)]
+pub struct VodClipReactStats {
+    pub video_uuid: Uuid,
+    pub views: i64,
+    pub reacts: i64,
+    pub comments: i64,
+}
+
 #[derive(Serialize,Deserialize,Clone)]
 #[serde(rename_all="camelCase")]
 pub struct ClipReact {
@@ -223,7 +237,7 @@ pub struct ClipComment {
     pub tm: DateTime<Utc>,
 }
 
-#[derive(Serialize,Deserialize,Debug)]
+#[derive(Serialize,Deserialize,Debug, Clone)]
 pub struct VodSegment {
     pub uri: String,
     pub duration: f32,
@@ -233,14 +247,14 @@ pub struct VodSegment {
     pub mime_type: String,
 }
 
-#[derive(Serialize,Deserialize,Debug)]
+#[derive(Serialize,Deserialize,Debug, Clone)]
 pub struct VodTrack {
     pub metadata: VodMetadata,
     pub segments: Vec<VodSegment>,
     pub preview: Option<String>,
 }
 
-#[derive(Serialize,Deserialize,Debug)]
+#[derive(Serialize,Deserialize,Debug, Clone)]
 pub struct VodManifest {
     #[serde(rename="videoTracks")]
     pub video_tracks: Vec<VodTrack>
@@ -259,6 +273,7 @@ pub struct VodProcessingInterface {
     rmq: Arc<RabbitMqInterface>,
     db: Arc<PgPool>,
     vod: Arc<StorageManager<Arc<dyn manager::VodManager + Send + Sync>>>,
+    es_itf: Arc<ElasticSearchJobInterface>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -300,12 +315,13 @@ impl RabbitMqListener for VodProcessingInterface {
 }
 
 impl VodProcessingInterface {
-    pub fn new(queue: &str, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>, vod: Arc<StorageManager<Arc<dyn manager::VodManager + Send + Sync>>>) -> Self {
+    pub fn new(queue: &str, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>, vod: Arc<StorageManager<Arc<dyn manager::VodManager + Send + Sync>>>, es_itf: Arc<ElasticSearchJobInterface>) -> Self {
         Self {
             queue: String::from(queue),
             rmq,
             db,
             vod,
+            es_itf,
         }
     }
 
@@ -385,6 +401,9 @@ impl VodProcessingInterface {
         db::mark_vod_with_preview(&mut tx, vod_uuid).await?;
         log::info!("[Preview] Process VOD TX (Commit) - {}", vod_uuid);
         tx.commit().await?;
+
+        log::info!("[Preview] Dispatch ES Update - {}", vod_uuid);
+        self.es_itf.request_update_vod_data(vod_uuid.clone()).await?;
         Ok(())
     }
 
@@ -451,6 +470,7 @@ impl VodProcessingInterface {
             is_clip: true,
             is_local: false,
             md5: None,
+            last_sync_elasticsearch: None,
         }).await?;
 
         log::info!("[Clip] Add Video Metadata - {}", request.id);
@@ -471,6 +491,9 @@ impl VodProcessingInterface {
 
         log::info!("[Clip] TX (Commit) - {}", request.id);
         tx.commit().await?;
+
+        log::info!("[Clip] Dispatch ElasticSearch - {}", request.id);
+        self.es_itf.request_sync_vod(vec![clip_uuid.clone()]).await?;
         Ok(())
     }
 
@@ -512,6 +535,9 @@ impl VodProcessingInterface {
 
         log::info!("[Thumbnail] Process VOD TX (Commit) - {}", vod_uuid);
         tx.commit().await?;
+
+        log::info!("[Thumbnail] Dispatch ES Update - {}", vod_uuid);
+        self.es_itf.request_update_vod_data(vod_uuid.clone()).await?;
         Ok(())
     }
 
@@ -607,6 +633,9 @@ impl VodProcessingInterface {
             manager.make_segment_public(&fastify_segment).await?;
         }
 
+        log::info!("[Fastify] Dispatch ES Update - {}", vod_uuid);
+        self.es_itf.request_update_vod_data(vod_uuid.clone()).await?;
+
         log::info!("[Fastify] Getting Staged Clips - {}", vod_uuid);
         let staged_clips = db::get_staged_clips_for_vod(&*self.db, vod_uuid).await?;
 
@@ -633,5 +662,31 @@ pub fn container_format_to_mime_type(container_format: &str) -> String {
     match container_format {
         "mpegts" => String::from("video/mp2t"),
         _ => String::from("video/mp4")
+    }
+}
+
+pub fn vod_document_to_vod_clip_for_user(doc: ESVodDocument, user_id: i64) -> Option<VodClip> {
+    if let Some(c) = doc.clip.as_ref() {
+        let fav = doc.find_favorite_reason(user_id);
+        let watchlist = doc.is_on_user_watchlist(user_id);
+        Some(VodClip {
+            clip: doc.vod.clone(),
+            manifest: doc.manifest.clone(),
+            title: c.title.clone(),
+            description: c.description.clone(),
+            clipper: doc.owner.username,
+            game: doc.data.game,
+            tm: doc.vod.end_time.unwrap_or(Utc::now()),
+            views: 0,
+            reacts: 0,
+            comments: 0,
+            favorite_reason: fav,
+            is_watchlist: watchlist,
+            access_token: None,
+            tags: condense_raw_vod_tags(doc.tags, user_id),
+            published: c.published,
+        })
+    } else {
+        None
     }
 }

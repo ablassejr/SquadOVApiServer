@@ -91,7 +91,7 @@ pub struct TftUnitDto {
     pub tier: i32
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TftPlayerMatchSummary {
     pub match_uuid: Uuid,
