@@ -737,7 +737,7 @@ pub async fn upload_hearthstone_logs_handler(mut body : web::Payload, path : web
     tokio::task::spawn(async move {
         match app.parse_hearthstone_power_logs(&data, &path.match_uuid, user_id).await {
             Ok(_) => {
-                app.es_itf.request_sync_match(path.match_uuid.clone()).await.unwrap();
+                app.es_itf.request_sync_match(path.match_uuid.clone(), None).await.unwrap();
                 Ok(())
             },
             Err(err) => {

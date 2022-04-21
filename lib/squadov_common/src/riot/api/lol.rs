@@ -123,7 +123,7 @@ impl super::RiotApiApplicationInterface {
             }
             tx.commit().await?;
 
-            self.es_itf.request_sync_match(match_uuid).await?;
+            self.es_itf.request_sync_match(match_uuid, None).await?;
             break;
         }
 

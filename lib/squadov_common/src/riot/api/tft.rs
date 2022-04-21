@@ -96,7 +96,7 @@ impl super::RiotApiApplicationInterface {
             };
             db::store_tft_match_info(&mut tx, &match_uuid, &tft_match).await?;
             tx.commit().await?;
-            self.es_itf.request_sync_match(match_uuid).await?;
+            self.es_itf.request_sync_match(match_uuid, None).await?;
             break;
         }
 

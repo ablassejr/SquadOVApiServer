@@ -4,7 +4,6 @@ use squadov_common::{
     SquadOvError,
     WoWCombatLogEvent,
     GenericWoWMatchView,
-    vod::db as vdb,
 };
 use rdkafka::consumer::stream_consumer::StreamConsumer;
 use rdkafka::consumer::{Consumer};
@@ -123,9 +122,8 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
 
             if is_view_complete {
                 if let Some(match_uuid) = match_view.match_uuid {
-                    if let Ok(video_uuid) = vdb::get_vod_id_from_match_user(&*opaque.app.pool, &match_uuid, match_view.user_id).await {
-                        opaque.app.es_itf.request_sync_vod(vec![video_uuid]).await?;
-                    }
+                    log::info!("...Sending Sync Match VOD: {} {}", &match_uuid, match_view.user_id);
+                    opaque.app.es_itf.request_sync_match(match_uuid.clone(), Some(match_view.user_id)).await?;
                 }
             }
 
