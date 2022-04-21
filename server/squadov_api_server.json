@@ -1651,6 +1651,11 @@
           "ordinal": 9,
           "name": "last_sync_elasticsearch",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "request_sync_elasticsearch",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -1667,6 +1672,7 @@
         false,
         false,
         false,
+        true,
         true,
         true
       ]
@@ -2312,6 +2318,11 @@
           "ordinal": 9,
           "name": "last_sync_elasticsearch",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "request_sync_elasticsearch",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -2329,6 +2340,7 @@
         false,
         false,
         false,
+        true,
         true,
         true
       ]
@@ -6490,6 +6502,26 @@
       ]
     }
   },
+  "5e7219edbf767149c78b557aea42b6f31f9e672dface46d5df9204971148bc0f": {
+    "query": "\n                SELECT\n                    v.video_uuid\n                FROM squadov.matches AS m\n                INNER JOIN squadov.vods AS v\n                    ON v.match_uuid = m.uuid\n                WHERE m.uuid = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "5eee3980db9197d8e678c2f5ae1b00fc79116d011cf724866c1ed1fc51a055f3": {
     "query": "\n        SELECT ra.puuid, ra.game_name, ra.tag_line\n        FROM squadov.riot_accounts AS ra\n        INNER JOIN squadov.riot_account_links AS ral\n            ON ral.puuid = ra.puuid\n        WHERE ral.user_id = $1\n            AND ra.puuid = $2\n            AND ra.game_name IS NOT NULL\n            AND ra.tag_line IS NOT NULL\n        ",
     "describe": {
@@ -8619,26 +8651,6 @@
       "nullable": []
     }
   },
-  "85245d0b0cf7f17611f707aa60904122ccfc75ca4aa16705a9359dbfb79291fe": {
-    "query": "\n            SELECT\n                v.video_uuid\n            FROM squadov.matches AS m\n            INNER JOIN squadov.vods AS v\n                ON v.match_uuid = m.uuid\n            WHERE m.uuid = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "video_uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
   "859af184e95bded1db98a5f6f12ccde35c3c0459277724421d2ffd8476f60192": {
     "query": "\n            SELECT\n                rso_access_token AS \"access_token!\",\n                rso_refresh_token AS \"refresh_token!\",\n                rso_expiration AS \"expiration!\"\n            FROM squadov.riot_account_links\n            WHERE puuid = $1\n                AND user_id = $2\n                AND rso_access_token IS NOT NULL\n                AND rso_refresh_token IS NOT NULL\n                AND rso_expiration IS NOT NULL\n            ",
     "describe": {
@@ -9059,6 +9071,11 @@
           "ordinal": 9,
           "name": "last_sync_elasticsearch",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "request_sync_elasticsearch",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -9076,6 +9093,7 @@
         false,
         false,
         false,
+        true,
         true,
         true
       ]
@@ -13635,6 +13653,11 @@
           "ordinal": 9,
           "name": "last_sync_elasticsearch",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "request_sync_elasticsearch",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -13652,6 +13675,7 @@
         false,
         false,
         false,
+        true,
         true,
         true
       ]
@@ -14227,6 +14251,27 @@
         false,
         false,
         false,
+        false
+      ]
+    }
+  },
+  "e740fe791791d416c1bd88e0adf3f50d6d0ebb6fbe0d189038bc5afa3f287bbf": {
+    "query": "\n                SELECT\n                    v.video_uuid\n                FROM squadov.matches AS m\n                INNER JOIN squadov.vods AS v\n                    ON v.match_uuid = m.uuid\n                INNER JOIN squadov.users AS u\n                    ON u.uuid = v.user_uuid\n                WHERE m.uuid = $1\n                    AND u.id = $2\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8"
+        ]
+      },
+      "nullable": [
         false
       ]
     }
