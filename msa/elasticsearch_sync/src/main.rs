@@ -55,8 +55,8 @@ async fn main() -> Result<(), SquadOvError> {
         let pool = Arc::new(PgPoolOptions::new()
             .min_connections(1)
             .max_connections(config.db_connections)
-            .max_lifetime(std::time::Duration::from_secs(6*60*60))
-            .idle_timeout(std::time::Duration::from_secs(3*60*60))
+            .max_lifetime(std::time::Duration::from_secs(60))
+            .idle_timeout(std::time::Duration::from_secs(20))
             .connect_with(conn)
             .await
             .unwrap());

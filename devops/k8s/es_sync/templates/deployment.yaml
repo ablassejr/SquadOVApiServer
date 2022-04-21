@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: es-sync
+    labels:
+        task: es-sync
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            task: es-sync
+    template:
+        metadata:
+            labels:
+                task: es-sync
+        spec:
+            nodeSelector:
+                eks.amazonaws.com/compute-type: fargate
+            containers:
+                - name: worker
+                  image: "registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/elasticsearch_sync:{{ .Values.commitHash }}"
+                  resources:
+                    requests:
+                        cpu: "500m"
+                        memory: "1Gi"
+                  env:
+                    - name: SQUADOV_DB_CONNECTIONS
+                      value: "1"
+                    - name: SQUADOV_RABBITMQ__ELASTICSEARCH_WORKERS
+                      value: "1"
+            imagePullSecrets:
+                - name: regcred
