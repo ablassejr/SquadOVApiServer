@@ -5,7 +5,7 @@ metadata:
     labels:
         task: es-sync
 spec:
-    replicas: 1
+    replicas: {{ .Values.replicas }}
     selector:
         matchLabels:
             task: es-sync
@@ -25,8 +25,8 @@ spec:
                         memory: "1Gi"
                   env:
                     - name: SQUADOV_DB_CONNECTIONS
-                      value: "1"
+                      value: "{{ .Values.threads }}"
                     - name: SQUADOV_RABBITMQ__ELASTICSEARCH_WORKERS
-                      value: "1"
+                      value: "{{ .Values.threads }}"
             imagePullSecrets:
                 - name: regcred

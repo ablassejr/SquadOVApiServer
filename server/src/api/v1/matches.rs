@@ -231,15 +231,13 @@ impl RecentMatchQuery {
             q = q.filter(Query::terms("owner.userId", users.clone()));
         }
 
-        if self.time_start.is_some() || self.time_end.is_some() {
+        {
             let mut r = Query::range("vod.endTime");
             if let Some(ts) = self.time_start {
                 r = r.gte(ts);
             }
 
-            if let Some(te) = self.time_end {
-                r = r.lte(te);
-            }
+            r = r.lte(self.time_end.unwrap_or(Utc::now().timestamp_millis()));
             q = q.filter(r);
         }
 
