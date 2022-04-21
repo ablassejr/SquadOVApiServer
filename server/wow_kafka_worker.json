@@ -909,6 +909,11 @@
           "ordinal": 9,
           "name": "last_sync_elasticsearch",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "request_sync_elasticsearch",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -926,6 +931,7 @@
         false,
         false,
         false,
+        true,
         true,
         true
       ]
@@ -2797,6 +2803,11 @@
           "ordinal": 9,
           "name": "last_sync_elasticsearch",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "request_sync_elasticsearch",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -2813,6 +2824,7 @@
         false,
         false,
         false,
+        true,
         true,
         true
       ]
@@ -3863,6 +3875,11 @@
           "ordinal": 9,
           "name": "last_sync_elasticsearch",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "request_sync_elasticsearch",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -3880,6 +3897,7 @@
         false,
         false,
         false,
+        true,
         true,
         true
       ]

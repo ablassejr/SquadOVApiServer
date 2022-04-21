@@ -988,6 +988,11 @@
           "ordinal": 9,
           "name": "last_sync_elasticsearch",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "request_sync_elasticsearch",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -1004,6 +1009,7 @@
         false,
         false,
         false,
+        true,
         true,
         true
       ]
@@ -4367,6 +4373,18 @@
         "Left": [
           "Int8",
           "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "78a55c3f9b1be67491a2e9a30c26ee8e7a7afa93f3eefa2ef5704d897b3bb37c": {
+    "query": "\n            UPDATE squadov.vods\n            SET request_sync_elasticsearch = NOW()\n            WHERE video_uuid = ANY($1)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "UuidArray"
         ]
       },
       "nullable": []
@@ -8142,6 +8160,11 @@
           "ordinal": 9,
           "name": "last_sync_elasticsearch",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "request_sync_elasticsearch",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -8159,6 +8182,7 @@
         false,
         false,
         false,
+        true,
         true,
         true
       ]

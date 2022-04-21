@@ -909,6 +909,11 @@
           "ordinal": 9,
           "name": "last_sync_elasticsearch",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "request_sync_elasticsearch",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -926,6 +931,7 @@
         false,
         false,
         false,
+        true,
         true,
         true
       ]
@@ -1785,6 +1791,24 @@
           "Int8",
           "Bool"
         ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
+  "3dbbc62a80274c41e5a9e9be78479d50c8415f71e8ea3b4c44efe79bdd405e4d": {
+    "query": "\n                        SELECT v.video_uuid\n                        FROM squadov.vods AS v\n                        INNER JOIN squadov.matches AS m\n                            ON m.uuid = v.match_uuid\n                        WHERE request_sync_elasticsearch IS NULL\n                            AND m.game IS NOT NULL\n                        ORDER BY v.end_time DESC\n                        LIMIT 1000\n                        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": []
       },
       "nullable": [
         false
@@ -2863,6 +2887,11 @@
           "ordinal": 9,
           "name": "last_sync_elasticsearch",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "request_sync_elasticsearch",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -2879,6 +2908,7 @@
         false,
         false,
         false,
+        true,
         true,
         true
       ]
@@ -3929,6 +3959,11 @@
           "ordinal": 9,
           "name": "last_sync_elasticsearch",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 10,
+          "name": "request_sync_elasticsearch",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -3946,6 +3981,7 @@
         false,
         false,
         false,
+        true,
         true,
         true
       ]

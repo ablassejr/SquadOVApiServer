@@ -5,7 +5,6 @@ mod api;
 
 use structopt::StructOpt;
 use std::{fs, sync::Arc};
-use squadov_common::SquadOvError;
 
 #[derive(StructOpt, Debug)]
 struct Options {
@@ -51,7 +50,28 @@ fn main() -> std::io::Result<()> {
                 api::start_event_loop(app.clone());
 
                 loop {
-                    async_std::task::sleep(std::time::Duration::from_secs(10)).await;
+                    // A bit hacky but use this opportunity to do backfill for all the VODs and clips that need to be synced to ES.
+                    if let Ok(backfill_es_vods) = sqlx::query!(
+                        "
+                        SELECT v.video_uuid
+                        FROM squadov.vods AS v
+                        INNER JOIN squadov.matches AS m
+                            ON m.uuid = v.match_uuid
+                        WHERE request_sync_elasticsearch IS NULL
+                            AND m.game IS NOT NULL
+                        ORDER BY v.end_time DESC
+                        LIMIT 1000
+                        "
+                    )
+                        .fetch_all(&*app.pool)
+                        .await
+                    {
+                        for v in backfill_es_vods {
+                            app.es_itf.request_sync_vod(vec![v.video_uuid]).await.unwrap();
+                        }
+                    }
+
+                    async_std::task::sleep(std::time::Duration::from_secs(1)).await;
                 }
             }).await.unwrap();
             Ok(())

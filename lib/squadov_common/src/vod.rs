@@ -85,7 +85,9 @@ pub struct VodAssociation {
     pub is_local: bool,
     pub md5: Option<String>,
     #[serde(skip)]
-    pub last_sync_elasticsearch: Option<DateTime<Utc>>
+    pub last_sync_elasticsearch: Option<DateTime<Utc>>,
+    #[serde(skip)]
+    pub request_sync_elasticsearch: Option<DateTime<Utc>>,
 }
 
 #[derive(Serialize,Deserialize,Clone,Debug)]
@@ -471,6 +473,7 @@ impl VodProcessingInterface {
             is_local: false,
             md5: None,
             last_sync_elasticsearch: None,
+            request_sync_elasticsearch: None,
         }).await?;
 
         log::info!("[Clip] Add Video Metadata - {}", request.id);

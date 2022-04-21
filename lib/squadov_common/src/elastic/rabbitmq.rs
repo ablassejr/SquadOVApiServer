@@ -231,6 +231,17 @@ impl ElasticSearchJobInterface {
     }
 
     pub async fn request_sync_vod(&self, video_uuid: Vec<Uuid>) -> Result<(), SquadOvError> {
+        sqlx::query!(
+            "
+            UPDATE squadov.vods
+            SET request_sync_elasticsearch = NOW()
+            WHERE video_uuid = ANY($1)
+            ",
+            &video_uuid,
+        )
+            .execute(&*self.db)
+            .await?;
+
         self.rmq.publish(&self.mqconfig.elasticsearch_queue, serde_json::to_vec(&ElasticSearchSyncTask::SyncVod{
             video_uuid,
         })?, RABBITMQ_DEFAULT_PRIORITY, ES_MAX_AGE_SECONDS).await;

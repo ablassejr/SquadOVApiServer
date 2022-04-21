@@ -12,23 +12,17 @@ if __name__ == '__main__':
     parser.add_argument('--username', required=True)
     parser.add_argument('--password', required=True)
     parser.add_argument('--threads', required=True, type=int)
-    parser.add_argument('--size', type=int, required=True)
     args = parser.parse_args()
 
     data = []
     with open(args.csv) as classes:
         reader = csv.DictReader(classes)
         for row in reader:
-            if 'video_uuid' not in row:
+            if 'uuid' not in row:
                 continue
-            data.append(row['video_uuid'])
+            data.append(row['uuid'])
 
-    subsets = []
-    for i in range(0, len(data), args.size):
-        subset = data[i:i+args.size]
-        subsets.append(subset)
-
-    def process(subset):
+    def process(d):
         cmd = [
             'rabbitmqadmin',
             '--host={}'.format(args.host),
@@ -42,8 +36,8 @@ if __name__ == '__main__':
             'routing_key={}'.format(args.queue),
             'payload={}'.format(
                 json.dumps({
-                    'type': 'SyncVod',
-                    'video_uuid': subset,
+                    'type': 'SyncMatch',
+                    'match_uuid': d,
                 })
             )
         ]
@@ -52,4 +46,4 @@ if __name__ == '__main__':
         subprocess.call(cmd)
 
     with Pool(args.threads) as p:
-        p.map(process, subsets)
+        p.map(process, data)
