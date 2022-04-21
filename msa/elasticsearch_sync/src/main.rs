@@ -35,8 +35,8 @@ async fn main() -> Result<(), SquadOvError> {
 
     // Initialize shared state to access the database as well as any other shared configuration.
     let config: SyncConfig = Config::builder()
-        .add_source(File::with_name("config/elasticsearch_sync.toml").required(false))
-        .add_source(Environment::with_prefix("squadov").separator("_"))
+        .add_source(File::with_name("config/elasticsearch_sync.toml"))
+        .add_source(Environment::with_prefix("squadov").separator("__").prefix_separator("_").try_parsing(true))
         .build()
         .unwrap()
         .try_deserialize()
@@ -66,7 +66,6 @@ async fn main() -> Result<(), SquadOvError> {
         let es_api = Arc::new(ElasticSearchClient::new(config.elasticsearch.clone()));
         let es_itf = Arc::new(ElasticSearchJobInterface::new(es_api.clone(), &config.elasticsearch, &config.rabbitmq, rabbitmq.clone(), pool.clone()));
 
-        log::info!("{} - {}", config.rabbitmq.elasticsearch_workers, config.db_connections);
         for _i in 0..config.rabbitmq.elasticsearch_workers {
             RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.elasticsearch_queue.clone(), es_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
         }
