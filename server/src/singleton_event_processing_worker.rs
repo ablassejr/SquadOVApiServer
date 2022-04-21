@@ -68,8 +68,8 @@ fn main() -> std::io::Result<()> {
                         .await
                     {
                         log::info!("...Backfilling {} VODs to ES.", backfill_es_vods.len());
-                        for v in backfill_es_vods {
-                            app.es_itf.request_sync_vod(vec![v]).await.unwrap();
+                        for (idx, v) in backfill_es_vods.chunks(10).enumerate() {
+                            app.es_itf.request_sync_vod(v.iter().map(|x| { x.video_uuid.clone() }).collect()).await.unwrap();
 
                             if idx % 5 == 0 {
                                 async_std::task::sleep(std::time::Duration::from_millis(1)).await;
