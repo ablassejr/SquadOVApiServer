@@ -108,7 +108,12 @@ impl ValorantMatchFilters {
                             let mut player_query = Query::bool()
                                 .filter(Query::term("data.valorant.teams.players.isPov", true));
                             if let Some(agent_povs) = self.agent_povs.as_ref() {
-                                player_query = player_query.filter(Query::terms("data.valorant.teams.players.info.characterId", agent_povs.clone()));
+                                player_query = player_query.filter(
+                                    Query::terms(
+                                        "data.valorant.teams.players.info.characterId",
+                                        agent_povs.iter().map(|x| { x.clone().to_lowercase() }).collect::<Vec<_>>(),
+                                    )
+                                );
                             }
 
                             {
@@ -251,7 +256,7 @@ impl ValorantMatchFilters {
                         }
                         has_filter = true;
     
-                        q = q.should(Query::terms("data.valorant.teams.players.info.characterId", x.clone()));
+                        q = q.should(Query::terms("data.valorant.teams.players.info.characterId", x.iter().map(|y| { y.clone().to_lowercase() }).collect::<Vec<_>>()));
                     }
         
                     if has_filter {
