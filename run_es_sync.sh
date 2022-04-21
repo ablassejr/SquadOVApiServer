@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./elastcisearch_sync
+./elasticsearch_sync
