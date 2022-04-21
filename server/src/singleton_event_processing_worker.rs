@@ -68,6 +68,7 @@ fn main() -> std::io::Result<()> {
                     {
                         for v in backfill_es_vods {
                             app.es_itf.request_sync_vod(vec![v.video_uuid]).await.unwrap();
+                            async_std::task::sleep(std::time::Duration::from_millis(5)).await;
                         }
                     }
 
