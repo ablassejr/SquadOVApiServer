@@ -1572,7 +1572,9 @@ dependencies = [
  "serde_json",
  "sqlx",
  "squadov_common",
+ "structopt",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

@@ -17,6 +17,14 @@ use sqlx::{
         PgConnectOptions,
     },
 };
+use uuid::Uuid;
+use structopt::StructOpt;
+
+#[derive(StructOpt, Debug)]
+struct Options {
+    #[structopt(short, long)]
+    manual: Option<Uuid>,
+}
 
 #[derive(Deserialize)]
 pub struct SyncConfig {
@@ -34,6 +42,7 @@ async fn main() -> Result<(), SquadOvError> {
     env_logger::init();
 
     // Initialize shared state to access the database as well as any other shared configuration.
+    let opts = Options::from_args();
     let config: SyncConfig = Config::builder()
         .add_source(File::with_name("config/elasticsearch_sync.toml"))
         .add_source(Environment::with_prefix("squadov").separator("__").prefix_separator("_").try_parsing(true))
@@ -66,12 +75,16 @@ async fn main() -> Result<(), SquadOvError> {
         let es_api = Arc::new(ElasticSearchClient::new(config.elasticsearch.clone()));
         let es_itf = Arc::new(ElasticSearchJobInterface::new(es_api.clone(), &config.elasticsearch, &config.rabbitmq, rabbitmq.clone(), pool.clone()));
 
-        for _i in 0..config.rabbitmq.elasticsearch_workers {
-            RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.elasticsearch_queue.clone(), es_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
-        }
+        if let Some(manual) = opts.manual {
+            es_itf.handle_sync_vod(&[manual.clone()]).await.unwrap();
+        } else {
+            for _i in 0..config.rabbitmq.elasticsearch_workers {
+                RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.elasticsearch_queue.clone(), es_itf.clone(), config.rabbitmq.prefetch_count).await.unwrap();
+            }
 
-        loop {
-            async_std::task::sleep(std::time::Duration::from_secs(5)).await;
+            loop {
+                async_std::task::sleep(std::time::Duration::from_secs(5)).await;
+            }
         }
     }).await.unwrap();
     Ok(())

@@ -249,7 +249,7 @@ impl ElasticSearchJobInterface {
         Ok(())
     }
 
-    async fn handle_sync_vod(&self, video_uuid: &[Uuid]) -> Result<(), SquadOvError> {
+    pub async fn handle_sync_vod(&self, video_uuid: &[Uuid]) -> Result<(), SquadOvError> {
         // TODO: Actually batch?
         for id in video_uuid {
             let doc = elastic::vod::build_es_vod_document(&*self.db, id).await?;

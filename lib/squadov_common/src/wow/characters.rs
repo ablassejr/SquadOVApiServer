@@ -193,7 +193,7 @@ where
                 SELECT DISTINCT ON (wcp.unit_guid)
                     wcp.unit_guid AS "guid",
                     COALESCE(wcp.unit_name, '') AS "name!",
-                    COALESCE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), ARRAY[]::INTEGER[]) AS "items!",
+                    COALESCE(ARRAY_REMOVE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), NULL), ARRAY[]::INTEGER[]) AS "items!",
                     wvc.spec_id,
                     wvc.team,
                     wvc.rating,
@@ -284,7 +284,7 @@ where
             MAX(wci.item_id) AS "item_id!",
             MAX(wci.ilvl) AS "ilvl!"
         FROM squadov.wow_match_view_character_presence AS wcp
-        LEFT JOIN squadov.wow_match_view_combatant_items AS wci
+        INNER JOIN squadov.wow_match_view_combatant_items AS wci
             ON wci.character_id = wcp.character_id
         WHERE wcp.view_id = $1
             AND wcp.unit_guid = $2
