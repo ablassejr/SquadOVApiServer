@@ -327,12 +327,21 @@ where
                 });
             },
             SquadOvGames::LeagueOfLegends => {
+                log::info!("...Listing Riot Summoners [User] {}", video_uuid);
                 let riot_accounts = rdb::list_riot_summoners_for_user(ex, owner.id).await?;
                 data.lol = Some(ESVodCachedLol{
-                    region: rdb::get_lol_match_region(ex, &match_uuid).await?,
-                    summary: rdb::list_lol_match_summaries_for_uuids(ex, &[pair]).await?.pop(),
+                    region: {
+                        log::info!("...Getting LoL Match Region {}", video_uuid);
+                        rdb::get_lol_match_region(ex, &match_uuid).await?
+                    },
+                    summary: {
+                        log::info!("...Getting LoL Match Summaries {}", video_uuid);
+                        rdb::list_lol_match_summaries_for_uuids(ex, &[pair]).await?.pop()
+                    },
                     teams: {
+                        log::info!("...Getting LoL Match Participants {}", video_uuid);
                         let players = rdb::get_lol_match_participants(ex, &match_uuid).await?;
+                        log::info!("...Getting LoL Match Teams {}", video_uuid);
                         let teams = rdb::get_lol_match_teams(ex, &match_uuid).await?;
                         teams.into_iter().map(|t| {
                             ESCachedTeam{

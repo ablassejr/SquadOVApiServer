@@ -1026,6 +1026,33 @@
       "nullable": []
     }
   },
+  "111a16908d13f0b5be7b398b4138eda3f0e6e34e10c1ba9b872c419989697389": {
+    "query": "\n        SELECT\n            MAX(wci.item_id) AS \"item_id!\",\n            MAX(wci.ilvl) AS \"ilvl!\"\n        FROM squadov.wow_match_view_character_presence AS wcp\n        LEFT JOIN squadov.wow_match_view_combatant_items AS wci\n            ON wci.character_id = wcp.character_id\n        WHERE wcp.view_id = $1\n            AND wcp.unit_guid = $2\n            AND wci.character_id IS NOT NULL\n        GROUP BY wcp.unit_guid, wci.idx\n        ORDER BY wci.idx ASC\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "item_id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "ilvl!",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": [
+        null,
+        null
+      ]
+    }
+  },
   "112d9a871f807191b3805da0cbd651ee43599196bcb6b0bc223d682d3ef6d9e2": {
     "query": "\n        SELECT *\n        FROM squadov.csgo_event_container_round_player_stats\n        WHERE container_id = $1\n        ",
     "describe": {
@@ -4033,6 +4060,72 @@
       ]
     }
   },
+  "378a3b827c5fbd60be6b2711ab87f3cef81d2b96dd48281f09510470b9f28efb": {
+    "query": "\n            SELECT DISTINCT\n                u.id,\n                u.username,\n                u.email,\n                u.verified,\n                u.uuid,\n                u.is_test,\n                u.is_admin,\n                u.welcome_sent,\n                u.registration_time\n            FROM squadov.users AS u\n            LEFT JOIN squadov.daily_active_sessions AS das\n                ON das.user_id = u.id\n                    AND das.tm >= (NOW() - INTERVAL '14 day')\n            LEFT JOIN squadov.user_event_record AS uer\n                ON uer.user_id = u.id\n                    AND uer.event_name = 'inactive_14'\n            WHERE uer.user_id IS NULL\n                AND das.user_id IS NULL\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "username",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "email",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "verified",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 5,
+          "name": "is_test",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 6,
+          "name": "is_admin",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 7,
+          "name": "welcome_sent",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 8,
+          "name": "registration_time",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ]
+    }
+  },
   "379dea34d9b547227ee37726efc193076e423233eef53132314c965128ada89d": {
     "query": "\n        SELECT\n            entity_id,\n            tags,\n            attributes\n        FROM squadov.hearthstone_snapshots_entities\n        WHERE snapshot_id = $1\n        ",
     "describe": {
@@ -6590,6 +6683,24 @@
       ]
     }
   },
+  "6115143a5246ea59e26185c9847e65c2e8b94c5a6b35cd3ea7663ba322b210ee": {
+    "query": "\n                        SELECT v.video_uuid\n                        FROM squadov.vods AS v\n                        INNER JOIN squadov.matches AS m\n                            ON m.uuid = v.match_uuid\n                        WHERE request_sync_elasticsearch IS NULL\n                            AND m.game IS NOT NULL\n                        ORDER BY v.end_time DESC\n                        LIMIT 10000\n                        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "61392061af743e6ce12c197fadea87fd5cce6fda3720406384c3093c09d4d080": {
     "query": "\n                SELECT v.*\n                FROM squadov.vods AS v\n                WHERE v.video_uuid = ANY($1)\n                ",
     "describe": {
@@ -7163,6 +7274,63 @@
       },
       "nullable": [
         false
+      ]
+    }
+  },
+  "6c3e6488156a115c3aae2b241b5188033511df214b8767871d07c3f274605cc3": {
+    "query": "\n                SELECT DISTINCT ON (wcp.unit_guid)\n                    wcp.unit_guid AS \"guid\",\n                    COALESCE(wcp.unit_name, '') AS \"name!\",\n                    COALESCE(ARRAY_REMOVE(ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC), NULL), ARRAY[]::INTEGER[]) AS \"items!\",\n                    wvc.spec_id,\n                    wvc.team,\n                    wvc.rating,\n                    wvc.class_id\n                FROM squadov.wow_match_view AS wmv\n                INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                    ON wcp.view_id = wmv.id\n                        AND wcp.has_combatant_info\n                INNER JOIN squadov.wow_match_view_combatants AS wvc\n                    ON wvc.character_id = wcp.character_id\n                LEFT JOIN squadov.wow_match_view_combatant_items AS wci\n                    ON wci.event_id = wvc.event_id\n                WHERE wmv.match_uuid = $1\n                    AND wmv.user_id = $2\n                GROUP BY wcp.unit_guid, wcp.unit_name, wvc.spec_id, wvc.team, wvc.event_id, wvc.rating, wvc.class_id\n                ORDER BY wcp.unit_guid, wvc.class_id\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "guid",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "name!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "items!",
+          "type_info": "Int4Array"
+        },
+        {
+          "ordinal": 3,
+          "name": "spec_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "team",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "rating",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "class_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        null,
+        null,
+        false,
+        false,
+        false,
+        true
       ]
     }
   },
@@ -8565,26 +8733,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "85245d0b0cf7f17611f707aa60904122ccfc75ca4aa16705a9359dbfb79291fe": {
-    "query": "\n            SELECT\n                v.video_uuid\n            FROM squadov.matches AS m\n            INNER JOIN squadov.vods AS v\n                ON v.match_uuid = m.uuid\n            WHERE m.uuid = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "video_uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false
-      ]
     }
   },
   "859af184e95bded1db98a5f6f12ccde35c3c0459277724421d2ffd8476f60192": {
@@ -12713,6 +12861,33 @@
       },
       "nullable": [
         false
+      ]
+    }
+  },
+  "d0696a98e198d0b54741eae369164f53f2a3a1b1c244d310875cebd88110a3c8": {
+    "query": "\n        SELECT\n            MAX(wci.item_id) AS \"item_id!\",\n            MAX(wci.ilvl) AS \"ilvl!\"\n        FROM squadov.wow_match_view_character_presence AS wcp\n        INNER JOIN squadov.wow_match_view_combatant_items AS wci\n            ON wci.character_id = wcp.character_id\n        WHERE wcp.view_id = $1\n            AND wcp.unit_guid = $2\n        GROUP BY wcp.unit_guid, wci.idx\n        ORDER BY wci.idx ASC\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "item_id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "ilvl!",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": [
+        null,
+        null
       ]
     }
   },

@@ -2,7 +2,6 @@ import argparse
 import csv
 import subprocess
 import json
-from multiprocessing import Pool
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -11,7 +10,6 @@ if __name__ == '__main__':
     parser.add_argument('--queue', required=True)
     parser.add_argument('--username', required=True)
     parser.add_argument('--password', required=True)
-    parser.add_argument('--threads', required=True, type=int)
     parser.add_argument('--size', type=int, required=True)
     args = parser.parse_args()
 
@@ -50,5 +48,5 @@ if __name__ == '__main__':
         print(cmd)
         subprocess.call(cmd)
 
-    with Pool(args.threads) as p:
-        p.map(process, subsets)
+    for sub in subsets:
+        process(sub)
