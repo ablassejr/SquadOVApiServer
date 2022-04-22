@@ -50,7 +50,7 @@ fn main() -> std::io::Result<()> {
                 api::start_event_loop(app.clone());
 
                 loop {
-                    async_std::task::sleep(std::time::Duration::from_secs(1).await;
+                    async_std::task::sleep(std::time::Duration::from_secs(1)).await;
                 }
             }).await.unwrap();
             Ok(())
