@@ -260,11 +260,8 @@ where
     T: Executor<'a, Database = Postgres> + Copy
 {
     log::info!("Building ES Vod Document for {}", video_uuid);
-    log::info!("...Getting Game {}", video_uuid);
     let game = vdb::get_vod_game(ex, video_uuid).await?;
-    log::info!("...Getting VOD {}", video_uuid);
     let assoc = vdb::get_vod_association(ex, video_uuid).await?;
-    log::info!("...Getting Manifest {}", video_uuid);
     let manifest = vdb::get_vod_manifest(ex, &assoc).await.unwrap_or(VodManifest{
         video_tracks: vec![
             VodTrack{
@@ -278,13 +275,9 @@ where
         ]
     });
 
-    log::info!("...Getting Owner {}", video_uuid);
     let owner = user::get_squadov_user_from_uuid(ex, assoc.user_uuid.as_ref().unwrap()).await?;
-    log::info!("...Getting Tags {}", video_uuid);
     let tags = vdb::get_raw_vod_tags(ex, video_uuid).await?;
-    log::info!("...Getting Sharing {}", video_uuid);
     let sharing = build_es_vod_document_sharing(ex, video_uuid).await?;
-    log::info!("...Getting Lists {}", video_uuid);
     let lists = build_es_vod_document_lists(ex, video_uuid, &assoc).await?;
 
     let mut data = ESVodCachedMatch{
@@ -304,8 +297,6 @@ where
             match_uuid: match_uuid.clone(),
             player_uuid: owner.uuid.clone(),
         };
-
-        log::info!("...Getting Game Data {}", video_uuid);
         match game {
             SquadOvGames::AimLab => {
                 data.aimlab = aimlab::list_aimlab_matches_for_uuids(ex, &[match_uuid.clone()]).await?.pop().map(|x| {
@@ -327,21 +318,16 @@ where
                 });
             },
             SquadOvGames::LeagueOfLegends => {
-                log::info!("...Listing Riot Summoners [User] {}", video_uuid);
                 let riot_accounts = rdb::list_riot_summoners_for_user(ex, owner.id).await?;
                 data.lol = Some(ESVodCachedLol{
                     region: {
-                        log::info!("...Getting LoL Match Region {}", video_uuid);
                         rdb::get_lol_match_region(ex, &match_uuid).await?
                     },
                     summary: {
-                        log::info!("...Getting LoL Match Summaries {}", video_uuid);
                         rdb::list_lol_match_summaries_for_uuids(ex, &[pair]).await?.pop()
                     },
                     teams: {
-                        log::info!("...Getting LoL Match Participants {}", video_uuid);
                         let players = rdb::get_lol_match_participants(ex, &match_uuid).await?;
-                        log::info!("...Getting LoL Match Teams {}", video_uuid);
                         let teams = rdb::get_lol_match_teams(ex, &match_uuid).await?;
                         teams.into_iter().map(|t| {
                             ESCachedTeam{
@@ -399,17 +385,11 @@ where
                 });
             },
             SquadOvGames::WorldOfWarcraft => {
-                log::info!("...Listing WoW Chars [User] {}", video_uuid);
                 let user_chars = wc::list_wow_characters_for_user(ex, owner.id, None).await?;
-                log::info!("...Getting Match View {}", video_uuid);
                 let match_view = wm::get_generic_wow_match_view_from_match_user(ex, &match_uuid, owner.id).await?;
-                log::info!("...List Encounters {}", video_uuid);
                 let encounter = wm::list_wow_encounter_for_uuids(ex, &[pair.clone()]).await?.pop();
-                log::info!("...List Challenges {}", video_uuid);
                 let challenge = wm::list_wow_challenges_for_uuids(ex, &[pair.clone()]).await?.pop();
-                log::info!("...List Arenas {}", video_uuid);
                 let arena = wm::list_wow_arenas_for_uuids(ex, &[pair.clone()]).await?.pop();
-                log::info!("...List Instances {}", video_uuid);
                 let instance = wm::list_wow_instances_for_uuids(ex, &[pair.clone()]).await?.pop();
 
                 let force_win = if let Some(e) = &encounter {
@@ -427,11 +407,9 @@ where
                 };
 
                 let teams = {
-                    log::info!("...List WoW Chars [Match] {}", video_uuid);
                     let characters = wc::list_wow_characters_for_match(ex, &match_uuid, owner.id).await?;
                     let mut char_wrappers = vec![];
                     for c in characters {
-                        log::info!("...Get Full Char {}", &c.guid);
                         char_wrappers.push(WowCharacterWrapper{
                             traits: wc::get_wow_full_character(ex, &match_view.id, &c.guid).await?,
                             data: c,
@@ -473,8 +451,7 @@ where
             _ => (),
         }
     }
-    
-    log::info!("...Finalize and Build Clip {}", video_uuid);
+
     Ok(
         ESVodDocument{
             owner: ESVodOwner{
