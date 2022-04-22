@@ -50,35 +50,7 @@ fn main() -> std::io::Result<()> {
                 api::start_event_loop(app.clone());
 
                 loop {
-                    log::info!("Checking for Backfill ES Vods.");
-                    // A bit hacky but use this opportunity to do backfill for all the VODs and clips that need to be synced to ES.
-                    if let Ok(backfill_es_vods) = sqlx::query!(
-                        "
-                        SELECT v.video_uuid
-                        FROM squadov.vods AS v
-                        INNER JOIN squadov.matches AS m
-                            ON m.uuid = v.match_uuid
-                        WHERE request_sync_elasticsearch IS NULL
-                            AND m.game IS NOT NULL
-                        ORDER BY v.end_time DESC
-                        LIMIT 10000
-                        "
-                    )
-                        .fetch_all(&*app.pool)
-                        .await
-                    {
-                        log::info!("...Backfilling {} VODs to ES.", backfill_es_vods.len());
-                        for (idx, v) in backfill_es_vods.chunks(10).enumerate() {
-                            app.es_itf.request_sync_vod(v.iter().map(|x| { x.video_uuid.clone() }).collect()).await.unwrap();
-
-                            if idx % 5 == 0 {
-                                async_std::task::sleep(std::time::Duration::from_millis(1)).await;
-                            }
-                        }
-                    }
-
-                    log::info!("...Finish Backfill - Sleep for next.");
-                    async_std::task::sleep(std::time::Duration::from_millis(10)).await;
+                    async_std::task::sleep(std::time::Duration::from_secs(1).await;
                 }
             }).await.unwrap();
             Ok(())
