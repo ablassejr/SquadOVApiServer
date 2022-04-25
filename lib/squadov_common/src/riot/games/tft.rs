@@ -61,9 +61,9 @@ pub struct TftParticipantDto {
 
 #[derive(Serialize,Deserialize,Clone,Debug)]
 pub struct TftCompanionDto {
-    #[serde(rename(deserialize="content_ID", serialize="contentId"))]
+    #[serde(rename(deserialize="content_ID", serialize="contentId"), alias="contentId")]
     pub content_id: String,
-    #[serde(rename(deserialize="skin_ID", serialize="skinId"))]
+    #[serde(rename(deserialize="skin_ID", serialize="skinId"), alias="skinId")]
     pub skin_id: i32,
     pub species: String,
 }
