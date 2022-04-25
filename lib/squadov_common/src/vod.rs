@@ -28,7 +28,7 @@ use crate::{
 };
 use std::sync::{Arc};
 use std::io::{self, BufReader};
-use tempfile::{NamedTempFile, TempPath};
+use tempfile::{NamedTempFile};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use md5::{Md5, Digest};
@@ -357,36 +357,38 @@ impl VodProcessingInterface {
         Ok(())
     }
 
-    async fn download_vod_locally(&self, vod_uuid: &Uuid, context: &str) -> Result<(VodAssociation, VodMetadata, TempPath), SquadOvError> {
+    // Returns (VodAssociation, Metadata, URI)
+    async fn get_raw_uri(&self, vod_uuid: &Uuid, context: &str) -> Result<(VodAssociation, VodMetadata, String), SquadOvError> {
         log::info!("[{}] Get VOD Association {}", context, vod_uuid);
         let vod = db::get_vod_association(&*self.db, vod_uuid).await?;
 
-        log::info!("[{}] Generate Preview for VOD {}", context, vod_uuid);
+        log::info!("[{}] Get VOD Metadata {}", context, vod_uuid);
         let metadata = db::get_vod_metadata(&*self.db, vod_uuid, "source").await?;
 
-        log::info!("[{}] Get VOD Manager {}", context, vod_uuid);
-        let manager = self.vod.get_bucket(&metadata.bucket).await.ok_or(SquadOvError::InternalError(format!("Invalid bucket: {}", &metadata.bucket)))?;
-
-        let input_filename = NamedTempFile::new()?.into_temp_path();
-        log::info!("[{}] Download VOD - {}", context, vod_uuid);
         let source_segment_id = VodSegmentId{
             video_uuid: vod_uuid.clone(),
             quality: String::from("source"),
             segment_name: String::from("fastify.mp4"),
         };
-        manager.download_vod_to_path(&source_segment_id, &input_filename).await?;
-        Ok((vod, metadata, input_filename))
+
+        log::info!("[{}] Get VOD Manager {}", context, vod_uuid);
+        let manager = self.vod.get_bucket(&metadata.bucket).await.ok_or(SquadOvError::InternalError(format!("Invalid bucket: {}", &metadata.bucket)))?;
+
+        // Note that we should use the raw URI and don't route the request through a CDN here.
+        log::info!("[{}] Get Raw VOD URL {}", context, vod_uuid);
+        let uri = manager.get_segment_redirect_uri(&source_segment_id).await?.0;
+        Ok((vod, metadata, uri))
     }
 
     pub async fn generate_preview(&self, vod_uuid: &Uuid) -> Result<(), SquadOvError> {
-        let (vod, metadata, input_filename) = self.download_vod_locally(vod_uuid, "Preview").await?;
+        let (vod, metadata, uri) = self.get_raw_uri(vod_uuid, "Preview").await?;
 
         let preview_filename = NamedTempFile::new()?.into_temp_path();
         // Get VOD length in seconds - we use this to manually determine where to clip.
         let length_seconds = vod.end_time.unwrap_or(Utc::now()).signed_duration_since(vod.start_time.unwrap_or(Utc::now())).num_seconds();
 
         log::info!("[Preview] Generate Preview Mp4 - {}", vod_uuid);
-        preview::generate_vod_preview(input_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &preview_filename, length_seconds).await?;
+        preview::generate_vod_preview(&uri, &preview_filename, length_seconds).await?;
 
         log::info!("[Preview] Upload Preview VOD - {}", vod_uuid);
         let manager = self.vod.get_bucket(&metadata.bucket).await.ok_or(SquadOvError::InternalError(format!("Invalid bucket: {}", &metadata.bucket)))?;
@@ -411,14 +413,14 @@ impl VodProcessingInterface {
 
     pub async fn generate_staged_clip(&self, request: &StagedVodClip) -> Result<(), SquadOvError> {
         log::info!("[Clip] Downloading VOD {}", request.id);
-        let (vod, metadata, input_filename) = self.download_vod_locally(&request.video_uuid, "Clip").await?;
+        let (vod, metadata, uri) = self.get_raw_uri(&request.video_uuid, "Clip").await?;
 
         log::info!("[Clip] Get VOD Manager {}", request.id);
         let manager = self.vod.get_bucket(&metadata.bucket).await.ok_or(SquadOvError::InternalError(format!("Invalid bucket: {}", &metadata.bucket)))?;
 
         log::info!("[Clip] Generating Clip {}", request.id);
         let clip_filename = NamedTempFile::new()?.into_temp_path();
-        clip::generate_clip(&input_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &clip_filename, request.start_offset_ms, request.end_offset_ms).await?;
+        clip::generate_clip(&uri, &clip_filename, request.start_offset_ms, request.end_offset_ms).await?;
 
         log::info!("[Clip] Computing VOD MD5 - {}", request.id);
         let md5_hash = {
@@ -501,14 +503,14 @@ impl VodProcessingInterface {
     }
 
     pub async fn generate_thumbnail(&self, vod_uuid: &Uuid) -> Result<(), SquadOvError> {
-        let (vod, metadata, input_filename) = self.download_vod_locally(vod_uuid, "Thumbnail").await?;
+        let (vod, metadata, uri) = self.get_raw_uri(vod_uuid, "Thumbnail").await?;
 
         let thumbnail_filename = NamedTempFile::new()?.into_temp_path();
         // Get VOD length in seconds - we use this to manually determine where to clip.
         let length_seconds = vod.end_time.unwrap_or(Utc::now()).signed_duration_since(vod.start_time.unwrap_or(Utc::now())).num_seconds();
 
         log::info!("[Thumbnail] Generate Thumbnail - {}", vod_uuid);
-        preview::generate_vod_thumbnail(input_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &thumbnail_filename, length_seconds).await?;
+        preview::generate_vod_thumbnail(&uri, &thumbnail_filename, length_seconds).await?;
 
         log::info!("[Thumbnail] Upload Thumbnail - {}", vod_uuid);
         let manager = self.vod.get_bucket(&metadata.bucket).await.ok_or(SquadOvError::InternalError(format!("Invalid bucket: {}", &metadata.bucket)))?;
