@@ -13,6 +13,7 @@ use squadov_common::{
         VodSegmentId,
         container_format_to_extension,
         db as vdb,
+        manager::StorageType,
     },
     storage::CloudStorageLocation,
 };
@@ -51,7 +52,7 @@ impl api::ApiApplication {
             quality: String::from("source"),
             segment_name: format!("video.{}", &extension),
         };
-        let session_id = manager.start_segment_upload(&vod_segment).await?;
+        let session_id = manager.start_segment_upload(&vod_segment, StorageType::Hot).await?;
         let path = manager.get_segment_upload_uri(&vod_segment, &session_id, 1, use_accel).await?;
         Ok(
             VodDestination{

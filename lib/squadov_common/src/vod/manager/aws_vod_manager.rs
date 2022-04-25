@@ -1,7 +1,10 @@
 use crate::{
     SquadOvError,
     VodSegmentId,
-    vod::manager::VodManager,
+    vod::manager::{
+        VodManager,
+        StorageType,
+    },
     aws::{
         AWSClient,
         AWSCDNConfig,
@@ -51,6 +54,16 @@ pub struct S3VodManager {
     bucket: String,
     aws: Arc<Option<AWSClient>>,
     cdn: AWSCDNConfig,
+}
+
+impl StorageType {
+    fn to_aws_storage_class(&self) -> &'static str {
+        match self {
+            StorageType::Hot => "STANDARD",
+            StorageType::Warm => "STANDARD_IA",
+            StorageType::Cold => "GLACIER_IR",
+        }
+    }
 }
 
 impl S3VodManager {
@@ -134,11 +147,11 @@ impl VodManager for S3VodManager {
         }
     }
 
-    async fn upload_vod_from_file(&self, segment: &VodSegmentId, path: &std::path::Path) -> Result<(), SquadOvError> {
+    async fn upload_vod_from_file(&self, segment: &VodSegmentId, path: &std::path::Path, storage: StorageType) -> Result<(), SquadOvError> {
         // We need to do a multi-part upload to S3 because otherwise we run the risk of
         //  1) the video being too large so the regular PUT request fails or
         //  2) the time it takes to upload is too long which results in a timeout.
-        let upload_id = self.start_segment_upload(segment).await?;
+        let upload_id = self.start_segment_upload(segment, storage).await?;
 
         // Since we're uploading from a file we can pre-determine how many segments we're going to use
         // based off of the file size.
@@ -218,10 +231,11 @@ impl VodManager for S3VodManager {
         Ok(true)
     }
 
-    async fn start_segment_upload(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
+    async fn start_segment_upload(&self, segment: &VodSegmentId, storage: StorageType) -> Result<String, SquadOvError> {
         let req = CreateMultipartUploadRequest{
             bucket: self.bucket.clone(),
             key: segment.get_fname(),
+            storage_class: Some(String::from(storage.to_aws_storage_class())),
             ..CreateMultipartUploadRequest::default()
         };
 

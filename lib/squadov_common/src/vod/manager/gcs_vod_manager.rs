@@ -3,7 +3,10 @@ use crate::{
     gcp::gcs::GCSUploadStatus,
     SquadOvError,
     VodSegmentId,
-    vod::manager::VodManager
+    vod::manager::{
+        VodManager,
+        StorageType,
+    },
 };
 use std::sync::Arc;
 use std::collections::BTreeMap;
@@ -87,7 +90,7 @@ impl VodManager for GCSVodManager {
         Ok(())
     }
 
-    async fn upload_vod_from_file(&self, segment: &VodSegmentId, path: &std::path::Path) -> Result<(), SquadOvError> {
+    async fn upload_vod_from_file(&self, segment: &VodSegmentId, path: &std::path::Path, _storage: StorageType) -> Result<(), SquadOvError> {
         let client = self.get_gcp_client().gcs();
         let fname = self.get_path_parts_from_segment_id(segment);
         
@@ -140,7 +143,7 @@ impl VodManager for GCSVodManager {
         Ok(client.get_upload_status(session).await? == GCSUploadStatus::Complete)
     }
     
-    async fn start_segment_upload(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
+    async fn start_segment_upload(&self, segment: &VodSegmentId, _storage: StorageType) -> Result<String, SquadOvError> {
         let fname = self.get_fname_from_segment_id(segment);
         let client = self.get_gcp_client().gcs();
 

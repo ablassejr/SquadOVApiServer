@@ -394,7 +394,7 @@ impl VodProcessingInterface {
             video_uuid: vod_uuid.clone(),
             quality: String::from("source"),
             segment_name: String::from("preview.mp4"),
-        }, &preview_filename).await?;
+        }, &preview_filename, manager::StorageType::Hot).await?;
 
         log::info!("[Preview] Process VOD TX (Begin) - {}", vod_uuid);
         let mut tx = self.db.begin().await?;
@@ -435,7 +435,7 @@ impl VodProcessingInterface {
             quality: String::from("source"),
             segment_name: String::from("fastify.mp4"),
         };
-        manager.upload_vod_from_file(&clip_id, &clip_filename).await?;
+        manager.upload_vod_from_file(&clip_id, &clip_filename, manager::StorageType::Hot).await?;
 
         log::info!("[Clip] Inferring Metadata {}", request.id);
         let mut clip_metadata = metadata.clone();
@@ -517,7 +517,7 @@ impl VodProcessingInterface {
             quality: String::from("source"),
             segment_name: String::from("thumbnail.jpg"),
         };
-        manager.upload_vod_from_file(&thumbnail_id, &thumbnail_filename).await?;
+        manager.upload_vod_from_file(&thumbnail_id, &thumbnail_filename, manager::StorageType::Hot).await?;
 
         log::info!("[Thumbnail] Process VOD TX (Begin) - {}", vod_uuid);
         let mut tx = self.db.begin().await?;
@@ -603,7 +603,7 @@ impl VodProcessingInterface {
             quality: String::from("source"),
             segment_name: String::from("fastify.mp4"),
         };
-        manager.upload_vod_from_file(&fastify_segment, &fastify_filename).await?;
+        manager.upload_vod_from_file(&fastify_segment, &fastify_filename, manager::StorageType::Cold).await?;
 
         log::info!("[Fastify] Process VOD TX (Begin) - {}", vod_uuid);
         let mut tx = self.db.begin().await?;

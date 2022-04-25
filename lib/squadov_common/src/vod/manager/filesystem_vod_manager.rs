@@ -1,6 +1,9 @@
 use crate::{
     SquadOvError,
-    vod::manager::VodManager,
+    vod::manager::{
+        VodManager,
+        StorageType,
+    },
     VodSegmentId
 };
 use async_trait::async_trait;
@@ -58,13 +61,13 @@ impl VodManager for FilesystemVodManager {
         Ok(true)
     }
 
-    async fn upload_vod_from_file(&self, segment: &VodSegmentId, path: &std::path::Path) -> Result<(), SquadOvError> {
+    async fn upload_vod_from_file(&self, segment: &VodSegmentId, path: &std::path::Path, _storage: StorageType) -> Result<(), SquadOvError> {
         let fname = self.segment_id_to_path(segment);
         std::fs::copy(path, &fname)?;
         Ok(())
     }
 
-    async fn start_segment_upload(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
+    async fn start_segment_upload(&self, segment: &VodSegmentId, _storage: StorageType) -> Result<String, SquadOvError> {
         Ok(String::from(self.segment_id_to_path(segment).to_str().unwrap_or("")))
     }
 
