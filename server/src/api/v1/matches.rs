@@ -156,6 +156,8 @@ pub struct RecentMatchQuery {
     pub tags: Option<Vec<String>>,
     // Shared to squads
     pub squads: Option<Vec<i64>>,
+    #[serde(default)]
+    pub must_match_squads: bool,
     // Recorded by user
     pub users: Option<Vec<i64>>,
     pub time_start: Option<i64>,
@@ -213,15 +215,20 @@ impl RecentMatchQuery {
 
         {
             let mut sharing_query = Query::bool()
-                .minimum_should_match("1")
                 .should(Query::term("owner.userId", user_id));
 
             if let Some(squads) = self.squads.as_ref() {
-                sharing_query = sharing_query.should(
-                    Query::bool()
-                        .filter(Query::terms("sharing.squads", squads.clone()))
-                        .filter(Query::term("vod.isLocal", false))
-                );
+                let inner = Query::bool()
+                    .filter(Query::terms("sharing.squads", squads.clone()))
+                    .filter(Query::term("vod.isLocal", false));
+
+                if self.must_match_squads {
+                    sharing_query = sharing_query.filter(inner);
+                } else {
+                    sharing_query = sharing_query
+                        .minimum_should_match("1")
+                        .should(inner);
+                }
             }
 
             q = q.filter(sharing_query);
@@ -317,6 +324,7 @@ impl Default for RecentMatchQuery {
             wow_releases: None,
             tags: None,
             squads: None,
+            must_match_squads: false,
             users: None,
             time_start: None,
             time_end: None,
@@ -1012,11 +1020,13 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
     }
 
     let available_user_squads: HashSet<i64> = app.get_user_squads(session.user.id).await?.into_iter().map(|x| { x.squad.id }).collect();
-    filter.squads = if let Some(squad_filter) = &filter.squads {
-        Some(squad_filter.iter().filter(|x| { available_user_squads.contains(x) }).map(|x| { *x }).collect())
+    if let Some(squad_filter) = &filter.squads {
+        filter.squads = Some(squad_filter.iter().filter(|x| { available_user_squads.contains(x) }).map(|x| { *x }).collect());
+        filter.must_match_squads = true;
     } else {
-        Some(available_user_squads.into_iter().collect())
-    };
+        filter.squads = Some(available_user_squads.into_iter().collect());
+        filter.must_match_squads = false;
+    }
 
     // We need to keep querying VODs until we receive the number of matches the user wants (or there's nothing left).
     // I'm going to make the assumption here that querying ElasticSearch multiple times is better than running aggregation queries -
@@ -1126,7 +1136,8 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
     get_recent_matches_for_user(session.user.id, app, &req, query, filter, false).await
 }
 
-pub async fn get_profile_matches_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<UserProfilePath>, req: HttpRequest, query: web::Query<api::PaginationParameters>, filter: web::Json<RecentMatchQuery>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_profile_matches_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<UserProfilePath>, req: HttpRequest, query: web::Query<api::PaginationParameters>, mut filter: web::Json<RecentMatchQuery>) -> Result<HttpResponse, SquadOvError> {
+    filter.only_profile = true;
     get_recent_matches_for_user(path.profile_id, app, &req, query, filter, true).await
 }
 
