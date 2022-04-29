@@ -915,7 +915,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::resource("/stage")
                                         .wrap(access::ApiAccess::new(
                                             Box::new(access::VodAccessChecker{
-                                                must_be_vod_owner: true,
+                                                must_be_vod_owner: false,
                                                 obtainer: access::VodPathObtainer{
                                                     video_uuid_key: "video_uuid"
                                                 },
