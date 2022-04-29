@@ -121,6 +121,8 @@ pub fn create_wow_consumer_thread(app: Arc<api::ApiApplication>, topic: &str, cf
             }
 
             if is_view_complete {
+                // Need to get the match view again since we probably cached it from when no match uuid exists.
+                let match_view = squadov_common::get_generic_wow_match_view_from_id(&*opaque.app.pool, &match_view_uuid).await?;
                 if let Some(match_uuid) = match_view.match_uuid {
                     log::info!("...Sending Sync Match VOD: {} {}", &match_uuid, match_view.user_id);
                     opaque.app.es_itf.request_sync_match(match_uuid.clone(), Some(match_view.user_id)).await?;
