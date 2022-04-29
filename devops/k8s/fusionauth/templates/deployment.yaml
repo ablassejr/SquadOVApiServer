@@ -56,7 +56,7 @@ spec:
                     - name: DATABASE_CONNECTION_TIMEOUT
                       value: "60000"
                     - name: DATABASE_CONNECTION_HEALTHCHECK_99PERCENT_MS
-                      value: "15000"
+                      value: "30000"
                     - name: DATABASE_ROOT_USER
                       valueFrom:
                         secretKeyRef:
