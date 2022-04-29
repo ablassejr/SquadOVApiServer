@@ -605,7 +605,7 @@ impl VodProcessingInterface {
             quality: String::from("source"),
             segment_name: String::from("fastify.mp4"),
         };
-        manager.upload_vod_from_file(&fastify_segment, &fastify_filename, manager::StorageType::Cold).await?;
+        manager.upload_vod_from_file(&fastify_segment, &fastify_filename, manager::StorageType::Hot).await?;
 
         log::info!("[Fastify] Process VOD TX (Begin) - {}", vod_uuid);
         let mut tx = self.db.begin().await?;
