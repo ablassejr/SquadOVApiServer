@@ -2816,24 +2816,6 @@
       ]
     }
   },
-  "6115143a5246ea59e26185c9847e65c2e8b94c5a6b35cd3ea7663ba322b210ee": {
-    "query": "\n                        SELECT v.video_uuid\n                        FROM squadov.vods AS v\n                        INNER JOIN squadov.matches AS m\n                            ON m.uuid = v.match_uuid\n                        WHERE request_sync_elasticsearch IS NULL\n                            AND m.game IS NOT NULL\n                        ORDER BY v.end_time DESC\n                        LIMIT 10000\n                        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "video_uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
   "61392061af743e6ce12c197fadea87fd5cce6fda3720406384c3093c09d4d080": {
     "query": "\n                SELECT v.*\n                FROM squadov.vods AS v\n                WHERE v.video_uuid = ANY($1)\n                ",
     "describe": {

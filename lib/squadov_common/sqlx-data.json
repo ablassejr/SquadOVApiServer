@@ -2807,18 +2807,6 @@
       ]
     }
   },
-  "48ecabe966a3f28268c6cafa15728d43d78951b1671c782537535fd050b56497": {
-    "query": "\n                UPDATE squadov.vods\n                SET last_sync_elasticsearch = NOW()\n                WHERE video_uuid = $1\n                ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "4924319db705ea8f6bdd17883d05c56e9327da9c1b87564c664bdfc2c1134b93": {
     "query": "\n            SELECT ral.user_id, lmpi.participant_id\n            FROM squadov.lol_match_participant_identities AS lmpi\n            INNER JOIN squadov.riot_accounts AS ra\n                ON ra.summoner_id = lmpi.summoner_id\n            INNER JOIN squadov.riot_account_links AS ral\n                ON ral.puuid = ra.puuid\n            WHERE lmpi.match_uuid = $1\n            ",
     "describe": {
@@ -9173,6 +9161,27 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "f905001a3659fd9332735f6000c5431857f042fdbbd43411617e97486b5b96ff": {
+    "query": "\n            SELECT EXISTS (\n                SELECT 1\n                FROM squadov.riot_accounts AS ra\n                INNER JOIN squadov.riot_account_links AS ral\n                    ON ral.puuid = ra.puuid\n                WHERE ra.puuid = $1\n                    AND ral.user_id = $2\n            ) AS \"exists!\"\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "exists!",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null
       ]
     }
   },
