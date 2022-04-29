@@ -18,7 +18,7 @@ spec:
                 eks.amazonaws.com/compute-type: fargate
             containers:
                 - name: fusionauth
-                  image: fusionauth/fusionauth-app:1.27.2
+                  image: fusionauth/fusionauth-app:1.36.4
                   ports:
                     - containerPort: 9011
                   livenessProbe:

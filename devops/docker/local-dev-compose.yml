@@ -28,7 +28,7 @@ services:
             c3p0:
                 ipv4_address: "172.22.0.2"
     fusionauth:
-        image: "fusionauth/fusionauth-app:1.27.2"
+        image: "fusionauth/fusionauth-app:1.36.4"
         volumes:
             - type: volume
               source: fa-config
