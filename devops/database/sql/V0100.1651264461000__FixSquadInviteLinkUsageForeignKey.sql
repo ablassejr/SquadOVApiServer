@@ -1,0 +1,3 @@
+ALTER TABLE squad_invite_link_usage
+DROP CONSTRAINT squad_invite_link_usage_link_id_fkey,
+ADD CONSTRAINT squad_invite_link_usage_link_id_fkey FOREIGN KEY(link_id) REFERENCES squad_invite_links(id) ON DELETE CASCADE;
