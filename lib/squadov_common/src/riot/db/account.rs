@@ -6,6 +6,31 @@ use sqlx::{Executor, Postgres};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+pub async fn is_riot_puuid_linked_to_user<'a, T>(ex: T, user_id: i64, puuid: &str) -> Result<bool, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM squadov.riot_accounts AS ra
+                INNER JOIN squadov.riot_account_links AS ral
+                    ON ral.puuid = ra.puuid
+                WHERE ra.puuid = $1
+                    AND ral.user_id = $2
+            ) AS "exists!"
+            "#,
+            puuid,
+            user_id,
+        )
+            .fetch_one(ex)
+            .await?
+            .exists
+    )
+}
+
 pub async fn get_user_riot_account_from_raw_puuid<'a, T>(ex: T, user_id: i64, raw_puuid: &str) -> Result<Option<RiotAccount>, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>

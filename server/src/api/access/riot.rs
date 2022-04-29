@@ -46,10 +46,7 @@ impl super::AccessChecker<RiotValorantAccountAccessBasicData> for RiotValorantAc
     }
 
     async fn check(&self, app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, data: RiotValorantAccountAccessBasicData) -> Result<bool, SquadOvError> {
-        match db::get_user_riot_account(&*app.pool, data.user_id, &data.puuid).await {
-            Ok(_) => Ok(true),
-            Err(_) => Ok(false)
-        }
+        Ok(db::is_riot_puuid_linked_to_user(&*app.pool, data.user_id, &data.puuid).await?)
     }
 
     async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: RiotValorantAccountAccessBasicData) -> Result<bool, SquadOvError> {
