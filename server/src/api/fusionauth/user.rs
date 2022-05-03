@@ -91,6 +91,8 @@ struct FusionAuthChangePasswordWithUserInput<'a> {
     password: &'a str,
     current_password: &'a str,
     login_id: &'a str,
+    trust_challenge: Option<String>,
+    trust_token: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -296,12 +298,14 @@ impl super::FusionAuthClient {
         }
     }
 
-    pub async fn change_user_password_with_id(&self, current_password: &str, new_password: &str, login_id: &str) -> Result<(), SquadOvError> {
+    pub async fn change_user_password_with_id(&self, current_password: &str, new_password: &str, login_id: &str, trust_challenge: Option<String>, trust_token: Option<String>) -> Result<(), SquadOvError> {
         let resp = self.client.post(self.build_url("/api/user/change-password").as_str())
             .json(&FusionAuthChangePasswordWithUserInput{
                 password: new_password,
                 current_password: current_password,
                 login_id: login_id,
+                trust_challenge,
+                trust_token,
             })
             .send()
             .await?;
@@ -311,7 +315,7 @@ impl super::FusionAuthClient {
             400 => {
                 let body = resp.text().await?;
                 log::warn!("Failure in request to change user password: {}", body);
-                Err(SquadOvError::BadRequest)
+                Err(SquadOvError::TwoFactor(String::new()))
             },
             401 => Err(SquadOvError::Unauthorized),
             404 => Err(SquadOvError::NotFound),

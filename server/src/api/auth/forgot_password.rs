@@ -33,6 +33,7 @@ pub struct ChangePasswordResponse {
 pub struct NewPasswordInputs {
     current_pw: String,
     new_pw: String,
+    mfa_code: Option<String>,
 }
 
 async fn forgot_pw(fa: &fusionauth::FusionAuthClient, login_id: &str) -> Result<(), SquadOvError> {
@@ -47,8 +48,8 @@ async fn forgot_pw(fa: &fusionauth::FusionAuthClient, login_id: &str) -> Result<
     }
 }
 
-async fn get_trust_token(fa: &fusionauth::FusionAuthClient, challenge: &str, user_id: &str, mfa_code: &str) -> Result<String, SquadOvError> {
-    let two_factor_id = fa.start_mfa(mfa_code, challenge, user_id).await?;
+async fn get_trust_token(fa: &fusionauth::FusionAuthClient, challenge: &str, user_id: Option<&str>, login_id: Option<&str>, mfa_code: &str) -> Result<String, SquadOvError> {
+    let two_factor_id = fa.start_mfa(challenge, user_id, login_id).await?;
     Ok(fa.complete_mfa(mfa_code, &two_factor_id).await?)
 }
 
@@ -86,7 +87,7 @@ pub async fn forgot_pw_handler(data : web::Query<ForgotPasswordInputs>, app : we
 /// * 500 - Internal error (password was not  changed).
 pub async fn forgot_pw_change_handler(app : web::Data<Arc<api::ApiApplication>>, data : web::Json<ChangePasswordInputs>) -> Result<HttpResponse, SquadOvError> {
     let (trust_challenge, trust_token) = if let Some(mfa) = data.mfa_code.as_ref() {
-        (Some(String::from("FORGOT_PW")), Some(get_trust_token(&app.clients.fusionauth, "FORGOT_PW", &data.user_id, &mfa).await?))
+        (Some(String::from("FORGOT_PW")), Some(get_trust_token(&app.clients.fusionauth, "FORGOT_PW", Some(&data.user_id), None, &mfa).await?))
     } else {
         (None, None)
     };
@@ -106,10 +107,19 @@ pub async fn change_pw_handler(app : web::Data<Arc<api::ApiApplication>>, data :
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
-    match app.clients.fusionauth.change_user_password_with_id(&data.current_pw, &data.new_pw, &session.user.email).await {
+    let (trust_challenge, trust_token) = if let Some(mfa) = data.mfa_code.as_ref() {
+        (Some(String::from("CHANGE_PW")), Some(get_trust_token(&app.clients.fusionauth, "CHANGE_PW", None, Some(&session.user.email), &mfa).await?))
+    } else {
+        (None, None)
+    };
+
+    match app.clients.fusionauth.change_user_password_with_id(&data.current_pw, &data.new_pw, &session.user.email, trust_challenge, trust_token).await {
         Ok(_) => Ok(HttpResponse::NoContent().finish()),
         Err(err) => {
             match err {
+                SquadOvError::TwoFactor(_c) => Ok(HttpResponse::Ok().json(ChangePasswordResponse{
+                    needs_mfa: true,
+                })),
                 _ => Err(err),
             }
         }

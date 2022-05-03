@@ -56,19 +56,19 @@ impl super::FusionAuthClient {
         }
     }
 
-    pub async fn start_mfa(&self, code: &str, challenge: &str, user_id: &str) -> Result<String, SquadOvError> {
+    pub async fn start_mfa(&self, challenge: &str, user_id: Option<&str>, login_id: Option<&str>) -> Result<String, SquadOvError> {
         #[derive(Serialize)]
         #[serde(rename_all="camelCase")]
         struct Input {
-            code: String,
-            user_id: String,
+            user_id: Option<String>,
+            login_id: Option<String>,
             trust_challenge: String,
         }
 
         let resp = self.client.post(self.build_url("/api/two-factor/start").as_str())
             .json(&Input{
-                code: code.to_string(),
-                user_id: user_id.to_string(),
+                user_id: user_id.map(|x| { x.to_string() }),
+                login_id: login_id.map(|x| { x.to_string() }),
                 trust_challenge: challenge.to_string(),
             })
             .send()
