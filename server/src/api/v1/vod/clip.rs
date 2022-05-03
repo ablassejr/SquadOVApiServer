@@ -97,7 +97,12 @@ impl api::ApiApplication {
         let base_data = sqlx::query!(
             r#"
             SELECT
-                vc.*,
+                vc.clip_uuid,
+                vc.title,
+                vc.description,
+                vc.tm,
+                vc.published,
+                vc.game,
                 u.username AS "clipper",
                 COALESCE(rc.count, 0) AS "reacts!",
                 COALESCE(cc.count, 0) AS "comments!",
