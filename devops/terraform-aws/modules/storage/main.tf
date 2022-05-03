@@ -17,13 +17,9 @@ resource "aws_s3_bucket" "vod_storage_bucket" {
     lifecycle_rule {
         enabled = true
         abort_incomplete_multipart_upload_days = 1
-        transition {
-            days = 30
-            storage_class = "STANDARD_IA"
-        }
 
         transition {
-            days = 90
+            days = 3
             storage_class = "GLACIER_IR"
         }
     }
