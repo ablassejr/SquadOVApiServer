@@ -5,6 +5,7 @@ mod api;
 
 use structopt::StructOpt;
 use std::{fs, sync::Arc};
+use uuid::Uuid;
 
 #[derive(StructOpt, Debug)]
 struct Options {
@@ -14,6 +15,41 @@ struct Options {
     db: u32,
     #[structopt(short, long)]
     workers: usize,
+}
+
+pub fn start_cleanup_loop(app: Arc<api::ApiApplication>) {
+    tokio::task::spawn(async move {
+        loop {
+            log::info!("Doing cleanup loop...");
+
+            let old_unpublished_clips: Vec<Uuid> = sqlx::query!(
+                "
+                SELECT clip_uuid
+                FROM squadov.vod_clips
+                WHERE NOT published
+                    AND tm < (NOW() - INTERVAL '1 day')
+                "
+            )
+                .fetch_all(&*app.pool)
+                .await
+                .unwrap_or(vec![])
+                .into_iter()
+                .map(|x| {
+                    x.clip_uuid
+                })
+                .collect();
+            log::info!("Found {} Unpublished Clips", old_unpublished_clips.len());
+            for x in old_unpublished_clips {
+                match app.vod_itf.request_delete_vod(&x).await {
+                    Ok(_) => (),
+                    Err(err) => log::warn!("...Failed to delete VOD [{}] {:?}", &x, err),
+                }
+            }
+
+            // Doing this once per day should be sufficient...
+            tokio::time::sleep(tokio::time::Duration::from_secs(86400)).await;
+        }
+    });
 }
 
 fn main() -> std::io::Result<()> {
@@ -48,6 +84,7 @@ fn main() -> std::io::Result<()> {
             tokio::task::spawn(async move {
                 let app = Arc::new(api::ApiApplication::new(&config, "singleton_event").await);
                 api::start_event_loop(app.clone());
+                start_cleanup_loop(app.clone());
 
                 loop {
                     async_std::task::sleep(std::time::Duration::from_secs(1)).await;

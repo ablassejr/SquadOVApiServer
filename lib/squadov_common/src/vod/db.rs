@@ -21,6 +21,22 @@ use uuid::Uuid;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
+pub async fn delete_vod<'a, T>(ex: T, uuid: &Uuid) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        DELETE FROM squadov.vods
+        WHERE video_uuid = $1
+        ",
+        uuid
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
 pub async fn find_accessible_vods_in_match_for_user<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64) -> Result<Vec<VodAssociation>, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>

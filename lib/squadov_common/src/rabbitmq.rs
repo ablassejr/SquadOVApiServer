@@ -17,13 +17,14 @@ use chrono::{DateTime, Utc, NaiveDateTime};
 use rand::Rng;
 use sqlx::PgPool;
 
-pub const RABBITMQ_DEFAULT_PRIORITY: u8 = 0;
-pub const RABBITMQ_HIGH_PRIORITY: u8 = 5;
+pub const RABBITMQ_LOW_PRIORITY: u8 = 2;
+pub const RABBITMQ_DEFAULT_PRIORITY: u8 = 5;
+pub const RABBITMQ_HIGH_PRIORITY: u8 = 8;
 const RABBITMQ_MAX_DELAY_MS: i64 = 7200000; // 2 hour
 const SQUADOV_RETRY_COUNT_HEADER: &'static str = "x-squadov-retry-count";
 const SQUADOV_MESSAGE_MAX_AGE_HEADER: &'static str = "x-squadov-max-age";
 const DEFAULT_MAX_AGE_SECONDS: i64 = 3600; // 1 hour
-const INFITE_MAX_AGE: i64 = -1;
+pub const INFITE_MAX_AGE: i64 = -1;
 
 #[derive(Deserialize,Debug,Clone,Default)]
 pub struct RabbitMqConfig {

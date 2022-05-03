@@ -14,8 +14,10 @@ use crate::{
     SquadOvError,
     SquadOvGames,
     rabbitmq::{
+        RABBITMQ_LOW_PRIORITY,
         RABBITMQ_DEFAULT_PRIORITY,
         RABBITMQ_HIGH_PRIORITY,
+        INFITE_MAX_AGE,
         RabbitMqInterface,
         RabbitMqListener,
     },
@@ -294,6 +296,9 @@ pub enum VodProcessingTask {
     },
     GenerateStagedClip{
         request: StagedVodClip,
+    },
+    Delete{
+        vod_uuid: Uuid,
     }
 }
 
@@ -311,6 +316,7 @@ impl RabbitMqListener for VodProcessingInterface {
             VodProcessingTask::GeneratePreview{vod_uuid} => self.generate_preview(&vod_uuid).await?,
             VodProcessingTask::GenerateThumbnail{vod_uuid} => self.generate_thumbnail(&vod_uuid).await?,
             VodProcessingTask::GenerateStagedClip{request} => self.generate_staged_clip(&request).await?,
+            VodProcessingTask::Delete{vod_uuid} => self.delete_vod(&vod_uuid).await?,
         };
         Ok(())
     }
@@ -652,6 +658,79 @@ impl VodProcessingInterface {
         }
 
         log::info!("[Fastify] Finish Fastifying {:?}", vod_uuid);
+        Ok(())
+    }
+
+    pub async fn request_delete_vod(&self, vod_uuid: &Uuid) -> Result<(), SquadOvError> {
+        self.rmq.publish(&self.queue, serde_json::to_vec(&VodProcessingTask::Delete{
+            vod_uuid: vod_uuid.clone(),
+        })?, RABBITMQ_LOW_PRIORITY, INFITE_MAX_AGE).await;
+        Ok(())
+    }
+
+    pub async fn delete_vod(&self, vod_uuid: &Uuid) -> Result<(), SquadOvError> {
+        log::info!("[Delete] Delete VOD {}", vod_uuid);
+
+        // We need to delete from both the database and storage.
+        // We want to do our best to make sure things stayed sync'd in case of errors.
+        // So we do the DB deletion in a transaction and before we commit the transaction,
+        // we delete from S3. This way, if the S3 delete fails, the DB deletion doesn't go through
+        // either. The only way this desyncs is if the commit fails, oh well.
+        log::info!("[Delete] Get VOD Metadata");
+        let metadata = db::get_vod_metadata(&*self.db, vod_uuid, "source").await?;
+
+        log::info!("[Delete] Get VOD Thumbnail");
+        let thumbnail = db::get_vod_thumbnail(&*self.db, vod_uuid).await?;
+
+        log::info!("[Delete] Get VOD Manager");
+        let manager = self.vod.get_bucket(&metadata.bucket).await.ok_or(SquadOvError::InternalError(format!("Invalid bucket: {}", &metadata.bucket)))?;
+
+        log::info!("[Delete] Delete VOD TX (Begin) - {}", vod_uuid);
+        let mut tx = self.db.begin().await?;
+
+        log::info!("[Delete] DB Delete - {}", vod_uuid);
+        db::delete_vod(&mut tx, vod_uuid).await?;
+
+        log::info!("[Delete] VOD Delete - {}", vod_uuid);
+        manager.delete_vod(&VodSegmentId{
+            video_uuid: vod_uuid.clone(),
+            quality: String::from("source"),
+            segment_name: if metadata.has_fastify {
+                String::from("fastify.mp4")
+            } else {
+                String::from("video.ts")
+            },
+        }).await?;
+
+        if metadata.has_preview {
+            log::info!("[Delete] Preview Delete - {}", vod_uuid);
+            match manager.delete_vod(&VodSegmentId{
+                video_uuid: vod_uuid.clone(),
+                quality: String::from("source"),
+                segment_name: String::from("preview.mp4"),
+            }).await {
+                Ok(_) => (),
+                Err(err) => log::warn!("Failed to delete preview: {:?} [{}]", err, vod_uuid),
+            }
+        }
+
+        if thumbnail.is_some() {
+            log::info!("[Delete] Thumbnail Delete - {}", vod_uuid);
+            match manager.delete_vod(&VodSegmentId{
+                video_uuid: vod_uuid.clone(),
+                quality: String::from("source"),
+                segment_name: String::from("thumbnail.jpg"),
+            }).await {
+                Ok(_) => (),
+                Err(err) => log::warn!("Failed to delete thumbnail: {:?} [{}]", err, vod_uuid),
+            }
+        }
+
+        log::info!("[Delete] Delete VOD TX (Commit) - {}", vod_uuid);
+        tx.commit().await?;
+
+        log::info!("[Delete] Request ES Delete - {}", vod_uuid);
+        self.es_itf.request_delete_vod(vec![vod_uuid.clone()]).await?;
         Ok(())
     }
 }
