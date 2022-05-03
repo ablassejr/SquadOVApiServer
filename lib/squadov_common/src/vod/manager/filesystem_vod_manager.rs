@@ -42,7 +42,7 @@ impl VodManager for FilesystemVodManager {
         super::UploadManagerType::FileSystem
     }
 
-    async fn get_segment_redirect_uri(&self, segment: &VodSegmentId) -> Result<(String, Option<DateTime<Utc>>), SquadOvError> {
+    async fn get_segment_redirect_uri(&self, segment: &VodSegmentId, _use_cdn: bool) -> Result<(String, Option<DateTime<Utc>>), SquadOvError> {
         let fname = self.segment_id_to_path(segment);
         if !fname.exists() {
             return Err(SquadOvError::NotFound);
@@ -89,7 +89,7 @@ impl VodManager for FilesystemVodManager {
     }
 
     async fn get_public_segment_redirect_uri(&self, segment: &VodSegmentId) -> Result<String, SquadOvError> {
-        Ok(self.get_segment_redirect_uri(segment).await?.0)
+        Ok(self.get_segment_redirect_uri(segment, true).await?.0)
     }
 
     async fn make_segment_public(&self, _segment: &VodSegmentId) -> Result<(), SquadOvError> {

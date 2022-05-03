@@ -678,7 +678,7 @@ pub async fn get_staged_clip_status_handler(app : web::Data<Arc<api::ApiApplicat
                 video_uuid: clip_uuid.clone(),
                 quality: String::from("source"),
                 segment_name: String::from("fastify.mp4"),
-            }).await?.0,
+            }, true).await?.0,
             uuid: clip_uuid.clone(),
         }))
     } else {

@@ -65,7 +65,7 @@ impl VodManager for GCSVodManager {
         super::UploadManagerType::GCS
     }
 
-    async fn get_segment_redirect_uri(&self, segment: &VodSegmentId) -> Result<(String, Option<DateTime<Utc>>), SquadOvError> {       
+    async fn get_segment_redirect_uri(&self, segment: &VodSegmentId, _use_cdn: bool) -> Result<(String, Option<DateTime<Utc>>), SquadOvError> {       
         let fname = self.get_fname_from_segment_id(segment);
         let client = self.get_gcp_client().gcs();
 
@@ -82,7 +82,7 @@ impl VodManager for GCSVodManager {
     }
 
     async fn download_vod_to_path(&self, segment: &VodSegmentId, path: &std::path::Path) -> Result<(), SquadOvError> {
-        let uri = self.get_segment_redirect_uri(segment).await?.0;
+        let uri = self.get_segment_redirect_uri(segment, false).await?.0;
         let resp = reqwest::get(&uri).await?;
         let mut output_file = std::fs::File::create(path)?;
         let body = resp.bytes().await?;

@@ -92,9 +92,9 @@ impl VodManager for S3VodManager {
         super::UploadManagerType::S3
     }
 
-    async fn get_segment_redirect_uri(&self, segment: &VodSegmentId) -> Result<(String, Option<DateTime<Utc>>), SquadOvError> {
+    async fn get_segment_redirect_uri(&self, segment: &VodSegmentId, use_cdn: bool) -> Result<(String, Option<DateTime<Utc>>), SquadOvError> {
         Ok(
-            if !self.cdn.private_cdn_domain.is_empty() {
+            if use_cdn && !self.cdn.private_cdn_domain.is_empty() {
                 // We need to manually sign the CloudFront URL here using the trusted private key
                 let base_url = format!(
                     "{base}/{fname}",

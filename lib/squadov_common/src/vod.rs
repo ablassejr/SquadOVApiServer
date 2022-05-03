@@ -382,7 +382,7 @@ impl VodProcessingInterface {
 
         // Note that we should use the raw URI and don't route the request through a CDN here.
         log::info!("[{}] Get Raw VOD URL {}", context, vod_uuid);
-        let uri = manager.get_segment_redirect_uri(&source_segment_id).await?.0;
+        let uri = manager.get_segment_redirect_uri(&source_segment_id, false).await?.0;
         Ok((vod, metadata, uri))
     }
 

@@ -268,7 +268,7 @@ pub async fn get_vod_track_segment_handler(data : web::Path<squadov_common::VodS
         // If the VOD is public (shared), then we can return the public URL instead of the signed private one.
         (manager.get_public_segment_redirect_uri(&data).await?, None)
     } else {
-        manager.get_segment_redirect_uri(&data).await?
+        manager.get_segment_redirect_uri(&data, true).await?
     };
 
 
