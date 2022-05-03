@@ -24,6 +24,72 @@ pub struct FusionAuthRecoveryCodes {
 }
 
 impl super::FusionAuthClient {
+    pub async fn complete_mfa(&self, code: &str, two_factor_id: &str) -> Result<String, SquadOvError> {
+        #[derive(Serialize)]
+        #[serde(rename_all="camelCase")]
+        struct Input {
+            code: String,
+            two_factor_id: String,
+        }
+
+        let resp = self.client.post(self.build_url("/api/two-factor/login").as_str())
+            .json(&Input{
+                code: code.to_string(),
+                two_factor_id: two_factor_id.to_string(),
+            })
+            .send()
+            .await?;
+
+        #[derive(Deserialize)]
+        #[serde(rename_all="camelCase")]
+        struct Output {
+            trust_token: String,
+        }
+        
+        match resp.status().as_u16() {
+            200 => Ok(resp.json::<Output>().await?.trust_token),
+            401 => Err(SquadOvError::Unauthorized),
+            _ => Err(SquadOvError::InternalError(format!(
+                "Complete MFA: {}",
+                resp.text().await?,
+            )))
+        }
+    }
+
+    pub async fn start_mfa(&self, code: &str, challenge: &str, user_id: &str) -> Result<String, SquadOvError> {
+        #[derive(Serialize)]
+        #[serde(rename_all="camelCase")]
+        struct Input {
+            code: String,
+            user_id: String,
+            trust_challenge: String,
+        }
+
+        let resp = self.client.post(self.build_url("/api/two-factor/start").as_str())
+            .json(&Input{
+                code: code.to_string(),
+                user_id: user_id.to_string(),
+                trust_challenge: challenge.to_string(),
+            })
+            .send()
+            .await?;
+
+        #[derive(Deserialize)]
+        #[serde(rename_all="camelCase")]
+        struct Output {
+            two_factor_id: String,
+        }
+        
+        match resp.status().as_u16() {
+            200 => Ok(resp.json::<Output>().await?.two_factor_id),
+            401 => Err(SquadOvError::Unauthorized),
+            _ => Err(SquadOvError::InternalError(format!(
+                "Start MFA: {}",
+                resp.text().await?,
+            )))
+        }
+    }
+
     pub async fn generate_mfa_secret(&self) -> Result<FusionAuthMfaSecret, SquadOvError> {
         let resp = self.client.get(self.build_url("/api/two-factor/secret").as_str())
             .send()

@@ -78,8 +78,11 @@ struct FusionAuthStartForgotPasswordInput<'a> {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 struct FusionAuthChangePasswordInput<'a> {
-    password: &'a str
+    password: &'a str,
+    trust_challenge: Option<String>,
+    trust_token: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -256,10 +259,12 @@ impl super::FusionAuthClient {
         }
     }
 
-    pub async fn change_user_password(&self, change_password_id: &str, password: &str) -> Result<(), FusionAuthUserError> {
+    pub async fn change_user_password(&self, change_password_id: &str, password: &str, trust_challenge: Option<String>, trust_token: Option<String>) -> Result<(), FusionAuthUserError> {
         match self.client.post(self.build_url(format!("/api/user/change-password/{}", change_password_id).as_str()).as_str())
             .json(&FusionAuthChangePasswordInput{
                 password: password,
+                trust_challenge,
+                trust_token,
             })
             .send()
             .await

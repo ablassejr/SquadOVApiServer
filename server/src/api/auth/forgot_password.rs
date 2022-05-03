@@ -1,5 +1,5 @@
 use actix_web::{HttpResponse, web, HttpRequest, HttpMessage};
-use serde::Deserialize;
+use serde::{Serialize,Deserialize};
 use crate::logged_error;
 use crate::api;
 use crate::api::fusionauth;
@@ -14,10 +14,18 @@ pub struct ForgotPasswordInputs {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
 pub struct ChangePasswordInputs {
-    #[serde(rename = "changePasswordId")]
     change_password_id: String,
     password: String,
+    user_id: String,
+    mfa_code: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct ChangePasswordResponse {
+    needs_mfa: bool
 }
 
 #[derive(Deserialize)]
@@ -39,10 +47,22 @@ async fn forgot_pw(fa: &fusionauth::FusionAuthClient, login_id: &str) -> Result<
     }
 }
 
-async fn change_pw(fa: &fusionauth::FusionAuthClient, change_id: &str, password: &str) -> Result<(), SquadOvError> {
-    match fa.change_user_password(change_id, password).await {
+async fn get_trust_token(fa: &fusionauth::FusionAuthClient, challenge: &str, user_id: &str, mfa_code: &str) -> Result<String, SquadOvError> {
+    let two_factor_id = fa.start_mfa(mfa_code, challenge, user_id).await?;
+    Ok(fa.complete_mfa(mfa_code, &two_factor_id).await?)
+}
+
+async fn change_pw(fa: &fusionauth::FusionAuthClient, change_id: &str, password: &str, trust_challenge: Option<String>, trust_token: Option<String>) -> Result<(), SquadOvError> {
+    match fa.change_user_password(change_id, password, trust_challenge, trust_token).await {
         Ok(_) => Ok(()),
-        Err(err) => Err(SquadOvError::InternalError(format!("Change Password: {}", err))),
+        Err(err) => {
+            match err {
+                fusionauth::FusionAuthUserError::InvalidRequest(_j) => {
+                    Err(SquadOvError::TwoFactor(String::new()))
+                },
+                _ => Err(SquadOvError::InternalError(format!("Change Password: {}", err))),
+            }
+        }
     }
 }
 
@@ -65,9 +85,20 @@ pub async fn forgot_pw_handler(data : web::Query<ForgotPasswordInputs>, app : we
 /// * 200 - Success.
 /// * 500 - Internal error (password was not  changed).
 pub async fn forgot_pw_change_handler(app : web::Data<Arc<api::ApiApplication>>, data : web::Json<ChangePasswordInputs>) -> Result<HttpResponse, SquadOvError> {
-    match change_pw(&app.clients.fusionauth, &data.change_password_id, &data.password).await {
+    let (trust_challenge, trust_token) = if let Some(mfa) = data.mfa_code.as_ref() {
+        (Some(String::from("FORGOT_PW")), Some(get_trust_token(&app.clients.fusionauth, "FORGOT_PW", &data.user_id, &mfa).await?))
+    } else {
+        (None, None)
+    };
+
+    match change_pw(&app.clients.fusionauth, &data.change_password_id, &data.password, trust_challenge, trust_token).await {
         Ok(_) => Ok(HttpResponse::NoContent().finish()),
-        Err(err) => logged_error!(err),
+        Err(err) => match err {
+            SquadOvError::TwoFactor(_c) => Ok(HttpResponse::Ok().json(ChangePasswordResponse{
+                needs_mfa: true,
+            })),
+            _ => logged_error!(err),
+        }
     }
 }
 
@@ -75,6 +106,12 @@ pub async fn change_pw_handler(app : web::Data<Arc<api::ApiApplication>>, data :
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
-    app.clients.fusionauth.change_user_password_with_id(&data.current_pw, &data.new_pw, &session.user.email).await?;
-    Ok(HttpResponse::NoContent().finish())
+    match app.clients.fusionauth.change_user_password_with_id(&data.current_pw, &data.new_pw, &session.user.email).await {
+        Ok(_) => Ok(HttpResponse::NoContent().finish()),
+        Err(err) => {
+            match err {
+                _ => Err(err),
+            }
+        }
+    }
 }
