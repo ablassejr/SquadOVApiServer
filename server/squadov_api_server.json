@@ -324,27 +324,6 @@
       ]
     }
   },
-  "08ef729b9c42e92e4822b9b605a1aa94ce117188672d91b1c9ae832fcca48cd9": {
-    "query": "\n            SELECT EXISTS (\n                SELECT 1\n                FROM squadov.riot_accounts AS ra\n                INNER JOIN squadov.riot_account_links AS ral\n                    ON ral.puuid = ra.puuid\n                WHERE ra.puuid = $1\n                    AND ral.user_id = $2\n            ) AS \"exists\"\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "exists",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null
-      ]
-    }
-  },
   "0aade85bc5a26ede2baff94dfd1504d3b63342d66d3ccb112f2296401518bb4a": {
     "query": "\n            DELETE FROM squadov.wow_instance_view\n            WHERE view_id = $1\n            ",
     "describe": {
@@ -14759,6 +14738,18 @@
         null,
         null
       ]
+    }
+  },
+  "f4c816216bc5d245d6257616b0219f01c047cb5aea25390b0d8fd2d0c0497e53": {
+    "query": "\n        DELETE FROM squadov.vods\n        WHERE video_uuid = $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": []
     }
   },
   "f50c5ac94f3d32241a5da1fe7b41a8a4b61f67e8c2957aee8b13a222a4eac3fb": {

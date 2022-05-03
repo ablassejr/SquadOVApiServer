@@ -5044,6 +5044,24 @@
       ]
     }
   },
+  "c283f7bbde35517614e0992ec8c8082abb3f1fd4d9ba4f081b2cfe3a5e23e81a": {
+    "query": "\n                SELECT clip_uuid\n                FROM squadov.vod_clips\n                WHERE NOT published\n                    AND tm < (NOW() - INTERVAL '1 day')\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "clip_uuid",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "c42644f28903487b40a20762fe33769dd26ac7e07c124b4b94ac4aa896a369c9": {
     "query": "\n            INSERT INTO squadov.valorant_player_match_metadata (\n                match_uuid,\n                puuid,\n                start_time,\n                end_time\n            )\n            VALUES (\n                $1,\n                $2,\n                $3,\n                $4\n            )\n            ",
     "describe": {
