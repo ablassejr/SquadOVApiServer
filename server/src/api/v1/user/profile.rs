@@ -81,6 +81,9 @@ pub async fn edit_current_user_username_handler(app : web::Data<Arc<api::ApiAppl
     app.clients.fusionauth.update_user_id(&fa_user.id, &user.username, &session.user.email).await?;
     tx.commit().await?;
 
+    // Also update the user's username in analytics.
+    app.analytics_identify_user(&user, "", "").await?;
+
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -111,6 +114,9 @@ pub async fn edit_current_user_email_handler(app : web::Data<Arc<api::ApiApplica
 
     app.clients.fusionauth.update_user_id(&fa_user.id, &session.user.username, &user.email).await?;
     tx.commit().await?;
+
+    // Also update the user's email in analytics.
+    app.analytics_identify_user(&user, "", "").await?;
 
     Ok(HttpResponse::NoContent().finish())
 }
