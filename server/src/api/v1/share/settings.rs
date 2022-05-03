@@ -130,6 +130,11 @@ impl api::ApiApplication {
 pub async fn get_user_auto_share_settings_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
+    let mut tx = app.pool.begin().await?;
+    app.create_auto_share_settings_for_user_if_not_exist(&mut tx, session.user.id).await?;
+    tx.commit().await?;
+
     Ok(HttpResponse::Ok().json(
         &app.get_user_auto_share_settings(&*app.pool, session.user.id).await?
     ))
