@@ -23,20 +23,23 @@ pub struct VodWatchRangeData {
 }
 
 impl api::ApiApplication {
-    pub async fn record_user_event(&self, user_ids: &[i64], event: &str) -> Result<(), SquadOvError> {
+    pub async fn record_user_event(&self, user_ids: &[i64], event: &str, platform: Option<&str>) -> Result<(), SquadOvError> {
         sqlx::query!(
             "
             INSERT INTO squadov.user_event_record (
                 user_id,
                 event_name,
+                platform,
                 tm
             )
-            SELECT inp.id, $2, NOW()
+            SELECT inp.id, $2, $3, NOW()
             FROM UNNEST($1::BIGINT[]) AS inp(id)
-            ON CONFLICT DO NOTHING
+            ON CONFLICT (user_id, event_name, platform) DO UPDATE
+                SET tm = EXCLUDED.tm
             ",
             user_ids,
             event,
+            platform,
         )
             .execute(&*self.pool)
             .await?;

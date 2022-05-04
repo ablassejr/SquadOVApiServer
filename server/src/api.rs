@@ -368,7 +368,7 @@ impl ApiApplication {
         // Then mark them as being inactive in the database.
         self.record_user_event(&inactive_users.iter().map(|x| {
             x.id
-        }).collect::<Vec<i64>>(), "inactive_14").await?;
+        }).collect::<Vec<i64>>(), "inactive_14", None).await?;
         
         Ok(())
     }

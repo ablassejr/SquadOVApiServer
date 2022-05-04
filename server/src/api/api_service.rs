@@ -307,6 +307,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 )
                                 .service(
                                     web::scope("/analytics")
+                                        .route("/event", web::post().to(v1::mark_user_analytics_event_handler))
                                         .route("/vod/{video_uuid}", web::post().to(v1::create_user_vod_watch_analytics_handler))
                                 )
                                 .service(

@@ -13,16 +13,18 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc, NaiveDateTime};
 use convert_case::{Case, Casing};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct LoginData {
     username: String,
     password: String,
+    platform: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct MfaLoginData {
     id: String,
     code: String,
+    platform: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -158,7 +160,7 @@ pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<Arc<api:
 
     // First authenticate with our backend and obtain a valid session.
     let conn = req.connection_info();
-    let login_result = match login(&app.clients.fusionauth, data.into_inner(), conn.realip_remote_addr()).await {
+    let login_result = match login(&app.clients.fusionauth, data.clone(), conn.realip_remote_addr()).await {
         Ok(x) => x,
         Err(err) => match err {
             SquadOvError::TwoFactor(two_factor_id) => return Ok(HttpResponse::Ok().json(LoginResponse{
@@ -171,6 +173,8 @@ pub async fn login_handler(data : web::Json<LoginData>, app : web::Data<Arc<api:
         }
     };
     let session = app.generic_login_from_fusionauth(login_result).await?;
+    app.record_user_event(&[session.user.id], "login", data.platform.as_ref().map(|x| { x.as_str() })).await?;
+
     Ok(HttpResponse::Ok().json(LoginResponse{
         user_id: session.user.id,
         session_id: session.session_id,
@@ -186,6 +190,8 @@ pub async fn mfa_login_handler(data : web::Json<MfaLoginData>, app : web::Data<A
 
     let login_result = app.clients.fusionauth.mfa_login(&data.id, &data.code).await?;
     let session = app.generic_login_from_fusionauth(login_result).await?;
+    app.record_user_event(&[session.user.id], "mfa_login", data.platform.as_ref().map(|x| { x.as_str() })).await?;
+
     Ok(HttpResponse::Ok().json(LoginResponse{
         user_id: session.user.id,
         session_id: session.session_id,
@@ -208,6 +214,7 @@ pub async fn verify_pw_handler(app : web::Data<Arc<api::ApiApplication>>, data :
     let _ = login(&app.clients.fusionauth, LoginData{
         username: session.user.email.clone(),
         password: data.password.clone(),
+        platform: None,
     }, conn.realip_remote_addr()).await?;
 
     Ok(HttpResponse::NoContent().finish())

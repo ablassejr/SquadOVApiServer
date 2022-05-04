@@ -156,7 +156,7 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
         if !data.association.is_clip && app.get_user_full_match_vod_count(session.user.id).await? == 1 {
             let event = "recordfirst";
             app.segment.track(&session.user.uuid.to_string(), event).await?;
-            app.record_user_event(&[session.user.id], event).await?;
+            app.record_user_event(&[session.user.id], event, Some("DESKTOP")).await?;
         }
     }
     Ok(HttpResponse::Ok().finish())

@@ -357,6 +357,7 @@ impl ApiApplication {
 pub async fn sync_user_hardware_handler(app : web::Data<Arc<ApiApplication>>, data: web::Json<Hardware>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    app.record_user_event(&[session.user.id], "hw_sync", Some("DESKTOP")).await?;
     store_hardware_for_user(&*app.pool, session.user.id, data.into_inner()).await?;
 
     Ok(HttpResponse::NoContent().finish())
@@ -373,5 +374,19 @@ pub async fn perform_user_analytics_identify_handler(app : web::Data<Arc<ApiAppl
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
     app.analytics_identify_user(&session.user, &data.ip, &data.anon_id).await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct EventInput {
+    event_id: String,
+    platform: String,
+}
+
+pub async fn mark_user_analytics_event_handler(app : web::Data<Arc<ApiApplication>>, data: web::Json<EventInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+    app.record_user_event(&[session.user.id], data.event_id.as_str(), Some(data.platform.as_str())).await?;
     Ok(HttpResponse::NoContent().finish())
 }
