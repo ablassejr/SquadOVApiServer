@@ -442,6 +442,57 @@ where
     )
 }
 
+pub async fn get_video_uuids_owned_by_user<'a, T>(ex: T, uuid: &[Uuid], user_id: i64) -> Result<Vec<Uuid>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT video_uuid
+            FROM squadov.vods AS v
+            INNER JOIN squadov.users AS u
+                ON u.uuid = v.user_uuid
+            WHERE video_uuid = ANY($1)
+                AND u.id = $2
+            ",
+            uuid,
+            user_id,
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| { x.video_uuid })
+            .collect()
+    )
+}
+
+pub async fn get_local_vods<'a, T>(ex: T, uuid: &[Uuid], user_id: i64) -> Result<Vec<Uuid>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT video_uuid
+            FROM squadov.vods AS v
+            INNER JOIN squadov.users AS u
+                ON u.uuid = v.user_uuid
+            WHERE video_uuid = ANY($1)
+                AND is_local
+                AND u.id = $2
+            ",
+            uuid,
+            user_id,
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| { x.video_uuid })
+            .collect()
+    )
+}
+
 pub async fn get_vod_association<'a, T>(ex: T, uuid: &Uuid) -> Result<VodAssociation, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>

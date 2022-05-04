@@ -15,8 +15,11 @@ pub struct VodDeleteFromUuid {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
 pub struct BulkDeleteVodData {
     vods: Vec<Uuid>,
+    #[serde(default)]
+    local_only: bool,
 }
 
 impl api::ApiApplication {
@@ -111,15 +114,42 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn delete_vod_handler(data : web::Path<VodDeleteFromUuid>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+#[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct DeleteVodQuery {
+    #[serde(default)]
+    local_only: bool
+}
+
+async fn delete_vod_helper(app: Arc<api::ApiApplication>, video_uuids: &[Uuid], user_id: i64, local_only: bool) -> Result<(), SquadOvError> {
+    // Security measure to make sure user is only ever able to delete their own VODs.
+    let video_uuids = db::get_video_uuids_owned_by_user(&*app.pool, video_uuids, user_id).await?;
+
+    let vods_to_delete_from_server = if local_only {
+        // Two scenarios:
+        //  1) We're trying to delete a VOD that is local but also stored on our servers.
+        //  2) We're trying to delete a VOD that is ONLY local.
+        // In scenario two, those are the VODS we want to delete.
+        db::get_local_vods(&*app.pool, &video_uuids, user_id).await?
+    } else {
+        video_uuids
+    };
+
+    if !vods_to_delete_from_server.is_empty() {
+        app.bulk_delete_vods(&vods_to_delete_from_server, user_id).await?;
+        app.es_itf.request_delete_vod(vods_to_delete_from_server).await?;
+    }
+    Ok(())
+}
+
+pub async fn delete_vod_handler(data : web::Path<VodDeleteFromUuid>, app : web::Data<Arc<api::ApiApplication>>, query: web::Query<DeleteVodQuery>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    app.bulk_delete_vods(&[data.video_uuid.clone()], session.user.id).await?;
-    app.es_itf.request_delete_vod(vec![data.video_uuid.clone()]).await?;
+    delete_vod_helper(app.get_ref().clone(), &[data.video_uuid.clone()], session.user.id, query.local_only).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -130,6 +160,6 @@ pub async fn bulk_delete_vods_handler(app : web::Data<Arc<api::ApiApplication>>,
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    app.bulk_delete_vods(&data.vods, session.user.id).await?;
+    delete_vod_helper(app.get_ref().clone(), &data.vods, session.user.id, data.local_only).await?;
     Ok(HttpResponse::NoContent().finish())
 }
