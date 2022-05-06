@@ -147,7 +147,7 @@ impl ValorantMatchFilters {
                     q = q.filter(Query::terms("data.valorant.povEvents", pov_events.iter().map(|x| *x as i32).collect::<Vec<i32>>()));
                 }
 
-                {
+                if self.has_composition_filter() {
                     let friendly = self.build_friendly_es_composition_filter();
                     let enemy = self.build_enemy_es_composition_filter();
 
@@ -233,6 +233,28 @@ impl ValorantMatchFilters {
                 String::from(".*")
             }
         )
+    }
+
+    pub fn has_composition_filter(&self) -> bool {
+        if let Some(inner) = self.friendly_composition.as_ref() {
+            for x in inner {
+                if x.is_empty() {
+                    continue;
+                }
+                return true;
+            }
+        }
+
+        if let Some(inner) = self.enemy_composition.as_ref() {
+            for x in inner {
+                if x.is_empty() {
+                    continue;
+                }
+                return true;
+            }
+        }
+
+        false
     }
 
     pub fn build_friendly_es_composition_filter(&self) -> NestedQuery {
