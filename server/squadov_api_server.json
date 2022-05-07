@@ -3455,6 +3455,19 @@
       ]
     }
   },
+  "3036523524cbe9828c3cd12ecfbd3f8eb9c58c535e54b71c33c24a8205ec19c0": {
+    "query": "\n            INSERT INTO squadov.user_event_record (\n                user_id,\n                event_name,\n                tm\n            )\n            SELECT inp.id, $2, NOW()\n            FROM UNNEST($1::BIGINT[]) AS inp(id)\n            ON CONFLICT (user_id, event_name) DO UPDATE\n                SET tm = EXCLUDED.tm\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "3089c7722b7ec3db389026e8d59e40efd79574a2d5583d5c28773036471109c1": {
     "query": "\n                SELECT match_uuid\n                FROM squadov.new_wow_challenges AS wc\n                CROSS JOIN (\n                    SELECT wmv.start_tm, wcv.instance_id, wcv.keystone_level\n                    FROM squadov.wow_match_view AS wmv\n                    INNER JOIN squadov.wow_challenge_view AS wcv\n                        ON wcv.view_id = wmv.id\n                    WHERE wmv.id = $2\n                ) AS wmv(start_tm, instance_id, keystone_level)\n                WHERE wc.tr && tstzrange(wmv.start_tm, $3, '[]')\n                    AND wc.combatants_key = $1\n                    AND wc.instance_id = wmv.instance_id\n                    AND wc.keystone_level = wmv.keystone_level\n                ",
     "describe": {
@@ -5314,6 +5327,27 @@
       "nullable": []
     }
   },
+  "5083948128d3ad6cc48b1dd87ab5aa5bfa1b75769ba6a1097d5afcd50bd2826b": {
+    "query": "\n            SELECT video_uuid\n            FROM squadov.vods AS v\n            INNER JOIN squadov.users AS u\n                ON u.uuid = v.user_uuid\n            WHERE video_uuid = ANY($1)\n                AND is_local\n                AND u.id = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "50e5bf138da27e6485d3a633d157e16b749c5ab21dd6b9fef9faa304f5fb16b8": {
     "query": "\n        SELECT *\n        FROM squadov.csgo_event_container_round_kills\n        WHERE container_id = $1\n        ORDER BY tm ASC\n        ",
     "describe": {
@@ -5470,6 +5504,27 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "54be5ab9fe735fd9c8d77d16ab020c76ebc3a3a3194f830ce5cd78b2a6d26b29": {
+    "query": "\n            SELECT video_uuid\n            FROM squadov.vods AS v\n            INNER JOIN squadov.users AS u\n                ON u.uuid = v.user_uuid\n            WHERE video_uuid = ANY($1)\n                AND u.id = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "551344dfce7c376b125f7489a6a82db0cfef8dc27063a49771524be2df624267": {
@@ -6492,6 +6547,20 @@
         true,
         false
       ]
+    }
+  },
+  "60d4fd6c3516865929b55fb890aad97c1acad2b4decc0597152ca05bace54630": {
+    "query": "\n            INSERT INTO squadov.user_event_record (\n                user_id,\n                event_name,\n                platform,\n                tm\n            )\n            SELECT inp.id, $2, $3, NOW()\n            FROM UNNEST($1::BIGINT[]) AS inp(id)\n            ON CONFLICT (user_id, event_name, platform) DO UPDATE\n                SET tm = EXCLUDED.tm\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array",
+          "Varchar",
+          "Varchar"
+        ]
+      },
+      "nullable": []
     }
   },
   "61392061af743e6ce12c197fadea87fd5cce6fda3720406384c3093c09d4d080": {
@@ -8093,7 +8162,7 @@
       },
       "nullable": [
         false,
-        false,
+        true,
         false,
         false,
         false,
@@ -9503,6 +9572,99 @@
       ]
     }
   },
+  "96cc15e17ebae9dc83db3365dc6f315cd8538fb206e4e261b37f2205f352939d": {
+    "query": "\n            SELECT\n                vc.clip_uuid,\n                vc.title,\n                vc.description,\n                vc.tm,\n                vc.published,\n                vc.game,\n                u.username AS \"clipper\",\n                COALESCE(rc.count, 0) AS \"reacts!\",\n                COALESCE(cc.count, 0) AS \"comments!\",\n                COALESCE(cv.count, 0) AS \"views!\",\n                ufv.reason AS \"favorite_reason?\",\n                uwv.video_uuid IS NOT NULL AS \"is_watchlist!\",\n                COALESCE(JSONB_AGG(vvt.*) FILTER(WHERE vvt.video_uuid IS NOT NULL), '[]'::JSONB)  AS \"tags!\"\n            FROM squadov.vod_clips AS vc\n            INNER JOIN squadov.users AS u\n                ON u.id = vc.clip_user_id\n            LEFT JOIN squadov.view_clip_react_count AS rc\n                ON rc.clip_uuid = vc.clip_uuid\n            LEFT JOIN squadov.view_clip_comment_count AS cc\n                ON cc.clip_uuid = vc.clip_uuid\n            LEFT JOIN squadov.view_clip_view_count AS cv\n                ON cv.clip_uuid = vc.clip_uuid\n            LEFT JOIN squadov.user_favorite_vods AS ufv\n                ON ufv.video_uuid = vc.clip_uuid\n                    AND ufv.user_id = $2\n            LEFT JOIN squadov.user_watchlist_vods AS uwv\n                ON uwv.video_uuid = vc.clip_uuid\n                    AND uwv.user_id = $2\n            LEFT JOIN squadov.view_vod_tags AS vvt\n                ON vvt.video_uuid = vc.clip_uuid\n            WHERE vc.clip_uuid = ANY($1)\n            GROUP BY vc.clip_uuid, vc.parent_vod_uuid, vc.clip_user_id, vc.title, vc.description, vc.game, vc.tm, vc.published, u.username, rc.count, cc.count, cv.count, ufv.reason, uwv.video_uuid\n            ORDER BY vc.tm DESC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "clip_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "title",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "description",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "published",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "game",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 6,
+          "name": "clipper",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 7,
+          "name": "reacts!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 8,
+          "name": "comments!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 9,
+          "name": "views!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 10,
+          "name": "favorite_reason?",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 11,
+          "name": "is_watchlist!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 12,
+          "name": "tags!",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        null,
+        null,
+        null,
+        false,
+        null,
+        null
+      ]
+    }
+  },
   "96ff33e46b560bad266cc05563f9509107dfa1b85bc0bfa816a0e92b05296d73": {
     "query": "\n        DELETE FROM squadov.share_tokens\n        WHERE clip_uuid = $1 AND user_id = $2\n        ",
     "describe": {
@@ -9514,6 +9676,93 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "971c826c911c7c9f48a4edc9b7a4e6fb1ff61246639726bc4f9b401e2f9ec98b": {
+    "query": "\n            SELECT\n                vc.clip_uuid,\n                vc.title,\n                vc.description,\n                vc.tm,\n                vc.published,\n                u.username AS \"clipper\",\n                COALESCE(rc.count, 0) AS \"reacts!\",\n                COALESCE(cc.count, 0) AS \"comments!\",\n                COALESCE(cv.count, 0) AS \"views!\",\n                ufv.reason AS \"favorite_reason?\",\n                uwv.video_uuid IS NOT NULL AS \"is_watchlist!\",\n                COALESCE(JSONB_AGG(vvt.*) FILTER(WHERE vvt.video_uuid IS NOT NULL), '[]'::JSONB)  AS \"tags!\"\n            FROM squadov.vod_clips AS vc\n            INNER JOIN squadov.users AS u\n                ON u.id = vc.clip_user_id\n            LEFT JOIN squadov.view_clip_react_count AS rc\n                ON rc.clip_uuid = vc.clip_uuid\n            LEFT JOIN squadov.view_clip_comment_count AS cc\n                ON cc.clip_uuid = vc.clip_uuid\n            LEFT JOIN squadov.view_clip_view_count AS cv\n                ON cv.clip_uuid = vc.clip_uuid\n            LEFT JOIN squadov.user_favorite_vods AS ufv\n                ON ufv.video_uuid = vc.clip_uuid\n                    AND ufv.user_id = $2\n            LEFT JOIN squadov.user_watchlist_vods AS uwv\n                ON uwv.video_uuid = vc.clip_uuid\n                    AND uwv.user_id = $2\n            LEFT JOIN squadov.view_vod_tags AS vvt\n                ON vvt.video_uuid = vc.clip_uuid\n            WHERE vc.clip_uuid = ANY($1)\n            GROUP BY vc.clip_uuid, vc.parent_vod_uuid, vc.clip_user_id, vc.title, vc.description, vc.game, vc.tm, vc.published, u.username, rc.count, cc.count, cv.count, ufv.reason, uwv.video_uuid\n            ORDER BY vc.tm DESC\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "clip_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "title",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "description",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "published",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "clipper",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "reacts!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 7,
+          "name": "comments!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 8,
+          "name": "views!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 9,
+          "name": "favorite_reason?",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 10,
+          "name": "is_watchlist!",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 11,
+          "name": "tags!",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        null,
+        null,
+        null,
+        false,
+        null,
+        null
+      ]
     }
   },
   "97238f7c0e5f7081dbe80a63ca7a1c0714fed70f08b9b603978ccc7928b3770a": {
