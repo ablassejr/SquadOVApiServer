@@ -41,18 +41,18 @@ pub struct TftInfoDto {
 
 #[derive(Serialize, Deserialize)]
 pub struct TftParticipantDto {
-    #[serde(rename(serialize="goldLeft"))]
+    #[serde(rename(serialize="goldLeft"), alias="goldLeft")]
     pub gold_left: i32,
-    #[serde(rename(serialize="lastRound"))]
+    #[serde(rename(serialize="lastRound"), alias="lastRound")]
     pub last_round: i32,
     pub level: i32,
     pub placement: i32,
-    #[serde(rename(serialize="playersEliminated"))]
+    #[serde(rename(serialize="playersEliminated"), alias="playersEliminated")]
     pub players_eliminated: i32,
     pub puuid: String,
-    #[serde(rename(serialize="timeEliminated"))]
+    #[serde(rename(serialize="timeEliminated"), alias="timeEliminated")]
     pub time_eliminated: f32, // seconds
-    #[serde(rename(serialize="totalDamageToPlayers"))]
+    #[serde(rename(serialize="totalDamageToPlayers"), alias="totalDamageToPlayers")]
     pub total_damage_to_players: i32,
     pub traits: Vec<TftTraitDto>,
     pub units: Vec<TftUnitDto>,
@@ -71,19 +71,19 @@ pub struct TftCompanionDto {
 #[derive(Serialize,Deserialize,Clone,Debug)]
 pub struct TftTraitDto {
     pub name: String,
-    #[serde(rename(serialize="numUnits"))]
+    #[serde(rename(serialize="numUnits"), alias="numUnits")]
     pub num_units: i32,
     pub style: i32,
-    #[serde(rename(serialize="tierCurrent"))]
+    #[serde(rename(serialize="tierCurrent"), alias="tierCurrent")]
     pub tier_current: i32,
-    #[serde(rename(serialize="tierTotal"), default)]
+    #[serde(rename(serialize="tierTotal"), default, alias="tierTotal")]
     pub tier_total: i32
 }
 
 #[derive(Serialize,Deserialize,Clone,Debug)]
 pub struct TftUnitDto {
     pub items: Vec<i32>,
-    #[serde(rename(serialize="characterId"))]
+    #[serde(rename(serialize="characterId"), alias="characterId")]
     pub character_id: Option<String>,
     pub chosen: Option<String>,
     pub name: String,
