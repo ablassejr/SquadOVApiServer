@@ -93,7 +93,8 @@ resource "aws_iam_role_policy" "authenticated_cognito_policy" {
                 "execute-api:Invoke"
             ],
             "Resource": [
-                "arn:aws:execute-api:*:*:${var.api_gateway_id}/*/PUT/ff14"
+                "arn:aws:execute-api:*:*:${var.api_gateway_id}/*/PUT/ff14",
+                "arn:aws:execute-api:*:*:${var.api_gateway_id}/*/PUT/wow"
             ]
         }
     ]

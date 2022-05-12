@@ -156,13 +156,9 @@ resource "aws_s3_bucket" "combatlog_bucket" {
 
     lifecycle_rule {
         enabled = true
-        transition {
-            days = 30
-            storage_class = "STANDARD_IA"
-        }
 
         transition {
-            days = 90
+            days = 3
             storage_class = "GLACIER_IR"
         }
     }

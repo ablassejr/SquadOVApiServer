@@ -1,0 +1,2 @@
+ALTER TABLE combat_logs
+ADD COLUMN cl_state JSONB NOT NULL;

@@ -156,6 +156,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                             Box::new(access::DenyShareTokenAccess{}),
                         ))
                         .route("/config", web::get().to(v1::get_combatlog_config_handler))
+                        .service(
+                            web::scope("/partition/{partition_key}")
+                                .route("", web::post().to(v1::create_update_combat_log_handler))
+                        )
                 )
                 .service(
                     web::scope("/speedcheck")

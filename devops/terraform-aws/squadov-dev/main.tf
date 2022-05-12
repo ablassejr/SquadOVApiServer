@@ -39,6 +39,7 @@ module "db" {
     postgres_instance_type = "db.t4g.micro"
     postgres_db_subnets = module.network.database_subnets
     postgres_db_security_groups = module.network.database_security_groups
+    glue_subnet = module.network.private_k8s_subnets[0]
 
     redis_instance_type = "cache.t4g.micro"
 }

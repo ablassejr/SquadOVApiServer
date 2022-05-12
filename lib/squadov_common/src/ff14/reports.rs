@@ -6,12 +6,13 @@ use crate::{
     combatlog::{
         CombatLogReportHandler,
         CombatLogReportIO,
-        RawStaticCombatLogReport,
+        CombatLogReport,
     },
     ff14::combatlog::Ff14CombatLogPacket,
 };
 use num_enum::TryFromPrimitive;
 use chrono::{DateTime, Utc};
+use std::sync::Arc;
 
 pub struct Ff14ReportsGenerator<'a> {
     start_time: DateTime<Utc>,
@@ -64,8 +65,8 @@ impl<'a> CombatLogReportIO for Ff14ReportsGenerator<'a> {
         Ok(())
     }
 
-    fn get_reports(&mut self) -> Result<Vec<RawStaticCombatLogReport>, SquadOvError> {
-        let mut ret: Vec<RawStaticCombatLogReport> = vec![];
+    fn get_reports(&mut self) -> Result<Vec<Arc<dyn CombatLogReport + Send + Sync>>, SquadOvError> {
+        let mut ret: Vec<Arc<dyn CombatLogReport + Send + Sync>> = vec![];
 
         if let Some(dr) = self.death_report.as_mut() {
             ret.extend(dr.get_reports()?);

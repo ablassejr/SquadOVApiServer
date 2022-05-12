@@ -1,3 +1,4 @@
+/*
 resource "aws_kinesis_stream" "ff14_stream" {
     name = "ff14-stream"
     retention_period = 24
@@ -72,3 +73,4 @@ resource "aws_lambda_event_source_mapping" "ff14_lambda_kinesis" {
     maximum_retry_attempts = 0
     parallelization_factor = 8
 }
+*/

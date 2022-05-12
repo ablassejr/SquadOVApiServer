@@ -8,6 +8,7 @@ use crate::{
             CombatLogDiskIO,
             avro::CombatLogAvroFileIO,
         },
+        CombatLogReport,
     },
     ff14::{
         combatlog::{
@@ -23,6 +24,8 @@ use serde::Serialize;
 use avro_rs::{
     Schema,
 };
+use async_std::sync::{RwLock};
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct Ff14DeathReportGenerator<'a> {
@@ -89,16 +92,16 @@ impl<'a> CombatLogReportIO for Ff14DeathReportGenerator<'a> {
         Ok(())
     }
 
-    fn get_reports(&mut self) -> Result<Vec<RawStaticCombatLogReport>, SquadOvError> {
+    fn get_reports(&mut self) -> Result<Vec<Arc<dyn CombatLogReport + Send + Sync>>, SquadOvError> {
         let writer = self.writer.take();
         Ok(
             if let Some(w) = writer {
                 vec![
-                    RawStaticCombatLogReport{
+                    Arc::new(RawStaticCombatLogReport{
                         key_name: String::from("deaths.avro"),
-                        raw_file: w.get_underlying_file()?,
+                        raw_file: RwLock::new(w.get_underlying_file()?),
                         canonical_type: Ff14ReportTypes::Deaths as i32,
-                    }
+                    })
                 ]
             } else {
                 vec![]

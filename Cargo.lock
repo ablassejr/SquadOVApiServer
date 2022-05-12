@@ -1001,6 +1001,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
+name = "combat_log_parser"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "base64 0.13.0",
+ "byte-unit",
+ "bytes 1.1.0",
+ "chrono",
+ "env_logger 0.7.1",
+ "flate2",
+ "futures",
+ "lambda_runtime",
+ "log",
+ "lru",
+ "rusoto_core",
+ "rusoto_firehose",
+ "rusoto_secretsmanager",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "squadov_common",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "combat_log_report_generator"
 version = "0.1.0"
 dependencies = [
@@ -1659,28 +1685,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3fcf0cee53519c866c09b5de1f6c56ff9d647101f81c1964fa632e148896cdf"
 dependencies = [
  "instant",
-]
-
-[[package]]
-name = "ff14_combat_log_parser"
-version = "0.1.0"
-dependencies = [
- "base64 0.13.0",
- "byte-unit",
- "bytes 1.1.0",
- "chrono",
- "env_logger 0.7.1",
- "flate2",
- "futures",
- "lambda_runtime",
- "log",
- "rusoto_core",
- "rusoto_firehose",
- "serde",
- "serde_json",
- "sqlx",
- "squadov_common",
- "tokio",
 ]
 
 [[package]]

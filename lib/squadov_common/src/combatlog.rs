@@ -1,5 +1,6 @@
 pub mod io;
 pub mod agg;
+pub mod db;
 
 use crate::SquadOvError;
 use rusoto_s3::{
@@ -24,15 +25,52 @@ use rand::{
     Rng,
     SeedableRng,
 };
-use serde::{de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
+use std::fmt::Debug;
+use chrono::{DateTime, Utc};
+use async_trait::async_trait;
+use async_std::sync::{RwLock};
+use sqlx::{
+    postgres::{PgPool},
+};
+
+pub const LOG_FLUSH: &'static str = "//SQUADOV_COMBAT_LOG_FLUSH";
+
+#[derive(PartialEq)]
+pub enum CombatLogReportType {
+    Static,
+    Dynamic
+}
+
+#[async_trait]
+pub trait CombatLogReport {
+    fn report_type(&self) -> CombatLogReportType;
+    async fn store_static_report(&self, bucket: String, partition: String, s3: Arc<S3Client>) -> Result<(), SquadOvError>;
+    async fn store_dynamic_report(&self, pool: Arc<PgPool>) -> Result<(), SquadOvError>;
+}
 
 pub struct RawStaticCombatLogReport {
     // Name of the file we store into S3.
     pub key_name: String,
     // The file that contains the data on disk.
-    pub raw_file: File,
+    pub raw_file: RwLock<File>,
     // The 'type' of the report. This number depends on the game we're generating the report for.
     pub canonical_type: i32,
+}
+
+#[async_trait]
+impl CombatLogReport for RawStaticCombatLogReport {
+    fn report_type(&self) -> CombatLogReportType {
+        CombatLogReportType::Static
+    }
+
+    async fn store_static_report(&self, bucket: String, partition: String, s3: Arc<S3Client>) -> Result<(), SquadOvError> {
+        store_single_static_report(self, &bucket, &partition, s3).await
+    }
+
+    async fn store_dynamic_report(&self, _pool: Arc<PgPool>) -> Result<(), SquadOvError> {
+        Err(SquadOvError::BadRequest)
+    }
 }
 
 pub trait CombatLogReportHandler {
@@ -44,7 +82,7 @@ pub trait CombatLogReportHandler {
 pub trait CombatLogReportIO {
     fn finalize(&mut self) -> Result<(), SquadOvError>;
     fn initialize_work_dir(&mut self, dir: &str) -> Result<(), SquadOvError>;
-    fn get_reports(&mut self) -> Result<Vec<RawStaticCombatLogReport>, SquadOvError>;
+    fn get_reports(&mut self) -> Result<Vec<Arc<dyn CombatLogReport + Send + Sync>>, SquadOvError>;
 }
 
 pub trait CombatLogReportParser {
@@ -87,7 +125,7 @@ where
         self.generator.initialize_work_dir(dir)
     }
 
-    fn get_reports(&mut self) -> Result<Vec<RawStaticCombatLogReport>, SquadOvError> {
+    fn get_reports(&mut self) -> Result<Vec<Arc<dyn CombatLogReport + Send + Sync>>, SquadOvError> {
         self.generator.get_reports()
     }
 }
@@ -100,9 +138,18 @@ impl<T> CombatLogReportContainer<T> {
     }
 }
 
+pub trait CombatLogPacket {
+    type Data : Clone + Serialize + Debug;
+
+    fn parse_from_raw(partition_key: String, raw: String, cl_state: serde_json::Value) -> Result<Option<Self::Data>, SquadOvError>;
+    fn create_flush_packet(partition_key: String) -> Self::Data;
+    fn create_raw_packet(partition_key: String, tm: DateTime<Utc>, raw: String) -> Self::Data;
+    fn extract_timestamp(data: &Self::Data) -> DateTime<Utc>;
+}
+
 const MULTIPART_SEGMENT_SIZE_BYTES: u64 = 100 * 1024 * 1024;
 
-async fn store_single_static_report(mut report: RawStaticCombatLogReport, bucket: &str, partition: &str, s3: Arc<S3Client>) -> Result<(), SquadOvError> {
+async fn store_single_static_report(report: &RawStaticCombatLogReport, bucket: &str, partition: &str, s3: Arc<S3Client>) -> Result<(), SquadOvError> {
     let mut rng = rand::rngs::StdRng::from_entropy();
     let key = format!(
         "form=Report/partition={partition}/canonical={canonical}/{name}",
@@ -124,7 +171,8 @@ async fn store_single_static_report(mut report: RawStaticCombatLogReport, bucket
     // I imagine that it's unlikely that the report will ever get to the size where multipart upload
     // seriously needs to be considered but let's leave it here just in case to be robust. Note that this
     // code is duplicated from the AWS VOD manager. Ideally we'd consolidate...
-    let mut bytes_left_to_upload = report.raw_file.metadata().await?.len();
+    let mut raw_file = report.raw_file.write().await;
+    let mut bytes_left_to_upload = raw_file.metadata().await?.len();
     let num_parts = (bytes_left_to_upload as f32 / MULTIPART_SEGMENT_SIZE_BYTES as f32).ceil() as u64;
 
     let mut parts: Vec<String> = vec![];
@@ -135,8 +183,8 @@ async fn store_single_static_report(mut report: RawStaticCombatLogReport, bucket
             let part_size_bytes = std::cmp::min(bytes_left_to_upload, MULTIPART_SEGMENT_SIZE_BYTES);
 
             let mut buffer: Vec<u8> = vec![0; part_size_bytes as usize];
-            report.raw_file.seek(std::io::SeekFrom::Start(offset)).await?;
-            report.raw_file.read_exact(&mut buffer).await?;
+            raw_file.seek(std::io::SeekFrom::Start(offset)).await?;
+            raw_file.read_exact(&mut buffer).await?;
 
             let md5_hash = {
                 let mut hasher = md5::Md5::new();
@@ -201,14 +249,15 @@ async fn store_single_static_report(mut report: RawStaticCombatLogReport, bucket
     Ok(())
 }
 
-pub async fn store_static_combat_log_reports<'a>(reports: Vec<RawStaticCombatLogReport>, bucket: &'a str, partition: &'a str, s3: Arc<S3Client>) -> Result<(), SquadOvError> {
+pub async fn store_static_combat_log_reports<'a>(reports: Vec<Arc<dyn CombatLogReport + Send + Sync>>, bucket: &'a str, partition: &'a str, s3: Arc<S3Client>) -> Result<(), SquadOvError> {
     let handles = reports.into_iter()
+        .filter(|x| { x.report_type() == CombatLogReportType::Static })
         .map(|report| {
             let bucket = String::from(bucket);
             let partition = String::from(partition);
             let s3 = s3.clone();
             tokio::task::spawn(async move {
-                store_single_static_report(report, &bucket, &partition, s3).await?;
+                report.store_static_report(bucket, partition, s3).await?;
                 Ok::<(), SquadOvError>(())
             })
         })

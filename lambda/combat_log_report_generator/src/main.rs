@@ -9,9 +9,13 @@ use squadov_common::{
     encode,
     combatlog::{
         self,
-        CombatLogReportIO,
         CombatLogReportGenerator,
         CombatLogReportContainer,
+        CombatLogReportType,
+    },
+    wow::{
+        reports::WowReportsGenerator,
+        combatlog::WoWCombatLogState,
     },
     ff14::reports::Ff14ReportsGenerator,
 };
@@ -192,11 +196,14 @@ impl SharedClient {
             .fetch_one(&*self.pool)
             .await?;
 
-        let mut gen = match game {
-            "ff14" => CombatLogReportContainer::new(
+        let mut gen: Box<dyn CombatLogReportGenerator> = match game {
+            "ff14" => Box::new(CombatLogReportContainer::new(
                 // TODO: Pull actual start time from database
                 Ff14ReportsGenerator::new(report.start_time)?
-            ),
+            )),
+            "wow" => Box::new(CombatLogReportContainer::new(
+                WowReportsGenerator::new(report.start_time, self.pool.clone(), serde_json::from_value::<WoWCombatLogState>(report.cl_state)?)?
+            )),
             _ => {
                 log::error!("Unsupported game for combat log generation: {}", &game);
                 return Err(SquadOvError::BadRequest);
@@ -204,7 +211,7 @@ impl SharedClient {
         };
         
         gen.initialize_work_dir(work_dir)?;
-        Ok(Box::new(gen))
+        Ok(gen)
     }
 
     async fn generate_reports<'a>(&self, mut gen: Box<dyn CombatLogReportGenerator>, mut file: File) -> Result<Box<dyn CombatLogReportGenerator>, SquadOvError> {
@@ -232,7 +239,7 @@ impl SharedClient {
         // So we need to parse out the partition key to get 1) the game and 2) the unique ID since it's in the form: GAME_ID.
         // We can dispatch the report generation task based off of the game that we parsed out.
         lazy_static! {
-            static ref RE_KEY: Regex = Regex::new(r"form=(?P<form>.*)\/partition=(?P<partition>.*)\/").unwrap();
+            static ref RE_KEY: Regex = Regex::new(r"form=(?P<form>.*)/partition=(?P<partition>.*)/").unwrap();
             static ref RE_MATCH: Regex = Regex::new(r"(?P<game>.*)_(?P<id>.*)").unwrap();
         }
 
@@ -254,7 +261,17 @@ impl SharedClient {
                     self.create_report_generator(&game, &id, &self.efs_directory).await?,
                     self.load_merge_combat_log_data_to_disk(&data.bucket.name, &partition).await?
                 ).await?;
-                combatlog::store_static_combat_log_reports(gen.get_reports()?, &data.bucket.name, &partition, self.s3.clone()).await?;
+
+                let all_reports = gen.get_reports()?;
+                // There's two types of reports - static and "dynamic". Dynamic reports technicaly aren't really "dynamic";
+                // rather, they're just stored in the database rather than in S3.
+                combatlog::store_static_combat_log_reports(all_reports.clone(), &data.bucket.name, &partition, self.s3.clone()).await?;
+
+                for r in all_reports {
+                    if r.report_type() == CombatLogReportType::Dynamic {
+                        r.store_dynamic_report(self.pool.clone()).await?;
+                    }
+                }
                 Ok(())
             } else {
                 log::error!("Invalid game partition ID format: {}", &data.object.key);
@@ -326,8 +343,8 @@ async fn main() -> Result<(), SquadOvError> {
         pool: Arc::new(PgPoolOptions::new()
             .min_connections(1)
             .max_connections(1)
-            .max_lifetime(std::time::Duration::from_secs(6*60*60))
-            .idle_timeout(std::time::Duration::from_secs(3*60*60))
+            .max_lifetime(std::time::Duration::from_secs(60))
+            .idle_timeout(std::time::Duration::from_secs(10))
             .connect_with(conn)
             .await?
         ),

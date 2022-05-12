@@ -2,7 +2,6 @@
 extern crate log;
 
 mod api;
-mod wow_kafka;
 
 use tokio;
 use actix_rt;
@@ -81,17 +80,11 @@ async fn async_main(opts: Options) {
                 app.vod_itf.request_vod_processing(&v, "source", None, false).await.unwrap();
             }
             async_std::task::sleep(std::time::Duration::from_secs(5)).await;
-        } else if mode == "wow_manual_parsing" {
-            wow_kafka::create_wow_consumer_thread(app.clone(), &config.kafka.wow_combat_log_topic, &kafka_config).await.unwrap();
         } else {
             log::error!("Invalid mode: {}", &mode);
         }
     } else {
         let config2 = config.clone();
-
-        for _i in 0..config.kafka.wow_combat_log_threads {
-            wow_kafka::create_wow_consumer_thread(app.clone(), &config.kafka.wow_combat_log_topic, &kafka_config);
-        }
 
         let redis_pool = Arc::new(deadpool_redis::Config{
             url: Some(config.redis.url.clone()),

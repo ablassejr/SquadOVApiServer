@@ -1,9 +1,12 @@
-use crate::SquadOvError;
+use crate::{
+    SquadOvError,
+    combatlog::{
+        CombatLogPacket,
+    },
+};
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use std::str::FromStr;
-
-const LOG_FLUSH: &'static str = "//SQUADOV_COMBAT_LOG_FLUSH";
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub enum Ff14DotHotType {
@@ -664,7 +667,7 @@ fn parse_map(parts: &[&str]) -> Result<Ff14CombatLogEvent, SquadOvError> {
     )
 }
 
-fn internal_parse_ff14_combat_log_line(partition_id: String, parts: &[&str]) -> Result<Ff14CombatLogPacket, SquadOvError> {
+fn internal_parse_ff14_combat_log_line(partition_id: String, parts: &[&str]) -> Result<Option<Ff14CombatLogPacket>, SquadOvError> {
     if parts.is_empty() || parts.len() < 2 {
         return Err(SquadOvError::BadRequest);
     }
@@ -672,7 +675,7 @@ fn internal_parse_ff14_combat_log_line(partition_id: String, parts: &[&str]) -> 
     let action_id: i64 = parts[0].parse()?;
     let time: DateTime<Utc> = DateTime::from(DateTime::parse_from_rfc3339(parts[1])?);
     let rest = &parts[2..];
-    Ok(
+    Ok(Some(
         Ff14CombatLogPacket{
             partition_id,
             time,
@@ -710,25 +713,42 @@ fn internal_parse_ff14_combat_log_line(partition_id: String, parts: &[&str]) -> 
                     252 => Ff14CombatLogEvent::PacketDump,
                     253 => Ff14CombatLogEvent::Version,
                     254 => Ff14CombatLogEvent::Error,
-                    _ => Ff14CombatLogEvent::Unknown,
+                    _ => return Ok(None),
                 },
             },
         }
-    )
+    ))
 }
 
-pub fn parse_ff14_combat_log_line(partition_id: String, line: String) -> (String, Result<Ff14CombatLogPacket, SquadOvError>) {
+pub fn parse_ff14_combat_log_line(partition_id: String, line: String) -> Result<Option<Ff14CombatLogPacket>, SquadOvError> {
     let parts: Vec<&str> = line.split("|").collect();
-    (
-        line.clone(),
-        if line == LOG_FLUSH {
-            Ok(Ff14CombatLogPacket{
-                partition_id,
-                time: Utc::now(),
-                data: Ff14PacketData::Flush,
-            })
-        } else {
-            internal_parse_ff14_combat_log_line(partition_id, &parts)
-        },
-    )
+    internal_parse_ff14_combat_log_line(partition_id, &parts)
+}
+
+impl CombatLogPacket for Ff14CombatLogPacket {
+    type Data = Ff14CombatLogPacket;
+
+    fn parse_from_raw(partition_key: String, raw: String, _cl_state: serde_json::Value) -> Result<Option<Self::Data>, SquadOvError> {
+        parse_ff14_combat_log_line(partition_key, raw)
+    }
+
+    fn create_flush_packet(partition_key: String) -> Self::Data {
+        Ff14CombatLogPacket{
+            partition_id: partition_key,
+            time: Utc::now(),
+            data: Ff14PacketData::Flush,
+        }
+    }
+
+    fn create_raw_packet(partition_key: String, tm: DateTime<Utc>, raw: String) -> Self::Data {
+        Ff14CombatLogPacket{
+            partition_id: partition_key,
+            time: tm,
+            data: Ff14PacketData::Raw{inner: raw},
+        }
+    }
+
+    fn extract_timestamp(data: &Self::Data) -> DateTime<Utc> {
+        data.time.clone()
+    }
 }

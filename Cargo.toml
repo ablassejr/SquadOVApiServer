@@ -10,7 +10,7 @@ members = [
     "msa/csgo_demo_handler",
     "msa/devapi",
     "msa/elasticsearch_sync",
-    "lambda/ff14_combat_log_parser",
+    "lambda/combat_log_parser",
     "lambda/combat_log_report_generator"
 ]
 default-members = [
@@ -24,7 +24,7 @@ default-members = [
     "msa/csgo_demo_handler",
     "msa/devapi",
     "msa/elasticsearch_sync",
-    "lambda/ff14_combat_log_parser",
+    "lambda/combat_log_parser",
     "lambda/combat_log_report_generator"
 ]
 exclude = ["deps/cargo/rust-petname", "deps/cargo/sqlx"]

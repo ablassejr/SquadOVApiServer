@@ -1,4 +1,5 @@
 pub mod avro;
+pub mod json;
 
 use crate::SquadOvError;
 use serde::Serialize;

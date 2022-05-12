@@ -62,6 +62,11 @@ resource "aws_route_table" "public_route_table" {
         cidr_block = "0.0.0.0/0"
         gateway_id = aws_internet_gateway.primary_gateway.id
     }
+
+    route {
+        cidr_block = aws_vpc.lambda.cidr_block
+        vpc_peering_connection_id = aws_vpc_peering_connection.lambda_primary.id
+    }
 }
 
 resource "aws_vpc_endpoint" "s3_endpoint_us_east_2" {
