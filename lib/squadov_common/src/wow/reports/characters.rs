@@ -56,6 +56,7 @@ pub struct WowCharacterReportGenerator {
 }
 
 #[derive(Serialize, Debug)]
+#[serde(rename_all="camelCase")]
 pub struct WowCharacterReport {
     unit_guid: String,
     unit_name: String,
@@ -68,19 +69,20 @@ const CHAR_REPORT_SCHEMA_RAW: &'static str = r#"
         "type": "record",
         "name": "wow_character_summary",
         "fields": [
-            {"name": "unit_guid", "type": "string"},
-            {"name": "unit_name", "type": "string"},
+            {"name": "unitGuid", "type": "string"},
+            {"name": "unitName", "type": "string"},
             {"name": "flags", "type": {
                 "type": "array",
                 "items": "long",
                 "default": []
             }},
-            {"name": "owner_guid", "type": ["null", "string"]}
+            {"name": "ownerGuid", "type": ["null", "string"]}
         ]
     }
 "#;
 
 #[derive(Serialize, Debug)]
+#[serde(rename_all="camelCase")]
 pub struct WowCombatantReport {
     unit_guid: String,
     unit_name: String,
@@ -96,13 +98,13 @@ const COMBATANT_REPORT_SCHEMA_RAW: &'static str = r#"
         "type": "record",
         "name": "wow_combatant_summary",
         "fields": [
-            {"name": "unit_guid", "type": "string"},
-            {"name": "unit_name", "type": "string"},
+            {"name": "unitGuid", "type": "string"},
+            {"name": "unitName", "type": "string"},
             {"name": "ilvl", "type": "int"},
-            {"name": "spec_id", "type": "int"},
+            {"name": "specId", "type": "int"},
             {"name": "team", "type": "int"},
             {"name": "rating", "type": "int"},
-            {"name": "class_id", "type": ["null", "long"]}
+            {"name": "classId", "type": ["null", "long"]}
         ]
     }
 "#;

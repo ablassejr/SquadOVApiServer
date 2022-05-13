@@ -144,7 +144,7 @@ impl RawWoWCombatLogPayload {
 pub struct WoWSpellInfo {
     pub id: i64,
     name: String,
-    school: i64
+    pub school: i64
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
@@ -472,7 +472,7 @@ impl WoWCombatLogAdvancedCVars {
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct WoWCombatLogEvent {
-    timestamp: DateTime<Utc>,
+    pub timestamp: DateTime<Utc>,
     pub source: Option<WoWCombatLogSourceDest>,
     pub dest: Option<WoWCombatLogSourceDest>,
     pub advanced: Option<WoWCombatLogAdvancedCVars>,

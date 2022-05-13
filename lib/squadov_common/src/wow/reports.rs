@@ -1,4 +1,5 @@
 mod characters;
+mod events;
 mod stats;
 
 use crate::{
@@ -20,10 +21,11 @@ use sqlx::{
     postgres::{PgPool},
 };
 
-pub struct WowReportsGenerator {
+pub struct WowReportsGenerator<'a> {
     parent_cl: CombatLog,
     work_dir: Option<String>,
     character_gen: Option<characters::WowCharacterReportGenerator>,
+    event_gen: Option<events::WowEventReportGenerator<'a>>,
     pool: Arc<PgPool>,
     cl_state: WoWCombatLogState,
 }
@@ -42,19 +44,27 @@ pub enum WowReportTypes {
     DeathRecap,
 }
 
-impl CombatLogReportHandler for WowReportsGenerator {
+impl<'a> CombatLogReportHandler for WowReportsGenerator<'a> {
     type Data = WowCombatLogPacket;
     fn handle(&mut self, data: &Self::Data) -> Result<(), SquadOvError> {
         if let Some(gen) = self.character_gen.as_mut() {
+            gen.handle(data)?;
+        }
+
+        if let Some(gen) = self.event_gen.as_mut() {
             gen.handle(data)?;
         }
         Ok(())
     }
 }
 
-impl CombatLogReportIO for WowReportsGenerator {
+impl<'a> CombatLogReportIO for WowReportsGenerator<'a> {
     fn finalize(&mut self) -> Result<(), SquadOvError> {
         if let Some(g) = self.character_gen.as_mut() {
+            g.finalize()?;
+        }
+
+        if let Some(g) = self.event_gen.as_mut() {
             g.finalize()?;
         }
         Ok(())
@@ -69,13 +79,23 @@ impl CombatLogReportIO for WowReportsGenerator {
             self.character_gen = Some(gen);
         }
 
+        {
+            let mut gen = events::WowEventReportGenerator::new();
+            gen.initialize_work_dir(dir)?;
+            self.event_gen = Some(gen);
+        }
+
         Ok(())
     }
 
     fn get_reports(&mut self) -> Result<Vec<Arc<dyn CombatLogReport + Send + Sync>>, SquadOvError> {
         let mut ret: Vec<Arc<dyn CombatLogReport + Send + Sync>> = vec![];
 
-        if let Some(gen) = self.character_gen.as_mut() {
+        if let Some(mut gen) = self.character_gen.take() {
+            ret.extend(gen.get_reports()?);
+        }
+
+        if let Some(mut gen) = self.event_gen.take() {
             ret.extend(gen.get_reports()?);
         }
 
@@ -83,12 +103,13 @@ impl CombatLogReportIO for WowReportsGenerator {
     }
 }
 
-impl WowReportsGenerator {
+impl<'a> WowReportsGenerator<'a> {
     pub fn new(parent_cl: CombatLog, pool: Arc<PgPool>) -> Result<Self, SquadOvError> {
         let cl_state = serde_json::from_value(parent_cl.cl_state.clone())?;
         Ok(Self{
             parent_cl,
             character_gen: None,
+            event_gen: None,
             work_dir: None,
             pool,
             cl_state,
