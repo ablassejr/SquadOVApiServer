@@ -272,20 +272,6 @@
       ]
     }
   },
-  "088b03cc7496681c1b942904373fd965d15a20d35263913c60b52750ff1ec822": {
-    "query": "\n            INSERT INTO squadov.wow_user_character_cache (\n                user_id,\n                unit_guid,\n                unit_name,\n                spec_id,\n                class_id,\n                items,\n                cache_time,\n                build_version\n            )\n            SELECT DISTINCT ON (data.user_id, data.unit_guid)\n                data.user_id,\n                data.unit_guid,\n                wcp.unit_name,\n                wvc.spec_id,\n                wvc.class_id,\n                ARRAY_AGG(wci.ilvl ORDER BY wci.idx ASC),\n                NOW(),\n                wmv.build_version\n            FROM UNNEST($1::BIGINT[], $2::VARCHAR[], $3::UUID[]) AS data(user_id, unit_guid, view_id)\n            INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                ON wcp.view_id = data.view_id\n                    AND wcp.unit_guid = data.unit_guid\n            INNER JOIN squadov.wow_match_view_combatants AS wvc\n                ON wvc.character_id = wcp.character_id\n            INNER JOIN squadov.wow_match_view AS wmv\n                ON wmv.id = data.view_id\n            LEFT JOIN squadov.wow_match_view_combatant_items AS wci\n                ON wci.event_id = wvc.event_id\n            GROUP BY data.user_id, data.unit_guid, wcp.unit_name, wvc.spec_id, wvc.class_id, wmv.build_version, wvc.event_id\n            ORDER BY data.user_id, data.unit_guid, wvc.event_id DESC\n            ON CONFLICT (user_id, unit_guid) DO UPDATE SET\n                unit_name = EXCLUDED.unit_name,\n                spec_id = EXCLUDED.spec_id,\n                class_id = EXCLUDED.class_id,\n                items = EXCLUDED.items,\n                cache_time = EXCLUDED.cache_time,\n                build_version = EXCLUDED.build_version\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8Array",
-          "VarcharArray",
-          "UuidArray"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "089bb1331035647563769932a352c2ebca473988956d80a52ecd9e666d381568": {
     "query": "\n            SELECT\n                encrypted_token AS \"data\",\n                iv,\n                aad,\n                tag\n            FROM squadov.share_tokens\n            WHERE id = $1\n            ",
     "describe": {
@@ -1641,6 +1627,32 @@
       ]
     }
   },
+  "18ca4b7fc1df8bc287aa2cc875f94f5080cae105f1bb14782a0d82a0cbec9584": {
+    "query": "\n                SELECT spell_id, class_id\n                FROM squadov.wow_spell_to_class\n                WHERE spell_id = ANY($1)\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "spell_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "class_id",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4Array"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
   "18dfcd29bfec0daf50c4b5908fa8f63fb3253fd5c4cf27795c6a19d139cae1ec": {
     "query": "\n        DELETE FROM squadov.community_member_roles AS cmr\n        USING squadov.community_membership AS cm\n        WHERE cm.id = cmr.membership_id\n            AND cm.user_id = $1\n            AND cmr.role_id = $2\n        ",
     "describe": {
@@ -2307,6 +2319,32 @@
         ]
       },
       "nullable": [
+        false
+      ]
+    }
+  },
+  "1feb81bde422dbfe9c2edba8d3548cd7ecb139abdf2bab1e01538de8099cbc0d": {
+    "query": "\n                    SELECT spell_id, class_id\n                    FROM squadov.wow_spell_to_class\n                    WHERE spell_id = ANY($1)\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "spell_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "class_id",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4Array"
+        ]
+      },
+      "nullable": [
+        false,
         false
       ]
     }
@@ -3535,6 +3573,44 @@
       ]
     }
   },
+  "310218fca8b32edbcc43688c8021719dbaf4d76f00ebd4b556ad4d839f12f387": {
+    "query": "\n            SELECT *\n            FROM squadov.combat_logs\n            WHERE partition_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "partition_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "start_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "owner_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "cl_state",
+          "type_info": "Jsonb"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "31351fc49f1d143329928a4b3d7ca11685fce8980b904464e7ae8d1c00e00010": {
     "query": "\n                SELECT (($3::BOOLEAN AND wev.view_id IS NOT NULL) \n                    OR ($4::BOOLEAN AND (wiv.view_id IS NOT NULL AND wiv.instance_type = 1))\n                    OR ($5::BOOLEAN AND wcv.view_id IS NOT NULL)\n                    OR ($6::BOOLEAN AND \n                        (\n                            wav.view_id IS NOT NULL\n                                OR (\n                                    wiv.view_id IS NOT NULL AND wiv.instance_type = 4\n                                )\n                        )\n                    )\n                    OR ($7::BOOLEAN AND (wiv.view_id IS NOT NULL AND wiv.instance_type = 3))\n                    OR (wmv.build_version LIKE ANY ($8::VARCHAR[]))\n                ) AS \"value!\"\n                FROM squadov.wow_match_view AS wmv\n                LEFT JOIN squadov.wow_encounter_view AS wev\n                    ON wev.view_id = wmv.id\n                LEFT JOIN squadov.wow_challenge_view AS wcv\n                    ON wcv.view_id = wmv.id\n                LEFT JOIN squadov.wow_arena_view AS wav\n                    ON wav.view_id = wmv.id\n                LEFT JOIN squadov.wow_instance_view AS wiv\n                    ON wiv.view_id = wmv.id\n                WHERE wmv.match_uuid = $1\n                    AND wmv.user_id = $2\n                ",
     "describe": {
@@ -3999,20 +4075,6 @@
         false,
         false
       ]
-    }
-  },
-  "37c985e8677d3b0c198dd017fa1271c56cd2a4297ba2606af1abccfa9ad74683": {
-    "query": "\n        UPDATE squadov.wow_match_view_combatants AS wvc\n        SET class_id = sub.class_id\n        FROM (\n            SELECT wve.event_id, wsc.class_id\n            FROM UNNEST($1::VARCHAR[], $2::BIGINT[], $3::BIGINT[]) AS t(guid, spell_id, view_id)\n            INNER JOIN squadov.wow_match_view AS wmv\n                ON wmv.alt_id = t.view_id\n            INNER JOIN squadov.wow_spell_to_class AS wsc\n                ON wsc.spell_id = t.spell_id\n                    AND wmv.build_version LIKE wsc.build_id  || '.%'\n            INNER JOIN squadov.wow_match_view_events AS wve\n                ON wve.view_id = wmv.alt_id\n            INNER JOIN squadov.wow_match_view_combatants AS wvc\n                ON wvc.event_id = wve.event_id\n            INNER JOIN squadov.wow_match_view_character_presence AS wcp\n                ON wcp.character_id = wvc.character_id\n                    AND wcp.view_id = wmv.id\n                    AND wcp.unit_guid = t.guid\n        ) AS sub\n        WHERE wvc.event_id = sub.event_id\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "VarcharArray",
-          "Int8Array",
-          "Int8Array"
-        ]
-      },
-      "nullable": []
     }
   },
   "37cb05e05f2bc313ccc27d8a51725734341ded0a1972ec432ce6a3f91974d9c6": {
@@ -4660,39 +4722,6 @@
       ]
     }
   },
-  "4558b1d6bcd403f55d85705f8434160430568e7d521a45f025e719dc65e75a07": {
-    "query": "\n            UPDATE squadov.wow_match_view_character_presence AS wcp\n            SET has_combatant_info = TRUE\n            FROM UNNEST($1::UUID[], $2::VARCHAR[]) AS sub(view_id, unit_guid)\n            WHERE wcp.view_id = sub.view_id AND wcp.unit_guid = sub.unit_guid\n            RETURNING wcp.view_id, wcp.unit_guid, wcp.character_id\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "view_id",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "unit_guid",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "character_id",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "VarcharArray"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "46b58655513b8e467a7585a7ecc23ec9663bb971b38d211821126c265fc8d4df": {
     "query": "\n                UPDATE squadov.geo_ip_cache\n                SET cache_tm = NOW()\n                WHERE ip_addr >>= $1\n                ",
     "describe": {
@@ -4807,6 +4836,32 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "492050755af2da5f872cbdc01c23cc0235b968f3e2a8bd93911ef86b1f65a4a2": {
+    "query": "\n            SELECT spell_id, class_id\n            FROM squadov.wow_spell_to_class\n            WHERE spell_id = ANY($1)\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "spell_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "class_id",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4Array"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
     }
   },
   "4924319db705ea8f6bdd17883d05c56e9327da9c1b87564c664bdfc2c1134b93": {
@@ -5665,6 +5720,33 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "560ce4225f6df4d6dc4ebc529ec4e77cc6c26082645d418d7838edfd1c6f9e65": {
+    "query": "\n                    SELECT spell_id, class_id\n                    FROM squadov.wow_spell_to_class\n                    WHERE spell_id = ANY($1)\n                        AND $2 LIKE build_id || '.%'\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "spell_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "class_id",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4Array",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
     }
   },
   "5616044cca9560f02809f6007f8640731d5a20cfafd1a9f1eaab0aa8c6fda65d": {
@@ -8783,22 +8865,6 @@
       ]
     }
   },
-  "86a217b788f8af0e2836978e615fb03937a1174287252b51b170c81aafa202f8": {
-    "query": "\n        INSERT INTO squadov.wow_user_character_cache (\n            user_id,\n            unit_guid,\n            unit_name,\n            class_id,\n            cache_time,\n            build_version\n        )\n        SELECT t.user_id, t.unit_guid, t.unit_name, wsc.class_id, NOW(), t.build_version\n        FROM UNNEST($1::BIGINT[], $2::VARCHAR[], $3::VARCHAR[], $4::VARCHAR[], $5::BIGINT[]) AS t(user_id, unit_guid, unit_name, build_version, spell_id)\n        INNER JOIN squadov.wow_spell_to_class AS wsc\n            ON wsc.spell_id = t.spell_id\n                AND t.build_version LIKE wsc.build_id  || '.%'\n        ON CONFLICT (user_id, unit_guid) DO UPDATE SET\n            unit_name = EXCLUDED.unit_name,\n            class_id = EXCLUDED.class_id,\n            cache_time = EXCLUDED.cache_time,\n            build_version = EXCLUDED.build_version\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8Array",
-          "VarcharArray",
-          "VarcharArray",
-          "VarcharArray",
-          "Int8Array"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "8846f3debccc6abdf917b3ec0c7987cad19df3c136c03160a641db6962f651ab": {
     "query": "\n            SELECT DISTINCT\n                wcc.covenant_id,\n                wcc.soulbind_id,\n                wcc.soulbind_traits,\n                wcc.conduit_item_ids,\n                wcc.conduit_item_ilvls\n            FROM squadov.wow_match_view_character_presence AS wcp\n            INNER JOIN squadov.wow_match_view_combatant_covenants AS wcc\n                ON wcc.character_id = wcp.character_id\n            WHERE wcp.view_id = $1\n                AND wcp.unit_guid = $2\n            ",
     "describe": {
@@ -9994,21 +10060,6 @@
         null,
         null
       ]
-    }
-  },
-  "9d1a6905caf2a95b43fa01bc0a7d76692c3abb499b5ac6c1c8465c6d8b84dd76": {
-    "query": "\n            UPDATE squadov.wow_match_view_character_presence AS wcp\n            SET current_hp = COALESCE(t.hp, wcp.current_hp),\n                max_hp = COALESCE(t.max, wcp.max_hp)\n            FROM UNNEST($1::UUID[], $2::VARCHAR[], $3::BIGINT[], $4::BIGINT[]) AS t(view_id, unit_guid, hp, max)\n            WHERE wcp.view_id = t.view_id\n                AND wcp.unit_guid = t.unit_guid\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "VarcharArray",
-          "Int8Array",
-          "Int8Array"
-        ]
-      },
-      "nullable": []
     }
   },
   "9d28d2b79590563f64924574abd36e4ef7f9268cd6df2b890a85cdfa4a3e2de0": {
@@ -11381,20 +11432,6 @@
       "nullable": []
     }
   },
-  "b787010a9881aa0f8fab806325b79ace65dfb51f78b9c4ba06337502c14633cb": {
-    "query": "\n        UPDATE squadov.wow_match_view_character_presence AS wcp\n        SET class_id = sub.class_id\n        FROM (\n            SELECT t.guid, wsc.class_id, wmv.id AS \"view_id\"\n            FROM UNNEST($1::VARCHAR[], $2::BIGINT[], $3::BIGINT[]) AS t(guid, spell_id, view_id)\n            INNER JOIN squadov.wow_match_view AS wmv\n                ON wmv.alt_id = t.view_id\n            INNER JOIN squadov.wow_spell_to_class AS wsc\n                ON wsc.spell_id = t.spell_id\n                    AND wmv.build_version LIKE wsc.build_id  || '.%'\n        ) AS sub\n        WHERE wcp.view_id = sub.view_id\n            AND unit_guid = sub.guid\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "VarcharArray",
-          "Int8Array",
-          "Int8Array"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "b7dc5c515f2c5b74c68d533c7e7bf21f44aa699e057af3b305dc9c9af8f41f2c": {
     "query": "\n        UPDATE squadov.vod_clips\n        SET published = TRUE,\n            title = COALESCE($2, title),\n            description = COALESCE($3, description)\n        WHERE clip_uuid = $1\n        ",
     "describe": {
@@ -12272,6 +12309,24 @@
         "Left": [
           "Uuid",
           "Int8",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "c8d85af10829910b6b57e32603dfa4dac12c1f975193a17b854952101a38c067": {
+    "query": "\n            INSERT INTO squadov.wow_user_character_cache (\n                user_id,\n                unit_guid,\n                unit_name,\n                spec_id,\n                class_id,\n                items,\n                cache_time,\n                build_version\n            ) VALUES (\n                $1,\n                $2,\n                $3,\n                $4,\n                $5,\n                $6,\n                NOW(),\n                $7\n            ) ON CONFLICT (user_id, unit_guid) DO UPDATE SET\n                unit_name = EXCLUDED.unit_name,\n                class_id = EXCLUDED.class_id,\n                spec_id = EXCLUDED.spec_id,\n                items = EXCLUDED.items,\n                build_version = EXCLUDED.build_version\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Varchar",
+          "Varchar",
+          "Int4",
+          "Int4",
+          "Int4Array",
           "Varchar"
         ]
       },

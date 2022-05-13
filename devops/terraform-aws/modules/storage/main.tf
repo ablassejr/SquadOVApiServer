@@ -156,6 +156,7 @@ resource "aws_s3_bucket" "combatlog_bucket" {
 
     lifecycle_rule {
         enabled = true
+        abort_incomplete_multipart_upload_days = 1
 
         transition {
             days = 3
@@ -176,11 +177,7 @@ resource "aws_s3_bucket" "combatlog_bucket" {
     }
 }
 
-output "combatlog_bucket_arn" {
-    value = aws_s3_bucket.combatlog_bucket.arn
-}
-
-output "combatlog_bucket_id" {
+output "combatlog_bucket_name" {
     value = aws_s3_bucket.combatlog_bucket.id
 }
 

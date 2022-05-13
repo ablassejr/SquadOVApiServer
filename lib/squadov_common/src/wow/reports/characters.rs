@@ -1,3 +1,5 @@
+mod cache;
+
 use crate::{
     SquadOvError,
     combatlog::{
@@ -10,6 +12,7 @@ use crate::{
             json::CombatLogJsonFileIO,
         },
         CombatLogReport,
+        CombatLog,
     },
     wow::{
         combatlog::{
@@ -41,8 +44,10 @@ use sqlx::{
 };
 
 pub struct WowCharacterReportGenerator {
+    parent_cl: CombatLog,
     work_dir: Option<String>,
     chars: HashMap<String, WowCharacterReport>,
+    self_guid: Option<String>,
     per_combatant_unique_spells: HashMap<String, HashSet<i64>>,
     combatants: HashMap<String, WowCombatantReport>,
     loadouts: HashMap<String, WowFullCharacter>,
@@ -50,7 +55,7 @@ pub struct WowCharacterReportGenerator {
     build_version: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct WowCharacterReport {
     unit_guid: String,
     unit_name: String,
@@ -75,7 +80,7 @@ const CHAR_REPORT_SCHEMA_RAW: &'static str = r#"
     }
 "#;
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct WowCombatantReport {
     unit_guid: String,
     unit_name: String,
@@ -194,10 +199,12 @@ impl CombatLogReportHandler for WowCharacterReportGenerator {
 }
 
 impl WowCharacterReportGenerator {
-    pub fn new(pool: Arc<PgPool>, build_version: String) -> Self {
+    pub fn new(pool: Arc<PgPool>, parent_cl: CombatLog, build_version: String) -> Self {
         WowCharacterReportGenerator{
+            parent_cl,
             work_dir: None,
             chars: HashMap::new(),
+            self_guid: None,
             per_combatant_unique_spells: HashMap::new(),
             combatants: HashMap::new(),
             loadouts: HashMap::new(),
@@ -255,6 +262,10 @@ impl WowCharacterReportGenerator {
         // All players needs to be tracked with combatant reports.
         if data.guid.starts_with("Player-") {
             self.initialize_combatant(&data.guid, &data.name)?;
+
+            if data.flags & constants::COMBATLOG_FILTER_ME == constants::COMBATLOG_FILTER_ME && data.guid != constants::NIL_WOW_GUID {
+                self.self_guid = Some(data.guid.clone());
+            }
         }
 
         Ok(())
@@ -328,9 +339,35 @@ impl CombatLogReportIO for WowCharacterReportGenerator {
         let mut ret: Vec<Arc<dyn CombatLogReport + Send + Sync>> = vec![];
         let work_dir = self.work_dir.as_ref().ok_or(SquadOvError::InternalError(String::from("No Work Dir Set [WowCharacterReportGenerator]")))?.as_str();
 
+        // Create a report that associates the report owner with the current character.
+        if let Some(self_guid) = self.self_guid.take() {
+            let mut report = cache::WowUserCharacterCacheReport{
+                user_id: self.parent_cl.owner_id,
+                build_version: self.build_version.clone(),
+                unit_guid: self_guid.clone(),
+                ..cache::WowUserCharacterCacheReport::default()
+            };
+
+            if let Some(ch) = self.chars.get(&self_guid) {
+                report.unit_name = ch.unit_name.clone();
+            }
+
+            if let Some(ct) = self.combatants.get(&self_guid) {
+                report.spec_id = ct.spec_id;
+                report.class_id = ct.class_id.clone().map(|x| { x as i32 });
+            }
+
+            if let Some(loadout) = self.loadouts.get(&self_guid) {
+                report.items = loadout.items.iter().map(|x| { x.item_id as i32 }).collect();
+            }
+
+            ret.push(Arc::new(report));
+        }
+
         {
             let mut w = CombatLogAvroFileIO::new(work_dir, &CHAR_REPORT_SCHEMA)?;
             for (_, c) in self.chars.drain() {
+                log::info!("Add char: {:?}", &c);
                 w.handle(c)?;
             }
 
@@ -346,6 +383,7 @@ impl CombatLogReportIO for WowCharacterReportGenerator {
         {
             let mut w = CombatLogAvroFileIO::new(work_dir, &COMBATANT_REPORT_SCHEMA)?;
             for (_, c) in self.combatants.drain() {
+                log::info!("Add combatant: {:?}", &c);
                 w.handle(c)?;
             }
 

@@ -1,8 +1,4 @@
-variable "combatlog_bucket_arn" {
-    type = string
-}
-
-variable "combatlog_bucket_id" {
+variable "combatlog_bucket_name" {
     type = string
 }
 

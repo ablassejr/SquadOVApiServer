@@ -1,10 +1,17 @@
+variable "wow_shards" {
+    type = number
+}
+
 resource "aws_kinesis_stream" "wow_stream" {
     name = "wow-stream"
+    shard_count = var.wow_shards
+
     retention_period = 24
     encryption_type = "KMS"
     kms_key_id = "alias/aws/kinesis"
+
     stream_mode_details {
-        stream_mode = "ON_DEMAND"
+        stream_mode = "PROVISIONED"
     }
 }
 
@@ -41,7 +48,7 @@ resource "aws_lambda_function" "wow_combat_log_lambda" {
     handler = "not.used"
     memory_size = 128
     package_type = "Zip"
-    reserved_concurrent_executions = 64
+    reserved_concurrent_executions = var.wow_shards * 10
     runtime = "provided.al2"
     timeout = 30
 
@@ -52,9 +59,9 @@ resource "aws_lambda_function" "wow_combat_log_lambda" {
     environment {
         variables = {
             "SQUADOV_AWS_REGION" = "us-east-2"
-            "SQUADOV_FIREHOSE_DELIVERY_STREAM" = aws_kinesis_firehose_delivery_stream.combat_log_s3_stream.name
             "SQUADOV_LAMBDA_DB_SECRET" = var.db_secret
             "SQUADOV_LAMBDA_DBHOST" = var.db_host
+            "SQUADOV_COMBAT_LOG_BUCKET" = data.aws_s3_bucket.combatlog_bucket.id
         }
     }
 
@@ -72,5 +79,5 @@ resource "aws_lambda_event_source_mapping" "wow_lambda_kinesis" {
     maximum_batching_window_in_seconds = 15
     maximum_record_age_in_seconds = -1
     maximum_retry_attempts = 0
-    parallelization_factor = 8
+    parallelization_factor = 10
 }

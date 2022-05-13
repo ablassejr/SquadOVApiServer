@@ -1,3 +1,5 @@
+pub mod s3;
+
 use crate::SquadOvError;
 use rusoto_core::{Region, HttpClient};
 use rusoto_s3::S3Client;

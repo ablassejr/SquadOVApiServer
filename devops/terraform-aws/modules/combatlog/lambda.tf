@@ -40,9 +40,10 @@ resource "aws_iam_policy" "lambda_policy" {
                 "kinesis:DescribeStream",
                 "kinesis:ListShards",
                 "kinesis:ListStreams",
-                "firehose:PutRecordBatch",
                 "s3:GetObject",
-                "s3:ListBucket"
+                "s3:ListBucket",
+                "s3:DeleteObject",
+                "s3:PutObject"
             ],
             "Resource": "*"
         }
@@ -65,5 +66,5 @@ resource "aws_lambda_permission" "lambda_combatlog_bucket_permissions" {
     action        = "lambda:InvokeFunction"
     function_name = aws_lambda_function.combat_log_reports_lambda.arn
     principal     = "s3.amazonaws.com"
-    source_arn    = var.combatlog_bucket_arn
+    source_arn    = data.aws_s3_bucket.combatlog_bucket.arn
 }

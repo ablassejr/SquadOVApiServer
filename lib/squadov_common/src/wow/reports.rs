@@ -7,6 +7,7 @@ use crate::{
         CombatLogReportHandler,
         CombatLogReportIO,
         CombatLogReport,
+        CombatLog,
     },
     wow::combatlog::{
         WowCombatLogPacket,
@@ -14,14 +15,13 @@ use crate::{
     },
 };
 use num_enum::TryFromPrimitive;
-use chrono::{DateTime, Utc};
 use std::sync::Arc;
 use sqlx::{
     postgres::{PgPool},
 };
 
 pub struct WowReportsGenerator {
-    start_time: DateTime<Utc>,
+    parent_cl: CombatLog,
     work_dir: Option<String>,
     character_gen: Option<characters::WowCharacterReportGenerator>,
     pool: Arc<PgPool>,
@@ -64,7 +64,7 @@ impl CombatLogReportIO for WowReportsGenerator {
         self.work_dir = Some(String::from(dir));
 
         {
-            let mut gen = characters::WowCharacterReportGenerator::new(self.pool.clone(), self.cl_state.build_version.clone());
+            let mut gen = characters::WowCharacterReportGenerator::new(self.pool.clone(), self.parent_cl.clone(), self.cl_state.build_version.clone());
             gen.initialize_work_dir(dir)?;
             self.character_gen = Some(gen);
         }
@@ -84,9 +84,10 @@ impl CombatLogReportIO for WowReportsGenerator {
 }
 
 impl WowReportsGenerator {
-    pub fn new(start_time: DateTime<Utc>, pool: Arc<PgPool>, cl_state: WoWCombatLogState) -> Result<Self, SquadOvError> {
+    pub fn new(parent_cl: CombatLog, pool: Arc<PgPool>) -> Result<Self, SquadOvError> {
+        let cl_state = serde_json::from_value(parent_cl.cl_state.clone())?;
         Ok(Self{
-            start_time,
+            parent_cl,
             character_gen: None,
             work_dir: None,
             pool,

@@ -1,9 +1,11 @@
 #[macro_use]
 extern crate lazy_static;
 
+use structopt::StructOpt;
 use lambda_runtime::{handler_fn, Context};
 use serde::Deserialize;
 use serde_json::{Value};
+use std::sync::RwLock;
 use squadov_common::{
     SquadOvError,
     encode,
@@ -12,12 +14,14 @@ use squadov_common::{
         CombatLogReportGenerator,
         CombatLogReportContainer,
         CombatLogReportType,
+        CombatLog,
+        CombatLogReport,
     },
     wow::{
         reports::WowReportsGenerator,
-        combatlog::WoWCombatLogState,
     },
     ff14::reports::Ff14ReportsGenerator,
+    aws::s3,
 };
 use regex::Regex;
 use std::{
@@ -31,12 +35,15 @@ use std::{
     sync::Arc,
     fs::File,
 };
-use rusoto_core::Region;
+use rusoto_core::{Region, HttpClient};
 use rusoto_s3::{
     S3Client,
     S3,
     ListObjectsV2Request,
     GetObjectRequest,
+    DeleteObjectsRequest,
+    Delete,
+    ObjectIdentifier,
 };
 use rusoto_secretsmanager::{
     SecretsManagerClient,
@@ -49,6 +56,7 @@ use sqlx::{
     ConnectOptions,
     postgres::{PgPool, PgPoolOptions, PgConnectOptions},
 };
+use rusoto_credential::ProfileProvider;
 
 #[derive(Deserialize)]
 struct Payload {
@@ -84,9 +92,10 @@ struct SharedClient {
 }
 
 impl SharedClient {
-    async fn load_merge_combat_log_data_to_disk(&self, bucket: &str, partition: &str) -> Result<File, SquadOvError> {
+    async fn load_merge_combat_log_data_to_disk(&self, bucket: &str, form: &str, partition: &str, need_merge: bool) -> Result<File, SquadOvError> {
         // The data in S3 will be split into multiple compressed files so we want to merge them all into one uncompressed file for us to deal with while processing.
-        let parsed_object_prefix = format!("form=Parsed/partition={}/", partition);
+        let parsed_object_prefix = format!("form={}/partition={}/", form, partition);
+        log::info!("Load Separated Combat Log: {}/{}", bucket, parsed_object_prefix);
 
         // We need to first get all the files with the given prefix and then we need to sort.
         // We want to sort by date of file creation since Firehose *should* dump all the data out in its
@@ -109,6 +118,7 @@ impl SharedClient {
                 ..ListObjectsV2Request::default()
             };
 
+            log::info!("...Listing Objects.");
             let resp = self.s3.list_objects_v2(req).await?;
 
             if let Some(objects) = resp.contents {
@@ -147,6 +157,7 @@ impl SharedClient {
         }
 
         // Sort in order of ascending last modified.
+        log::info!("...Sorting Objects.");
         available_keys.sort_by(|a, b| {
             let a_mod = a.last_modified.as_ref().unwrap();
             let b_mod = b.last_modified.as_ref().unwrap();
@@ -154,38 +165,96 @@ impl SharedClient {
         });
 
         // Download files one by one, uncompress, and merge them into the temp file.
-        let file = tempfile::tempfile_in(&self.efs_directory)?;
-        for key in available_keys {
-            let req = GetObjectRequest{
-                bucket: String::from(bucket),
-                key: key.key.clone(),
-                ..GetObjectRequest::default()
-            };
+        let mut file = tempfile::tempfile_in(&self.efs_directory)?;
 
-            let resp = self.s3.get_object(req).await?;
+        if need_merge {
+            log::info!("...Performing Merge.");
+            for key in &available_keys {
+                let req = GetObjectRequest{
+                    bucket: String::from(bucket),
+                    key: key.key.clone(),
+                    ..GetObjectRequest::default()
+                };
 
-            let mut compressed_data: Vec<u8> = Vec::new();
-            if let Some(body) = resp.body {
-                let mut body = body.into_async_read();
-                body.read(&mut compressed_data).await?;
-            } else {
-                log::error!("Invalid body for object: {}/{:?}", bucket, &key);
-                continue;
+                let resp = self.s3.get_object(req).await?;
+
+                let mut compressed_data: Vec<u8> = Vec::new();
+                if let Some(body) = resp.body {
+                    let mut body = body.into_async_read();
+                    body.read_to_end(&mut compressed_data).await?;
+                } else {
+                    log::error!("Invalid body for object: {}/{:?}", bucket, &key);
+                    continue;
+                }
+
+                log::info!("Decompressing: {}/{} - {} bytes", bucket, &key.key, compressed_data.len());
+                let mut decoder = flate2::write::GzDecoder::new(&file);
+                decoder.write_all(&mut compressed_data)?;
+                decoder.finish()?;
+
+                // Note that we do not need to add an extra new line at the end because the parsed data
+                // should already contain that new line. Note that our report generation will need to be resilient
+                // to new lines.
             }
 
-            let mut decoder = flate2::write::GzDecoder::new(&file);
-            decoder.write_all(&mut compressed_data)?;
+            log::info!("Decoded Merged File Size: {}", file.metadata()?.len());
 
-            // Note that we do not need to add an extra new line at the end because the parsed data
-            // should already contain that new line. Note that our report generation will need to be resilient
-            // to new lines.
+            // In addition to creating the merged file for our own consumption.
+            // We should also upload back to S3 so we don't have to do this merge again.
+            // As an added benefit of that, we should theoretically have a larger file in the end,
+            // which will allow us to lifecycle the resulting file into cheaper storage.
+            {
+                let compressed_file = tempfile::tempfile_in(&self.efs_directory)?;
+                let mut encoder = flate2::write::GzEncoder::new(compressed_file, flate2::Compression::default());
+
+                file.seek(std::io::SeekFrom::Start(0))?;
+                std::io::copy(&mut file, &mut encoder)?;
+
+                let compressed_file = encoder.finish()?;
+                let compressed_size = compressed_file.metadata()?.len() as usize;
+                log::info!("Compressed Merged File Size: {}", compressed_size);
+
+                s3::s3_multipart_upload_data(
+                    self.s3.clone(),
+                    tokio::fs::File::from_std(compressed_file),
+                    compressed_size,
+                    bucket,
+                    &format!("{}completed_merged_{}.gz",parsed_object_prefix, Utc::now().timestamp_millis()),
+                ).await?;
+            }
+
+            file.seek(std::io::SeekFrom::Start(0))?;
+        }
+
+        // Also cleanup all the files we retrieved - we shouldn't ever need to use them again.
+        // If need_merge is true, then we would've uploaded a merged file that's sufficient for future purposes.
+        // If need_merge is false, then it isn't necessary to actually keep the files we found.
+        let delete_chunks: Vec<_> = available_keys.chunks(1000).collect();
+        log::info!("...Deleting Chunks: {}.", delete_chunks.len());
+        for chunk in delete_chunks {
+            let req = DeleteObjectsRequest{
+                bucket: bucket.to_string(),
+                delete: Delete{
+                    objects: chunk.into_iter().map(|x| {
+                        ObjectIdentifier{
+                            key: x.key.clone(),
+                            version_id: None,
+                        }
+                    }).collect(),
+                    ..Delete::default()
+                },
+                ..DeleteObjectsRequest::default()
+            };
+
+            self.s3.delete_objects(req).await?;
         }
 
         Ok(file)
     }
 
-    async fn create_report_generator<'a>(&self, game: &'a str, id: &'a str, work_dir: &'a str) -> Result<Box<dyn CombatLogReportGenerator>, SquadOvError> {
-        let report = sqlx::query!(
+    async fn create_report_generator<'a>(&self, game: &'a str, id: &'a str, work_dir: &'a str) -> Result<Arc<RwLock<dyn CombatLogReportGenerator + Send + Sync>>, SquadOvError> {
+        let report = sqlx::query_as!(
+            CombatLog,
             "
             SELECT *
             FROM squadov.combat_logs
@@ -196,41 +265,56 @@ impl SharedClient {
             .fetch_one(&*self.pool)
             .await?;
 
-        let mut gen: Box<dyn CombatLogReportGenerator> = match game {
-            "ff14" => Box::new(CombatLogReportContainer::new(
+        log::info!("Create Report Generator For Game: {}", game);
+        let gen: Arc<RwLock<dyn CombatLogReportGenerator + Send + Sync>> = match game {
+            "ff14" => Arc::new(RwLock::new(CombatLogReportContainer::new(
                 // TODO: Pull actual start time from database
                 Ff14ReportsGenerator::new(report.start_time)?
-            )),
-            "wow" => Box::new(CombatLogReportContainer::new(
-                WowReportsGenerator::new(report.start_time, self.pool.clone(), serde_json::from_value::<WoWCombatLogState>(report.cl_state)?)?
-            )),
+            ))),
+            "wow" => Arc::new(RwLock::new(CombatLogReportContainer::new(
+                WowReportsGenerator::new(report, self.pool.clone())?
+            ))),
             _ => {
                 log::error!("Unsupported game for combat log generation: {}", &game);
                 return Err(SquadOvError::BadRequest);
             },
         };
         
-        gen.initialize_work_dir(work_dir)?;
+        {
+            log::info!("Initialize Work Dir: {}", work_dir);
+            let mut gen = gen.write()?;
+            gen.initialize_work_dir(work_dir)?;
+        }
         Ok(gen)
     }
 
-    async fn generate_reports<'a>(&self, mut gen: Box<dyn CombatLogReportGenerator>, mut file: File) -> Result<Box<dyn CombatLogReportGenerator>, SquadOvError> {
+    async fn generate_reports<'a>(&self, gen: Arc<RwLock<dyn CombatLogReportGenerator + Send + Sync>>, mut file: File) -> Result<Vec<Arc<dyn CombatLogReport + Send + Sync>>, SquadOvError> {
         // Seek to beginning of file just because we were previously writing to the file so the stream offset is probably at the end.
         file.seek(std::io::SeekFrom::Start(0))?;
+
+        log::info!("Read Parsed Report File");
         let reader = BufReader::new(file);
 
-        for ln in reader.lines() {
-            if let Ok(ln) = ln {
-                let data = ln.trim();
-                if data.is_empty() {
-                    continue;
+        {
+            let mut gen = gen.write()?;
+            for ln in reader.lines() {
+                if let Ok(ln) = ln {
+                    let data = ln.trim();
+                    if data.is_empty() {
+                        continue;
+                    }
+                    gen.handle(data)?;
                 }
-                gen.handle(data)?;
             }
         }
 
-        gen.finalize()?;
-        Ok(gen)
+        tokio::task::spawn_blocking(move || {
+            log::info!("Finalize Reports");
+            let mut gen = gen.write()?;
+            gen.finalize()?;
+            log::info!("Return Reports");
+            Ok::<_, SquadOvError>(gen.get_reports())
+        }).await??
     }
 
     async fn handle_s3_data(&self, data: S3Record) -> Result<(), SquadOvError> {
@@ -243,12 +327,12 @@ impl SharedClient {
             static ref RE_MATCH: Regex = Regex::new(r"(?P<game>.*)_(?P<id>.*)").unwrap();
         }
 
-        if let Some(key_cap) = RE_KEY.captures(&data.object.key) {
+        let decoded_key = encode::url_decode(&data.object.key)?;
+        if let Some(key_cap) = RE_KEY.captures(&decoded_key) {
             let form = key_cap.name("form").map(|x| { String::from(x.as_str()) }).unwrap_or(String::new());
-            let partition = encode::url_decode(&key_cap.name("partition").map(|x| { String::from(x.as_str()) }).unwrap_or(String::new()))?;
+            let partition = key_cap.name("partition").map(|x| { String::from(x.as_str()) }).unwrap_or(String::new());
 
-            // Sanity check the form field first - need to make sure it's "Flush" since that's the only thing
-            // we care about.
+            // Sanity check the form field first - need to make sure it's "Flush" since that's the only thing we care about.
             if form != "Flush" {
                 log::error!("Incorrect form for Combat log report generation: {}", &data.object.key);
                 return Err(SquadOvError::BadRequest);
@@ -257,21 +341,37 @@ impl SharedClient {
             if let Some(match_cap) = RE_MATCH.captures(&partition) {
                 let game = match_cap.name("game").map(|x| { String::from(x.as_str()) }).unwrap_or(String::new());
                 let id = match_cap.name("id").map(|x| { String::from(x.as_str()) }).unwrap_or(String::new());
-                let mut gen = self.generate_reports(
+
+                log::info!("Found Match: {} - {}", &game, &id);
+                let all_reports = self.generate_reports(
                     self.create_report_generator(&game, &id, &self.efs_directory).await?,
-                    self.load_merge_combat_log_data_to_disk(&data.bucket.name, &partition).await?
+                    self.load_merge_combat_log_data_to_disk(&data.bucket.name, "Parsed", &partition, true).await?
                 ).await?;
 
-                let all_reports = gen.get_reports()?;
                 // There's two types of reports - static and "dynamic". Dynamic reports technicaly aren't really "dynamic";
                 // rather, they're just stored in the database rather than in S3.
+                log::info!("Store All Reports: {}", all_reports.len());
                 combatlog::store_static_combat_log_reports(all_reports.clone(), &data.bucket.name, &partition, self.s3.clone()).await?;
 
+                let mut tx = self.pool.begin().await?;
                 for r in all_reports {
                     if r.report_type() == CombatLogReportType::Dynamic {
-                        r.store_dynamic_report(self.pool.clone()).await?;
+                        r.store_dynamic_report(&mut tx).await?;
                     }
                 }
+                tx.commit().await?;
+
+                log::info!("Merge and Cleanup Raw Logs");
+                match self.load_merge_combat_log_data_to_disk(&data.bucket.name, "Raw", &partition, true).await {
+                    Ok(_) => (),
+                    Err(err) => log::warn!("Failed to merge raw data: {}.", err),
+                };
+
+                log::info!("Merge and Cleanup Flush Logs");
+                match self.load_merge_combat_log_data_to_disk(&data.bucket.name, "Flush", &partition, false).await {
+                    Ok(_) => (),
+                    Err(err) => log::warn!("Failed to merge flush data: {}.", err),
+                };
                 Ok(())
             } else {
                 log::error!("Invalid game partition ID format: {}", &data.object.key);
@@ -282,6 +382,22 @@ impl SharedClient {
             Err(SquadOvError::BadRequest)
         }
     }
+}
+
+#[derive(StructOpt, Debug)]
+struct Options {
+    #[structopt(long)]
+    bucket: Option<String>,
+    #[structopt(long)]
+    object: Option<String>,
+    #[structopt(long)]
+    creds: Option<String>,
+    #[structopt(long)]
+    profile: Option<String>,
+    #[structopt(long)]
+    username: Option<String>,
+    #[structopt(long)]
+    password: Option<String>,
 }
 
 #[tokio::main]
@@ -298,16 +414,19 @@ async fn main() -> Result<(), SquadOvError> {
     log::info!("Secret ID: {}", &secret_id);
     log::info!("DB Host: {}", &db_host);
 
+    let opts = Options::from_args();
+    let provider = if opts.creds.is_some() && opts.profile.is_some() {
+        ProfileProvider::with_configuration(&opts.creds.unwrap(), &opts.profile.unwrap())
+    } else {
+        ProfileProvider::new().unwrap()
+    };
+
     log::info!("Creating Secret Manager...");
-    let secrets_client = SecretsManagerClient::new(
+    let secrets_client = SecretsManagerClient::new_with(
+        HttpClient::new().unwrap(),
+        provider.clone(),
         Region::from_str(&aws_region)?
     );
-
-    log::info!("Getting DB Secret...");
-    let secret_object = secrets_client.get_secret_value(GetSecretValueRequest{
-        secret_id,
-        ..GetSecretValueRequest::default()
-    }).await?;
 
     // Secret string contains a JSON structure of the form:
     // (it technically has more fields but these are the ones we care about)
@@ -317,7 +436,15 @@ async fn main() -> Result<(), SquadOvError> {
         password: String,
     }
 
-    let creds = if let Some(secret_string) = secret_object.secret_string {
+    let creds = if opts.username.is_some() && opts.password.is_some() {
+        DbSecret{
+            username: opts.username.unwrap(),
+            password: opts.password.unwrap(),
+        }
+    } else if let Some(secret_string) = secrets_client.get_secret_value(GetSecretValueRequest{
+        secret_id,
+        ..GetSecretValueRequest::default()
+    }).await?.secret_string {
         log::info!("...Found Creds.");
         serde_json::from_str::<DbSecret>(&secret_string)?
     } else {
@@ -333,10 +460,13 @@ async fn main() -> Result<(), SquadOvError> {
         .database("squadov")
         .statement_cache_capacity(0);
     conn.log_statements(log::LevelFilter::Trace);
+    
 
     log::info!("Creating Shared Client...");
     let shared = SharedClient{
-        s3: Arc::new(S3Client::new(
+        s3: Arc::new(S3Client::new_with(
+            HttpClient::new().unwrap(),
+            provider.clone(),
             Region::from_str(&aws_region)?
         )),
         efs_directory,
@@ -351,18 +481,29 @@ async fn main() -> Result<(), SquadOvError> {
     };
 
     let shared_ref = &shared;
-    let closure = move |event: Value, _ctx: Context| async move {
-        log::info!("Handling S3 Event Notification: {:?}", event);
-
-        let payload = serde_json::from_value::<Payload>(event)?;
-        for record in payload.records {
-            shared_ref.handle_s3_data(record.s3).await?;
-        }
-
-        Ok::<(), SquadOvError>(())
-    };
-
-    log::info!("Starting Runtime [Combat Log Report Generator]...");
-    lambda_runtime::run(handler_fn(closure)).await?;
+    if opts.bucket.is_some() && opts.object.is_some() {
+        shared_ref.handle_s3_data(S3Record{
+            bucket: S3Bucket{
+                name: opts.bucket.unwrap(),
+            },
+            object: S3Object{
+                key: opts.object.unwrap(),
+            },
+        }).await?;
+    } else {
+        let closure = move |event: Value, _ctx: Context| async move {
+            log::info!("Handling S3 Event Notification: {:?}", event);
+    
+            let payload = serde_json::from_value::<Payload>(event)?;
+            for record in payload.records {
+                shared_ref.handle_s3_data(record.s3).await?;
+            }
+    
+            Ok::<(), SquadOvError>(())
+        };
+    
+        log::info!("Starting Runtime [Combat Log Report Generator]...");
+        lambda_runtime::run(handler_fn(closure)).await?;
+    }
     Ok(())
 }
