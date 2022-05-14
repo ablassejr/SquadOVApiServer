@@ -303,6 +303,7 @@ impl SharedClient {
                     if data.is_empty() {
                         continue;
                     }
+                    log::trace!("Handle: {:?}", &data);
                     gen.handle(data)?;
                 }
             }

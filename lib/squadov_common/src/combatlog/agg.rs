@@ -3,8 +3,10 @@ pub mod sliding_window;
 use crate::SquadOvError;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use std::fmt::Debug;
 
-pub struct InputAggregatorPacket<T> {
+#[derive(Debug)]
+pub struct InputAggregatorPacket<T: Debug> {
     pub tm: DateTime<Utc>,
     pub data: T,
 }
@@ -16,7 +18,7 @@ pub struct OutputAggregatorPacket<T> {
     pub value: T,
 }
 
-pub trait CombatLogAggregator<T> {
+pub trait CombatLogAggregator<T: Debug> {
     fn handle(&mut self, packet: InputAggregatorPacket<T>) -> Result<Option<OutputAggregatorPacket<T>>, SquadOvError>;
-    fn flush(&mut self) -> Result<Option<OutputAggregatorPacket<T>>, SquadOvError>;
+    fn flush(&mut self) -> Result<OutputAggregatorPacket<T>, SquadOvError>;
 }

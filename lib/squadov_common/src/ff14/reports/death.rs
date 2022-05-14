@@ -19,7 +19,7 @@ use crate::{
         reports::Ff14ReportTypes,
     },
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, serde::ts_milliseconds};
 use serde::Serialize;
 use avro_rs::{
     Schema,
@@ -34,6 +34,7 @@ pub struct Ff14DeathReportGenerator<'a> {
 
 #[derive(Serialize)]
 pub struct Ff14DeathReportEvent {
+    #[serde(with = "ts_milliseconds")]
     tm: DateTime<Utc>,
     killer: i64,
     victim: i64,
@@ -44,7 +45,7 @@ const DEATH_REPORT_SCHEMA_RAW: &'static str = r#"
         "type": "record",
         "name": "ff14_death_event",
         "fields": [
-            {"name": "tm", "type": "timestamp-millis"},
+            {"name": "tm", "type": "long", "logicalType": "timestamp-millis"},
             {"name": "killer", "type": "long"},
             {"name": "victim", "type": "long"}
         ]

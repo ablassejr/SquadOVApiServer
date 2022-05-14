@@ -26,7 +26,7 @@ use serde::Serialize;
 use avro_rs::{
     Schema,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, serde::ts_milliseconds};
 use std::collections::HashMap;
 
 pub struct WowEncounterReportGenerator<'a> {
@@ -38,7 +38,9 @@ pub struct WowEncounterReportGenerator<'a> {
 #[serde(rename_all="camelCase")]
 pub struct WowEncounterEventReport {
     encounter_name: String,
+    #[serde(with = "ts_milliseconds")]
     start_tm: DateTime<Utc>,
+    #[serde(with = "ts_milliseconds")]
     end_tm: DateTime<Utc>,
 }
 
@@ -48,8 +50,8 @@ const REPORT_SCHEMA_RAW: &'static str = r#"
         "name": "wow_encounter_events",
         "fields": [
             {"name": "encounterName", "type": "string"},
-            {"name": "startTm", "type": "timestamp-millis"},
-            {"name": "endTm", "type": "timestamp-millis"}
+            {"name": "startTm", "type": "long", "logicalType": "timestamp-millis"},
+            {"name": "endTm", "type": "long", "logicalType": "timestamp-millis"}
         ]
     }
 "#;

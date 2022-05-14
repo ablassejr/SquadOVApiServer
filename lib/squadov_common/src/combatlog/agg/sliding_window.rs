@@ -14,6 +14,7 @@ use chrono::{DateTime, Utc};
 
 pub enum SlidingWindowFunction {
     Average,
+    PerUnitTime(Duration),
 }
 
 pub struct CombatLogSlidingWindowAggregator<T> {
@@ -25,7 +26,7 @@ pub struct CombatLogSlidingWindowAggregator<T> {
 
 impl<T> CombatLogSlidingWindowAggregator<T>
 where
-    T: num::traits::Zero + std::ops::Div<Output = T> + num::traits::NumCast + num::traits::ToPrimitive + Copy,
+    T: num::traits::Zero + std::ops::Div<Output = T> + num::traits::NumCast + num::traits::ToPrimitive + Copy + std::fmt::Debug,
 {
     pub fn new(func: SlidingWindowFunction, window_size: Duration, next_start_time: DateTime<Utc>) -> Self{
         Self {
@@ -54,29 +55,37 @@ where
         let reduced_value = buffer.iter()
             .fold(T::zero(), |acc, x| {
                 match self.func {
-                    SlidingWindowFunction::Average => acc + *x,
+                    _ => acc + *x,
                 }
             });
 
+        let val = reduced_value.to_f64().ok_or(SquadOvError::BadRequest)?;
         Ok(
             match self.func {
-                SlidingWindowFunction::Average => T::from(reduced_value.to_f64().ok_or(SquadOvError::BadRequest)? / (buffer.len() as f64)).ok_or(SquadOvError::BadRequest)?,
+                SlidingWindowFunction::Average => T::from(val / (buffer.len() as f64)).ok_or(SquadOvError::BadRequest)?,
+                SlidingWindowFunction::PerUnitTime(unit) => {
+                    let buffer_time: f64 = (self.buffer_range.end - self.buffer_range.start).num_milliseconds() as f64;
+                    let unit_time: f64 = unit.as_millis() as f64;
+
+                    // val / buffer_time gets us the amount per millisecond. Then we multiply by unit_time to get the amount of
+                    // the amount value that would happen in unit_time.
+                    log::info!("Val: {}, Buffer: {}, Unit: {}", val, buffer_time, unit_time);
+                    T::from(val / buffer_time * unit_time).ok_or(SquadOvError::BadRequest)?
+                }
             }
         )
     }
 
-    fn compute_next_output_packet_from_buffer(&self) -> Result<Option<OutputAggregatorPacket<T>>, SquadOvError> {
+    fn compute_next_output_packet_from_buffer(&self) -> Result<OutputAggregatorPacket<T>, SquadOvError> {
         Ok(
-            if self.buffer.is_empty() {
-                None
-            } else {
-                Some(
-                    OutputAggregatorPacket{
-                        start: self.buffer_range.start,
-                        end: self.buffer_range.end,
-                        value: self.compute_next_value_from_buffer(&self.buffer)?,
-                    }
-                )
+            OutputAggregatorPacket{
+                start: self.buffer_range.start,
+                end: self.buffer_range.end,
+                value: if self.buffer.is_empty() {
+                    T::from(0i64).ok_or(SquadOvError::BadRequest)?
+                } else {
+                    self.compute_next_value_from_buffer(&self.buffer)?
+                },
             }
         )
     }
@@ -84,13 +93,13 @@ where
 
 impl<T> CombatLogAggregator<T> for CombatLogSlidingWindowAggregator<T>
 where
-    T: num::traits::Zero + std::ops::Div<Output = T> + num::traits::NumCast + num::traits::ToPrimitive + Copy,
+    T: num::traits::Zero + std::ops::Div<Output = T> + num::traits::NumCast + num::traits::ToPrimitive + Copy + std::fmt::Debug,
 {
     fn handle(&mut self, packet: InputAggregatorPacket<T>) -> Result<Option<OutputAggregatorPacket<T>>, SquadOvError> {
         // If the next packet is outside of the current then we want to flush the values stored in the buffer
         // and bubble that up.
         let ret = if !self.buffer_range.contains(&packet.tm) {
-            self.flush()?
+            Some(self.flush()?)
         } else {
             None
         };
@@ -101,7 +110,7 @@ where
         Ok(ret)
     }
 
-    fn flush(&mut self) -> Result<Option<OutputAggregatorPacket<T>>, SquadOvError> {
+    fn flush(&mut self) -> Result<OutputAggregatorPacket<T>, SquadOvError> {
         let packet = self.compute_next_output_packet_from_buffer()?;
         self.clear_buffer();
         Ok(packet)

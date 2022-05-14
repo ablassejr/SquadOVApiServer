@@ -26,7 +26,7 @@ use serde::Serialize;
 use avro_rs::{
     Schema,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, serde::ts_milliseconds};
 
 pub struct WowResurrectionReportGenerator<'a> {
     writer: Option<CombatLogAvroFileIO<'a>>,
@@ -38,6 +38,7 @@ pub struct WowResurrectionEventReport {
     guid: String,
     name: String,
     flags: i64,
+    #[serde(with = "ts_milliseconds")]
     tm: DateTime<Utc>,
 }
 
@@ -49,7 +50,7 @@ const REPORT_SCHEMA_RAW: &'static str = r#"
             {"name": "guid", "type": "string"},
             {"name": "name", "type": "string"},
             {"name": "flags", "type": "long"},
-            {"name": "tm", "type": "timestamp-millis"}
+            {"name": "tm", "type": "long", "logicalType": "timestamp-millis"}
         ]
     }
 "#;

@@ -27,7 +27,7 @@ use serde::Serialize;
 use avro_rs::{
     Schema,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, serde::ts_milliseconds};
 use std::collections::HashMap;
 
 pub struct WowAuraReportGenerator<'a> {
@@ -42,7 +42,9 @@ pub struct WowAuraEventReport {
     target_name: String,
     spell_id: i64,
     aura_type: WoWSpellAuraType,
+    #[serde(with = "ts_milliseconds")]
     applied_tm: DateTime<Utc>,
+    #[serde(with = "ts_milliseconds")]
     removed_tm: DateTime<Utc>,
 }
 
@@ -61,8 +63,8 @@ const REPORT_SCHEMA_RAW: &'static str = r#"
                     {"name": "type", "type": "string"}
                 ]
             }},
-            {"name": "appliedTm", "type": "timestamp-millis"},
-            {"name": "removedTm", "type": "timestamp-millis"}
+            {"name": "appliedTm", "type": "long", "logicalType": "timestamp-millis"},
+            {"name": "removedTm", "type": "long", "logicalType": "timestamp-millis"}
         ]
     }
 "#;

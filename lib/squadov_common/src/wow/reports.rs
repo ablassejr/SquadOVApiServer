@@ -20,12 +20,14 @@ use std::sync::Arc;
 use sqlx::{
     postgres::{PgPool},
 };
+use std::collections::HashMap;
 
 pub struct WowReportsGenerator<'a> {
     parent_cl: CombatLog,
     work_dir: Option<String>,
     character_gen: Option<characters::WowCharacterReportGenerator>,
     event_gen: Option<events::WowEventReportGenerator<'a>>,
+    stat_gen: Option<stats::WowStatReportGenerator<'a>>,
     pool: Arc<PgPool>,
     cl_state: WoWCombatLogState,
 }
@@ -36,10 +38,7 @@ pub enum WowReportTypes {
     MatchCharacters,
     MatchCombatants,
     Events,
-    StatSummary,
-    StatDps,
-    StatHps,
-    StatDrps,
+    Stats,
     CharacterLoadout,
     DeathRecap,
 }
@@ -47,11 +46,19 @@ pub enum WowReportTypes {
 impl<'a> CombatLogReportHandler for WowReportsGenerator<'a> {
     type Data = WowCombatLogPacket;
     fn handle(&mut self, data: &Self::Data) -> Result<(), SquadOvError> {
+        let mut ownership_update: HashMap<String, String> = HashMap::new();
+
         if let Some(gen) = self.character_gen.as_mut() {
             gen.handle(data)?;
+            ownership_update = gen.get_ownership_update();
         }
 
         if let Some(gen) = self.event_gen.as_mut() {
+            gen.handle(data)?;
+        }
+
+        if let Some(gen) = self.stat_gen.as_mut() {
+            gen.update_ownership(&ownership_update);
             gen.handle(data)?;
         }
         Ok(())
@@ -65,6 +72,10 @@ impl<'a> CombatLogReportIO for WowReportsGenerator<'a> {
         }
 
         if let Some(g) = self.event_gen.as_mut() {
+            g.finalize()?;
+        }
+
+        if let Some(g) = self.stat_gen.as_mut() {
             g.finalize()?;
         }
         Ok(())
@@ -85,6 +96,12 @@ impl<'a> CombatLogReportIO for WowReportsGenerator<'a> {
             self.event_gen = Some(gen);
         }
 
+        {
+            let mut gen = stats::WowStatReportGenerator::new(self.parent_cl.start_time.clone());
+            gen.initialize_work_dir(dir)?;
+            self.stat_gen = Some(gen);
+        }
+
         Ok(())
     }
 
@@ -99,6 +116,10 @@ impl<'a> CombatLogReportIO for WowReportsGenerator<'a> {
             ret.extend(gen.get_reports()?);
         }
 
+        if let Some(mut gen) = self.stat_gen.take() {
+            ret.extend(gen.get_reports()?);
+        }
+
         Ok(ret)
     }
 }
@@ -110,6 +131,7 @@ impl<'a> WowReportsGenerator<'a> {
             parent_cl,
             character_gen: None,
             event_gen: None,
+            stat_gen: None,
             work_dir: None,
             pool,
             cl_state,

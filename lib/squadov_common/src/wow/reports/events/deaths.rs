@@ -27,12 +27,13 @@ use serde::Serialize;
 use avro_rs::{
     Schema,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, serde::ts_milliseconds};
 use std::collections::{HashMap, VecDeque};
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct WowDeathRecapHpEvent {
+    #[serde(with = "ts_milliseconds")]
     tm: DateTime<Utc>,
     diff_ms: i64,
     diff_hp: i32,
@@ -78,6 +79,7 @@ pub struct WowDeathEventReport {
     guid: String,
     name: String,
     flags: i64,
+    #[serde(with = "ts_milliseconds")]
     tm: DateTime<Utc>,
 }
 
@@ -90,7 +92,7 @@ const REPORT_SCHEMA_RAW: &'static str = r#"
             {"name": "guid", "type": "string"},
             {"name": "name", "type": "string"},
             {"name": "flags", "type": "long"},
-            {"name": "tm", "type": "timestamp-millis"}
+            {"name": "tm", "type": "long", "logicalType": "timestamp-millis"}
         ]
     }
 "#;
@@ -100,7 +102,7 @@ const DEATH_RECAP_SCHEMA_RAW: &'static str = r#"
         "type": "record",
         "name": "wow_death_report_events",
         "fields": [
-            {"name": "tm", "type": "timestamp-millis"},
+            {"name": "tm", "type": "long", "logicalType": "timestamp-millis"},
             {"name": "diffMs", "type": "long"},
             {"name": "diffHp", "type": "int"},
             {"name": "spellId", "type": ["null", "long"]},

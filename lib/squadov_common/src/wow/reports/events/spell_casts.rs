@@ -26,7 +26,14 @@ use serde::Serialize;
 use avro_rs::{
     Schema,
 };
-use chrono::{DateTime, Utc};
+use chrono::{
+    DateTime,
+    Utc,
+    serde::{
+        ts_milliseconds,
+        ts_milliseconds_option,
+    }
+};
 use std::collections::HashMap;
 
 
@@ -39,7 +46,9 @@ pub struct WowSpellCastEventReport {
     target_guid: Option<String>,
     target_name: Option<String>,
     target_flags: Option<i64>,
+    #[serde(with = "ts_milliseconds_option")]
     cast_start: Option<DateTime<Utc>>,
+    #[serde(with = "ts_milliseconds")]
     cast_finish: DateTime<Utc>,
     spell_id: i64,
     spell_school: i32,
@@ -60,11 +69,11 @@ const REPORT_SCHEMA_RAW: &'static str = r#"
             {"name": "sourceGuid", "type": "string"},
             {"name": "sourceName", "type": "string"},
             {"name": "sourceFlags", "type": "long"},
-            {"name": "targetGuid", "type": "string"},
-            {"name": "targetName", "type": "string"},
-            {"name": "targetFlags", "type": "long"},
-            {"name": "castStart", "type": ["null", "timestamp-millis"]},
-            {"name": "castFinish", "type": "timestamp-millis"},
+            {"name": "targetGuid", "type": ["null", "string"]},
+            {"name": "targetName", "type": ["null", "string"]},
+            {"name": "targetFlags", "type": ["null", "long"]},
+            {"name": "castStart", "type": ["null", { "type": "long", "logicalType": "timestamp-millis"}]},
+            {"name": "castFinish", "type": "long", "logicalType": "timestamp-millis"},
             {"name": "spellId", "type": "long"},
             {"name": "spellSchool", "type": "int"},
             {"name": "success", "type": "boolean"},

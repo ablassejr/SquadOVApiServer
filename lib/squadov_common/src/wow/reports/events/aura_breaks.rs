@@ -27,7 +27,7 @@ use serde::Serialize;
 use avro_rs::{
     Schema,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, serde::ts_milliseconds};
 
 pub struct WowAuraBreakReportGenerator<'a> {
     writer: Option<CombatLogAvroFileIO<'a>>,
@@ -45,6 +45,7 @@ pub struct WowAuraBreakEventReport {
     aura_id: i64,
     aura_type: WoWSpellAuraType,
     spell_id: Option<i64>,
+    #[serde(with = "ts_milliseconds")]
     tm: DateTime<Utc>,
 }
 
@@ -68,7 +69,7 @@ const REPORT_SCHEMA_RAW: &'static str = r#"
                 ]
             }},
             {"name": "spellId", "type": ["null", "long"]},
-            {"name": "tm", "type": "timestamp-millis"}
+            {"name": "tm", "type": "long", "logicalType": "timestamp-millis"}
         ]
     }
 "#;

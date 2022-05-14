@@ -27,7 +27,7 @@ use crate::{
         reports::Ff14ReportTypes,
     },
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, serde::ts_milliseconds};
 use serde::Serialize;
 use avro_rs::{
     Schema,
@@ -43,6 +43,7 @@ pub struct Ff14LimitBreakReportGenerator<'a> {
 
 #[derive(Serialize)]
 pub struct Ff14LimitBreakEvent {
+    #[serde(with = "ts_milliseconds")]
     tm: DateTime<Utc>,
     value: i64,
 }
@@ -61,8 +62,8 @@ const LIMIT_BREAK_REPORT_SCHEMA_RAW: &'static str = r#"
         "type": "record",
         "name": "ff14_death_event",
         "fields": [
-            {"name": "start", "type": "timestamp-millis"},
-            {"name": "end", "type": "timestamp-millis"},
+            {"name": "start", "type": "long", "logicalType": "timestamp-millis"},
+            {"name": "end", "type": "long", "logicalType": "timestamp-millis"},
             {"name": "value", "type": "long"}
         ]
     }
@@ -139,7 +140,7 @@ impl<'a> Ff14LimitBreakReportGenerator<'a> {
         let packet = if let Some(d) = data {
             self.agg.handle(d.into())?
         } else {
-            self.agg.flush()?
+            Some(self.agg.flush()?)
         };
 
         if let Some(packet) = packet {

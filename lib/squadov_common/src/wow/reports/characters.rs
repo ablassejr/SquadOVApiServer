@@ -53,6 +53,8 @@ pub struct WowCharacterReportGenerator {
     loadouts: HashMap<String, WowFullCharacter>,
     pool: Arc<PgPool>,
     build_version: String,
+    // key: unit, value: owner
+    ownership_updates: HashMap<String, String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -212,12 +214,18 @@ impl WowCharacterReportGenerator {
             loadouts: HashMap::new(),
             pool,
             build_version,
+            ownership_updates: HashMap::new(),
         }
+    }
+
+    pub fn get_ownership_update(&mut self) -> HashMap<String, String> {
+        self.ownership_updates.drain().collect()
     }
 
     fn mark_ownership(&mut self, unit_guid: &str, owner_guid: &str) -> Result<(), SquadOvError> {
         if let Some(c) = self.chars.get_mut(unit_guid) {
             c.owner_guid = Some(owner_guid.to_string());
+            self.ownership_updates.insert(unit_guid.to_string(), owner_guid.to_string());
         }
         Ok(())
     }
