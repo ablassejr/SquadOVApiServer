@@ -44,3 +44,37 @@ impl super::AccessChecker<WowMatchUserMatchupBasicData> for WowMatchUserMatchupC
         Ok(true)
     }
 }
+
+pub struct WowViewBasicData {
+    pub view_uuid: Uuid,
+}
+
+pub struct WowViewPathObtainer {
+    pub view_uuid_key: &'static str,
+}
+
+pub struct WowViewChecker {
+    pub obtainer: WowViewPathObtainer
+}
+
+#[async_trait]
+impl super::AccessChecker<WowViewBasicData> for WowViewChecker {
+    fn generate_aux_metadata(&self, req: &HttpRequest) -> Result<WowViewBasicData, SquadOvError> {
+        Ok(WowViewBasicData{
+            view_uuid: match req.match_info().get(self.obtainer.view_uuid_key) {
+                Some(x) => x.parse::<Uuid>()?,
+                None => return Err(squadov_common::SquadOvError::BadRequest),
+            },
+        })
+    }
+
+    async fn check(&self, app: Arc<ApiApplication>, session: Option<&SquadOVSession>, data: WowViewBasicData) -> Result<bool, SquadOvError> {
+        // Check that the given user (in the path) is actually a part of the given match.
+        let view_owner = app.get_wow_match_view_owner(&data.view_uuid).await?;
+        Ok(view_owner == session.ok_or(SquadOvError::Unauthorized)?.user.id)
+    }
+
+    async fn post_check(&self, _app: Arc<ApiApplication>, _session: Option<&SquadOVSession>, _data: WowViewBasicData) -> Result<bool, SquadOvError> {
+        Ok(true)
+    }
+}

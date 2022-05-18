@@ -245,6 +245,21 @@
       "nullable": []
     }
   },
+  "067d9d1a88051fe6a302e20c0e0289deb90ca53652cc8dbebfb92016d9871ddf": {
+    "query": "\n        INSERT INTO squadov.combat_logs (\n            partition_id,\n            start_time,\n            owner_id,\n            cl_state\n        ) VALUES (\n            $1,\n            $2,\n            $3,\n            $4\n        )\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Timestamptz",
+          "Int8",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "06924108c0da13d78eac8195c0a7507b8e984b819f8031fa2626e2812abf8bfc": {
     "query": "\n            SELECT u.uuid, lmpi.participant_id\n            FROM squadov.lol_match_participant_identities AS lmpi\n            INNER JOIN squadov.riot_accounts AS ra\n                ON ra.summoner_id = lmpi.summoner_id\n            INNER JOIN squadov.riot_account_links AS ral\n                ON ral.puuid = ra.puuid\n            INNER JOIN squadov.users AS u\n                ON u.id = ral.user_id\n            WHERE lmpi.match_uuid = $1\n                AND u.uuid = ANY($2)\n            ",
     "describe": {
@@ -1627,32 +1642,6 @@
       ]
     }
   },
-  "18ca4b7fc1df8bc287aa2cc875f94f5080cae105f1bb14782a0d82a0cbec9584": {
-    "query": "\n                SELECT spell_id, class_id\n                FROM squadov.wow_spell_to_class\n                WHERE spell_id = ANY($1)\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "spell_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "class_id",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4Array"
-        ]
-      },
-      "nullable": [
-        false,
-        false
-      ]
-    }
-  },
   "18dfcd29bfec0daf50c4b5908fa8f63fb3253fd5c4cf27795c6a19d139cae1ec": {
     "query": "\n        DELETE FROM squadov.community_member_roles AS cmr\n        USING squadov.community_membership AS cm\n        WHERE cm.id = cmr.membership_id\n            AND cm.user_id = $1\n            AND cmr.role_id = $2\n        ",
     "describe": {
@@ -2319,32 +2308,6 @@
         ]
       },
       "nullable": [
-        false
-      ]
-    }
-  },
-  "1feb81bde422dbfe9c2edba8d3548cd7ecb139abdf2bab1e01538de8099cbc0d": {
-    "query": "\n                    SELECT spell_id, class_id\n                    FROM squadov.wow_spell_to_class\n                    WHERE spell_id = ANY($1)\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "spell_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "class_id",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4Array"
-        ]
-      },
-      "nullable": [
-        false,
         false
       ]
     }
@@ -4838,32 +4801,6 @@
       "nullable": []
     }
   },
-  "492050755af2da5f872cbdc01c23cc0235b968f3e2a8bd93911ef86b1f65a4a2": {
-    "query": "\n            SELECT spell_id, class_id\n            FROM squadov.wow_spell_to_class\n            WHERE spell_id = ANY($1)\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "spell_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "class_id",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4Array"
-        ]
-      },
-      "nullable": [
-        false,
-        false
-      ]
-    }
-  },
   "4924319db705ea8f6bdd17883d05c56e9327da9c1b87564c664bdfc2c1134b93": {
     "query": "\n            SELECT ral.user_id, lmpi.participant_id\n            FROM squadov.lol_match_participant_identities AS lmpi\n            INNER JOIN squadov.riot_accounts AS ra\n                ON ra.summoner_id = lmpi.summoner_id\n            INNER JOIN squadov.riot_account_links AS ral\n                ON ral.puuid = ra.puuid\n            WHERE lmpi.match_uuid = $1\n            ",
     "describe": {
@@ -6929,6 +6866,19 @@
       "nullable": [
         false
       ]
+    }
+  },
+  "687ff0e4fc427231d5a1de9c0c3bf7a776eb87654507bbaa0c43e21712cec649": {
+    "query": "\n        UPDATE squadov.wow_match_view\n        SET combat_log_partition_id = $2\n        WHERE id = $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Varchar"
+        ]
+      },
+      "nullable": []
     }
   },
   "68af7b42b6415047528946590b10101428a135387da3df99d5f20dee911bdb23": {
@@ -10805,6 +10755,26 @@
       ]
     }
   },
+  "aa9300cd63146356803c2feed291f7eb049e41344d6e0adef674aecd705825e9": {
+    "query": "\n                SELECT user_id\n                FROM squadov.wow_match_view\n                WHERE id = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "user_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "ab31b9de96ddfd358b4c8f58fa6ad2318f1b63a9c7ba1895d4b52758328796e7": {
     "query": "\n            SELECT\n                vmul.match_id,\n                vm.game_mode,\n                vm.map_id,\n                vm.is_ranked,\n                vm.provisioning_flow_id,\n                vm.server_start_time_utc,\n                vm.game_length_millis,\n                vm.season_id\n            FROM squadov.valorant_matches AS vm\n            INNER JOIN squadov.valorant_match_uuid_link AS vmul\n                ON vmul.match_uuid = vm.match_uuid\n            WHERE vm.match_uuid = $1\n            ",
     "describe": {
@@ -12391,6 +12361,62 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "cae7e97e9a3e09327713d75cdce3b5c24ee1b3ad6dd0404979a57b4b0f8ad80d": {
+    "query": "\n            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid\n            FROM squadov.wow_match_view\n            WHERE combat_log_partition_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "alt_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "combat_log_version",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "advanced_log",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "build_version",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ]
     }
   },
   "cc1cae08dc17e29d7560dd87aa566e35646d59723132556081654ac78c756cac": {

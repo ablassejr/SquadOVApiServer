@@ -1,0 +1,1 @@
+CREATE INDEX ON wow_match_view(combat_log_partition_id);

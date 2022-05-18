@@ -2,6 +2,7 @@ db_endpoint = "${DATABASE_HOST}"
 db_username = "${POSTGRES_USER}"
 db_password = "${POSTGRES_PASSWORD}"
 db_connections = 4
+combatlog_bucket = "${COMBAT_LOG_BUCKET}"
 
 [rabbitmq]
 amqp_url = "${RABBITMQ_AMQP_URL}"
@@ -40,3 +41,21 @@ username = "${ES_USERNAME}"
 password = "${ES_PASSWORD}"
 vod_index_read = "vod-index-read"
 vod_index_write = "vod-index-write"
+
+[aws]
+enabled = true
+credential_path = "aws/api.profile"
+profile = "api"
+region = "us-east-2"
+account_id = ""
+
+[aws.cdn]
+public_cdn_domain = ""
+private_cdn_domain = ""
+blob_cdn_domain = ""
+public_key_id = ""
+private_key_fname = ""
+
+[aws.cognito]
+pool_id = ""
+provider = ""

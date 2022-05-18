@@ -45,22 +45,6 @@ impl api::ApiApplication {
         )
     }
 
-    pub async fn user_id_to_uuid(&self, user_id: i64) -> Result<Uuid, SquadOvError> {
-        Ok(
-            sqlx::query!(
-                "
-                SELECT uuid
-                FROM squadov.users AS u
-                WHERE u.id = $1
-                ",
-                user_id,
-            )
-                .fetch_one(&*self.pool)
-                .await?
-                .uuid
-        )
-    }
-
     pub async fn get_user_uuid_to_user_id_map(&self, uuids: &[Uuid]) -> Result<HashMap<Uuid, i64>, SquadOvError> {
         Ok(sqlx::query!(
             "

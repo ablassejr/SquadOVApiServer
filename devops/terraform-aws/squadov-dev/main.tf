@@ -64,6 +64,7 @@ module "combatlog" {
     db_secret = module.db.db_secret
 
     wow_shards = 1
+    amqp_url = var.amqp_url
 }
 
 module "iam" {

@@ -24,11 +24,15 @@ use squadov_common::{
     },
     generate_combatants_key,
     generate_combatants_hashed_array,
+    elastic::vod::ESVodDocument,
 };
 use actix_web::{web, HttpResponse, HttpRequest, HttpMessage};
 use crate::api;
 use crate::api::auth::SquadOVSession;
-use crate::api::v1::GenericMatchPathInput;
+use crate::api::v1::{
+    GenericMatchPathInput,
+    RecentMatchQuery,
+};
 use squadov_common::vod::VodAssociation;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -675,44 +679,20 @@ impl api::ApiApplication {
         Ok(wm::list_wow_instances_for_uuids(&*self.heavy_pool, &pairs).await?)
     }
 
-    async fn find_wow_challenge(&self, match_uuid: &Uuid, user_uuid: &Uuid) -> Result<Option<WoWChallenge>, SquadOvError> {
-        let pairs = vec![MatchPlayerPair{
-            match_uuid: match_uuid.clone(),
-            player_uuid: user_uuid.clone(),
-        }];
-
-        let mut challenges = wm::list_wow_challenges_for_uuids(&*self.heavy_pool, &pairs).await?;
-        Ok(challenges.pop())
-    }
-
-    async fn find_wow_encounter(&self, match_uuid: &Uuid, user_uuid: &Uuid) -> Result<Option<WoWEncounter>, SquadOvError> {
-        let pairs = vec![MatchPlayerPair{
-            match_uuid: match_uuid.clone(),
-            player_uuid: user_uuid.clone(),
-        }];
-
-        let mut encounters = wm::list_wow_encounter_for_uuids(&*self.heavy_pool, &pairs).await?;
-        Ok(encounters.pop())
-    }
-
-    async fn find_wow_arena(&self, match_uuid: &Uuid, user_uuid: &Uuid) -> Result<Option<WoWArena>, SquadOvError> {
-        let pairs = vec![MatchPlayerPair{
-            match_uuid: match_uuid.clone(),
-            player_uuid: user_uuid.clone(),
-        }];
-
-        let mut arenas = wm::list_wow_arenas_for_uuids(&*self.heavy_pool, &pairs).await?;
-        Ok(arenas.pop())
-    }
-
-    async fn find_wow_instance(&self, match_uuid: &Uuid, user_uuid: &Uuid) -> Result<Option<WowInstance>, SquadOvError> {
-        let pairs = vec![MatchPlayerPair{
-            match_uuid: match_uuid.clone(),
-            player_uuid: user_uuid.clone(),
-        }];
-
-        let mut instances = wm::list_wow_instances_for_uuids(&*self.heavy_pool, &pairs).await?;
-        Ok(instances.pop())
+    pub async fn get_wow_match_view_owner(&self, view_uuid: &Uuid) -> Result<i64, SquadOvError> {
+        Ok(
+            sqlx::query!(
+                "
+                SELECT user_id
+                FROM squadov.wow_match_view
+                WHERE id = $1
+                ",
+                view_uuid,
+            )
+                .fetch_one(&*self.pool)
+                .await?
+                .user_id
+        )
     }
 
     pub async fn get_wow_match_view_for_user_match(&self, user_id: i64, match_uuid: &Uuid) -> Result<Option<Uuid>, SquadOvError> {
@@ -1751,7 +1731,7 @@ pub async fn list_wow_instances_for_character_handler(app : web::Data<Arc<api::A
     Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(instances, &req, &query, expected_total == got_total)?))
 }
 
-pub async fn get_wow_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_wow_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     #[derive(Serialize)]
     struct Response {
         encounter: Option<WoWEncounter>,
@@ -1760,13 +1740,31 @@ pub async fn get_wow_match_handler(app : web::Data<Arc<api::ApiApplication>>, pa
         instance: Option<WowInstance>,
     }
 
-    let uuid = app.user_id_to_uuid(path.user_id).await?;
-    Ok(HttpResponse::Ok().json(Response{
-        encounter: app.find_wow_encounter(&path.match_uuid, &uuid).await?,
-        challenge: app.find_wow_challenge(&path.match_uuid, &uuid).await?,
-        arena: app.find_wow_arena(&path.match_uuid, &uuid).await?,
-        instance: app.find_wow_instance(&path.match_uuid, &uuid).await?,
-    }))
+    let filter = RecentMatchQuery{
+        games: Some(vec![SquadOvGames::WorldOfWarcraft]),
+        matches: Some(vec![path.match_uuid.clone()]),
+        users: Some(vec![path.user_id]),
+        ..RecentMatchQuery::default()
+    };
+
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
+    let es_search = filter.to_es_search(session.user.id, false);
+    if let Some(document) = app.es_api.search_documents::<ESVodDocument>(&app.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?.pop() {
+        if let Some(wow) = document.data.wow {
+            Ok(HttpResponse::Ok().json(Response{
+                encounter: wow.encounter,
+                challenge: wow.challenge,
+                arena: wow.arena,
+                instance: wow.instance,
+            }))
+        } else {
+            Err(SquadOvError::NotFound)
+        }
+    } else {
+        Err(SquadOvError::NotFound)
+    }
 }
 
 #[derive(Serialize)]
@@ -1802,4 +1800,19 @@ pub async fn list_wow_match_pulls_handler(app : web::Data<Arc<api::ApiApplicatio
     Ok(HttpResponse::Ok().json(
         app.list_ordered_wow_encounter_match_pulls(&path.match_uuid, path.user_id).await?
     ))
+}
+
+pub async fn link_wow_match_view_to_combat_log_handler(app : web::Data<Arc<api::ApiApplication>>, view: web::Path<super::WoWViewPath>, cl: web::Path<super::WowCombatLogPath>) -> Result<HttpResponse, SquadOvError> {
+    sqlx::query!(
+        "
+        UPDATE squadov.wow_match_view
+        SET combat_log_partition_id = $2
+        WHERE id = $1
+        ",
+        &view.view_uuid,
+        &cl.partition_id
+    )
+        .execute(&*app.pool)
+        .await?;
+    Ok(HttpResponse::NoContent().finish())
 }

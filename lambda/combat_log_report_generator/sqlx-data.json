@@ -164,6 +164,21 @@
       "nullable": []
     }
   },
+  "067d9d1a88051fe6a302e20c0e0289deb90ca53652cc8dbebfb92016d9871ddf": {
+    "query": "\n        INSERT INTO squadov.combat_logs (\n            partition_id,\n            start_time,\n            owner_id,\n            cl_state\n        ) VALUES (\n            $1,\n            $2,\n            $3,\n            $4\n        )\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Timestamptz",
+          "Int8",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "06924108c0da13d78eac8195c0a7507b8e984b819f8031fa2626e2812abf8bfc": {
     "query": "\n            SELECT u.uuid, lmpi.participant_id\n            FROM squadov.lol_match_participant_identities AS lmpi\n            INNER JOIN squadov.riot_accounts AS ra\n                ON ra.summoner_id = lmpi.summoner_id\n            INNER JOIN squadov.riot_account_links AS ral\n                ON ral.puuid = ra.puuid\n            INNER JOIN squadov.users AS u\n                ON u.id = ral.user_id\n            WHERE lmpi.match_uuid = $1\n                AND u.uuid = ANY($2)\n            ",
     "describe": {
@@ -7184,6 +7199,62 @@
       "nullable": []
     }
   },
+  "cae7e97e9a3e09327713d75cdce3b5c24ee1b3ad6dd0404979a57b4b0f8ad80d": {
+    "query": "\n            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid\n            FROM squadov.wow_match_view\n            WHERE combat_log_partition_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "alt_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "combat_log_version",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "advanced_log",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "build_version",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ]
+    }
+  },
   "cc1cae08dc17e29d7560dd87aa566e35646d59723132556081654ac78c756cac": {
     "query": "\n        SELECT cer.round_num, cer.tm_round_start, cer.tm_round_play, cer.tm_round_end\n        FROM squadov.csgo_event_container_rounds AS cer\n        INNER JOIN squadov.csgo_event_container AS cec\n            ON cec.id = cer.container_id\n        WHERE cec.view_uuid = $1\n            AND cec.event_source = 0\n        ",
     "describe": {
@@ -8292,20 +8363,6 @@
       "nullable": [
         null
       ]
-    }
-  },
-  "e22b66a88d319e557a1d05dfc66be595e873af1a22640078bea020618d28a87b": {
-    "query": "\n        INSERT INTO squadov.combat_logs (\n            partition_id,\n            start_time,\n            owner_id,\n            cl_state\n        ) VALUES (\n            $1,\n            NOW(),\n            $2,\n            $3\n        )\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Varchar",
-          "Int8",
-          "Jsonb"
-        ]
-      },
-      "nullable": []
     }
   },
   "e2758db5e8f861beac21d5ef69cfd0725df21ae92b997359724aad88c840bbf2": {

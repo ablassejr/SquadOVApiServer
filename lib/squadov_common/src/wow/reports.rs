@@ -1,6 +1,6 @@
-mod characters;
-mod events;
-mod stats;
+pub mod characters;
+pub mod events;
+pub mod stats;
 
 use crate::{
     SquadOvError,

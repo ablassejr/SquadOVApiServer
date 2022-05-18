@@ -31,6 +31,8 @@ resource "aws_lambda_function" "combat_log_reports_lambda" {
             "SQUADOV_EFS_DIRECTORY" = "/tmp"
             "SQUADOV_LAMBDA_DB_SECRET" = var.db_secret
             "SQUADOV_LAMBDA_DBHOST" = var.db_host
+            "SQUADOV_AMQP_URL" = var.amqp_url
+            "SQUADOV_ES_RABBITMQ_QUEUE" = "squadov_elasticsearch"
         }
     }
 }

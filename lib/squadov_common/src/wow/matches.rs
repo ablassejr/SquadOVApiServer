@@ -189,6 +189,7 @@ pub struct GenericWoWMatchView {
     pub advanced_log: bool,
     pub build_version: String,
     pub match_uuid: Option<Uuid>,
+    pub combat_log_partition_id: Option<String>,
 }
 
 pub async fn get_generic_wow_match_view_from_match_user<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64) -> Result<GenericWoWMatchView, SquadOvError>
@@ -199,7 +200,7 @@ where
         sqlx::query_as!(
             GenericWoWMatchView,
             "
-            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid
+            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid, combat_log_partition_id
             FROM squadov.wow_match_view
             WHERE match_uuid = $1 AND user_id = $2
             ",
@@ -219,9 +220,28 @@ where
         sqlx::query_as!(
             GenericWoWMatchView,
             "
-            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid
+            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid, combat_log_partition_id
             FROM squadov.wow_match_view
             WHERE id = $1
+            ",
+            id,
+        )
+            .fetch_one(ex)
+            .await?
+    )
+}
+
+pub async fn get_generic_wow_match_view_from_combat_log_id<'a, T>(ex: T, id: &str) -> Result<GenericWoWMatchView, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            GenericWoWMatchView,
+            "
+            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid, combat_log_partition_id
+            FROM squadov.wow_match_view
+            WHERE combat_log_partition_id = $1
             ",
             id,
         )
@@ -458,13 +478,10 @@ where
                     ON wa.match_uuid = wmv.match_uuid
                 INNER JOIN squadov.wow_arena_view AS wav
                     ON wav.view_id = wmv.id
-                INNER JOIN squadov.wow_match_view_character_presence AS wcp
+                LEFT JOIN squadov.wow_match_view_character_presence AS wcp
                     ON wcp.view_id = wmv.id
                 LEFT JOIN squadov.wow_match_view_combatants AS wvc
                     ON wvc.character_id = wcp.character_id
-                INNER JOIN squadov.wow_user_character_cache AS wucc
-                    ON wucc.unit_guid = wcp.unit_guid
-                        AND wucc.user_id = inp.user_id
                 INNER JOIN squadov.users AS u
                     ON u.id = wmv.user_id
                 ORDER BY wmv.match_uuid, u.uuid

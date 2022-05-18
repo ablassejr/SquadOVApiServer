@@ -1,7 +1,15 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use sqlx::{Executor, Postgres};
-use crate::{SquadOvError, SquadOvWowRelease, games};
+use crate::{
+    SquadOvError,
+    SquadOvWowRelease,
+    games,
+    reports::characters::{
+        WowCombatantReport,
+    },
+    wow::matches::WowBossStatus,
+};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct WoWCharacter {
@@ -14,6 +22,20 @@ pub struct WoWCharacter {
     pub rating: i32,
     #[serde(rename="classId")]
     pub class_id: Option<i64>,
+}
+
+impl From<WowCombatantReport> for WoWCharacter {
+    fn from(x: WowCombatantReport) -> Self {
+        Self {
+            guid: x.unit_guid,
+            name: x.unit_name,
+            ilvl: x.ilvl,
+            spec_id: x.spec_id,
+            team: x.team,
+            rating: x.rating,
+            class_id: x.class_id,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -53,6 +75,34 @@ pub struct WowFullCharacter {
 pub struct WowCharacterWrapper {
     pub data: WoWCharacter,
     pub traits: WowFullCharacter,
+}
+
+pub async fn list_wow_encounter_bosses<'a, T>(ex: T, encounter_id: i64) -> Result<Vec<WowBossStatus>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT npc_id, name
+            FROM squadov.wow_encounter_bosses
+            WHERE encounter_id = $1
+            ",
+            encounter_id
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                WowBossStatus{
+                    name: Some(x.name),
+                    npc_id: Some(x.npc_id),
+                    current_hp: None,
+                    max_hp: None,
+                }
+            })
+            .collect()
+    )
 }
 
 pub fn compute_wow_character_ilvl(items: &[i32]) -> i32 {

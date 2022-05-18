@@ -14,7 +14,7 @@ use crate::{
         },
         db as rdb,
     },
-    wow::{WoWEncounter, WoWChallenge, WoWArena, WowInstance, WowCharacterWrapper},
+    wow::{WoWEncounter, WoWChallenge, WoWArena, WowInstance, WowCharacterWrapper, WowFullCharacter},
     aimlab::AimlabTask,
     csgo::summary::CsgoPlayerMatchSummary,
     VodManifest,
@@ -33,12 +33,26 @@ use crate::{
     matches,
     aimlab,
     wow::{
-        matches as wm,
+        matches:: {
+            self as wm,
+            WowBossStatus,
+        },
         characters as wc,
+        reports::{
+            WowReportTypes,
+            characters::{
+                WowCharacterReport,
+                WowCombatantReport,
+            },
+        },
+        combatlog::parse_creature_id_from_guid,
     },
+    combatlog::interface::CombatLogInterface,
 };
 use sqlx::{Executor, Postgres};
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::iter::FromIterator;
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]
@@ -255,7 +269,7 @@ where
     )
 }
 
-pub async fn build_es_vod_document<'a, T>(ex: T, video_uuid: &Uuid) -> Result<ESVodDocument, SquadOvError>
+pub async fn build_es_vod_document<'a, T>(ex: T, video_uuid: &Uuid, cl_itf: Arc<CombatLogInterface>) -> Result<ESVodDocument, SquadOvError>
 where
     T: Executor<'a, Database = Postgres> + Copy
 {
@@ -385,12 +399,12 @@ where
                 });
             },
             SquadOvGames::WorldOfWarcraft => {
-                let user_chars = wc::list_wow_characters_for_user(ex, owner.id, None).await?;
                 let match_view = wm::get_generic_wow_match_view_from_match_user(ex, &match_uuid, owner.id).await?;
-                let encounter = wm::list_wow_encounter_for_uuids(ex, &[pair.clone()]).await?.pop();
+                let mut encounter = wm::list_wow_encounter_for_uuids(ex, &[pair.clone()]).await?.pop();
                 let challenge = wm::list_wow_challenges_for_uuids(ex, &[pair.clone()]).await?.pop();
-                let arena = wm::list_wow_arenas_for_uuids(ex, &[pair.clone()]).await?.pop();
+                let mut arena = wm::list_wow_arenas_for_uuids(ex, &[pair.clone()]).await?.pop();
                 let instance = wm::list_wow_instances_for_uuids(ex, &[pair.clone()]).await?.pop();
+                let user_chars = wc::list_wow_characters_for_user(ex, owner.id, None).await?;
 
                 let force_win = if let Some(e) = &encounter {
                     e.success
@@ -406,35 +420,69 @@ where
                     -1
                 };
 
-                let teams = {
+                let char_wrappers = if let Some(combat_log_partition_id) = match_view.combat_log_partition_id {
+                    // TODO: These filenames shouldn't be hard-coded. Hmmm...
+                    // Get the combat log reports for chars/combatants.
+                    let combatants = cl_itf.get_report_avro::<WowCombatantReport>(&combat_log_partition_id, WowReportTypes::MatchCombatants as i32, "combatants.avro").await?; 
+
+                    // For every combatant, grab their loadout reports.
+                    let mut ret_wrappers = vec![];
+                    for c in combatants {
+                        ret_wrappers.push(WowCharacterWrapper{
+                            traits: cl_itf.get_report_json::<WowFullCharacter>(&combat_log_partition_id, WowReportTypes::CharacterLoadout as i32, &format!("{}.json", &c.unit_guid)).await?,
+                            data: c.into(),
+                        });
+                    }
+
+                    // If this is an encounter, we need to update the boss HP from the character data.
+                    // If this is an arena, we need to determine success based off of the POV's team ID and comparing it to the winning team ID.
+                    if let Some(arena) = arena.as_mut() {
+                        for c in ret_wrappers.iter() {
+                            if user_chars.iter().any(|x| { x.guid == c.data.guid}) {
+                                arena.success = winning_team_id == c.data.team;
+                                break;
+                            }
+                        }
+                    }
+
+                    if let Some(encounter) = encounter.as_mut() {
+                        let characters: HashMap<i64, WowCharacterReport> = HashMap::from_iter(
+                            cl_itf.get_report_avro::<WowCharacterReport>(&combat_log_partition_id, WowReportTypes::MatchCharacters as i32, "characters.avro").await?
+                                .into_iter()
+                                .map(|x| {
+                                    (parse_creature_id_from_guid(&x.unit_guid).unwrap(), x)
+                                })
+                                .filter(|x| {
+                                    x.0.is_some()
+                                })
+                                .map(|x| {
+                                    (x.0.unwrap(), x.1)
+                                })
+                        );
+
+                        let bosses = wc::list_wow_encounter_bosses(ex, encounter.encounter_id as i64).await?;
+                        encounter.boss = bosses.into_iter().map(|x| {
+                            let boss_char = characters.get(&x.npc_id.unwrap_or(-1));
+                            WowBossStatus {
+                                current_hp: boss_char.map(|x| { x.current_hp }),
+                                max_hp: boss_char.map(|x| { x.max_hp }),
+                                ..x
+                            }
+                        }).collect();
+                    }
+
+                    ret_wrappers
+                } else {
                     let characters = wc::list_wow_characters_for_match(ex, &match_uuid, owner.id).await?;
-                    let mut char_wrappers = vec![];
+                    let mut ret_wrappers = vec![];
                     for c in characters {
-                        char_wrappers.push(WowCharacterWrapper{
+                        ret_wrappers.push(WowCharacterWrapper{
                             traits: wc::get_wow_full_character(ex, &match_view.id, &c.guid).await?,
                             data: c,
                         });
                     }
 
-                    let mut teams: HashMap<i32, ESCachedTeam<ESCachedWowTeam, WowCharacterWrapper>> = HashMap::new();
-                    for c in char_wrappers {
-                        if !teams.contains_key(&c.data.team) {
-                            teams.insert(c.data.team, ESCachedTeam{
-                                team: ESCachedWowTeam{
-                                    id: c.data.team,
-                                    won: force_win || winning_team_id == c.data.team,
-                                },
-                                players: vec![],
-                            });
-                        }
-
-                        let team = teams.get_mut(&c.data.team).unwrap();
-                        team.players.push(ESCachedPlayer{
-                            is_pov: user_chars.iter().any(|x| { x.guid == c.data.guid}),
-                            info: c,
-                        })
-                    }
-                    teams.into_values().collect()
+                    ret_wrappers
                 };
 
                 data.wow = Some(ESVodCachedWow{
@@ -445,7 +493,27 @@ where
                     build_version: match_view.build_version.clone(),
                     combat_log_version: match_view.combat_log_version.clone(),
                     advanced_log: match_view.advanced_log,
-                    teams,
+                    teams: {
+                        let mut teams: HashMap<i32, ESCachedTeam<ESCachedWowTeam, WowCharacterWrapper>> = HashMap::new();
+                        for c in char_wrappers {
+                            if !teams.contains_key(&c.data.team) {
+                                teams.insert(c.data.team, ESCachedTeam{
+                                    team: ESCachedWowTeam{
+                                        id: c.data.team,
+                                        won: force_win || winning_team_id == c.data.team,
+                                    },
+                                    players: vec![],
+                                });
+                            }
+
+                            let team = teams.get_mut(&c.data.team).unwrap();
+                            team.players.push(ESCachedPlayer{
+                                is_pov: user_chars.iter().any(|x| { x.guid == c.data.guid}),
+                                info: c,
+                            })
+                        }
+                        teams.into_values().collect()
+                    },
                 });
             },
             _ => (),

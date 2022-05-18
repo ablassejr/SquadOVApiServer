@@ -86,6 +86,7 @@ use squadov_common::{
         ElasticSearchClient,
         rabbitmq::ElasticSearchJobInterface,
     },
+    combatlog::interface::CombatLogInterface,
 };
 use url::Url;
 use std::vec::Vec;
@@ -238,6 +239,7 @@ pub struct SquadOvStorageConfig {
 #[derive(Deserialize,Debug,Clone)]
 pub struct CombatLogConfig {
     pub hostname: String,
+    pub bucket: String,
 }
 
 #[derive(Deserialize,Debug,Clone)]
@@ -325,6 +327,7 @@ pub struct ApiApplication {
     pub twitch_api: Arc<TwitchApiClient>,
     pub zendesk: Arc<ZendeskClient>,
     pub es_api: Arc<ElasticSearchClient>,
+    pub cl_itf: Arc<CombatLogInterface>,
 }
 
 impl ApiApplication {
@@ -475,6 +478,7 @@ impl ApiApplication {
             }
         );
 
+        let cl_itf = Arc::new(CombatLogInterface::new(&config.combatlog.bucket, aws.clone()));
         let rso_api = Arc::new(RiotApiHandler::new(config.riot.rso_api_key.clone(), pool.clone()));
         let valorant_api = Arc::new(RiotApiHandler::new(config.riot.valorant_api_key.clone(), pool.clone()));
         let lol_api = Arc::new(RiotApiHandler::new(config.riot.lol_api_key.clone(), pool.clone()));
@@ -484,7 +488,7 @@ impl ApiApplication {
 
         let rabbitmq = RabbitMqInterface::new(&config.rabbitmq, Some(pool.clone()), !disable_rabbitmq).await.unwrap();
 
-        let es_itf = Arc::new(ElasticSearchJobInterface::new(es_api.clone(), &config.elasticsearch, &config.rabbitmq, rabbitmq.clone(), pool.clone()));
+        let es_itf = Arc::new(ElasticSearchJobInterface::new(es_api.clone(), &config.elasticsearch, &config.rabbitmq, rabbitmq.clone(), pool.clone(), cl_itf.clone()));
         let rso_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, rso_api.clone(), rabbitmq.clone(), pool.clone(), es_itf.clone()));
         let valorant_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, valorant_api.clone(), rabbitmq.clone(), pool.clone(), es_itf.clone()));
         let lol_itf = Arc::new(RiotApiApplicationInterface::new(config.riot.clone(), &config.rabbitmq, lol_api.clone(), rabbitmq.clone(), pool.clone(), es_itf.clone()));
@@ -603,6 +607,7 @@ impl ApiApplication {
             )),
             zendesk: Arc::new(ZendeskClient::new(config.zendesk.clone())),
             es_api,
+            cl_itf,
         };
 
         app.create_vod_manager(&config.storage.vods.global).await.unwrap();

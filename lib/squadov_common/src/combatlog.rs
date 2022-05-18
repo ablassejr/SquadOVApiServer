@@ -1,6 +1,7 @@
 pub mod io;
 pub mod agg;
 pub mod db;
+pub mod interface;
 
 use crate::{
     SquadOvError,

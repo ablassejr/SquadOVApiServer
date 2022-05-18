@@ -31,7 +31,7 @@ use crate::{
         },
     },
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use avro_rs::{
     Schema,
 };
@@ -57,13 +57,15 @@ pub struct WowCharacterReportGenerator {
     ownership_updates: HashMap<String, String>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct WowCharacterReport {
-    unit_guid: String,
-    unit_name: String,
-    flags: HashSet<i64>,
-    owner_guid: Option<String>,
+    pub unit_guid: String,
+    pub unit_name: String,
+    pub flags: HashSet<i64>,
+    pub owner_guid: Option<String>,
+    pub current_hp: i64,
+    pub max_hp: i64,
 }
 
 const CHAR_REPORT_SCHEMA_RAW: &'static str = r#"
@@ -78,21 +80,23 @@ const CHAR_REPORT_SCHEMA_RAW: &'static str = r#"
                 "items": "long",
                 "default": []
             }},
-            {"name": "ownerGuid", "type": ["null", "string"]}
+            {"name": "ownerGuid", "type": ["null", "string"]},
+            {"name": "currentHp", "type": "long"},
+            {"name": "maxHp", "type": "long"}
         ]
     }
 "#;
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct WowCombatantReport {
-    unit_guid: String,
-    unit_name: String,
-    ilvl: i32,
-    spec_id: i32,
-    team: i32,
-    rating: i32,
-    class_id: Option<i64>,
+    pub unit_guid: String,
+    pub unit_name: String,
+    pub ilvl: i32,
+    pub spec_id: i32,
+    pub team: i32,
+    pub rating: i32,
+    pub class_id: Option<i64>,
 }
 
 const COMBATANT_REPORT_SCHEMA_RAW: &'static str = r#"
@@ -194,6 +198,8 @@ impl CombatLogReportHandler for WowCharacterReportGenerator {
                     if adv.owner_guid != constants::NIL_WOW_GUID && adv.unit_guid != constants::NIL_WOW_GUID {
                         self.mark_ownership(&adv.unit_guid, &adv.owner_guid)?;
                     }
+
+                    self.update_character_hp(&adv.unit_guid, adv.current_hp, adv.max_hp)?;
                 }
             },
             _ => (),
@@ -266,6 +272,8 @@ impl WowCharacterReportGenerator {
                 unit_name: data.name.clone(),
                 flags: HashSet::from_iter(vec![data.flags]),
                 owner_guid: None,
+                current_hp: 0,
+                max_hp: 0,
             });
         }
 
@@ -278,6 +286,14 @@ impl WowCharacterReportGenerator {
             }
         }
 
+        Ok(())
+    }
+
+    fn update_character_hp(&mut self, unit_guid: &str, current_hp: i64, max_hp: i64) -> Result<(), SquadOvError> {
+        if let Some(cr) = self.chars.get_mut(unit_guid) {
+            cr.current_hp = current_hp;
+            cr.max_hp = max_hp;
+        }
         Ok(())
     }
 }

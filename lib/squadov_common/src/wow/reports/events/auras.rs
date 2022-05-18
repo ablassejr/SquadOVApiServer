@@ -23,7 +23,7 @@ use crate::{
 };
 use std::sync::Arc;
 use async_std::sync::{RwLock};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use avro_rs::{
     Schema,
 };
@@ -35,17 +35,17 @@ pub struct WowAuraReportGenerator<'a> {
     pending_auras: HashMap<(String, i64), DateTime<Utc>>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct WowAuraEventReport {
-    target_guid: String,
-    target_name: String,
-    spell_id: i64,
-    aura_type: WoWSpellAuraType,
+    pub target_guid: String,
+    pub target_name: String,
+    pub spell_id: i64,
+    pub aura_type: WoWSpellAuraType,
     #[serde(with = "ts_milliseconds")]
-    applied_tm: DateTime<Utc>,
+    pub applied_tm: DateTime<Utc>,
     #[serde(with = "ts_milliseconds")]
-    removed_tm: DateTime<Utc>,
+    pub removed_tm: DateTime<Utc>,
 }
 
 const REPORT_SCHEMA_RAW: &'static str = r#"

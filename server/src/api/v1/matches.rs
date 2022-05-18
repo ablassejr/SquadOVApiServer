@@ -1078,7 +1078,11 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
         }
 
         current_start = current_end;
-        current_end += ((expected_total - matches.len()) * 10) as i64;
+        current_end += if expected_total >= matches.len() {
+            ((expected_total - matches.len()) * 10) as i64
+        } else {
+            10
+        };
     }
 
     if has_access && !no_videos_left && filter.vods.is_none() {

@@ -22,7 +22,7 @@ use crate::{
 };
 use std::sync::Arc;
 use async_std::sync::{RwLock};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use avro_rs::{
     Schema,
 };
@@ -37,23 +37,23 @@ use chrono::{
 use std::collections::HashMap;
 
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct WowSpellCastEventReport {
-    source_guid: String,
-    source_name: String,
-    source_flags: i64,
-    target_guid: Option<String>,
-    target_name: Option<String>,
-    target_flags: Option<i64>,
+    pub source_guid: String,
+    pub source_name: String,
+    pub source_flags: i64,
+    pub target_guid: Option<String>,
+    pub target_name: Option<String>,
+    pub target_flags: Option<i64>,
     #[serde(with = "ts_milliseconds_option")]
-    cast_start: Option<DateTime<Utc>>,
+    pub cast_start: Option<DateTime<Utc>>,
     #[serde(with = "ts_milliseconds")]
-    cast_finish: DateTime<Utc>,
-    spell_id: i64,
-    spell_school: i32,
-    success: bool,
-    instant: bool,
+    pub cast_finish: DateTime<Utc>,
+    pub spell_id: i64,
+    pub spell_school: i32,
+    pub success: bool,
+    pub instant: bool,
 }
 
 pub struct WowSpellCastReportGenerator<'a> {

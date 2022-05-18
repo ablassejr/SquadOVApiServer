@@ -409,8 +409,8 @@ pub enum WoWGenericLevel {
 pub struct WoWCombatLogAdvancedCVars {
     pub unit_guid: String,
     pub owner_guid: String,
-    current_hp: i64,
-    max_hp: i64,
+    pub current_hp: i64,
+    pub max_hp: i64,
     attack_power: i64,
     spell_power: i64,
     armor: i64,
@@ -793,6 +793,15 @@ pub fn parse_raw_wow_combat_log_payload(state: &WoWCombatLogState, payload: &Raw
     ))
 }
 
+pub fn parse_creature_id_from_guid(guid: &str) -> Result<Option<i64>, SquadOvError> {
+    let parts = guid.split("-").collect::<Vec<&str>>();
+    if parts.len() != 7 || (parts[0] != "Creature" && parts[0] != "Vehicle") {
+        return Ok(None)
+    }
+    
+    Ok(Some(parts[5].parse::<i64>()?))
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -804,6 +813,29 @@ mod tests {
         std::env::set_var("RUST_LOG", "debug");
         let _ = env_logger::builder().is_test(true).try_init();
     }
+
+    #[test]
+    fn test_parse_creature_id() {
+        init();
+
+        struct TestDatum {
+            input: &'static str,
+            output: i64,
+        }
+
+        let test_data = vec![
+            TestDatum{
+                input: r#"Creature-0-4227-2296-24852-165066-0000504990"#,
+                output: 165066,
+            },
+        ];
+
+        for td in &test_data {
+            let creature_id = parse_creature_id_from_guid(td.input).unwrap();
+            assert_eq!(creature_id, Some(td.output));
+        }
+    }
+
 
     #[test]
     fn test_is_finish_token() {

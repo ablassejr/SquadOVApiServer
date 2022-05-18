@@ -37,3 +37,8 @@ pub struct WoWUserMatchPath {
     pub user_id: i64,
     pub match_uuid: Uuid
 }
+
+#[derive(Deserialize)]
+pub struct WowCombatLogPath {
+    pub partition_id: String,
+}

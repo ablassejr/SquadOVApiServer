@@ -159,7 +159,7 @@ resource "aws_s3_bucket" "combatlog_bucket" {
         abort_incomplete_multipart_upload_days = 1
 
         transition {
-            days = 3
+            days = 14
             storage_class = "GLACIER_IR"
         }
     }

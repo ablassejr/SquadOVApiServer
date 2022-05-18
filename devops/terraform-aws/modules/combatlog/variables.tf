@@ -17,3 +17,7 @@ variable "db_host" {
 variable "db_secret" {
     type = string
 }
+
+variable "amqp_url" {
+    type = string
+}

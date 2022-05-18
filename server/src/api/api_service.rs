@@ -753,6 +753,20 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 )
                         )
                         .service(
+                            web::scope("/view/{view_uuid}")
+                                .wrap(access::ApiAccess::new(
+                                    Box::new(access::WowViewChecker{
+                                        obtainer: access::WowViewPathObtainer{
+                                            view_uuid_key: "view_uuid",
+                                        },
+                                    })
+                                ))
+                                .service(
+                                    web::scope("/cl/{partition_id}")
+                                        .route("", web::post().to(v1::link_wow_match_view_to_combat_log_handler))
+                                )
+                        )
+                        .service(
                             web::scope("/users/{user_id}")
                                 .service(
                                     web::scope("/characters")

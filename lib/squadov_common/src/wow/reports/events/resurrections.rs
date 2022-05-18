@@ -22,7 +22,7 @@ use crate::{
 };
 use std::sync::Arc;
 use async_std::sync::{RwLock};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use avro_rs::{
     Schema,
 };
@@ -32,14 +32,14 @@ pub struct WowResurrectionReportGenerator<'a> {
     writer: Option<CombatLogAvroFileIO<'a>>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct WowResurrectionEventReport {
-    guid: String,
-    name: String,
-    flags: i64,
+    pub guid: String,
+    pub name: String,
+    pub flags: i64,
     #[serde(with = "ts_milliseconds")]
-    tm: DateTime<Utc>,
+    pub tm: DateTime<Utc>,
 }
 
 const REPORT_SCHEMA_RAW: &'static str = r#"

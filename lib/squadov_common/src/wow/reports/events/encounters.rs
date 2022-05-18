@@ -22,7 +22,7 @@ use crate::{
 };
 use std::sync::Arc;
 use async_std::sync::{RwLock};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use avro_rs::{
     Schema,
 };
@@ -34,14 +34,14 @@ pub struct WowEncounterReportGenerator<'a> {
     pending_encounters: HashMap<i32, DateTime<Utc>>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct WowEncounterEventReport {
-    encounter_name: String,
+    pub encounter_name: String,
     #[serde(with = "ts_milliseconds")]
-    start_tm: DateTime<Utc>,
+    pub start_tm: DateTime<Utc>,
     #[serde(with = "ts_milliseconds")]
-    end_tm: DateTime<Utc>,
+    pub end_tm: DateTime<Utc>,
 }
 
 const REPORT_SCHEMA_RAW: &'static str = r#"

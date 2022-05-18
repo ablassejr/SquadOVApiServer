@@ -348,7 +348,11 @@ impl RabbitMqConnectionBundle {
                 }
             }).unwrap_or(DEFAULT_MAX_AGE_SECONDS);
 
-            let expired = (current_timestamp - og_timestamp) > (max_age_seconds as u64) && max_age_seconds != INFITE_MAX_AGE;
+            let expired = if current_timestamp >= og_timestamp {
+                (current_timestamp - og_timestamp) > (max_age_seconds as u64) && max_age_seconds != INFITE_MAX_AGE
+            } else {
+                false
+            };
             let mut requeue_ms: Option<i64> = None;
             let mut change_queue: Option<String> = None;
 

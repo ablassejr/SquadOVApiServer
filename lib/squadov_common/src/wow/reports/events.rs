@@ -1,9 +1,9 @@
-mod deaths;
-mod auras;
-mod encounters;
-mod resurrections;
-mod aura_breaks;
-mod spell_casts;
+pub mod deaths;
+pub mod auras;
+pub mod encounters;
+pub mod resurrections;
+pub mod aura_breaks;
+pub mod spell_casts;
 
 use crate::{
     SquadOvError,

@@ -23,14 +23,14 @@ use crate::{
 };
 use std::sync::Arc;
 use async_std::sync::{RwLock};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use avro_rs::{
     Schema,
 };
 use chrono::{DateTime, Utc, serde::ts_milliseconds};
 use std::collections::{HashMap, VecDeque};
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct WowDeathRecapHpEvent {
     #[serde(with = "ts_milliseconds")]
@@ -55,7 +55,7 @@ impl Default for WowDeathRecapHpEvent {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct WowDeathRecap {
     pub hp_events: Vec<WowDeathRecapHpEvent>,
@@ -72,15 +72,15 @@ pub struct WowDeathEventsReportGenerator<'a> {
     completed_death_recaps: Vec<Arc<RawStaticCombatLogReport>>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct WowDeathEventReport {
-    event_id: i64,
-    guid: String,
-    name: String,
-    flags: i64,
+    pub event_id: i64,
+    pub guid: String,
+    pub name: String,
+    pub flags: i64,
     #[serde(with = "ts_milliseconds")]
-    tm: DateTime<Utc>,
+    pub tm: DateTime<Utc>,
 }
 
 const REPORT_SCHEMA_RAW: &'static str = r#"

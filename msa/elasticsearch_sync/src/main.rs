@@ -8,6 +8,8 @@ use squadov_common::{
         ElasticSearchClient,
         rabbitmq::ElasticSearchJobInterface,
     },
+    aws::{AWSConfig, AWSClient},
+    combatlog::interface::CombatLogInterface,
 };
 use std::sync::Arc;
 use sqlx::{
@@ -34,6 +36,8 @@ pub struct SyncConfig {
     db_connections: u32,
     rabbitmq: RabbitMqConfig,
     elasticsearch: ElasticSearchConfig,
+    combatlog_bucket: String,
+    aws: AWSConfig,
 }
 
 #[tokio::main]
@@ -70,10 +74,12 @@ async fn main() -> Result<(), SquadOvError> {
             .await
             .unwrap());
         
-
+        let aws = Arc::new(Some(AWSClient::new(&config.aws)));
         let rabbitmq = RabbitMqInterface::new(&config.rabbitmq, Some(pool.clone()), true).await.unwrap();
         let es_api = Arc::new(ElasticSearchClient::new(config.elasticsearch.clone()));
-        let es_itf = Arc::new(ElasticSearchJobInterface::new(es_api.clone(), &config.elasticsearch, &config.rabbitmq, rabbitmq.clone(), pool.clone()));
+
+        let cl_itf = Arc::new(CombatLogInterface::new(&config.combatlog_bucket, aws.clone()));
+        let es_itf = Arc::new(ElasticSearchJobInterface::new(es_api.clone(), &config.elasticsearch, &config.rabbitmq, rabbitmq.clone(), pool.clone(), cl_itf));
 
         if let Some(manual) = opts.manual {
             es_itf.handle_sync_vod(&[manual.clone()]).await.unwrap();

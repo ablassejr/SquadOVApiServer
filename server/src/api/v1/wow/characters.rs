@@ -6,7 +6,16 @@ use squadov_common::{
     SquadOvError,
     SquadOvWowRelease,
     WoWCharacterUserAssociation,
-    wow::characters,
+    wow::{
+        characters,
+        matches,
+        reports::{
+            WowReportTypes,
+            characters::{
+                WowCombatantReport,
+            },
+        },
+    },
 };
 use uuid::Uuid;
 use serde::Deserialize;
@@ -24,7 +33,34 @@ pub struct WowCharacterPath {
 }
 
 impl api::ApiApplication {
-    
+    async fn list_wow_characters_association_for_squad_from_guids(&self, guids: &[String], request_user_id: i64) -> Result<Vec<WoWCharacterUserAssociation>, SquadOvError> {
+        Ok(
+            sqlx::query_as!(
+                WoWCharacterUserAssociation,
+                r#"
+                SELECT wucc.user_id AS "user_id!", wucc.unit_guid AS "guid!"
+                FROM  squadov.wow_user_character_cache AS wucc
+                INNER JOIN (
+                    SELECT $2
+                    UNION
+                    SELECT ora.user_id
+                    FROM squadov.users AS u
+                    LEFT JOIN squadov.squad_role_assignments AS sra
+                        ON sra.user_id = u.id
+                    LEFT JOIN squadov.squad_role_assignments AS ora
+                        ON ora.squad_id = sra.squad_id
+                    WHERE u.id = $2
+                ) AS squ (user_id)
+                    ON squ.user_id = wucc.user_id
+                WHERE wucc.unit_guid = ANY($1)
+                "#,
+                guids,
+                request_user_id,
+            )
+                .fetch_all(&*self.heavy_pool)
+                .await?
+        )
+    }
 
     async fn list_wow_characters_association_for_squad_in_match(&self, match_uuid: &Uuid, view_user_id: i64, request_user_id: i64) -> Result<Vec<WoWCharacterUserAssociation>, SquadOvError> {
         Ok(
@@ -124,7 +160,13 @@ pub async fn list_wow_characters_for_user_handler(app : web::Data<Arc<api::ApiAp
 }
 
 pub async fn list_wow_characters_for_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>) -> Result<HttpResponse, SquadOvError> {
-    let chars = characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?;
+    let chars = if let Some(combat_log_partition_id) = matches::get_generic_wow_match_view_from_match_user(&*app.pool, &path.match_uuid, path.user_id).await?.combat_log_partition_id {
+        app.cl_itf.get_report_avro::<WowCombatantReport>(&combat_log_partition_id, WowReportTypes::MatchCombatants as i32, "combatants.avro").await?.into_iter().map(|x| {
+            x.into()
+        }).collect()
+    } else {
+        characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?
+    };
     Ok(HttpResponse::Ok().json(chars))
 }
 
@@ -135,8 +177,15 @@ pub async fn list_wow_characters_association_for_squad_in_match_handler(app : we
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    let chars = app.list_wow_characters_association_for_squad_in_match(&path.match_uuid, path.user_id, session.user.id).await?;
-    Ok(HttpResponse::Ok().json(chars))
+    
+    Ok(HttpResponse::Ok().json(if let Some(combat_log_partition_id) = matches::get_generic_wow_match_view_from_match_user(&*app.pool, &path.match_uuid, path.user_id).await?.combat_log_partition_id {
+        let combatants: Vec<String> = app.cl_itf.get_report_avro::<WowCombatantReport>(&combat_log_partition_id, WowReportTypes::MatchCombatants as i32, "combatants.avro").await?.into_iter().map(|x| {
+            x.unit_guid
+        }).collect();
+        app.list_wow_characters_association_for_squad_from_guids(&combatants, session.user.id).await?
+    } else {
+        app.list_wow_characters_association_for_squad_in_match(&path.match_uuid, path.user_id, session.user.id).await?    
+    }))
 }
 
 pub async fn get_wow_armory_link_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Query<WowCharacterDataInput>) -> Result<HttpResponse, SquadOvError> {

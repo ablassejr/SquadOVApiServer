@@ -27,6 +27,7 @@ use crate::{
         RawVodTag,
         db as vdb,
     },
+    combatlog::interface::CombatLogInterface,
 };
 use std::{
     sync::Arc,
@@ -67,21 +68,34 @@ pub enum ElasticSearchSyncTask {
 }
 
 pub struct ElasticSearchJobInterface {
-    es_client: Arc<ElasticSearchClient>,
-    esconfig: ElasticSearchConfig,
+    es_client: Option<Arc<ElasticSearchClient>>,
+    esconfig: Option<ElasticSearchConfig>,
     mqconfig: RabbitMqConfig,
     rmq: Arc<RabbitMqInterface>,
     db: Arc<PgPool>,
+    cl_itf: Option<Arc<CombatLogInterface>>,
 }
 
 impl ElasticSearchJobInterface {
-    pub fn new (es_client: Arc<ElasticSearchClient>, esconfig: &ElasticSearchConfig, mqconfig: &RabbitMqConfig, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>) -> Self {
+    pub fn new_producer_only(mqconfig: &RabbitMqConfig, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>) -> Self {
         Self {
-            es_client,
-            esconfig: esconfig.clone(),
+            es_client: None,
+            esconfig: None,
             mqconfig: mqconfig.clone(),
             rmq,
             db,
+            cl_itf: None,
+        }
+    }
+
+    pub fn new (es_client: Arc<ElasticSearchClient>, esconfig: &ElasticSearchConfig, mqconfig: &RabbitMqConfig, rmq: Arc<RabbitMqInterface>, db: Arc<PgPool>, cl_itf: Arc<CombatLogInterface>) -> Self {
+        Self {
+            es_client: Some(es_client),
+            esconfig: Some(esconfig.clone()),
+            mqconfig: mqconfig.clone(),
+            rmq,
+            db,
+            cl_itf: Some(cl_itf),
         }
     }
 
@@ -120,7 +134,7 @@ impl ElasticSearchJobInterface {
             }
         };
 
-        self.es_client.update_document(&self.esconfig.vod_index_write, video_uuid.to_string().as_str(), update).await?;
+        self.es_client.as_ref().unwrap().update_document(&self.esconfig.as_ref().unwrap().vod_index_write, video_uuid.to_string().as_str(), update).await?;
         Ok(())
     }
 
@@ -143,7 +157,7 @@ impl ElasticSearchJobInterface {
             }
         };
 
-        self.es_client.update_document(&self.esconfig.vod_index_write, video_uuid.to_string().as_str(), update).await?;
+        self.es_client.as_ref().unwrap().update_document(&self.esconfig.as_ref().unwrap().vod_index_write, video_uuid.to_string().as_str(), update).await?;
         Ok(())
     }
 
@@ -167,7 +181,7 @@ impl ElasticSearchJobInterface {
             }
         };
 
-        self.es_client.update_document(&self.esconfig.vod_index_write, video_uuid.to_string().as_str(), update).await?;
+        self.es_client.as_ref().unwrap().update_document(&self.esconfig.as_ref().unwrap().vod_index_write, video_uuid.to_string().as_str(), update).await?;
         Ok(())
     }
 
@@ -190,7 +204,7 @@ impl ElasticSearchJobInterface {
             }
         };
 
-        self.es_client.update_document(&self.esconfig.vod_index_write, video_uuid.to_string().as_str(), update).await?;
+        self.es_client.as_ref().unwrap().update_document(&self.esconfig.as_ref().unwrap().vod_index_write, video_uuid.to_string().as_str(), update).await?;
         Ok(())
     }
 
@@ -213,7 +227,7 @@ impl ElasticSearchJobInterface {
             }
         };
 
-        self.es_client.update_document(&self.esconfig.vod_index_write, video_uuid.to_string().as_str(), update).await?;
+        self.es_client.as_ref().unwrap().update_document(&self.esconfig.as_ref().unwrap().vod_index_write, video_uuid.to_string().as_str(), update).await?;
         Ok(())
     }
 
@@ -226,7 +240,7 @@ impl ElasticSearchJobInterface {
 
     async fn handle_delete_vod(&self, video_uuid: &[Uuid]) -> Result<(), SquadOvError> {
         for id in video_uuid {
-            self.es_client.delete_document(&self.esconfig.vod_index_write, id.to_string().as_str()).await?;
+            self.es_client.as_ref().unwrap().delete_document(&self.esconfig.as_ref().unwrap().vod_index_write, id.to_string().as_str()).await?;
         }
         Ok(())
     }
@@ -252,8 +266,8 @@ impl ElasticSearchJobInterface {
     pub async fn handle_sync_vod(&self, video_uuid: &[Uuid]) -> Result<(), SquadOvError> {
         // TODO: Actually batch?
         for id in video_uuid {
-            if let Ok(doc) = elastic::vod::build_es_vod_document(&*self.db, id).await {
-                self.es_client.add_or_update_document(&self.esconfig.vod_index_write, id.to_string().as_str(), serde_json::to_value(doc)?).await?;
+            if let Ok(doc) = elastic::vod::build_es_vod_document(&*self.db, id, self.cl_itf.as_ref().unwrap().clone()).await {
+                self.es_client.as_ref().unwrap().add_or_update_document(&self.esconfig.as_ref().unwrap().vod_index_write, id.to_string().as_str(), serde_json::to_value(doc)?).await?;
 
                 // Actually remember when we last sync'd this data.
                 sqlx::query!(

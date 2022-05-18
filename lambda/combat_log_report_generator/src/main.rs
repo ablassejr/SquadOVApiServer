@@ -22,6 +22,10 @@ use squadov_common::{
     },
     ff14::reports::Ff14ReportsGenerator,
     aws::s3,
+    rabbitmq::{RabbitMqInterface, RabbitMqConfig},
+    elastic::{
+        rabbitmq::ElasticSearchJobInterface,
+    },
 };
 use regex::Regex;
 use std::{
@@ -56,7 +60,7 @@ use sqlx::{
     ConnectOptions,
     postgres::{PgPool, PgPoolOptions, PgConnectOptions},
 };
-use rusoto_credential::ProfileProvider;
+use rusoto_credential::{ProfileProvider};
 
 #[derive(Deserialize)]
 struct Payload {
@@ -89,6 +93,7 @@ struct SharedClient {
     s3: Arc<S3Client>,
     efs_directory: String,
     pool: Arc<PgPool>,
+    es_itf: Arc<ElasticSearchJobInterface>,
 }
 
 impl SharedClient {
@@ -373,6 +378,21 @@ impl SharedClient {
                     Ok(_) => (),
                     Err(err) => log::warn!("Failed to merge flush data: {}.", err),
                 };
+
+                log::info!("Sending ES Document Generation");
+                match game.as_str() {
+                    "wow" => {
+                        let match_view = squadov_common::get_generic_wow_match_view_from_combat_log_id(&*self.pool, &partition).await?;
+                        if let Some(match_uuid) = match_view.match_uuid {
+                            log::info!("...Sending Sync Match VOD: {} {}", &match_uuid, match_view.user_id);
+                            self.es_itf.request_sync_match(match_uuid.clone(), Some(match_view.user_id)).await?;
+                        }
+                    },
+                    _ => {
+                        log::error!("Invalid game for ES document generation: {}", game);
+                        return Err(SquadOvError::BadRequest);
+                    }
+                }
                 Ok(())
             } else {
                 log::error!("Invalid game partition ID format: {}", &data.object.key);
@@ -408,26 +428,30 @@ async fn main() -> Result<(), SquadOvError> {
 
     let aws_region = std::env::var("SQUADOV_AWS_REGION").unwrap();
     let efs_directory = std::env::var("SQUADOV_EFS_DIRECTORY").unwrap();
-    let secret_id = std::env::var("SQUADOV_LAMBDA_DB_SECRET").unwrap();
+    let db_secret_id = std::env::var("SQUADOV_LAMBDA_DB_SECRET").unwrap();
     let db_host = std::env::var("SQUADOV_LAMBDA_DBHOST").unwrap();
+    let amqp_url = std::env::var("SQUADOV_AMQP_URL").unwrap();
+    let es_queue = std::env::var("SQUADOV_ES_RABBITMQ_QUEUE").unwrap();
     log::info!("AWS Region: {}", &aws_region);
     log::info!("EFS Directory: {}", &efs_directory);
-    log::info!("Secret ID: {}", &secret_id);
+    log::info!("Secret ID: {}", &db_secret_id);
     log::info!("DB Host: {}", &db_host);
+    log::info!("ES Queue: {}", &es_queue);
 
     let opts = Options::from_args();
-    let provider = if opts.creds.is_some() && opts.profile.is_some() {
-        ProfileProvider::with_configuration(&opts.creds.unwrap(), &opts.profile.unwrap())
-    } else {
-        ProfileProvider::new().unwrap()
-    };
 
     log::info!("Creating Secret Manager...");
-    let secrets_client = SecretsManagerClient::new_with(
-        HttpClient::new().unwrap(),
-        provider.clone(),
-        Region::from_str(&aws_region)?
-    );
+    let secrets_client =  if opts.creds.is_some() && opts.profile.is_some() {
+        SecretsManagerClient::new_with(
+            HttpClient::new().unwrap(),
+            ProfileProvider::with_configuration(&opts.creds.as_ref().unwrap().clone(), &opts.profile.as_ref().unwrap().clone()),
+            Region::from_str(&aws_region)?
+        )
+    } else {
+        SecretsManagerClient::new(
+            Region::from_str(&aws_region)?
+        )
+    };
 
     // Secret string contains a JSON structure of the form:
     // (it technically has more fields but these are the ones we care about)
@@ -437,16 +461,16 @@ async fn main() -> Result<(), SquadOvError> {
         password: String,
     }
 
-    let creds = if opts.username.is_some() && opts.password.is_some() {
+    let db_creds = if opts.username.is_some() && opts.password.is_some() {
         DbSecret{
             username: opts.username.unwrap(),
             password: opts.password.unwrap(),
         }
     } else if let Some(secret_string) = secrets_client.get_secret_value(GetSecretValueRequest{
-        secret_id,
+        secret_id: db_secret_id,
         ..GetSecretValueRequest::default()
     }).await?.secret_string {
-        log::info!("...Found Creds.");
+        log::info!("...Found DB Creds.");
         serde_json::from_str::<DbSecret>(&secret_string)?
     } else {
         return Err(SquadOvError::BadRequest);
@@ -454,31 +478,48 @@ async fn main() -> Result<(), SquadOvError> {
 
     let mut conn = PgConnectOptions::new()
         .host(&db_host)
-        .username(&creds.username)
-        .password(&creds.password)
+        .username(&db_creds.username)
+        .password(&db_creds.password)
         .port(5432)
         .application_name("combat_log_report_generator")
         .database("squadov")
         .statement_cache_capacity(0);
     conn.log_statements(log::LevelFilter::Trace);
     
+    let pool = Arc::new(PgPoolOptions::new()
+        .min_connections(1)
+        .max_connections(4)
+        .max_lifetime(std::time::Duration::from_secs(60))
+        .idle_timeout(std::time::Duration::from_secs(10))
+        .connect_with(conn)
+        .await?);
+
+    let rmq_config = RabbitMqConfig{
+        amqp_url,
+        enable_elasticsearch: true,
+        elasticsearch_queue: es_queue,
+        elasticsearch_workers: 0,
+        ..RabbitMqConfig::default()
+    };
+    let rabbitmq = RabbitMqInterface::new(&rmq_config, Some(pool.clone()), true).await.unwrap();
+    let es_itf = Arc::new(ElasticSearchJobInterface::new_producer_only(&rmq_config, rabbitmq.clone(), pool.clone()));
 
     log::info!("Creating Shared Client...");
     let shared = SharedClient{
-        s3: Arc::new(S3Client::new_with(
-            HttpClient::new().unwrap(),
-            provider.clone(),
-            Region::from_str(&aws_region)?
-        )),
-        efs_directory,
-        pool: Arc::new(PgPoolOptions::new()
-            .min_connections(1)
-            .max_connections(1)
-            .max_lifetime(std::time::Duration::from_secs(60))
-            .idle_timeout(std::time::Duration::from_secs(10))
-            .connect_with(conn)
-            .await?
+        s3: Arc::new(
+            if opts.creds.is_some() && opts.profile.is_some() {
+                S3Client::new_with(
+                    HttpClient::new().unwrap(),
+                    ProfileProvider::with_configuration(&opts.creds.as_ref().unwrap().clone(), &opts.profile.as_ref().unwrap().clone()),
+                    Region::from_str(&aws_region)?
+                )
+            } else {
+                S3Client::new(Region::from_str(&aws_region)?)
+            }
         ),
+        efs_directory,
+        pool,
+        es_itf,
     };
 
     let shared_ref = &shared;
