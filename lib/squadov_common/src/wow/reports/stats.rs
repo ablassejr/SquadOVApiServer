@@ -31,7 +31,7 @@ use crate::{
 use std::sync::Arc;
 use std::time::Duration;
 use std::collections::HashMap;
-use serde::{Serialize};
+use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use avro_rs::{
     Schema,
@@ -44,13 +44,13 @@ pub struct WowStatTimelineGenerator<'a> {
     start_tm: DateTime<Utc>,
 }
 
-#[derive(Serialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all="camelCase")]
 pub struct WowUnitTimelineEntry {
-    guid: String,
+    pub guid: String,
     // tm is which time bucket we're in. E.g. if we're in the first 5 seconds, tm = 0, in the next 5 seconds, tm = 1, etc.
-    tm: i64,
-    value: f64,
+    pub tm: i64,
+    pub value: f64,
 }
 
 const TIMELINE_SCHEMA_RAW: &'static str = r#"
@@ -65,13 +65,13 @@ const TIMELINE_SCHEMA_RAW: &'static str = r#"
     }
 "#;
 
-#[derive(Serialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all="camelCase")]
 pub struct WowUnitStatSummary {
-    guid: String,
-    damage_dealt: i64,
-    damage_received: i64,
-    heals: i64,
+    pub guid: String,
+    pub damage_dealt: i64,
+    pub damage_received: i64,
+    pub heals: i64,
 }
 
 const SUMMARY_SCHEMA_RAW: &'static str = r#"
@@ -122,7 +122,8 @@ impl<'a> WowStatTimelineGenerator<'a> {
         if let Some(packet) = packet {
             self.writer.handle(WowUnitTimelineEntry{
                 guid: guid.to_string(),
-                tm: (packet.start - self.start_tm).num_seconds() / TIMELINE_BUCKET_DURATION_SECONDS,
+                // The division and then multiplication is needed for when it isn't an exact multiple.
+                tm: (packet.start - self.start_tm).num_seconds() / TIMELINE_BUCKET_DURATION_SECONDS * TIMELINE_BUCKET_DURATION_SECONDS,
                 value: packet.value,
             })?;
         }

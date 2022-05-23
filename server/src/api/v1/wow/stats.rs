@@ -3,7 +3,19 @@ use crate::api;
 use std::sync::Arc;
 use squadov_common::{
     SquadOvError,
-    wow::characters,
+    wow::{
+        characters,
+        reports::{
+            WowReportTypes,
+            characters::{
+                WowCombatantReport,
+            },
+            stats::{
+                WowUnitTimelineEntry,
+                WowUnitStatSummary,
+            },
+        },
+    },
 };
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
@@ -296,30 +308,144 @@ impl api::ApiApplication {
 }
 
 pub async fn get_wow_match_dps_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>, query: web::Query<WowStatsQueryParams>) -> Result<HttpResponse, SquadOvError> {
-    let chars: Vec<_> = characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect();
-    let stats = app.get_wow_match_dps(path.user_id, &path.match_uuid, &chars, &query).await?;
+    let match_view = squadov_common::wow::matches::get_generic_wow_match_view_from_match_user(&*app.pool, &path.match_uuid, path.user_id).await?;
+    let chars: Vec<_> = if let Some(combat_log_partition_id) = match_view.combat_log_partition_id.as_ref() {
+        app.cl_itf.get_report_avro::<WowCombatantReport>(&combat_log_partition_id, WowReportTypes::MatchCombatants as i32, "combatants.avro").await?.into_iter().map(|x| {
+            x.unit_guid
+        }).collect()
+    } else {
+        characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect()
+    };
+
+    let stats = if let Some(combat_log_partition_id) = match_view.combat_log_partition_id.as_ref() {
+        let reports: Vec<_> = app.cl_itf.get_report_avro::<WowUnitTimelineEntry>(&combat_log_partition_id, WowReportTypes::Stats as i32, "dps.avro").await?;
+        let mut ret: HashMap<String, Vec<WowStatDatum>> = HashMap::new();
+
+        for x in reports {
+            let datum = WowStatDatum{
+                tm: x.tm as f64,
+                value: x.value,
+            };
+
+            if let Some(v) = ret.get_mut(&x.guid) {
+                v.push(datum);
+            } else {
+                ret.insert(x.guid.clone(), vec![datum]);
+            }
+        }
+
+        ret
+    } else {
+        app.get_wow_match_dps(path.user_id, &path.match_uuid, &chars, &query).await?
+    };
     Ok(HttpResponse::Ok().json(stats))
 }
 
 pub async fn get_wow_match_heals_per_second_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>, query: web::Query<WowStatsQueryParams>) -> Result<HttpResponse, SquadOvError> {
-    let chars: Vec<_> = characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect();
-    let stats = app.get_wow_match_heals_per_second(path.user_id, &path.match_uuid, &chars, &query).await?;
+    let match_view = squadov_common::wow::matches::get_generic_wow_match_view_from_match_user(&*app.pool, &path.match_uuid, path.user_id).await?;
+    let chars: Vec<_> = if let Some(combat_log_partition_id) = match_view.combat_log_partition_id.as_ref() {
+        app.cl_itf.get_report_avro::<WowCombatantReport>(&combat_log_partition_id, WowReportTypes::MatchCombatants as i32, "combatants.avro").await?.into_iter().map(|x| {
+            x.unit_guid
+        }).collect()
+    } else {
+        characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect()
+    };
+
+    let stats = if let Some(combat_log_partition_id) = match_view.combat_log_partition_id.as_ref() {
+        let reports: Vec<_> = app.cl_itf.get_report_avro::<WowUnitTimelineEntry>(&combat_log_partition_id, WowReportTypes::Stats as i32, "hps.avro").await?;
+        let mut ret: HashMap<String, Vec<WowStatDatum>> = HashMap::new();
+
+        for x in reports {
+            let datum = WowStatDatum{
+                tm: x.tm as f64,
+                value: x.value,
+            };
+
+            if let Some(v) = ret.get_mut(&x.guid) {
+                v.push(datum);
+            } else {
+                ret.insert(x.guid.clone(), vec![datum]);
+            }
+        }
+
+        ret
+    } else {
+        app.get_wow_match_heals_per_second(path.user_id, &path.match_uuid, &chars, &query).await?
+    };
     Ok(HttpResponse::Ok().json(stats))
 }
 
 pub async fn get_wow_match_damage_received_per_second_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>, query: web::Query<WowStatsQueryParams>) -> Result<HttpResponse, SquadOvError> {
-    let chars: Vec<_> = characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect();
-    let stats = app.get_wow_match_damage_received_per_second(path.user_id, &path.match_uuid, &chars, &query).await?;
+    let match_view = squadov_common::wow::matches::get_generic_wow_match_view_from_match_user(&*app.pool, &path.match_uuid, path.user_id).await?;
+    let chars: Vec<_> = if let Some(combat_log_partition_id) = match_view.combat_log_partition_id.as_ref() {
+        app.cl_itf.get_report_avro::<WowCombatantReport>(&combat_log_partition_id, WowReportTypes::MatchCombatants as i32, "combatants.avro").await?.into_iter().map(|x| {
+            x.unit_guid
+        }).collect()
+    } else {
+        characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect()
+    };
+
+    let stats = if let Some(combat_log_partition_id) = match_view.combat_log_partition_id.as_ref() {
+        let reports: Vec<_> = app.cl_itf.get_report_avro::<WowUnitTimelineEntry>(&combat_log_partition_id, WowReportTypes::Stats as i32, "drps.avro").await?;
+        let mut ret: HashMap<String, Vec<WowStatDatum>> = HashMap::new();
+
+        for x in reports {
+            let datum = WowStatDatum{
+                tm: x.tm as f64,
+                value: x.value,
+            };
+
+            if let Some(v) = ret.get_mut(&x.guid) {
+                v.push(datum);
+            } else {
+                ret.insert(x.guid.clone(), vec![datum]);
+            }
+        }
+
+        ret
+    } else {
+        app.get_wow_match_damage_received_per_second(path.user_id, &path.match_uuid, &chars, &query).await?
+    };
     Ok(HttpResponse::Ok().json(stats))
 }
 
 pub async fn get_wow_match_stat_summary_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>) -> Result<HttpResponse, SquadOvError> {
-    let chars: Vec<_> = characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect();
-    Ok(
-        HttpResponse::Ok().json(&WowMatchStatSummaryData{
+    let match_view = squadov_common::wow::matches::get_generic_wow_match_view_from_match_user(&*app.pool, &path.match_uuid, path.user_id).await?;
+    let summary = if let Some(combat_log_partition_id) = match_view.combat_log_partition_id.as_ref() {
+        let mut ret = WowMatchStatSummaryData{
+            damage_dealt: vec![],
+            damage_received: vec![],
+            heals: vec![],
+        };
+
+        let reports: Vec<_> = app.cl_itf.get_report_avro::<WowUnitStatSummary>(&combat_log_partition_id, WowReportTypes::Stats as i32, "summary.avro").await?;
+        for r in reports {
+            ret.damage_dealt.push(WowStatItem{
+                guid: r.guid.clone(),
+                value: r.damage_dealt,
+            });
+
+            ret.damage_received.push(WowStatItem{
+                guid: r.guid.clone(),
+                value: r.damage_received,
+            });
+
+            ret.heals.push(WowStatItem{
+                guid: r.guid.clone(),
+                value: r.heals,
+            });
+        }
+
+        ret
+    } else {
+        let chars: Vec<_> = characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?.into_iter().map(|x| { x.guid }).collect();
+        WowMatchStatSummaryData{
             damage_dealt: app.get_wow_summary_damage_dealt(path.user_id, &path.match_uuid, &chars).await?,
             damage_received: app.get_wow_summary_damage_received(path.user_id, &path.match_uuid, &chars).await?,
             heals: app.get_wow_summary_heals(path.user_id, &path.match_uuid, &chars).await?,
-        })
+        }
+    };
+    Ok(
+        HttpResponse::Ok().json(&summary)
     )
 }

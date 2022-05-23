@@ -7,7 +7,10 @@ use squadov_common::{
     SquadOvWowRelease,
     WoWCharacterUserAssociation,
     wow::{
-        characters,
+        characters::{
+            self,
+            WowFullCharacter,
+        },
         matches,
         reports::{
             WowReportTypes,
@@ -224,6 +227,10 @@ pub async fn get_wow_armory_link_for_character_handler(app : web::Data<Arc<api::
 }
 
 pub async fn get_full_wow_character_for_match_handler(app : web::Data<Arc<api::ApiApplication>>, match_path: web::Path<super::WoWUserMatchPath>, char_path: web::Path<WowCharacterPath>) -> Result<HttpResponse, SquadOvError> {
-    let view_uuid = app.get_wow_match_view_for_user_match(match_path.user_id, &match_path.match_uuid).await?.ok_or(SquadOvError::NotFound)?;
-    Ok(HttpResponse::Ok().json(characters::get_wow_full_character(&*app.heavy_pool, &view_uuid, &char_path.character_guid).await?))
+    let match_view = squadov_common::wow::matches::get_generic_wow_match_view_from_match_user(&*app.pool, &match_path.match_uuid, match_path.user_id).await?;
+    Ok(HttpResponse::Ok().json(if let Some(combat_log_partition_id) = match_view.combat_log_partition_id.as_ref() {
+        app.cl_itf.get_report_json::<WowFullCharacter>(&combat_log_partition_id, WowReportTypes::CharacterLoadout as i32, &format!("{}.json", &char_path.character_guid)).await?
+    } else {
+        characters::get_wow_full_character(&*app.heavy_pool, &match_view.id, &char_path.character_guid).await?
+    }))
 }
