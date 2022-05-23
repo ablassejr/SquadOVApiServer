@@ -26,23 +26,23 @@ use std::collections::HashMap;
 pub struct WowStatsQueryParams {
     // How often we sample the start - end time range.
     #[serde(rename="psStepSeconds")]
-    ps_step_seconds: i64,
+    pub ps_step_seconds: i64,
     #[serde(deserialize_with="squadov_common::parse_utc_time_from_milliseconds")]
-    start: Option<DateTime<Utc>>,
+    pub start: Option<DateTime<Utc>>,
     #[serde(deserialize_with="squadov_common::parse_utc_time_from_milliseconds")]
-    end: Option<DateTime<Utc>>
+    pub end: Option<DateTime<Utc>>
 }
 
 #[derive(Serialize)]
 pub struct WowStatDatum {
-    tm: f64,
-    value: f64
+    pub tm: f64,
+    pub value: f64
 }
 
 #[derive(Serialize)]
 pub struct WowStatItem {
-    guid: String,
-    value: i64,
+    pub guid: String,
+    pub value: i64,
 }
 
 #[derive(Serialize)]
@@ -54,7 +54,7 @@ pub struct WowMatchStatSummaryData {
 }
 
 impl api::ApiApplication {
-    async fn get_wow_match_dps(&self, user_id: i64, match_uuid: &Uuid, combatant_guids: &[String], params: &WowStatsQueryParams) -> Result<HashMap<String, Vec<WowStatDatum>>, SquadOvError> {
+    pub async fn get_wow_match_dps(&self, user_id: i64, match_uuid: &Uuid, combatant_guids: &[String], params: &WowStatsQueryParams) -> Result<HashMap<String, Vec<WowStatDatum>>, SquadOvError> {
         if params.start.is_none() || params.end.is_none() {
             return Err(SquadOvError::BadRequest);
         }
@@ -109,7 +109,7 @@ impl api::ApiApplication {
         Ok(ret_map)
     }
 
-    async fn get_wow_match_heals_per_second(&self, user_id: i64, match_uuid: &Uuid, combatant_guids: &[String], params: &WowStatsQueryParams) -> Result<HashMap<String, Vec<WowStatDatum>>, SquadOvError> {
+    pub async fn get_wow_match_heals_per_second(&self, user_id: i64, match_uuid: &Uuid, combatant_guids: &[String], params: &WowStatsQueryParams) -> Result<HashMap<String, Vec<WowStatDatum>>, SquadOvError> {
         if params.start.is_none() || params.end.is_none() {
             return Err(SquadOvError::BadRequest);
         }
@@ -164,7 +164,7 @@ impl api::ApiApplication {
         Ok(ret_map)
     }
 
-    async fn get_wow_match_damage_received_per_second(&self, user_id: i64, match_uuid: &Uuid, combatant_guids: &[String], params: &WowStatsQueryParams) -> Result<HashMap<String, Vec<WowStatDatum>>, SquadOvError> {
+    pub async fn get_wow_match_damage_received_per_second(&self, user_id: i64, match_uuid: &Uuid, combatant_guids: &[String], params: &WowStatsQueryParams) -> Result<HashMap<String, Vec<WowStatDatum>>, SquadOvError> {
         if params.start.is_none() || params.end.is_none() {
             return Err(SquadOvError::BadRequest);
         }
@@ -219,7 +219,7 @@ impl api::ApiApplication {
         Ok(ret_map)
     }
 
-    async fn get_wow_summary_damage_dealt(&self, user_id: i64, match_uuid: &Uuid, combatant_guids: &[String])  -> Result<Vec<WowStatItem>, SquadOvError> {
+    pub async fn get_wow_summary_damage_dealt(&self, user_id: i64, match_uuid: &Uuid, combatant_guids: &[String])  -> Result<Vec<WowStatItem>, SquadOvError> {
         Ok(
             sqlx::query_as!(
                 WowStatItem,
@@ -248,7 +248,7 @@ impl api::ApiApplication {
         )
     }
 
-    async fn get_wow_summary_damage_received(&self, user_id: i64, match_uuid: &Uuid, combatant_guids: &[String])  -> Result<Vec<WowStatItem>, SquadOvError> {
+    pub async fn get_wow_summary_damage_received(&self, user_id: i64, match_uuid: &Uuid, combatant_guids: &[String])  -> Result<Vec<WowStatItem>, SquadOvError> {
         Ok(
             sqlx::query_as!(
                 WowStatItem,
@@ -277,7 +277,7 @@ impl api::ApiApplication {
         )
     }
 
-    async fn get_wow_summary_heals(&self, user_id: i64, match_uuid: &Uuid, combatant_guids: &[String])  -> Result<Vec<WowStatItem>, SquadOvError> {
+    pub async fn get_wow_summary_heals(&self, user_id: i64, match_uuid: &Uuid, combatant_guids: &[String])  -> Result<Vec<WowStatItem>, SquadOvError> {
         Ok(
             sqlx::query_as!(
                 WowStatItem,

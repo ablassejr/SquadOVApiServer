@@ -38,6 +38,20 @@ impl From<WowCombatantReport> for WoWCharacter {
     }
 }
 
+impl From<WoWCharacter> for WowCombatantReport {
+    fn from(x: WoWCharacter) -> Self {
+        Self {
+            unit_guid: x.guid,
+            unit_name: x.name,
+            ilvl: x.ilvl,
+            spec_id: x.spec_id,
+            team: x.team,
+            rating: x.rating,
+            class_id: x.class_id,
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct WoWCharacterUserAssociation {
     #[serde(rename="userId")]

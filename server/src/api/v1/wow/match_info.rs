@@ -31,7 +31,7 @@ use chrono::{DateTime, Utc};
 use std::str::FromStr;
 
 impl api::ApiApplication {
-    async fn get_wow_death_recap(&self, view_uuid: &Uuid, event_id: i64, seconds: i32) -> Result<WowDeathRecap, SquadOvError> {
+    pub async fn get_wow_death_recap(&self, view_uuid: &Uuid, event_id: i64, seconds: i32) -> Result<WowDeathRecap, SquadOvError> {
         let death_window = sqlx::query!(
             r#"
             SELECT 
@@ -114,7 +114,7 @@ impl api::ApiApplication {
         })
     }
 
-    async fn get_wow_match_subencounters(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWowEncounter>, SquadOvError> {
+    pub async fn get_wow_match_subencounters(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWowEncounter>, SquadOvError> {
         let subencounter_events = sqlx::query!(
             r#"
             SELECT
@@ -180,7 +180,7 @@ impl api::ApiApplication {
         )
     }
 
-    async fn get_wow_match_aura_events(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWoWAura>, SquadOvError> {
+    pub async fn get_wow_match_aura_events(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWoWAura>, SquadOvError> {
         let raw_auras = sqlx::query!(
             r#"
             SELECT
@@ -261,7 +261,7 @@ impl api::ApiApplication {
         )
     }
 
-    async fn get_wow_match_death_events(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWoWDeath>, SquadOvError> {
+    pub async fn get_wow_match_death_events(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWoWDeath>, SquadOvError> {
         Ok(
             sqlx::query_as!(
                 SerializedWoWDeath,
@@ -289,7 +289,7 @@ impl api::ApiApplication {
         )
     }
 
-    async fn get_wow_match_resurrection_events(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWoWResurrection>, SquadOvError> {
+    pub async fn get_wow_match_resurrection_events(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWoWResurrection>, SquadOvError> {
         Ok(
             sqlx::query_as!(
                 SerializedWoWResurrection,
@@ -316,7 +316,7 @@ impl api::ApiApplication {
         )
     }
 
-    async fn get_wow_match_aura_break_events(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWoWAuraBreak>, SquadOvError> {
+    pub async fn get_wow_match_aura_break_events(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWoWAuraBreak>, SquadOvError> {
         Ok(
             sqlx::query!(
                 r#"
@@ -366,7 +366,7 @@ impl api::ApiApplication {
         )
     }
 
-    async fn get_wow_match_spell_cast_events(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWoWSpellCast>, SquadOvError> {
+    pub async fn get_wow_match_spell_cast_events(&self, view_uuid: &Uuid) -> Result<Vec<SerializedWoWSpellCast>, SquadOvError> {
         let raw_casts = sqlx::query!(
             r#"
             SELECT

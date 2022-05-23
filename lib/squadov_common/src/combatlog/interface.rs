@@ -7,7 +7,7 @@ use rusoto_s3::{
     S3,
     GetObjectRequest,
 };
-use serde::{de::DeserializeOwned};
+use serde::{Serialize, de::DeserializeOwned};
 use avro_rs::{Reader, from_value};
 
 pub struct CombatLogInterface {
@@ -56,6 +56,13 @@ impl CombatLogInterface {
         Ok(serde_json::from_slice::<T>(&self.get_report_raw(&key).await?)?)
     }
 
+    pub async fn save_report_json<T>(&self, partition_id: &str, canonical_type: i32, filename: &str, data: T) -> Result<(), SquadOvError>
+    where
+        T: Serialize
+    {
+        Ok(())
+    }
+
     pub async fn get_report_avro<T>(&self, partition_id: &str, canonical_type: i32, filename: &str) -> Result<Vec<T>, SquadOvError>
     where
         T: DeserializeOwned
@@ -71,5 +78,12 @@ impl CombatLogInterface {
             ret.push(from_value::<T>(&v?)?);
         }
         Ok(ret)
+    }
+
+    pub async fn save_report_avro<T>(&self, partition_id: &str, canonical_type: i32, filename: &str, data: Vec<T>) -> Result<(), SquadOvError>
+    where
+        T: Serialize
+    {
+        Ok(())
     }
 }

@@ -26,6 +26,18 @@ impl From<WowDeathRecapHpEvent> for WowDeathRecapEvent {
     }
 }
 
+impl From<WowDeathRecapEvent> for WowDeathRecapHpEvent {
+    fn from(x: WowDeathRecapEvent) -> Self {
+        Self {
+            tm: x.tm,
+            diff_ms: x.diff_ms,
+            diff_hp: x.diff_hp,
+            spell_id: x.spell_id,
+            source_guid: x.source_guid,
+            source_name: x.source_name,
+        }
+    }
+}
 
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
