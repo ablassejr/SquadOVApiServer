@@ -5,9 +5,12 @@ use sqlx::{
     postgres::{PgPoolOptions, PgConnectOptions},
 };
 use std::sync::Arc;
-use deadpool_postgres::{Config, Pool, Runtime};
-use native_tls::{TlsConnector};
-use postgres_native_tls::MakeTlsConnector;
+use squadov_common::{
+    elastic::{
+        ElasticSearchConfig,
+        ElasticSearchClient,
+    },
+};
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct DevApiConfig {
@@ -21,10 +24,8 @@ pub struct DevApiConfig {
     pub fa_client_secret: String,
     pub self_host: String,
     pub self_schema: String,
-    redshift_endpoint: String,
-    redshift_username: String,
-    redshift_password: String,
     pub workers: usize,
+    pub elasticsearch: ElasticSearchConfig,
 }
 
 impl DevApiConfig {
@@ -41,7 +42,7 @@ impl DevApiConfig {
 pub struct SharedApp {
     pub config: DevApiConfig,
     pub pool: Arc<PgPool>,
-    pub redshift: Arc<Pool>,
+    pub es_api: Arc<ElasticSearchClient>,
 }
 
 impl SharedApp {
@@ -67,22 +68,7 @@ impl SharedApp {
                     .await
                     .unwrap())
             },
-            redshift: {
-                let mut cfg = Config::new();
-                cfg.dbname = Some("squadov".to_string());
-                cfg.port = Some(5439);
-                cfg.application_name = Some("squadov_devapi".to_string());
-                cfg.user = Some(config.redshift_username.clone());
-                cfg.password = Some(config.redshift_password.clone());
-                cfg.host = Some(config.redshift_endpoint.clone());
-                Arc::new(
-                    cfg.create_pool(Some(Runtime::Tokio1), {
-                        let connector = TlsConnector::builder()
-                            .build().unwrap();
-                        MakeTlsConnector::new(connector)
-                    }).unwrap()
-                )
-            }
+            es_api: Arc::new(ElasticSearchClient::new(config.elasticsearch)),
         }
     }
 }

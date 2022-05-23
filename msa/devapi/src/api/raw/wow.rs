@@ -7,6 +7,13 @@ use std::{
 };
 use uuid::Uuid;
 use crate::shared::SharedApp;
+use elasticsearch_dsl::{Search, Sort, SortOrder, Query};
+use squadov_common::{
+    SquadOvGames,
+    SquadOvWowRelease,
+    games,
+    elastic::vod::ESVodDocument,
+};
 
 #[derive(PartialEq)]
 pub enum WowInstanceMode {
@@ -26,12 +33,23 @@ impl<'de> Deserialize<'de> for WowInstanceMode {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum WowRelease {
     Retail,
     Tbc,
     Vanilla,
     Unknown
+}
+
+impl Into<SquadOvWowRelease> for WowRelease {
+    fn into(self) -> SquadOvWowRelease {
+        match self {
+            WowRelease::Retail => SquadOvWowRelease::Retail,
+            WowRelease::Tbc => SquadOvWowRelease::Tbc,
+            WowRelease::Vanilla => SquadOvWowRelease::Vanilla,
+            _ => SquadOvWowRelease::Retail,
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for WowRelease {
@@ -45,17 +63,6 @@ impl<'de> Deserialize<'de> for WowRelease {
             "vanilla" => WowRelease::Vanilla,
             _ => WowRelease::Unknown,
         })
-    }
-}
-
-impl WowRelease {
-    fn to_patch_filter(&self) -> String {
-        match self {
-            WowRelease::Retail => "9.*",
-            WowRelease::Tbc => "2.*",
-            WowRelease::Vanilla => "1.*",
-            _ => ".*",
-        }.to_string()
     }
 }
 
@@ -132,6 +139,8 @@ pub struct RawWowResponse {
     combatants: Vec<WowCombatantInfo>,
 }
 
+const PAGE_SIZE: usize = 1000;
+
 pub async fn raw_wow_handler(payload: web::Json<RawWowRequest>, app: web::Data<Arc<SharedApp>>) -> Result<HttpResponse> {
     if payload.mode == WowInstanceMode::Unknown ||
         payload.release == WowRelease::Unknown
@@ -142,98 +151,111 @@ pub async fn raw_wow_handler(payload: web::Json<RawWowRequest>, app: web::Data<A
     if payload.end_tm.signed_duration_since(payload.start_tm).num_seconds() > 86400 {
         return Ok(HttpResponse::BadRequest().finish())
     }
-
-    let client = app.redshift.get().await.unwrap();
     
     let mut resp: HashMap<String, RawWowResponse> = HashMap::new();
-    
-    match payload.mode {
-        WowInstanceMode::Arena => {
-            // Slightly inefficient since we return 1 row per combatant rather than 1 row per match.
-            // Unfortunately, there's no good way to aggregate all the combatant data into a single "combatants" column.
-            // Thus, it'd be better to just have a single trip to the Redshift cluster and get all the info all at once.
-            let stmt = client.prepare_cached(r#"
-                SELECT
-                    wm.id,
-                    wm.tm,
-                    wm.build,
-                    JSON_SERIALIZE(wm.info),
-                    wmc.player_guid,
-                    wmc.spec_id,
-                    wmc.class_id,
-                    wmc.rating,
-                    wmc.team,
-                    JSON_SERIALIZE(wmc.items),
-                    JSON_SERIALIZE(wmc.talents),
-                    JSON_SERIALIZE(wmc.covenant)
-                FROM (
-                    SELECT *
-                    FROM wow_matches wm
-                    WHERE wm.tm >= $1 AND wm.tm < $2
-                        AND wm.match_type = 'arena'
-                        AND (wm.build ~ $3 OR wm.build ~ $4)
-                        AND wm.info.arena_type::VARCHAR = $5
-                    ORDER BY wm.tm ASC
-                    LIMIT 1000 OFFSET $6
-                ) wm
-                LEFT JOIN wow_match_combatants wmc
-                    ON wmc.match_id = wm.id
-            "#).await.unwrap();
+    let page = payload.page.unwrap_or(0);
+    let search_query = Search::new().query({
+        let mut q = Query::bool()
+            .filter(Query::terms("data.game", vec![SquadOvGames::WorldOfWarcraft as i32]))
+            .filter(Query::range("vod.endTime")
+                .gte(payload.start_tm.timestamp_millis())
+                .lte(payload.end_tm.timestamp_millis())
+            )
+            .filter(Query::regexp("data.wow.buildVersion", games::wow_release_to_regex_expression(payload.release.clone().into())))
+            .filter(Query::term("vod.isClip", false))
+        ;
 
-            let rows = client.query(&stmt, &[
-                &payload.start_tm.naive_utc(),
-                &payload.end_tm.naive_utc(),
-                &payload.release.to_patch_filter(),
-                &payload.patch.clone().unwrap_or(".*".to_string()),
-                &payload.bracket.as_ref().unwrap().to_string(),
-                &(payload.page.unwrap_or(0) as i32 * 1000i32),
-            ]).await.unwrap();
-
-            for x in rows {
-                let id: String = x.get(0);
-
-                if !resp.contains_key(&id) {
-                    let tm: chrono::NaiveDateTime = x.get(1);
-                    let build: String = x.get(2);
-                    let info: String = x.get(3);
-                    resp.insert(id.clone(), RawWowResponse{
-                        id: id.parse().unwrap(),
-                        tm,
-                        build,
-                        info: serde_json::from_str(&info).unwrap(),
-                        combatants: vec![],
-                    });
-                }
-
-                if let Some(data) = resp.get_mut(&id) {
-                    let player_guid: Option<String> = x.get(4);
-                    if player_guid.is_none() {
-                        continue;
-                    }
-                    let player_guid = player_guid.unwrap();
-
-                    let spec_id: i32 = x.get(5);
-                    let class_id: Option<i32> = x.get(6);
-                    let rating: i32 = x.get(7);
-                    let team: i32 = x.get(8);
-                    let items: String = x.get(9);
-                    let talents: String = x.get(10);
-                    let covenant: String = x.get(11);
-                    data.combatants.push(WowCombatantInfo{
-                        player_guid,
-                        spec_id,
-                        class_id,
-                        rating,
-                        team,
-                        items: serde_json::from_str(&items).unwrap(),
-                        talents: serde_json::from_str(&talents).unwrap(),
-                        covenant: serde_json::from_str(&covenant).unwrap(),
-                    });
-                }
+        match payload.mode {
+            WowInstanceMode::Arena => {
+                q = q.filter(Query::exists("data.wow.arena"));
             }
-        },
-        _ => return Ok(HttpResponse::BadRequest().finish()) 
-    };
+            _ => (),
+        };
+
+        if let Some(patch) = payload.patch.as_ref() {
+            q = q.filter(
+                Query::regexp("data.wow.buildVersion", patch.as_str())
+            );
+        }
+
+        if let Some(bracket) = payload.bracket.as_ref() {
+            q = q.filter(
+                Query::terms("data.wow.arena.type", vec![bracket.to_string()])
+            );
+        }
+
+        q
+    })
+        .from(page * PAGE_SIZE)
+        .size(PAGE_SIZE)
+        .sort(vec![
+            Sort::new("vod.endTime")
+                .order(SortOrder::Desc)
+        ]);
+    
+    let documents: Vec<ESVodDocument> = app.es_api.search_documents(&app.config.elasticsearch.vod_index_read, serde_json::to_value(search_query)?).await?;
+    for d in documents {
+        if let Some(match_uuid) = d.data.match_uuid.as_ref() {
+            let match_uuid_str = match_uuid.to_string();
+            if resp.contains_key(&match_uuid_str) {
+                continue;
+            }
+
+            if d.vod.end_time.is_none() {
+                continue;
+            }
+
+            if let Some(wow) = d.data.wow.as_ref() {
+                resp.insert(match_uuid_str.clone(), RawWowResponse{
+                    id: match_uuid.clone(),
+                    tm: d.vod.end_time.map(|x| { x.naive_utc() }).unwrap(),
+                    build: wow.build_version.clone(),
+                    info: if let Some(arena) = wow.arena.as_ref() {
+                        serde_json::to_value(arena)?
+                    } else {
+                        serde_json::Value::Null
+                    },
+                    combatants: wow.teams.iter().map(|t| {
+                        t.players.iter().map(|p| {
+                            WowCombatantInfo {
+                                player_guid: p.info.data.guid.clone(),
+                                spec_id: p.info.data.spec_id,
+                                class_id: p.info.data.class_id.map(|x| { x as i32 }),
+                                rating: p.info.data.rating,
+                                team: p.info.data.team,
+                                items: serde_json::to_value(&p.info.traits.items).unwrap_or(serde_json::Value::Null),
+                                talents: serde_json::to_value({
+                                    #[derive(Serialize, Clone)]
+                                    #[serde(rename_all="camelCase")]
+                                    struct TalentWrapper {
+                                        talent_id: i32,
+                                        is_pvp: bool
+                                    }
+
+                                    [
+                                        p.info.traits.talents.iter().map(|x| {
+                                            TalentWrapper {
+                                                talent_id: *x,
+                                                is_pvp: false,
+                                            }
+                                        }).collect::<Vec<_>>().as_slice(),
+                                        p.info.traits.pvp_talents.iter().map(|x| {
+                                            TalentWrapper {
+                                                talent_id: *x,
+                                                is_pvp: true,
+                                            }
+                                        }).collect::<Vec<_>>().as_slice(),
+                                    ].concat()
+                                }).unwrap_or(serde_json::Value::Null),
+                                covenant: serde_json::to_value(&p.info.traits.covenant).unwrap_or(serde_json::Value::Null),
+                            }
+                        })
+                    }).flatten().collect(),
+                });
+            }
+            
+        }
+    }
 
     Ok(
         HttpResponse::Ok().json(resp.values().collect::<Vec<_>>())

@@ -23,3 +23,5 @@ native-tls = "0.2.8"
 postgres-native-tls = "0.5.0"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
 serde_json = "1.0.79"
+squadov_common = { path="../../lib/squadov_common" }
+elasticsearch-dsl = "0.3.7"
