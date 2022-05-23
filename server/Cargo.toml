@@ -69,6 +69,10 @@ name = "vod_processing_worker"
 path = "src/vod_processing_worker.rs"
 
 [[bin]]
+name = "wow_combat_log_transfer_worker"
+path = "src/wow_combat_log_transfer_worker.rs"
+
+[[bin]]
 name = "singleton_event_processing_worker"
 path = "src/singleton_event_processing_worker.rs"
 required-features = ["eventloop"]

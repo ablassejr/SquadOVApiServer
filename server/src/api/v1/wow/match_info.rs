@@ -16,7 +16,7 @@ use squadov_common::{
         events::{
             aura_breaks::WowAuraBreakEventReport,
             auras::WowAuraEventReport,
-            deaths::WowDeathEventReport,
+            deaths::{WowDeathRecapHpEvent, WowDeathEventReport},
             encounters::WowEncounterEventReport,
             resurrections::WowResurrectionEventReport,
             spell_casts::WowSpellCastEventReport,
@@ -626,6 +626,14 @@ pub struct WowDeathRecapQuery {
 }
 
 pub async fn get_death_recap_handler(app : web::Data<Arc<api::ApiApplication>>, match_path: web::Path<super::WoWUserMatchPath>, event_path: web::Path<WowEventIdPath>, query: web::Query<WowDeathRecapQuery>) -> Result<HttpResponse, SquadOvError> {
-    let view_uuid = app.get_wow_match_view_for_user_match(match_path.user_id, &match_path.match_uuid).await?.ok_or(SquadOvError::NotFound)?;
-    Ok(HttpResponse::Ok().json(app.get_wow_death_recap(&view_uuid, event_path.event_id, query.seconds).await?))
+    let match_view = squadov_common::wow::matches::get_generic_wow_match_view_from_match_user(&*app.pool, &match_path.match_uuid, match_path.user_id).await?;
+    Ok(HttpResponse::Ok().json(if let Some(combat_log_partition_id) = match_view.combat_log_partition_id {
+        let reports = app.cl_itf.get_report_avro::<WowDeathRecapHpEvent>(&combat_log_partition_id, WowReportTypes::DeathRecap as i32, &format!("{}.avro", event_path.event_id)).await?;
+        WowDeathRecap{
+            // The output should be newest event first - we store oldest event first.
+            hp_events: reports.into_iter().map(|x| { x.into() }).rev().collect(),
+        }
+    } else {
+        app.get_wow_death_recap(&match_view.id, event_path.event_id, query.seconds).await?
+    }))
 }

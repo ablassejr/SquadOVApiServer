@@ -328,6 +328,7 @@ pub struct ApiApplication {
     pub zendesk: Arc<ZendeskClient>,
     pub es_api: Arc<ElasticSearchClient>,
     pub cl_itf: Arc<CombatLogInterface>,
+    pub rabbitmq: Arc<RabbitMqInterface>,
 }
 
 impl ApiApplication {
@@ -608,6 +609,7 @@ impl ApiApplication {
             zendesk: Arc::new(ZendeskClient::new(config.zendesk.clone())),
             es_api,
             cl_itf,
+            rabbitmq,
         };
 
         app.create_vod_manager(&config.storage.vods.global).await.unwrap();

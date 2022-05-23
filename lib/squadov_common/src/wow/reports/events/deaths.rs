@@ -34,12 +34,12 @@ use std::collections::{HashMap, VecDeque};
 #[serde(rename_all="camelCase")]
 pub struct WowDeathRecapHpEvent {
     #[serde(with = "ts_milliseconds")]
-    tm: DateTime<Utc>,
-    diff_ms: i64,
-    diff_hp: i32,
-    spell_id: Option<i64>,
-    source_guid: Option<String>,
-    source_name: Option<String>,
+    pub tm: DateTime<Utc>,
+    pub diff_ms: i64,
+    pub diff_hp: i32,
+    pub spell_id: Option<i64>,
+    pub source_guid: Option<String>,
+    pub source_name: Option<String>,
 }
 
 impl Default for WowDeathRecapHpEvent {
