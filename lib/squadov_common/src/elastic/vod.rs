@@ -437,17 +437,6 @@ where
                         });
                     }
 
-                    // If this is an encounter, we need to update the boss HP from the character data.
-                    // If this is an arena, we need to determine success based off of the POV's team ID and comparing it to the winning team ID.
-                    if let Some(arena) = arena.as_mut() {
-                        for c in ret_wrappers.iter() {
-                            if user_chars.iter().any(|x| { x.guid == c.data.guid}) {
-                                arena.success = winning_team_id == c.data.team;
-                                break;
-                            }
-                        }
-                    }
-
                     if let Some(encounter) = encounter.as_mut() {
                         let characters: HashMap<i64, WowCharacterReport> = HashMap::from_iter(
                             cl_itf.get_report_avro::<WowCharacterReport>(&combat_log_partition_id, WowReportTypes::MatchCharacters as i32, "characters.avro").await?
@@ -463,6 +452,7 @@ where
                                 })
                         );
 
+                        // If this is an encounter, we need to update the boss HP from the character data.
                         let bosses = wc::list_wow_encounter_bosses(ex, encounter.encounter_id as i64).await?;
                         encounter.boss = bosses.into_iter().map(|x| {
                             let boss_char = characters.get(&x.npc_id.unwrap_or(-1));
@@ -487,6 +477,16 @@ where
 
                     ret_wrappers
                 };
+
+                // If this is an arena, we need to determine success based off of the POV's team ID and comparing it to the winning team ID.
+                if let Some(arena) = arena.as_mut() {
+                    for c in char_wrappers.iter() {
+                        if user_chars.iter().any(|x| { x.guid == c.data.guid}) {
+                            arena.success = winning_team_id == c.data.team;
+                            break;
+                        }
+                    }
+                }
 
                 data.wow = Some(ESVodCachedWow{
                     encounter,
