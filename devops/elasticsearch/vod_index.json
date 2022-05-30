@@ -703,6 +703,9 @@
                     },
                     "published": {
                         "type": "boolean"
+                    },
+                    "clipTime": {
+                        "type": "date"
                     }
                 }   
             }

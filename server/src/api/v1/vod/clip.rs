@@ -169,8 +169,10 @@ impl api::ApiApplication {
             .from(start)
             .size(end)
             .sort(vec![
+                Sort::new("clip.clipTime")
+                    .order(SortOrder::Desc),
                 Sort::new("vod.endTime")
-                    .order(SortOrder::Desc)
+                    .order(SortOrder::Desc),
             ]);
 
         let documents: Vec<ESVodDocument> = self.es_api.search_documents(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?;

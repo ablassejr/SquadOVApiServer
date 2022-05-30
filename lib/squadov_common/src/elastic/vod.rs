@@ -54,6 +54,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::iter::FromIterator;
 use uuid::Uuid;
+use chrono::{DateTime, Utc};
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all="camelCase")]
@@ -183,6 +184,7 @@ pub struct ESVodClip {
     pub title: String,
     pub description: String,
     pub published: bool,
+    pub clip_time: Option<DateTime<Utc>>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -221,7 +223,8 @@ where
             SELECT
                 title,
                 description,
-                published
+                published,
+                tm AS "clip_time?"
             FROM squadov.vod_clips
             WHERE clip_uuid = $1
             "#,
