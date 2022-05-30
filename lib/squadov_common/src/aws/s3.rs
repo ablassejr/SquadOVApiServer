@@ -31,7 +31,7 @@ pub async fn s3_multipart_upload_data<T>(s3: &S3Client, mut data: T, total_bytes
 where 
     T: AsyncSeek + AsyncRead + std::marker::Unpin
 {
-    log::info!("Starting Multipart Upload: {}/{}", bucket, key);
+    log::info!("Starting Multipart Upload: {}/{} - {} bytes", bucket, key, total_bytes);
 
     if total_bytes == 0 {
         let req = PutObjectRequest{

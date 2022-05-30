@@ -163,8 +163,8 @@ impl WowTaskHandler {
                 {
                     let dps: Vec<_> = self.app.get_wow_match_dps(match_view.user_id, match_uuid, &combatant_guids, &api::v1::WowStatsQueryParams{
                         ps_step_seconds: 5,
-                        start: None,
-                        end: None,
+                        start: Some(match_view.start_tm.clone()),
+                        end: Some(match_view.end_tm.clone()),
                     }).await?
                         .into_iter()
                         .map(|(k,v)| {
@@ -182,8 +182,8 @@ impl WowTaskHandler {
 
                     let hps = self.app.get_wow_match_heals_per_second(match_view.user_id, match_uuid, &combatant_guids, &api::v1::WowStatsQueryParams{
                         ps_step_seconds: 5,
-                        start: None,
-                        end: None,
+                        start: Some(match_view.start_tm.clone()),
+                        end: Some(match_view.end_tm.clone()),
                     }).await?
                         .into_iter()
                         .map(|(k,v)| {
@@ -201,8 +201,8 @@ impl WowTaskHandler {
 
                     let drps = self.app.get_wow_match_damage_received_per_second(match_view.user_id, match_uuid, &combatant_guids, &api::v1::WowStatsQueryParams{
                         ps_step_seconds: 5,
-                        start: None,
-                        end: None,
+                        start: Some(match_view.start_tm.clone()),
+                        end: Some(match_view.end_tm.clone()),
                     }).await?
                         .into_iter()
                         .map(|(k,v)| {

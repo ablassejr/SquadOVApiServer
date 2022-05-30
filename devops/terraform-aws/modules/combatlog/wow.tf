@@ -50,7 +50,7 @@ resource "aws_lambda_function" "wow_combat_log_lambda" {
     package_type = "Zip"
     reserved_concurrent_executions = var.wow_shards * 10
     runtime = "provided.al2"
-    timeout = 30
+    timeout = 120
 
     tags = {
         "lambda" = "wow"
