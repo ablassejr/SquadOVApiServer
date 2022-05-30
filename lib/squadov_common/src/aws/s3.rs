@@ -1,7 +1,6 @@
 use crate::{
     SquadOvError,
 };
-use std::sync::Arc;
 use rusoto_s3::{
     S3Client,
     S3,
@@ -28,7 +27,7 @@ use tokio::{
 
 const MULTIPART_SEGMENT_SIZE_BYTES: usize = 100 * 1024 * 1024;
 
-pub async fn s3_multipart_upload_data<T>(s3: Arc<S3Client>, mut data: T, total_bytes: usize, bucket: &str, key: &str) -> Result<(), SquadOvError>
+pub async fn s3_multipart_upload_data<T>(s3: &S3Client, mut data: T, total_bytes: usize, bucket: &str, key: &str) -> Result<(), SquadOvError>
 where 
     T: AsyncSeek + AsyncRead + std::marker::Unpin
 {

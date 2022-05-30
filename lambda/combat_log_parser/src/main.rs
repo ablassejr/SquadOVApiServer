@@ -94,7 +94,7 @@ impl SharedClient {
             tm=Utc::now().timestamp_millis(),
             id=&Uuid::new_v4(),
         );
-        s3::s3_multipart_upload_data(self.s3.clone(), Cursor::new(compressed_data), compressed_data_size, &self.combat_log_bucket, &key).await?;
+        s3::s3_multipart_upload_data(self.s3.as_ref(), Cursor::new(compressed_data), compressed_data_size, &self.combat_log_bucket, &key).await?;
         Ok(())
     }
 

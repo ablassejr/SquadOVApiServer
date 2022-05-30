@@ -1,6 +1,9 @@
 use crate::{
     SquadOvError,
-    aws::AWSClient,
+    aws::{
+        AWSClient,
+        s3,
+    },
 };
 use std::sync::Arc;
 use rusoto_s3::{
@@ -8,7 +11,14 @@ use rusoto_s3::{
     GetObjectRequest,
 };
 use serde::{Serialize, de::DeserializeOwned};
-use avro_rs::{Reader, from_value};
+use avro_rs::{
+    Reader,
+    from_value,
+    Writer,
+    Codec,
+    Schema,
+};
+use std::io::{Cursor};
 
 pub struct CombatLogInterface {
     bucket: String,
@@ -44,6 +54,12 @@ impl CombatLogInterface {
         }
     }
 
+    async fn save_report_raw(&self, key: &str, data: Vec<u8>) -> Result<(), SquadOvError> {
+        let total_bytes = data.len();
+        s3::s3_multipart_upload_data(&(*self.aws).as_ref().unwrap().s3, Cursor::new(data), total_bytes, &self.bucket, key).await?;
+        Ok(())
+    }
+
     fn get_key(partition_id: &str, canonical_type: i32, filename: &str) -> String {
         format!("form=Report/partition={}/canonical={}/{}", partition_id, canonical_type, filename)
     }
@@ -60,6 +76,8 @@ impl CombatLogInterface {
     where
         T: Serialize
     {
+        let raw_data = serde_json::to_vec(&data)?;
+        self.save_report_raw(&Self::get_key(partition_id, canonical_type, filename), raw_data).await?;
         Ok(())
     }
 
@@ -80,10 +98,17 @@ impl CombatLogInterface {
         Ok(ret)
     }
 
-    pub async fn save_report_avro<T>(&self, partition_id: &str, canonical_type: i32, filename: &str, data: Vec<T>) -> Result<(), SquadOvError>
+    pub async fn save_report_avro<T>(&self, partition_id: &str, canonical_type: i32, filename: &str, schema: &Schema, data: Vec<T>) -> Result<(), SquadOvError>
     where
         T: Serialize
     {
+        let mut writer = Writer::with_codec(schema, Vec::new(), Codec::Snappy);
+        for d in data {
+            writer.append_ser(d)?;
+        }
+
+        let raw_data = writer.into_inner()?;
+        self.save_report_raw(&Self::get_key(partition_id, canonical_type, filename), raw_data).await?;
         Ok(())
     }
 }

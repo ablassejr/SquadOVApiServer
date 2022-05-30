@@ -156,7 +156,7 @@ async fn store_single_static_report(report: &RawStaticCombatLogReport, bucket: &
 
     let mut raw_file = report.raw_file.write().await;
     let byte_size = raw_file.metadata().await?.len() as usize;
-    s3::s3_multipart_upload_data(s3_client, raw_file.deref_mut(), byte_size, bucket, &key).await?;
+    s3::s3_multipart_upload_data(s3_client.as_ref(), raw_file.deref_mut(), byte_size, bucket, &key).await?;
     Ok(())
 }
 

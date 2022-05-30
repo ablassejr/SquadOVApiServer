@@ -116,8 +116,8 @@ const COMBATANT_REPORT_SCHEMA_RAW: &'static str = r#"
 "#;
 
 lazy_static! {
-    static ref CHAR_REPORT_SCHEMA: Schema = Schema::parse_str(CHAR_REPORT_SCHEMA_RAW).unwrap();
-    static ref COMBATANT_REPORT_SCHEMA: Schema = Schema::parse_str(COMBATANT_REPORT_SCHEMA_RAW).unwrap();
+    pub static ref CHAR_REPORT_SCHEMA: Schema = Schema::parse_str(CHAR_REPORT_SCHEMA_RAW).unwrap();
+    pub static ref COMBATANT_REPORT_SCHEMA: Schema = Schema::parse_str(COMBATANT_REPORT_SCHEMA_RAW).unwrap();
 }
 
 impl CombatLogReportHandler for WowCharacterReportGenerator {

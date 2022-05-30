@@ -220,7 +220,7 @@ impl SharedClient {
                 log::info!("Compressed Merged File Size: {}", compressed_size);
 
                 s3::s3_multipart_upload_data(
-                    self.s3.clone(),
+                    self.s3.as_ref(),
                     tokio::fs::File::from_std(compressed_file),
                     compressed_size,
                     bucket,

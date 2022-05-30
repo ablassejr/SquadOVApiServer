@@ -113,8 +113,8 @@ const DEATH_RECAP_SCHEMA_RAW: &'static str = r#"
 "#;
 
 lazy_static! {
-    static ref REPORT_SCHEMA: Schema = Schema::parse_str(REPORT_SCHEMA_RAW).unwrap();
-    static ref DEATH_RECAP_SCHEMA: Schema = Schema::parse_str(DEATH_RECAP_SCHEMA_RAW).unwrap();
+    pub static ref REPORT_SCHEMA: Schema = Schema::parse_str(REPORT_SCHEMA_RAW).unwrap();
+    pub static ref DEATH_RECAP_SCHEMA: Schema = Schema::parse_str(DEATH_RECAP_SCHEMA_RAW).unwrap();
 }
 
 impl<'a> CombatLogReportHandler for WowDeathEventsReportGenerator<'a> {

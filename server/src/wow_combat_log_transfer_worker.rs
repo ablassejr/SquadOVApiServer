@@ -15,18 +15,45 @@ use squadov_common::{
         reports::{
             characters::{
                 WowCombatantReport,
+                COMBATANT_REPORT_SCHEMA,
                 WowCharacterReport,
+                CHAR_REPORT_SCHEMA,
             },
             WowReportTypes,
             events::{
-                aura_breaks::WowAuraBreakEventReport,
-                auras::WowAuraEventReport,
-                deaths::{WowDeathEventReport, WowDeathRecapHpEvent},
-                encounters::WowEncounterEventReport,
-                resurrections::WowResurrectionEventReport,
-                spell_casts::WowSpellCastEventReport,
+                aura_breaks::{
+                    WowAuraBreakEventReport,
+                    REPORT_SCHEMA as AURA_BREAK_REPORT_SCHEMA,
+                },
+                auras::{
+                    WowAuraEventReport,
+                    REPORT_SCHEMA as AURAS_REPORT_SCHEMA,
+                },
+                deaths::{
+                    WowDeathEventReport,
+                    WowDeathRecapHpEvent,
+                    REPORT_SCHEMA as DEATHS_REPORT_SCHEMA,
+                    DEATH_RECAP_SCHEMA,
+                },
+                encounters::{
+                    WowEncounterEventReport,
+                    REPORT_SCHEMA as ENCOUNTERS_REPORT_SCHEMA,
+                },
+                resurrections::{
+                    WowResurrectionEventReport,
+                    REPORT_SCHEMA as RESURRECTIONS_REPORT_SCHEMA,
+                },
+                spell_casts::{
+                    WowSpellCastEventReport,
+                    REPORT_SCHEMA as SPELL_CAST_REPORT_SCHEMA,
+                },
             },
-            stats::{WowUnitTimelineEntry, WowUnitStatSummary},
+            stats::{
+                WowUnitTimelineEntry,
+                TIMELINE_SCHEMA,
+                WowUnitStatSummary,
+                SUMMARY_SCHEMA,
+            },
         }
     }
 };
@@ -126,7 +153,7 @@ impl WowTaskHandler {
                         }
                     }
 
-                    self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Stats as i32, "summary.avro", combatant_summaries.into_values().collect::<Vec<_>>()).await?;
+                    self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Stats as i32, "summary.avro", &SUMMARY_SCHEMA, combatant_summaries.into_values().collect::<Vec<_>>()).await?;
                 }
 
                 {
@@ -147,7 +174,7 @@ impl WowTaskHandler {
                         })
                         .flatten()
                         .collect();
-                    self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Stats as i32, "dps.avro", dps).await?;
+                    self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Stats as i32, "dps.avro", &TIMELINE_SCHEMA, dps).await?;
 
                     let hps = self.app.get_wow_match_heals_per_second(match_view.user_id, match_uuid, &combatant_guids, &api::v1::WowStatsQueryParams{
                         ps_step_seconds: 5,
@@ -166,7 +193,7 @@ impl WowTaskHandler {
                         })
                         .flatten()
                         .collect();
-                    self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Stats as i32, "hps.avro", hps).await?;
+                    self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Stats as i32, "hps.avro", &TIMELINE_SCHEMA, hps).await?;
 
                     let drps = self.app.get_wow_match_damage_received_per_second(match_view.user_id, match_uuid, &combatant_guids, &api::v1::WowStatsQueryParams{
                         ps_step_seconds: 5,
@@ -185,13 +212,14 @@ impl WowTaskHandler {
                         })
                         .flatten()
                         .collect();
-                    self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Stats as i32, "drps.avro", drps).await?;
+                    self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Stats as i32, "drps.avro", &TIMELINE_SCHEMA, drps).await?;
                 }
 
                 self.app.cl_itf.save_report_avro(
                     &partition_id,
                     WowReportTypes::MatchCombatants as i32,
                     "combatants.avro",
+                    &COMBATANT_REPORT_SCHEMA,
                     combatants
                         .into_iter()
                         .map(|x| { x.into() })
@@ -202,10 +230,9 @@ impl WowTaskHandler {
             {
                 // This is never needed after the fact currently aside from ES document generation so we can ignore it in the transfer.
                 let characters: Vec<WowCharacterReport> = vec![];
-                self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::MatchCharacters as i32, "characters.avro", characters).await?;
+                self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::MatchCharacters as i32, "characters.avro", &CHAR_REPORT_SCHEMA, characters).await?;
             }
         }
-
 
         // Event Reports
         // - Deaths
@@ -219,24 +246,24 @@ impl WowTaskHandler {
             let deaths: Vec<WowDeathEventReport> = self.app.get_wow_match_death_events(&match_view.id).await?.into_iter().map(|x| { x.into() }).collect();
             for d in &deaths {
                 let recap_events: Vec<WowDeathRecapHpEvent> = self.app.get_wow_death_recap(&match_view.id, d.event_id, 5).await?.hp_events.into_iter().map(|x| { x.into() }).collect();
-                self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::DeathRecap as i32, &format!("{}.avro", d.event_id), recap_events).await?;
+                self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::DeathRecap as i32, &format!("{}.avro", d.event_id), &DEATH_RECAP_SCHEMA, recap_events).await?;
             }
-            self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Events as i32, "deaths.avro", deaths).await?;
+            self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Events as i32, "deaths.avro", &DEATHS_REPORT_SCHEMA, deaths).await?;
 
             let auras: Vec<WowAuraEventReport> = self.app.get_wow_match_aura_events(&match_view.id).await?.into_iter().map(|x| { x.into() }).collect();
-            self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Events as i32, "auras.avro", auras).await?;
+            self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Events as i32, "auras.avro", &AURAS_REPORT_SCHEMA, auras).await?;
 
             let encounters: Vec<WowEncounterEventReport> = self.app.get_wow_match_subencounters(&match_view.id).await?.into_iter().map(|x| { x.into() }).collect();
-            self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Events as i32, "encounters.avro", encounters).await?;
+            self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Events as i32, "encounters.avro", &ENCOUNTERS_REPORT_SCHEMA, encounters).await?;
 
             let resurrections: Vec<WowResurrectionEventReport> = self.app.get_wow_match_resurrection_events(&match_view.id).await?.into_iter().map(|x| { x.into() }).collect();
-            self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Events as i32, "resurrections.avro", resurrections).await?;
+            self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Events as i32, "resurrections.avro", &RESURRECTIONS_REPORT_SCHEMA, resurrections).await?;
 
             let aura_breaks: Vec<WowAuraBreakEventReport> = self.app.get_wow_match_aura_break_events(&match_view.id).await?.into_iter().map(|x| { x.into() }).collect();
-            self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Events as i32, "aura_breaks.avro", aura_breaks).await?;
+            self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Events as i32, "aura_breaks.avro", &AURA_BREAK_REPORT_SCHEMA, aura_breaks).await?;
 
             let spell_casts: Vec<WowSpellCastEventReport> = self.app.get_wow_match_spell_cast_events(&match_view.id).await?.into_iter().map(|x| { x.into() }).collect();
-            self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Events as i32, "spell_casts.avro", spell_casts).await?;
+            self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Events as i32, "spell_casts.avro", &SPELL_CAST_REPORT_SCHEMA, spell_casts).await?;
         }
     
         Ok(())

@@ -88,8 +88,8 @@ const SUMMARY_SCHEMA_RAW: &'static str = r#"
 "#;
 
 lazy_static! {
-    static ref TIMELINE_SCHEMA: Schema = Schema::parse_str(TIMELINE_SCHEMA_RAW).unwrap();
-    static ref SUMMARY_SCHEMA: Schema = Schema::parse_str(SUMMARY_SCHEMA_RAW).unwrap();
+    pub static ref TIMELINE_SCHEMA: Schema = Schema::parse_str(TIMELINE_SCHEMA_RAW).unwrap();
+    pub static ref SUMMARY_SCHEMA: Schema = Schema::parse_str(SUMMARY_SCHEMA_RAW).unwrap();
 }
 
 const TIMELINE_BUCKET_DURATION_SECONDS: i64 = 5;
