@@ -173,7 +173,7 @@ enabled = true
 credential_path = "aws/api.profile"
 profile = "api"
 region = "us-east-2"
-account_id = ""
+account_id = "${AWS_ACCOUNT_ID}"
 
 [aws.cdn]
 public_cdn_domain = "https://d1goqoukzs4rbo.cloudfront.net"
@@ -183,8 +183,8 @@ public_key_id = "K1JG8A4WKH1W0X"
 private_key_fname = "aws/private_s3_vod_cloudfront.pem"
 
 [aws.cognito]
-pool_id = ""
-provider = ""
+pool_id = "${COGNITO_POOL_ID}"
+provider = "${COGNITO_PROVIDER}"
 
 [ipstack]
 api_key = "${IPSTACK_API_KEY}"

@@ -2,7 +2,7 @@ terraform {
     required_providers {
         aws = {
             source  = "hashicorp/aws"
-            version = "~> 3.70"
+            version = "~> 4.13"
         }
     }
 
@@ -51,11 +51,26 @@ module "storage" {
     cloudfront_suffix = ""
 }
 
+module "combatlog" {
+    source = "../modules/combatlog"
+
+    combatlog_bucket_name = module.storage.combatlog_bucket_name
+
+    lambda_subnets = module.network.lambda_subnets
+    lambda_security_groups = module.network.lambda_security_groups
+
+    db_host = module.db.db_host
+    db_secret = module.db.db_secret
+
+    wow_shards = 3
+    amqp_url = var.amqp_url
+}
+
 module "iam" {
     source = "../modules/iam"
 
     resource_suffix = "-prod"
-    api_gateway_id = ""
+    api_gateway_id = module.combatlog.api_gateway_id
 }
 
 module "k8s" {

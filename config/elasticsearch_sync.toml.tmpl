@@ -47,15 +47,15 @@ enabled = true
 credential_path = "aws/api.profile"
 profile = "api"
 region = "us-east-2"
-account_id = ""
+account_id = "${AWS_ACCOUNT_ID}"
 
 [aws.cdn]
-public_cdn_domain = ""
-private_cdn_domain = ""
-blob_cdn_domain = ""
-public_key_id = ""
-private_key_fname = ""
+public_cdn_domain = "https://d1goqoukzs4rbo.cloudfront.net"
+private_cdn_domain = "https://d2chagikgdm7bl.cloudfront.net"
+blob_cdn_domain = "https://d395ja7261zvra.cloudfront.net"
+public_key_id = "K1JG8A4WKH1W0X"
+private_key_fname = "aws/private_s3_vod_cloudfront.pem"
 
 [aws.cognito]
-pool_id = ""
-provider = ""
+pool_id = "${COGNITO_POOL_ID}"
+provider = "${COGNITO_PROVIDER}"

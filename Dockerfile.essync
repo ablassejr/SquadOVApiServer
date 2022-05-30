@@ -34,5 +34,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /squadov
 COPY --from=builder /squadov/target/release/elasticsearch_sync .
 COPY --from=builder /squadov/config/elasticsearch_sync.toml ./config 
+
+RUN mkdir -p /squadov/aws
+COPY devops/aws/$DEPLOYMENT_ENVIRONMENT.profile ./aws/api.profile
+COPY devops/aws/keys/private_s3_vod_cloudfront.pem ./aws/private_s3_vod_cloudfront.pem
 COPY run_es_sync.sh ./
 ENTRYPOINT ["./run_es_sync.sh"]
