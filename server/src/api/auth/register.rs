@@ -23,14 +23,14 @@ pub struct RegisterParams {
     sig: Option<String>
 }
 
-async fn register(fa: &fusionauth::FusionAuthClient, data: RegisterData) -> Result<(), SquadOvError> {
-    let _ = fa.register(fa.build_register_input(
+async fn register(fa: &fusionauth::FusionAuthClient, data: RegisterData) -> Result<String, SquadOvError> {
+    let output = fa.register(fa.build_register_input(
         data.username,
         data.email,
         data.password,
     )).await?;
 
-    Ok(())
+    Ok(output.user.email)
 }
 
 impl api::ApiApplication {
@@ -96,9 +96,9 @@ pub async fn register_handler(data : web::Json<RegisterData>, app : web::Data<Ar
         return Err(SquadOvError::BadRequest);
     }
 
-    let email = data.email.clone();
+    
     let referral = data.r#ref.clone();
-    register(&app.clients.fusionauth, data.into_inner()).await?;
+    let email = register(&app.clients.fusionauth, data.into_inner()).await?;
 
     let mut tx = app.pool.begin().await?;
     if let Some(referral_code) = &referral {
