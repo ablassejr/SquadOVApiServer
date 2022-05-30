@@ -96,9 +96,11 @@ pub async fn register_handler(data : web::Json<RegisterData>, app : web::Data<Ar
         return Err(SquadOvError::BadRequest);
     }
 
-    
+    let mut data = data.into_inner();
+    data.email = data.email.to_lowercase().trim().to_string();
+
     let referral = data.r#ref.clone();
-    let email = register(&app.clients.fusionauth, data.into_inner()).await?;
+    let email = register(&app.clients.fusionauth, data).await?;
 
     let mut tx = app.pool.begin().await?;
     if let Some(referral_code) = &referral {
