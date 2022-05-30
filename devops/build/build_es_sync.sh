@@ -9,5 +9,5 @@ envsubst < elasticsearch_sync.toml.tmpl > elasticsearch_sync.toml
 
 cd "${ROOTDIR}"
 TAG=registry.gitlab.com/squadov/squadovapiserver/${DEPLOYMENT_ENVIRONMENT}/elasticsearch_sync:${COMMIT_HASH}
-docker build . --file Dockerfile.essync --tag ${TAG}
+docker build . --file Dockerfile.essync --tag ${TAG} --build-arg DEPLOYMENT_ENVIRONMENT=${DEPLOYMENT_ENVIRONMENT}
 docker push ${TAG}

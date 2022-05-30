@@ -5,3 +5,4 @@ kubectl create secret generic postgres-secret --namespace=vod --from-literal=use
 kubectl create secret generic fusionauth-db-secret --from-literal=username=${FUSIONAUTH_DB_USER} --from-literal=password="${FUSIONAUTH_DB_PASSWORD}"
 kubectl create secret generic redshift-secret --from-literal=username=${REDSHIFT_USER} --from-literal=password="${REDSHIFT_PASSWORD}"
 kubectl create secret generic fusionauth-client-secret --from-literal=devapi=${FUSIONAUTH_DEVAPI_SECRET}
+kubectl create secret generic elasticsearch-secret --from-literal=username=${ES_USERNAME} --from-literal=password="${ES_PASSWORD}"

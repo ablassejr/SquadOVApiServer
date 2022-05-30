@@ -36,7 +36,7 @@ fn main() -> std::io::Result<()> {
     // Initialize shared state to access the database as well as any other shared configuration.
     let config: shared::DevApiConfig = Config::builder()
         .add_source(File::with_name("msa/devapi/config/config.toml").required(false))
-        .add_source(Environment::with_prefix("squadov"))
+        .add_source(Environment::with_prefix("squadov").separator("__").prefix_separator("_").try_parsing(true))
         .build()
         .unwrap()
         .try_deserialize()

@@ -63,7 +63,7 @@
 	"COMBAT_LOG_BUCKET": "ENC[AES256_GCM,data:cuW9JUrS7VQZZF5O77na098+9N0buCD/cmjT0aJkJF0=,iv:vDSjLR0ghxcBuMRxPx4PtZn2wIMTmPMXVMQaiqORUJU=,tag:13zM1qTN1XpXqn1jYt0mog==,type:str]",
 	"COMBAT_LOG_HOSTNAME": "ENC[AES256_GCM,data:upvPZoBd7t8S5nKjKy2Do3ztnVqxyFNnQqwMPQQZdLYGpbh99AneCYmzi1PMWQ==,iv:0J8/SVSecgr7SJNifiTRWu3VY2FFdxXGBK4cr21V95k=,tag:D9URrQ+9q2ErDjUossnqUw==,type:str]",
 	"AWS_ACCOUNT_ID": "ENC[AES256_GCM,data:gYNFdTGWBcqSeETv,iv:dCUV5zSK81IMmCnCfxQ7tG+zMuOPUWRYo0jai0MDhj8=,tag:Tzozsu8/CeWXTqZIn2HOGQ==,type:str]",
-	"COGNITO_POOL_ID": "ENC[AES256_GCM,data:E8VmXYYUmDK3vQIv1Up40POcwFMM5wxubJFe5ToMKD06EptYzvz86REIHwr789E=,iv:+uNvIdXgWB9FB3Ry0TZwJsZJIyfUtB11TqyNj4PCovs=,tag:nvmUFC+QlAaeDSr6wxRCpw==,type:str]",
+	"COGNITO_POOL_ID": "ENC[AES256_GCM,data:o08CcPQluqw3XBJsG2uDJ0e+EO5Fgc2rvZe07GqzOO4fKbxUy7SCdEcGcBUXAg==,iv:NF2KKjQjw82V+wyMFRrkdotHFAMGxGtfURKqlf/17sw=,tag:bxtea1TiLJ56Q8rl9m9nWw==,type:str]",
 	"COGNITO_PROVIDER": "ENC[AES256_GCM,data:TOFvdMmkxYulxLaSoO8=,iv:tDWsnZ5DStxAPjQG9hdELhQ36JEnrKkMqN/xIc/uThs=,tag:brjnTxeEBvw+80wsH56DIg==,type:str]",
 	"sops": {
 		"kms": null,
@@ -76,8 +76,8 @@
 		],
 		"azure_kv": null,
 		"hc_vault": null,
-		"lastmodified": "2022-05-30T16:43:09Z",
-		"mac": "ENC[AES256_GCM,data:eIY1YJFMs274ogzGizFIWiNWT9hovwHl+Acc9UHuklunM5teUw9MtHeQG0GkMSM1sFYmFJuNJ4uPMXP8Dv/PK7JMwCP89LJhArY0zvoy2/7cbKugsAbKqe7rYFNCADSArB6d4oIOzFlpye+6u8i6LopYohmkyk8YQRxek0PW0vo=,iv:WcSiNNu3lUoOrzZ0AqPaZplp0xkrmHtcamNlpKcI384=,tag:qOAHfqUXXfLuHNlaNNzItA==,type:str]",
+		"lastmodified": "2022-05-30T17:51:35Z",
+		"mac": "ENC[AES256_GCM,data:x5tnyvYCDZTHqO+tMN+N9ApbyWiyLE5NJmW5AeHGC82Cot2j5e0ezq3WN9xuYCHOooiLMF2QG0zRM6NHeWo5MO8j5nArhi4WdVBWfo8eY8izgXzPlVjtUeMzaZZa6UcvfZ1KdWL4WZ9ncVsGCxzn+W/bE6dHq6lvzRzr0NgKIiU=,iv:AfO4WP+JdRVQPBNG0kcirAGMVuTl/U+qODH6TsHFWp0=,tag:pRwowwclh3Rs9g+eDskxLQ==,type:str]",
 		"pgp": null,
 		"unencrypted_suffix": "_unencrypted",
 		"version": "3.6.1"

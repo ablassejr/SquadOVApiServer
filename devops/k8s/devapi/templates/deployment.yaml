@@ -63,6 +63,22 @@ spec:
                         secretKeyRef:
                             name: redshift-secret
                             key: password
+                    - name: SQUADOV_ELASTICSEARCH__HOST
+                      value: ""
+                    - name: SQUADOV_ELASTICSEARCH__VOD_INDEX_READ
+                      value: ""
+                    - name: SQUADOV_ELASTICSEARCH__VOD_INDEX_WRITE
+                      value: ""
+                    - name: SQUADOV_ELASTICSEARCH__USERNAME
+                      valueFrom:
+                        secretKeyRef:
+                            name: elasticsearch-secret
+                            key: username
+                    - name: SQUADOV_ELASTICSEARCH__PASSWORD
+                      valueFrom:
+                        secretKeyRef:
+                            name: elasticsearch-secret
+                            key: password
                   ports:
                     - containerPort: 8080
                   livenessProbe:
