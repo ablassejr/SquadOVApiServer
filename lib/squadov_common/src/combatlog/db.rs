@@ -18,7 +18,10 @@ where
             $2,
             $3,
             $4
-        )
+        ) ON CONFLICT (partition_id) DO UPDATE SET
+            start_time = EXCLUDED.start_time,
+            owner_id = EXCLUDED.owner_id,
+            cl_state = EXCLUDED.cl_state
         "#,
         partition_id,
         start_time,

@@ -10,7 +10,7 @@ use crate::{
 use unicode_segmentation::UnicodeSegmentation;
 use serde::Serialize;
 
-#[derive(Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all="camelCase")]
 pub struct WoWCombatLogState {
     pub combat_log_version: String,

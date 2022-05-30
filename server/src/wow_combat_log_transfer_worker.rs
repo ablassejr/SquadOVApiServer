@@ -54,8 +54,9 @@ use squadov_common::{
                 WowUnitStatSummary,
                 SUMMARY_SCHEMA,
             },
-        }
-    }
+        },
+    },
+    combatlog::db as cldb,
 };
 use structopt::StructOpt;
 use std::{fs, sync::Arc, collections::HashMap};
@@ -92,6 +93,9 @@ impl WowTaskHandler {
         // the parsed combat log, we need to create them from the existing data.
         let match_view = matches::get_generic_wow_match_view_from_id(&*self.app.pool, view_id).await?;
         let partition_id = format!("wow_{}", &match_view.id);
+
+        // Creat the combat log.
+        cldb::create_combat_log(&*self.app.pool, &partition_id, match_view.user_id, match_view.start_tm.clone(), serde_json::to_value(match_view.combat_log_state())?).await?;
 
         if let Some(match_uuid) = match_view.match_uuid.as_ref() {
             // Character Reports
@@ -265,7 +269,20 @@ impl WowTaskHandler {
             let spell_casts: Vec<WowSpellCastEventReport> = self.app.get_wow_match_spell_cast_events(&match_view.id).await?.into_iter().map(|x| { x.into() }).collect();
             self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Events as i32, "spell_casts.avro", &SPELL_CAST_REPORT_SCHEMA, spell_casts).await?;
         }
-    
+
+        // Associate combat log with wow match view.
+        sqlx::query!(
+            "
+            UPDATE squadov.wow_match_view
+            SET combat_log_partition_id = $2
+            WHERE id = $1
+            ",
+            &match_view.id,
+            &partition_id,
+        )
+            .execute(&*self.app.pool)
+            .await?;
+
         Ok(())
     }
 }
@@ -293,6 +310,15 @@ fn main() -> std::io::Result<()> {
     let opts = Options::from_args();
     let raw_cfg = fs::read_to_string(opts.config.clone()).unwrap();
     let mut config : api::ApiConfig = toml::from_str(&raw_cfg).unwrap();
+    config.rabbitmq.enable_rso = false;
+    config.rabbitmq.enable_lol = false;
+    config.rabbitmq.enable_tft = false;
+    config.rabbitmq.enable_valorant = false;
+    config.rabbitmq.enable_vod = false;
+    config.rabbitmq.enable_csgo = false;
+    config.rabbitmq.enable_steam = false;
+    config.rabbitmq.enable_twitch = false;
+    config.rabbitmq.enable_elasticsearch = false;
     config.rabbitmq.additional_queues = Some(vec!["wow_combat_log_transfer".to_string()]);
 
     tokio::runtime::Builder::new_multi_thread()

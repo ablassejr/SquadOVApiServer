@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: wow-combat-log-transfer
+    labels:
+        task: wcltransfer
+spec:
+    replicas: {{ .Values.replicas }}
+    selector:
+        matchLabels:
+            task: wcltransfer
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                task: wcltransfer
+        spec:
+            nodeSelector:
+                eks.amazonaws.com/compute-type: fargate
+            containers:
+                - name: wow-processor
+                  image: registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/wow_combat_log_transfer_worker:{{ .Values.commitHash }}
+                  env:
+                    - name: "DISABLE_RABBITMQ"
+                      value: "1"
+                    - name: "WORKERS"
+                      value: "{{ .Values.threads }}"
+                    - name: "THREADS"
+                      value: "{{ .Values.threads }}"
+                  resources:
+                    requests:
+                        cpu: "500m"
+                        memory: "1Gi"
+            imagePullSecrets:
+                - name: regcred

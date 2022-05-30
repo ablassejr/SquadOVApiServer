@@ -39,7 +39,7 @@ if __name__ == '__main__':
             'routing_key={}'.format(args.queue),
             'payload={}'.format(
                 json.dumps({
-                    'type': 'SyncVod',
+                    'type': 'UpdateVodClip',
                     'video_uuid': sub,
                 })
             )
@@ -49,4 +49,5 @@ if __name__ == '__main__':
         subprocess.call(cmd)
 
     for sub in subsets:
-        process(sub)
+        for s in sub:
+            process(s)
