@@ -2877,6 +2877,19 @@
       ]
     }
   },
+  "687ff0e4fc427231d5a1de9c0c3bf7a776eb87654507bbaa0c43e21712cec649": {
+    "query": "\n        UPDATE squadov.wow_match_view\n        SET combat_log_partition_id = $2\n        WHERE id = $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "6905d05fa7290e578400980a68306d6554004163b2cb62ba720bd58dea5a1a16": {
     "query": "\n                SELECT rc.code\n                FROM squadov.user_referral_code_usage AS ucu\n                INNER JOIN squadov.referral_codes AS rc\n                    ON rc.id = ucu.code_id\n                INNER JOIN squadov.users AS u\n                    ON u.email = ucu.email\n                WHERE u.id = $1\n                ",
     "describe": {
@@ -3305,6 +3318,33 @@
         true,
         false,
         false
+      ]
+    }
+  },
+  "798106499a92bdbb3d4082dc9d14545ddab97c84c4ef3b0c0b309d21957d9741": {
+    "query": "\n                SELECT wucc.user_id AS \"user_id!\", wucc.unit_guid AS \"guid!\"\n                FROM  squadov.wow_user_character_cache AS wucc\n                INNER JOIN (\n                    SELECT $2\n                    UNION\n                    SELECT ora.user_id\n                    FROM squadov.users AS u\n                    LEFT JOIN squadov.squad_role_assignments AS sra\n                        ON sra.user_id = u.id\n                    LEFT JOIN squadov.squad_role_assignments AS ora\n                        ON ora.squad_id = sra.squad_id\n                    WHERE u.id = $2\n                ) AS squ (user_id)\n                    ON squ.user_id = wucc.user_id\n                WHERE wucc.unit_guid = ANY($1)\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "user_id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "guid!",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "TextArray",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        true,
+        true
       ]
     }
   },
@@ -3814,26 +3854,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "8a077ab54c7c26c84447b3dbbe9c812aa6f8116fb624d2e7de30f5a197766de7": {
-    "query": "\n                SELECT uuid\n                FROM squadov.users AS u\n                WHERE u.id = $1\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false
-      ]
     }
   },
   "8b1ec933fba4cd9d44861e9d5c3fb04a036c323f01584a2f0c5bafedddc889ff": {
@@ -4605,6 +4625,26 @@
       "parameters": {
         "Left": [
           "Int8"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
+  "aa9300cd63146356803c2feed291f7eb049e41344d6e0adef674aecd705825e9": {
+    "query": "\n                SELECT user_id\n                FROM squadov.wow_match_view\n                WHERE id = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "user_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
         ]
       },
       "nullable": [
