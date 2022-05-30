@@ -1732,6 +1732,9 @@ pub async fn list_wow_instances_for_character_handler(app : web::Data<Arc<api::A
 }
 
 pub async fn get_wow_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+    let extensions = req.extensions();
+    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
+
     #[derive(Serialize)]
     struct Response {
         encounter: Option<WoWEncounter>,
@@ -1744,11 +1747,9 @@ pub async fn get_wow_match_handler(app : web::Data<Arc<api::ApiApplication>>, pa
         games: Some(vec![SquadOvGames::WorldOfWarcraft]),
         matches: Some(vec![path.match_uuid.clone()]),
         users: Some(vec![path.user_id]),
+        squads: Some(app.get_user_squads(session.user.id).await?.into_iter().map(|x| { x.squad.id }).collect()),
         ..RecentMatchQuery::default()
     };
-
-    let extensions = req.extensions();
-    let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
     let es_search = filter.to_es_search(session.user.id, false);
     if let Some(document) = app.es_api.search_documents::<ESVodDocument>(&app.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?.pop() {
