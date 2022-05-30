@@ -191,7 +191,7 @@ pub struct GenericWoWMatchView {
     pub match_uuid: Option<Uuid>,
     pub combat_log_partition_id: Option<String>,
     pub start_tm: DateTime<Utc>,
-    pub end_tm: DateTime<Utc>,
+    pub end_tm: Option<DateTime<Utc>>,
 }
 
 pub async fn get_generic_wow_match_view_from_match_user<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64) -> Result<GenericWoWMatchView, SquadOvError>
