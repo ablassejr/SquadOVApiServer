@@ -164,7 +164,7 @@ impl WowTaskHandler {
                     let dps: Vec<_> = self.app.get_wow_match_dps(match_view.user_id, match_uuid, &combatant_guids, &api::v1::WowStatsQueryParams{
                         ps_step_seconds: 5,
                         start: Some(match_view.start_tm.clone()),
-                        end: Some(match_view.end_tm.clone()),
+                        end: match_view.end_tm.clone(),
                     }).await?
                         .into_iter()
                         .map(|(k,v)| {
@@ -183,7 +183,7 @@ impl WowTaskHandler {
                     let hps = self.app.get_wow_match_heals_per_second(match_view.user_id, match_uuid, &combatant_guids, &api::v1::WowStatsQueryParams{
                         ps_step_seconds: 5,
                         start: Some(match_view.start_tm.clone()),
-                        end: Some(match_view.end_tm.clone()),
+                        end: match_view.end_tm.clone(),
                     }).await?
                         .into_iter()
                         .map(|(k,v)| {
@@ -202,7 +202,7 @@ impl WowTaskHandler {
                     let drps = self.app.get_wow_match_damage_received_per_second(match_view.user_id, match_uuid, &combatant_guids, &api::v1::WowStatsQueryParams{
                         ps_step_seconds: 5,
                         start: Some(match_view.start_tm.clone()),
-                        end: Some(match_view.end_tm.clone()),
+                        end: match_view.end_tm.clone(),
                     }).await?
                         .into_iter()
                         .map(|(k,v)| {
@@ -249,7 +249,7 @@ impl WowTaskHandler {
         {
             let deaths: Vec<WowDeathEventReport> = self.app.get_wow_match_death_events(&match_view.id).await?.into_iter().map(|x| { x.into() }).collect();
             for d in &deaths {
-                let recap_events: Vec<WowDeathRecapHpEvent> = self.app.get_wow_death_recap(&match_view.id, d.event_id, 5).await?.hp_events.into_iter().map(|x| { x.into() }).collect();
+                let recap_events: Vec<WowDeathRecapHpEvent> = self.app.get_wow_death_recap(&match_view.id, d.event_id, 5).await?.hp_events.into_iter().map(|x| { x.into() }).rev().collect();
                 self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::DeathRecap as i32, &format!("{}.avro", d.event_id), &DEATH_RECAP_SCHEMA, recap_events).await?;
             }
             self.app.cl_itf.save_report_avro(&partition_id, WowReportTypes::Events as i32, "deaths.avro", &DEATHS_REPORT_SCHEMA, deaths).await?;
