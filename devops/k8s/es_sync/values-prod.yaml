@@ -1,4 +1,4 @@
-commitHash: 423047cd8280adc4b0b7b52c00d47774ce111abd
+commitHash: 73479f25a4fd175616c5c6d067e3b316fa3658bd
 environment: "production"
 replicas: 2
 threads: 6

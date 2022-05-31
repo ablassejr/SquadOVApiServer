@@ -80,17 +80,3 @@ module "k8s" {
     private_k8s_subnets = module.network.private_k8s_subnets
     default_fargate_subnets = module.network.default_fargate_subnets
 }
-
-module "devapi" {
-    source = "../modules/devapi"
-
-    redshift_user = var.redshift_user
-    redshift_password = var.redshift_password
-    redshift_subnets = module.network.database_subnets
-    redshift_security_groups = module.network.database_security_groups
-    db_glue_connection_name = module.db.rds_glue_connection_name
-    glue_subnet = module.network.private_k8s_subnets[0]
-    bucket_suffix = "-prod"
-    db_secret_id = module.db.db_secret_id
-    db_endpoint = module.db.db_endpoint
-}
