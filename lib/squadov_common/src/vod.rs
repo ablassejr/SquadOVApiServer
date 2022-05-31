@@ -678,6 +678,7 @@ impl VodProcessingInterface {
         // So we do the DB deletion in a transaction and before we commit the transaction,
         // we delete from S3. This way, if the S3 delete fails, the DB deletion doesn't go through
         // either. The only way this desyncs is if the commit fails, oh well.
+        // NOTE (5/31/2022): This should only delete from the cloud.
         log::info!("[Delete] Get VOD Metadata");
         let metadata = db::get_vod_metadata(&*self.db, vod_uuid, "source").await?;
 
@@ -690,8 +691,8 @@ impl VodProcessingInterface {
         log::info!("[Delete] Delete VOD TX (Begin) - {}", vod_uuid);
         let mut tx = self.db.begin().await?;
 
-        log::info!("[Delete] DB Delete - {}", vod_uuid);
-        db::delete_vod(&mut tx, vod_uuid).await?;
+        log::info!("[Delete] DB Delete Storage - {}", vod_uuid);
+        db::bulk_delete_vod_copies(&mut tx, &[vod_uuid.clone()], VodCopyLocation::Cloud, &metadata.bucket).await?;
 
         log::info!("[Delete] VOD Delete - {}", vod_uuid);
         manager.delete_vod(&VodSegmentId{
@@ -731,8 +732,8 @@ impl VodProcessingInterface {
         log::info!("[Delete] Delete VOD TX (Commit) - {}", vod_uuid);
         tx.commit().await?;
 
-        log::info!("[Delete] Request ES Delete - {}", vod_uuid);
-        self.es_itf.request_delete_vod(vec![vod_uuid.clone()]).await?;
+        log::info!("[Delete] Delete Update ES - {}", vod_uuid);
+
         Ok(())
     }
 }
@@ -783,12 +784,13 @@ pub fn vod_document_to_vod_clip_for_user(doc: ESVodDocument, user_id: i64) -> Op
 pub enum VodCopyLocation {
     Cloud,
     Local,
+    Unknown,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct VodCopy {
-    video_uuid: Uuid,
-    loc: VodCopyLocation,
-    spec: String,
+    pub video_uuid: Uuid,
+    pub loc: VodCopyLocation,
+    pub spec: String,
 }

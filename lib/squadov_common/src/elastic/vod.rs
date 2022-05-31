@@ -24,6 +24,7 @@ use crate::{
     vod::{
         db as vdb,
         RawVodTag,
+        VodCopyLocation,
     },
     csgo::{
         db as csgo_db,
@@ -189,6 +190,13 @@ pub struct ESVodClip {
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all="camelCase")]
+pub struct ESVodCopy {
+    pub loc: VodCopyLocation,
+    pub spec: String,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct ESVodDocument {
     pub owner: ESVodOwner,
     pub sharing: ESVodSharing,
@@ -198,6 +206,7 @@ pub struct ESVodDocument {
     pub manifest: VodManifest,
     pub vod: VodAssociation,
     pub clip: Option<ESVodClip>,
+    pub storage_copies: Option<Vec<ESVodCopy>>,
 }
 
 impl ESVodDocument {
@@ -269,6 +278,23 @@ where
             }).collect(),
             profiles: vdb::get_vod_profiles(ex, video_uuid).await?,
         }
+    )
+}
+
+pub async fn build_es_vod_storage_copies<'a, T>(ex: T, video_uuid: &Uuid) -> Result<Vec<ESVodCopy>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
+    Ok(
+        vdb::get_vod_copies(ex, video_uuid).await?
+            .into_iter()
+            .map(|x| {
+                ESVodCopy{
+                    loc: x.loc,
+                    spec: x.spec,
+                }
+            })
+            .collect()
     )
 }
 
@@ -537,6 +563,7 @@ where
             manifest,
             vod: assoc,
             clip: build_es_vod_clip(ex, video_uuid).await?,
+            storage_copies: Some(build_es_vod_storage_copies(ex, video_uuid).await?),
         }
     )
 }

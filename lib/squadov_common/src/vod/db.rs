@@ -11,6 +11,8 @@ use crate::{
         VodClip,
         StagedVodClip,
         VodClipReactStats,
+        VodCopy,
+        VodCopyLocation,
         self,
     },
     SquadOvGames,
@@ -20,22 +22,6 @@ use sqlx::{Executor, Transaction, Postgres};
 use uuid::Uuid;
 use std::collections::HashMap;
 use std::convert::TryFrom;
-
-pub async fn delete_vod<'a, T>(ex: T, uuid: &Uuid) -> Result<(), SquadOvError>
-where
-    T: Executor<'a, Database = Postgres>
-{
-    sqlx::query!(
-        "
-        DELETE FROM squadov.vods
-        WHERE video_uuid = $1
-        ",
-        uuid
-    )
-        .execute(ex)
-        .await?;
-    Ok(())
-}
 
 pub async fn find_accessible_vods_in_match_for_user<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64) -> Result<Vec<VodAssociation>, SquadOvError>
 where
@@ -467,32 +453,6 @@ where
     )
 }
 
-pub async fn get_local_vods<'a, T>(ex: T, uuid: &[Uuid], user_id: i64) -> Result<Vec<Uuid>, SquadOvError>
-where
-    T: Executor<'a, Database = Postgres>
-{
-    Ok(
-        sqlx::query!(
-            "
-            SELECT video_uuid
-            FROM squadov.vods AS v
-            INNER JOIN squadov.users AS u
-                ON u.uuid = v.user_uuid
-            WHERE video_uuid = ANY($1)
-                AND is_local
-                AND u.id = $2
-            ",
-            uuid,
-            user_id,
-        )
-            .fetch_all(ex)
-            .await?
-            .into_iter()
-            .map(|x| { x.video_uuid })
-            .collect()
-    )
-}
-
 pub async fn get_vod_association<'a, T>(ex: T, uuid: &Uuid) -> Result<VodAssociation, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
@@ -886,5 +846,122 @@ where
         base_data.into_iter().map(|x| {
             ( x.video_uuid.clone(), x)
         }).collect()
+    )
+}
+
+pub async fn bulk_delete_vod_copies<'a, T>(ex: T, video_uuids: &[Uuid], loc: VodCopyLocation, spec: &str) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        DELETE FROM squadov.vod_storage_copies
+        WHERE video_uuid = ANY($1)
+            AND loc = $2
+            AND spec = $3
+        ",
+        video_uuids,
+        loc as i32,
+        spec,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
+pub async fn bulk_delete_vod_copies_from_location<'a, T>(ex: T, video_uuids: &[Uuid], loc: VodCopyLocation) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        DELETE FROM squadov.vod_storage_copies
+        WHERE video_uuid = ANY($1)
+            AND loc = $2
+        ",
+        video_uuids,
+        loc as i32,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
+pub async fn bulk_sync_vod_copies<'a, T>(ex: T, video_uuids: &[Uuid], loc: VodCopyLocation, spec: &str) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        INSERT INTO squadov.vod_storage_copies (
+            video_uuid,
+            loc,
+            spec
+        )
+        SELECT inp.id, $2, $3
+        FROM UNNEST($1::UUID[]) AS inp(id)
+        ",
+        video_uuids,
+        loc as i32,
+        spec,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
+pub async fn get_vod_copies<'a, T>(ex: T, video_uuid: &Uuid) -> Result<Vec<VodCopy>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT *
+            FROM squadov.vod_storage_copies
+            WHERE video_uuid = $1
+            ",
+            video_uuid,
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                VodCopy{
+                    video_uuid: x.video_uuid,
+                    loc: VodCopyLocation::try_from(x.loc).unwrap_or(VodCopyLocation::Unknown),
+                    spec: x.spec,
+                }
+            })
+            .collect()
+    )
+}
+
+pub async fn get_vod_copies_at_location<'a, T>(ex: T, loc: VodCopyLocation, spec: &str) -> Result<Vec<VodCopy>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT *
+            FROM squadov.vod_storage_copies
+            WHERE loc = $1
+                AND spec = $2
+            ",
+            loc as i32,
+            spec,
+        )
+            .fetch_all(ex)
+            .await?
+            .into_iter()
+            .map(|x| {
+                VodCopy{
+                    video_uuid: x.video_uuid,
+                    loc: VodCopyLocation::try_from(x.loc).unwrap_or(VodCopyLocation::Unknown),
+                    spec: x.spec,
+                }
+            })
+            .collect()
     )
 }

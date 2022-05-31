@@ -708,6 +708,17 @@
                         "type": "date"
                     }
                 }   
+            },
+            "storageCopies": {
+                "type": "nested",
+                "properties": {
+                    "loc": {
+                        "type": "integer"
+                    },
+                    "spec": {
+                        "type": "text"
+                    }
+                }
             }
         }
     }

@@ -16,6 +16,7 @@ use crate::{
             ESVodSharing,
             ESVodParentLists,
             ESVodClip,
+            ESVodCopy,
         },
         self,
     },
@@ -40,9 +41,6 @@ const ES_MAX_AGE_SECONDS: i64 = 172800; // 2 day
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ElasticSearchSyncTask {
-    DeleteVod{
-        video_uuid: Vec<Uuid>,
-    },
     SyncVod{
         video_uuid: Vec<Uuid>,
     },
@@ -64,6 +62,9 @@ pub enum ElasticSearchSyncTask {
     },
     UpdateVodClip{
         video_uuid: Uuid,
+    },
+    UpdateVodCopies{
+        video_uuid: Vec<Uuid>,
     },
 }
 
@@ -231,17 +232,26 @@ impl ElasticSearchJobInterface {
         Ok(())
     }
 
-    pub async fn request_delete_vod(&self, video_uuid: Vec<Uuid>) -> Result<(), SquadOvError> {
-        self.rmq.publish(&self.mqconfig.elasticsearch_queue, serde_json::to_vec(&ElasticSearchSyncTask::DeleteVod{
-            video_uuid,
+    pub async fn request_update_vod_copies(&self, video_uuid: Uuid) -> Result<(), SquadOvError> {
+        self.rmq.publish(&self.mqconfig.elasticsearch_queue, serde_json::to_vec(&ElasticSearchSyncTask::UpdateVodCopies{
+            video_uuid: vec![video_uuid],
         })?, RABBITMQ_DEFAULT_PRIORITY, ES_MAX_AGE_SECONDS).await;
         Ok(())
     }
 
-    async fn handle_delete_vod(&self, video_uuid: &[Uuid]) -> Result<(), SquadOvError> {
-        for id in video_uuid {
-            self.es_client.as_ref().unwrap().delete_document(&self.esconfig.as_ref().unwrap().vod_index_write, id.to_string().as_str()).await?;
+    async fn update_vod_copies(&self, video_uuid: &Uuid) -> Result<(), SquadOvError> {
+        #[derive(Serialize)]
+        struct Update {
+            storage_copies: Option<Vec<ESVodCopy>>,
         }
+
+        let update = ElasticSearchDocUpdate{
+            doc: Update{
+                storage_copies: Some(elastic::vod::build_es_vod_storage_copies(&*self.db, video_uuid).await?),
+            }
+        };
+
+        self.es_client.as_ref().unwrap().update_document(&self.esconfig.as_ref().unwrap().vod_index_write, video_uuid.to_string().as_str(), update).await?;
         Ok(())
     }
 
@@ -357,7 +367,6 @@ impl RabbitMqListener for ElasticSearchJobInterface {
         log::info!("Handle ElasticSearch RabbitMQ Task: {} [{}]", std::str::from_utf8(data).unwrap_or("failure"), queue);
         let task: ElasticSearchSyncTask = serde_json::from_slice(data)?;
         match task {
-            ElasticSearchSyncTask::DeleteVod{video_uuid} => self.handle_delete_vod(&video_uuid).await?,
             ElasticSearchSyncTask::SyncVod{video_uuid} => self.handle_sync_vod(&video_uuid).await?,
             ElasticSearchSyncTask::SyncMatch{match_uuid, user_id} => self.handle_sync_match(&match_uuid, user_id).await?,
             ElasticSearchSyncTask::UpdateVodData{video_uuid} => self.update_vod_data(&video_uuid).await?,
@@ -365,6 +374,11 @@ impl RabbitMqListener for ElasticSearchJobInterface {
             ElasticSearchSyncTask::UpdateVodLists{video_uuid} => self.update_vod_lists(&video_uuid).await?,
             ElasticSearchSyncTask::UpdateVodTags{video_uuid} => self.update_vod_tags(&video_uuid).await?,
             ElasticSearchSyncTask::UpdateVodClip{video_uuid} => self.update_vod_clip(&video_uuid).await?,
+            ElasticSearchSyncTask::UpdateVodCopies{video_uuid} => {
+                for v in video_uuid {
+                    self.update_vod_copies(&v).await?;
+                }
+            }
         };
         Ok(())
     }

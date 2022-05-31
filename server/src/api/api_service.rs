@@ -319,8 +319,13 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                         .route("", web::post().to(v1::create_new_custom_match_event_handler))
                                 )
                                 .service(
-                                    web::scope("/vod")
-                                        .route("/local", web::post().to(v1::sync_local_storage_handler))
+                                    web::scope("/vod/local")
+                                        .route("/sync", web::post().to(v1::sync_local_storage_handler))
+                                        .service(
+                                            web::resource("/{video_uuid}")
+                                                .route(web::post().to(v1::add_local_storage_handler))
+                                                .route(web::delete().to(v1::remove_local_storage_handler))
+                                        )
                                 )
                         )
                         .service(

@@ -4,6 +4,7 @@ mod find;
 mod get;
 mod clip;
 mod tags;
+mod local;
 
 pub use create::*;
 pub use delete::*;
@@ -11,6 +12,7 @@ pub use find::*;
 pub use get::*;
 pub use clip::*;
 pub use tags::*;
+pub use local::*;
 
 use crate::api;
 use crate::api::auth::SquadOVSession;
@@ -418,8 +420,4 @@ pub async fn check_watchlist_vod_handler(app : web::Data<Arc<api::ApiApplication
     Ok(HttpResponse::Ok().json(
         app.is_vod_watchlist_for_user(&path.video_uuid, session.user.id).await?
     ))
-}
-
-pub async fn sync_local_storage_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericVodPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
-    Ok(HttpResponse::NoContent().finish())
 }

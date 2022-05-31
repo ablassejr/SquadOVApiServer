@@ -1,6 +1,6 @@
 use crate::api;
 use actix_web::{web, HttpResponse, HttpRequest, HttpMessage};
-use crate::api::auth::SquadOVSession;
+use crate::api::auth::{SquadOvMachineId, SquadOVSession};
 use std::sync::Arc;
 use serde::{Deserialize};
 use uuid::Uuid;
@@ -11,6 +11,7 @@ use squadov_common::{
         VodAssociation,
         VodDestination,
         VodSegmentId,
+        VodCopyLocation,
         container_format_to_extension,
         db as vdb,
         manager::StorageType,
@@ -83,7 +84,7 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data : web::Json<super::VodAssociateBodyInput>, app : web::Data<Arc<api::ApiApplication>>, request : HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data : web::Json<super::VodAssociateBodyInput>, app : web::Data<Arc<api::ApiApplication>>, machine_id: web::Header<SquadOvMachineId>, request : HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let data = data.into_inner();
     if path.video_uuid != data.association.video_uuid {
         return Err(SquadOvError::BadRequest);
@@ -124,6 +125,13 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
     // Once the VOD is finished - we need to take care of who we actually want to share the match/VOD/clip with.
     if !data.association.is_local {
         app.handle_vod_share(&mut tx, session.user.id, &data.association).await?;
+    }
+
+    // Upon association, the video *should* only exist in one place. Either on the cloud OR on the user's machine.
+    if data.association.is_local {
+        vdb::bulk_sync_vod_copies(&mut tx, &[data.association.video_uuid.clone()], VodCopyLocation::Local, &machine_id.id).await?;
+    } else {
+        vdb::bulk_sync_vod_copies(&mut tx, &[data.association.video_uuid.clone()], VodCopyLocation::Cloud, &bucket).await?;
     }
 
     tx.commit().await?;

@@ -1,7 +1,22 @@
 use sqlx;
 use sqlx::postgres::PgPool;
 use sqlx::{Executor, Postgres};
-use actix_web::{ HttpRequest, FromRequest, dev, Error, HttpMessage};
+use actix_web::{
+    HttpRequest,
+    FromRequest,
+    dev,
+    Error,
+    HttpMessage,
+    http::header::{
+        self,
+        Header,
+        HeaderName,
+        TryIntoHeaderValue,
+        HeaderValue,
+        InvalidHeaderValue,
+    },
+    error::ParseError,
+};
 use actix_web::error::ErrorUnauthorized;
 use futures_util::future::{ok, err, Ready};
 use squadov_common;
@@ -40,6 +55,40 @@ impl FromRequest for SquadOVSession {
             Some(x) => ok(x.clone()),
             None => err(ErrorUnauthorized("No session available."))
         }
+    }
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct SquadOvMachineId {
+    pub id: String,
+    pub user_id: i64,
+}
+
+impl TryIntoHeaderValue for SquadOvMachineId {
+    type Error = InvalidHeaderValue;
+
+    fn try_into_value(self) -> Result<HeaderValue, Self::Error> {
+        HeaderValue::from_str(&format!("{}_{}", self.user_id, self.id))
+    }
+}
+
+impl Header for SquadOvMachineId {
+    fn name() -> HeaderName {
+        HeaderName::from_lowercase(b"x-squadov-machine-id").unwrap()
+    }
+
+    fn parse<T: HttpMessage>(msg: &T) -> Result<Self, ParseError> {
+        let raw: String = header::from_one_raw_str(msg.headers().get(Self::name()))?;
+        let parts = raw.split("_").collect::<Vec<_>>();
+
+        if parts.len() < 2 {
+            return Err(ParseError::Incomplete);
+        }
+
+        Ok(SquadOvMachineId{
+            id: parts[1].to_string(),
+            user_id: parts[0].parse().map_err(|_err| { ParseError::Method })?,
+        })
     }
 }
 
