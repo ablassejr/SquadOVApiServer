@@ -34,6 +34,8 @@ use tempfile::{NamedTempFile};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use md5::{Md5, Digest};
+use serde_repr::{Serialize_repr, Deserialize_repr};
+use num_enum::TryFromPrimitive;
 
 const VOD_MAX_AGE_SECONDS: i64 = 21600; // 6 hours
 
@@ -773,4 +775,20 @@ pub fn vod_document_to_vod_clip_for_user(doc: ESVodDocument, user_id: i64) -> Op
     } else {
         None
     }
+}
+
+
+#[derive(Copy, Clone, Serialize_repr, Deserialize_repr, Debug, TryFromPrimitive, PartialEq, Eq, Hash)]
+#[repr(i32)]
+pub enum VodCopyLocation {
+    Cloud,
+    Local,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct VodCopy {
+    video_uuid: Uuid,
+    loc: VodCopyLocation,
+    spec: String,
 }

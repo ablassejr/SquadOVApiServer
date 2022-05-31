@@ -318,6 +318,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                     web::scope("/events")
                                         .route("", web::post().to(v1::create_new_custom_match_event_handler))
                                 )
+                                .service(
+                                    web::scope("/vod")
+                                        .route("/local", web::post().to(v1::sync_local_storage_handler))
+                                )
                         )
                         .service(
                             web::scope("/{user_id}")
