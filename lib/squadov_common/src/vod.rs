@@ -17,7 +17,7 @@ use crate::{
         RABBITMQ_LOW_PRIORITY,
         RABBITMQ_DEFAULT_PRIORITY,
         RABBITMQ_HIGH_PRIORITY,
-        INFITE_MAX_AGE,
+        INFINITE_MAX_AGE,
         RabbitMqInterface,
         RabbitMqListener,
     },
@@ -666,7 +666,7 @@ impl VodProcessingInterface {
     pub async fn request_delete_vod(&self, vod_uuid: &Uuid) -> Result<(), SquadOvError> {
         self.rmq.publish(&self.queue, serde_json::to_vec(&VodProcessingTask::Delete{
             vod_uuid: vod_uuid.clone(),
-        })?, RABBITMQ_LOW_PRIORITY, INFITE_MAX_AGE).await;
+        })?, RABBITMQ_LOW_PRIORITY, INFINITE_MAX_AGE).await;
         Ok(())
     }
 

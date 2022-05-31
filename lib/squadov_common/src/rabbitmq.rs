@@ -24,7 +24,7 @@ const RABBITMQ_MAX_DELAY_MS: i64 = 7200000; // 2 hour
 const SQUADOV_RETRY_COUNT_HEADER: &'static str = "x-squadov-retry-count";
 const SQUADOV_MESSAGE_MAX_AGE_HEADER: &'static str = "x-squadov-max-age";
 const DEFAULT_MAX_AGE_SECONDS: i64 = 3600; // 1 hour
-pub const INFITE_MAX_AGE: i64 = -1;
+pub const INFINITE_MAX_AGE: i64 = -1;
 
 #[derive(Deserialize,Debug,Clone,Default)]
 pub struct RabbitMqConfig {
@@ -349,7 +349,7 @@ impl RabbitMqConnectionBundle {
             }).unwrap_or(DEFAULT_MAX_AGE_SECONDS);
 
             let expired = if current_timestamp >= og_timestamp {
-                (current_timestamp - og_timestamp) > (max_age_seconds as u64) && max_age_seconds != INFITE_MAX_AGE
+                (current_timestamp - og_timestamp) > (max_age_seconds as u64) && max_age_seconds != INFINITE_MAX_AGE
             } else {
                 false
             };
