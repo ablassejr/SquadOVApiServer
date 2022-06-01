@@ -1751,7 +1751,7 @@ pub async fn get_wow_match_handler(app : web::Data<Arc<api::ApiApplication>>, pa
         ..RecentMatchQuery::default()
     };
 
-    let es_search = filter.to_es_search(session.user.id, false);
+    let es_search = filter.to_es_search(session.user.id, None, false);
     if let Some(document) = app.es_api.search_documents::<ESVodDocument>(&app.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?.pop() {
         if let Some(wow) = document.data.wow {
             Ok(HttpResponse::Ok().json(Response{

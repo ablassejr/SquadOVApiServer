@@ -1,5 +1,5 @@
 use crate::api;
-use crate::api::auth::SquadOVSession;
+use crate::api::auth::{SquadOvMachineId, SquadOVSession};
 use crate::api::v1::{
     RecentMatchQuery,
     UserProfilePath,
@@ -164,8 +164,8 @@ impl api::ApiApplication {
         }).collect::<Result<Vec<VodClip>, SquadOvError>>()?)
     }
 
-    async fn list_user_accessible_clips(&self, user_id: i64, start: i64, end: i64, filter: &RecentMatchQuery) -> Result<Vec<VodClip>, SquadOvError> {
-        let es_search = filter.to_es_search(user_id, true)
+    async fn list_user_accessible_clips(&self, user_id: i64, start: i64, end: i64, filter: &RecentMatchQuery, machine_id: &str) -> Result<Vec<VodClip>, SquadOvError> {
+        let es_search = filter.to_es_search(user_id, Some(machine_id), true)
             .from(start)
             .size(end)
             .sort(vec![
@@ -480,7 +480,7 @@ pub async fn create_staged_clip_for_vod_handler(pth: web::Path<CreateClipPathInp
     Ok(HttpResponse::Ok().json(&svc.id))
 }
 
-async fn get_recent_clips_for_user(user_id: i64, app : web::Data<Arc<api::ApiApplication>>, req: &HttpRequest, page: web::Query<api::PaginationParameters>, query: web::Query<ClipQuery>, mut filter: web::Json<RecentMatchQuery>, needs_profile: bool) -> Result<HttpResponse, SquadOvError> {
+async fn get_recent_clips_for_user(user_id: i64, app : web::Data<Arc<api::ApiApplication>>, req: &HttpRequest, page: web::Query<api::PaginationParameters>, query: web::Query<ClipQuery>, mut filter: web::Json<RecentMatchQuery>, needs_profile: bool, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
     if needs_profile {
         filter.users = Some(vec![user_id]);
         filter.only_profile = true;
@@ -492,7 +492,7 @@ async fn get_recent_clips_for_user(user_id: i64, app : web::Data<Arc<api::ApiApp
     
     let has_access = app.is_user_allowed_to_es_search(user_id).await?;
     let mut clips = if has_access {
-        app.list_user_accessible_clips(user_id, page.start, page.end, &filter).await?
+        app.list_user_accessible_clips(user_id, page.start, page.end, &filter, &machine_id.id).await?
     } else {
         vec![]
     };
@@ -516,18 +516,18 @@ async fn get_recent_clips_for_user(user_id: i64, app : web::Data<Arc<api::ApiApp
     Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(clips, req, &page, expected_total == got_total)?)) 
 }
 
-pub async fn list_clips_for_user_handler(app : web::Data<Arc<api::ApiApplication>>, page: web::Query<api::PaginationParameters>,  query: web::Query<ClipQuery>, filter: web::Json<RecentMatchQuery>, request : HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_clips_for_user_handler(app : web::Data<Arc<api::ApiApplication>>, page: web::Query<api::PaginationParameters>,  query: web::Query<ClipQuery>, filter: web::Json<RecentMatchQuery>, request : HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
     let extensions = request.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    get_recent_clips_for_user(session.user.id, app, &request, page, query, filter, false).await
+    get_recent_clips_for_user(session.user.id, app, &request, page, query, filter, false, machine_id).await
 }
 
-pub async fn get_profile_clips_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<UserProfilePath>, page: web::Query<api::PaginationParameters>,  query: web::Query<ClipQuery>, filter: web::Json<RecentMatchQuery>, request : HttpRequest) -> Result<HttpResponse, SquadOvError> {
-    get_recent_clips_for_user(path.profile_id, app, &request, page, query, filter, true).await
+pub async fn get_profile_clips_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<UserProfilePath>, page: web::Query<api::PaginationParameters>,  query: web::Query<ClipQuery>, filter: web::Json<RecentMatchQuery>, request : HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+    get_recent_clips_for_user(path.profile_id, app, &request, page, query, filter, true, machine_id).await
 }
 
 pub async fn get_clip_handler(app : web::Data<Arc<api::ApiApplication>>, pth: web::Path<ClipPathInput>, request : HttpRequest) -> Result<HttpResponse, SquadOvError> {

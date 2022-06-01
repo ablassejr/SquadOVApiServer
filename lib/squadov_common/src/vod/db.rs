@@ -900,6 +900,7 @@ where
         )
         SELECT inp.id, $2, $3
         FROM UNNEST($1::UUID[]) AS inp(id)
+        ON CONFLICT DO NOTHING
         ",
         video_uuids,
         loc as i32,

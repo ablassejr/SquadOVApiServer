@@ -6,7 +6,7 @@ pub use events::*;
 
 use uuid::Uuid;
 use crate::api;
-use crate::api::auth::SquadOVSession;
+use crate::api::auth::{SquadOvMachineId, SquadOVSession};
 use actix_web::{web, HttpResponse, HttpRequest, HttpMessage};
 use squadov_common::{
     SquadOvError,
@@ -187,7 +187,7 @@ impl RecentMatchQuery {
         }
     }
 
-    pub fn to_es_search(&self, user_id: i64, is_clip_term: bool) -> Search {
+    pub fn to_es_search(&self, user_id: i64, machine_id: Option<&str>, is_clip_term: bool) -> Search {
         let mut q = Query::bool();
         if let Some(games) = self.games.as_ref() {
             q = q.filter(Query::terms("data.game", games.iter().map(|x| *x as i32).collect::<Vec<i32>>()));
@@ -209,6 +209,35 @@ impl RecentMatchQuery {
             }
         }
 
+        // If a machine ID is set then we only want to return videos that are stored on the cloud OR are stored on the machine.
+        // If no machine ID is set, then for whatever reason, the caller doesn't need this separation (e.g. only interested in the match details).
+        if let Some(machine_id) = machine_id {
+            q = q.filter(
+                Query::bool()
+                    .minimum_should_match("1")
+                    .should(
+                        // Mainly for legacy from pre-transition.
+                        Query::bool()
+                            .must_not(Query::exists("storageCopies"))
+                    )
+                    .should(
+                        Query::nested(
+                            "storageCopies",
+                            Query::bool()
+                                .filter(Query::term("storageCopies.loc", 0))
+                        )
+                    )
+                    .should(
+                        Query::nested(
+                            "storageCopies",
+                            Query::bool()
+                                .filter(Query::term("storageCopies.loc", 1))
+                                .filter(Query::term("storageCopies.spec", machine_id))
+                        )
+                    )
+            );
+        }
+
         if let Some(tags) = self.tags.as_ref() {
             q = q.filter(Query::terms("tags.tag", tags.clone()));
         }
@@ -219,8 +248,7 @@ impl RecentMatchQuery {
 
             if let Some(squads) = self.squads.as_ref() {
                 let inner = Query::bool()
-                    .filter(Query::terms("sharing.squads", squads.clone()))
-                    .filter(Query::term("vod.isLocal", false));
+                    .filter(Query::terms("sharing.squads", squads.clone()));
 
                 if self.must_match_squads {
                     sharing_query = sharing_query.filter(inner);
@@ -1011,7 +1039,7 @@ pub async fn get_vod_recent_match_handler(app : web::Data<Arc<api::ApiApplicatio
     }
 }
 
-async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiApplication>>, req: &HttpRequest, query: web::Query<api::PaginationParameters>, mut filter: web::Json<RecentMatchQuery>, needs_access_tokens: bool) -> Result<HttpResponse, SquadOvError> {
+async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiApplication>>, req: &HttpRequest, query: web::Query<api::PaginationParameters>, mut filter: web::Json<RecentMatchQuery>, needs_access_tokens: bool, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
@@ -1043,7 +1071,7 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
     while has_access && matches.len() < expected_total {
         let query_size = current_end - current_start;
         // Convert the query and filter into an ElasticSearch query.
-        let es_search = filter.to_es_search(session.user.id, false)
+        let es_search = filter.to_es_search(session.user.id, Some(&machine_id.id), false)
             .from(current_start)
             .size(current_end)
             .sort(vec![
@@ -1091,7 +1119,7 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
         filter.matches = Some(matches.keys().cloned().collect());
         filter.not_vods = Some(existing_video_uuids.into_iter().collect());
 
-        let documents: Vec<ESVodDocument> = app.es_api.search_documents(&app.config.elasticsearch.vod_index_read, serde_json::to_value(filter.to_es_search(session.user.id, false))?).await?;
+        let documents: Vec<ESVodDocument> = app.es_api.search_documents(&app.config.elasticsearch.vod_index_read, serde_json::to_value(filter.to_es_search(session.user.id, Some(&machine_id.id), false))?).await?;
         for d in documents {
             if let Some(match_uuid) = d.data.match_uuid {
                 // This is an error if I've ever seen one sheeee.
@@ -1130,19 +1158,19 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
     })?)) 
 }
 
-pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, query: web::Query<api::PaginationParameters>, filter: web::Json<RecentMatchQuery>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, query: web::Query<api::PaginationParameters>, filter: web::Json<RecentMatchQuery>, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    get_recent_matches_for_user(session.user.id, app, &req, query, filter, false).await
+    get_recent_matches_for_user(session.user.id, app, &req, query, filter, false, machine_id).await
 }
 
-pub async fn get_profile_matches_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<UserProfilePath>, req: HttpRequest, query: web::Query<api::PaginationParameters>, mut filter: web::Json<RecentMatchQuery>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_profile_matches_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<UserProfilePath>, req: HttpRequest, query: web::Query<api::PaginationParameters>, mut filter: web::Json<RecentMatchQuery>, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
     filter.only_profile = true;
-    get_recent_matches_for_user(path.profile_id, app, &req, query, filter, true).await
+    get_recent_matches_for_user(path.profile_id, app, &req, query, filter, true, machine_id).await
 }
 
 #[derive(Deserialize,Debug)]
