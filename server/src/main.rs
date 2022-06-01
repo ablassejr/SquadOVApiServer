@@ -124,6 +124,7 @@ async fn async_main(opts: Options) {
                             "x-squadov-access-token",
                             "x-squadov-session-id",
                             "x-squadov-share-id",
+                            "x-squadov-machine-id",
                             "content-type",
                             "pragma",
                             "cache-control",
