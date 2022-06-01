@@ -241,6 +241,7 @@ impl ElasticSearchJobInterface {
 
     async fn update_vod_copies(&self, video_uuid: &Uuid) -> Result<(), SquadOvError> {
         #[derive(Serialize)]
+        #[serde(rename_all="camelCase")]
         struct Update {
             storage_copies: Option<Vec<ESVodCopy>>,
         }

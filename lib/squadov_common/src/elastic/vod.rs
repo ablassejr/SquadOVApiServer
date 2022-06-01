@@ -285,16 +285,29 @@ pub async fn build_es_vod_storage_copies<'a, T>(ex: T, video_uuid: &Uuid) -> Res
 where
     T: Executor<'a, Database = Postgres> + Copy
 {
+    let copies: Vec<_> = vdb::get_vod_copies(ex, video_uuid).await?
+        .into_iter()
+        .map(|x| {
+            ESVodCopy{
+                loc: x.loc,
+                spec: x.spec,
+            }
+        })
+        .collect();
+
+    // Return a vec with a bogus copy.
+    // This is needed because elasticsearch treats an empty array as a null value
+    // which isn't behavior that we want to tide over some legacy documents without the
+    // storage copies field.
     Ok(
-        vdb::get_vod_copies(ex, video_uuid).await?
-            .into_iter()
-            .map(|x| {
-                ESVodCopy{
-                    loc: x.loc,
-                    spec: x.spec,
-                }
-            })
-            .collect()
+        if copies.is_empty() {
+            vec![ESVodCopy{
+                loc: VodCopyLocation::Unknown,
+                spec: String::new(),
+            }]
+        } else {
+            copies
+        }
     )
 }
 
