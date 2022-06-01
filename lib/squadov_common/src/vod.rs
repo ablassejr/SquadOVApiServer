@@ -733,6 +733,7 @@ impl VodProcessingInterface {
         tx.commit().await?;
 
         log::info!("[Delete] Delete Update ES - {}", vod_uuid);
+        self.es_itf.request_update_vod_copies(vod_uuid.clone()).await?;
 
         Ok(())
     }

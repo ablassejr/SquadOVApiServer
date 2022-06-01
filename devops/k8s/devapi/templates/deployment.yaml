@@ -64,11 +64,11 @@ spec:
                             name: redshift-secret
                             key: password
                     - name: SQUADOV_ELASTICSEARCH__HOST
-                      value: ""
+                      value: "https://squadov-production.es.us-east-2.aws.elastic-cloud.com:9243"
                     - name: SQUADOV_ELASTICSEARCH__VOD_INDEX_READ
-                      value: ""
+                      value: "vod-index-read"
                     - name: SQUADOV_ELASTICSEARCH__VOD_INDEX_WRITE
-                      value: ""
+                      value: "vod-index-write"
                     - name: SQUADOV_ELASTICSEARCH__USERNAME
                       valueFrom:
                         secretKeyRef:

@@ -211,6 +211,7 @@ impl RecentMatchQuery {
 
         // If a machine ID is set then we only want to return videos that are stored on the cloud OR are stored on the machine.
         // If no machine ID is set, then for whatever reason, the caller doesn't need this separation (e.g. only interested in the match details).
+        log::info!("IS THERE A MACHINE ID HERE: {:?}", &machine_id);
         if let Some(machine_id) = machine_id {
             q = q.filter(
                 Query::bool()
