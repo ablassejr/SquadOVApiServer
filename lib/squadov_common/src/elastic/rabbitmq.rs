@@ -379,7 +379,7 @@ impl RabbitMqListener for ElasticSearchJobInterface {
                 for v in video_uuid {
                     match self.update_vod_copies(&v).await {
                         Ok(_) => (),
-                        Err(err) => log::warn!("Failed to update VOD copy."),
+                        Err(err) => log::warn!("Failed to update VOD copy: {}", err),
                     }
                 }
             }
