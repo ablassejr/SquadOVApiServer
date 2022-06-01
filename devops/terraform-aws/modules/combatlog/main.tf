@@ -49,6 +49,17 @@ resource "aws_apigatewayv2_stage" "combat_log_gateway_stage" {
     api_id = aws_apigatewayv2_api.combat_log_gateway.id
     auto_deploy = true
     name   = "$default"
+
+    default_route_settings {
+        detailed_metrics_enabled = true
+        throttling_burst_limit = 5000
+        throttling_rate_limit = 10000
+    }
+
+    access_log_settings {
+        destination_arn = "arn:aws:logs:us-east-2:214663929182:log-group:aws-api-gateway"
+        format = "{ \"requestId\":\"$context.requestId\", \"ip\": \"$context.identity.sourceIp\", \"requestTime\":\"$context.requestTime\", \"httpMethod\":\"$context.httpMethod\",\"routeKey\":\"$context.routeKey\", \"status\":\"$context.status\",\"protocol\":\"$context.protocol\", \"responseLength\":\"$context.responseLength\" }"
+    }
 }
 
 output "api_gateway_id" {

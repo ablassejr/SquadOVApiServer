@@ -393,7 +393,6 @@ impl CombatLogReportIO for WowCharacterReportGenerator {
         {
             let mut w = CombatLogAvroFileIO::new(work_dir, &CHAR_REPORT_SCHEMA)?;
             for (_, c) in self.chars.drain() {
-                log::info!("Add char: {:?}", &c);
                 w.handle(c)?;
             }
 
@@ -409,7 +408,6 @@ impl CombatLogReportIO for WowCharacterReportGenerator {
         {
             let mut w = CombatLogAvroFileIO::new(work_dir, &COMBATANT_REPORT_SCHEMA)?;
             for (_, c) in self.combatants.drain() {
-                log::info!("Add combatant: {:?}", &c);
                 w.handle(c)?;
             }
 
