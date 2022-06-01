@@ -46,7 +46,7 @@ resource "aws_lambda_function" "wow_combat_log_lambda" {
     source_code_hash = filebase64sha256("../../aws/lambda/parser.zip")
 
     handler = "not.used"
-    memory_size = 128
+    memory_size = 512
     package_type = "Zip"
     reserved_concurrent_executions = var.wow_shards * 10
     runtime = "provided.al2"
@@ -76,7 +76,8 @@ resource "aws_lambda_event_source_mapping" "wow_lambda_kinesis" {
     function_name     = aws_lambda_function.wow_combat_log_lambda.arn
     starting_position = "LATEST"
 
-    maximum_batching_window_in_seconds = 5
+    batch_size = 10
+    maximum_batching_window_in_seconds = 3
     maximum_record_age_in_seconds = -1
     maximum_retry_attempts = 0
     parallelization_factor = 10

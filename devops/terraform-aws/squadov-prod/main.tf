@@ -62,7 +62,7 @@ module "combatlog" {
     db_host = module.db.db_host
     db_secret = module.db.db_secret
 
-    wow_shards = 8
+    wow_shards = 16
     amqp_url = var.amqp_url
 }
 

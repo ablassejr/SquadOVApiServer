@@ -10,6 +10,7 @@ use rusoto_s3::{
     CompletedMultipartUpload,
     CompletedPart,
     PutObjectRequest,
+    StreamingBody,
 };
 use rand::{
     Rng,
@@ -33,16 +34,74 @@ where
 {
     log::info!("Starting Multipart Upload: {}/{} - {} bytes", bucket, key, total_bytes);
 
+    let mut rng = rand::rngs::StdRng::from_entropy();
     if total_bytes == 0 {
-        let req = PutObjectRequest{
-            bucket: bucket.to_string(),
-            key: key.to_string(),
-            ..PutObjectRequest::default()
-        };
+        let mut success: bool = false;
+        for i in 0u32..5u32 {
+            let req = PutObjectRequest{
+                bucket: bucket.to_string(),
+                key: key.to_string(),
+                ..PutObjectRequest::default()
+            };
 
-        s3.put_object(req).await?;
+            match s3.put_object(req).await {
+                Ok(_) => {
+                    success = true;
+                    break;
+                },
+                Err(err) => {
+                    log::warn!("Failed to upload empty S3 data: {} - RETRYING", err);
+                    async_std::task::sleep(std::time::Duration::from_millis(100u64 * 2u64.pow(i) + rng.gen_range(0..1000))).await;
+                    continue;
+                }
+            }
+        }
+
+        if !success {
+            return Err(SquadOvError::InternalError(String::from("Failed to Upload Report [0 bytes] - Exceeded retry limit")));
+        }
+    } else if total_bytes < MULTIPART_SEGMENT_SIZE_BYTES {
+        let mut success: bool = false;
+        for i in 0u32..5u32 {
+            let mut buffer: Vec<u8> = vec![0; total_bytes as usize];
+            data.seek(std::io::SeekFrom::Start(0u64)).await?;
+            data.read_exact(&mut buffer).await?;
+
+            let md5_hash = {
+                let mut hasher = md5::Md5::new();
+                hasher.update(&buffer);
+                let hash = hasher.finalize();
+                base64::encode(hash)
+            };
+
+            let req = PutObjectRequest{
+                bucket: bucket.to_string(),
+                key: key.to_string(),
+                body: Some(
+                    StreamingBody::from(buffer)
+                ),
+                content_md5: Some(md5_hash),
+                content_type: Some(String::from("application/octet-stream")),
+                ..PutObjectRequest::default()
+            };
+
+            match s3.put_object(req).await {
+                Ok(_) => {
+                    success = true;
+                    break;
+                },
+                Err(err) => {
+                    log::warn!("Failed to upload single S3 data: {} - RETRYING", err);
+                    async_std::task::sleep(std::time::Duration::from_millis(100u64 * 2u64.pow(i) + rng.gen_range(0..1000))).await;
+                    continue;
+                }
+            }
+        }
+
+        if !success {
+            return Err(SquadOvError::InternalError(String::from("Failed to Upload Report [single] - Exceeded retry limit")));
+        }
     } else {
-        let mut rng = rand::rngs::StdRng::from_entropy();
         let upload_id = {
             let req = CreateMultipartUploadRequest{
                 bucket: bucket.to_string(),
