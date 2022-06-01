@@ -50,7 +50,7 @@ resource "aws_lambda_function" "wow_combat_log_lambda" {
     package_type = "Zip"
     reserved_concurrent_executions = var.wow_shards * 10
     runtime = "provided.al2"
-    timeout = 120
+    timeout = 240
 
     tags = {
         "lambda" = "wow"
@@ -76,7 +76,7 @@ resource "aws_lambda_event_source_mapping" "wow_lambda_kinesis" {
     function_name     = aws_lambda_function.wow_combat_log_lambda.arn
     starting_position = "LATEST"
 
-    maximum_batching_window_in_seconds = 15
+    maximum_batching_window_in_seconds = 5
     maximum_record_age_in_seconds = -1
     maximum_retry_attempts = 0
     parallelization_factor = 10
