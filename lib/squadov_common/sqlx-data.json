@@ -2550,27 +2550,6 @@
       ]
     }
   },
-  "241a7c267e604501abaa484be86548cc1a0410b6dd80d61e30dd2d0a009453d2": {
-    "query": "\n                SELECT v.video_uuid\n                FROM squadov.vods AS v\n                INNER JOIN squadov.users AS u\n                    ON u.uuid = v.user_uuid\n                WHERE v.video_uuid = ANY($1)\n                    AND u.id = $2\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "video_uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
   "244d1baa8f6f10a4d233b4ac5d047082bccf8dfd13786ecca67157bc6467d3a3": {
     "query": "\n        SELECT DISTINCT team_id\n        FROM squadov.valorant_match_players\n        WHERE match_uuid = $1\n        ",
     "describe": {
@@ -4294,19 +4273,6 @@
       "nullable": []
     }
   },
-  "3e72166b5788c58472dcbe8a42e5cc849d7a6fa3ac38b2ed361152add6530575": {
-    "query": "\n        DELETE FROM squadov.vod_storage_copies\n        WHERE loc = $1\n            AND spec = $2\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Text"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "3edcdf7295fb1f80e87048c6b3036b6f71f38c9854e8355295ff4850d7a0b082": {
     "query": "\n            SELECT\n                vvt.video_uuid AS \"video_uuid!\",\n                vvt.user_id AS \"user_id!\",\n                vvt.tm AS \"tm!\",\n                vvt.tag AS \"tag!\",\n                vvt.tag_id AS \"tag_id!\"\n            FROM UNNEST($2::VARCHAR[]) AS inp(tag)\n            INNER JOIN squadov.view_vod_tags AS vvt\n                ON vvt.video_uuid = $1\n                    AND vvt.tag = LOWER(inp.tag)\n            ",
     "describe": {
@@ -5348,27 +5314,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "5083948128d3ad6cc48b1dd87ab5aa5bfa1b75769ba6a1097d5afcd50bd2826b": {
-    "query": "\n            SELECT video_uuid\n            FROM squadov.vods AS v\n            INNER JOIN squadov.users AS u\n                ON u.uuid = v.user_uuid\n            WHERE video_uuid = ANY($1)\n                AND is_local\n                AND u.id = $2\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "video_uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false
-      ]
     }
   },
   "50e5bf138da27e6485d3a633d157e16b749c5ab21dd6b9fef9faa304f5fb16b8": {
@@ -9408,18 +9353,6 @@
       "nullable": []
     }
   },
-  "8c68c3d6d7de48ebcd6133dffb06330e91242421833aa38242bce99cfd02bb15": {
-    "query": "\n            DELETE FROM squadov.vods\n            WHERE video_uuid = ANY($1)\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "UuidArray"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "8c9d6b77ed239346c149fd601e27231c21fcb76a3b6b704db43e0da503da6ee2": {
     "query": "\n            SELECT\n                round_num,\n                puuid,\n                combat_score\n            FROM squadov.valorant_match_round_player_stats\n            WHERE match_uuid = $1\n            ",
     "describe": {
@@ -11416,20 +11349,6 @@
       "nullable": []
     }
   },
-  "b4235227f4e25cfd0fffabced3656796e3240b81ae511295757ff67480bd27eb": {
-    "query": "\n        INSERT INTO squadov.vod_storage_copies (\n            video_uuid,\n            loc,\n            spec\n        )\n        SELECT inp.id, $2, $3\n        FROM UNNEST($1::UUID[]) AS inp(id)\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "Int4",
-          "Varchar"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "b4389dc123920a68c36d1ceb490bcf8581a0abd98ae10dcc66b3af44e5c84f6e": {
     "query": "\n            SELECT u.uuid, tmp.puuid\n            FROM squadov.tft_match_participants AS tmp\n            INNER JOIN squadov.riot_accounts AS ra\n                ON ra.puuid = tmp.puuid\n            INNER JOIN squadov.riot_account_links AS ral\n                ON ral.puuid = ra.puuid\n            INNER JOIN squadov.users AS u\n                ON u.id = ral.user_id\n            WHERE tmp.match_uuid = $1\n                AND u.uuid = ANY($2)\n            ",
     "describe": {
@@ -12602,26 +12521,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "cd0aeaff0285dda04b3e35ffa3c6508fd1727ed8f4ad125aa26f33d128d6c278": {
-    "query": "\n                    SELECT EXISTS(\n                        SELECT 1\n                        FROM squadov.devapi_keys\n                        WHERE api_key = $1\n                    ) AS \"val!\"\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "val!",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        null
-      ]
     }
   },
   "cd44a39b93faa9acc827c3d85aa59149ddf9a85253d98721ff1968e71307ed6c": {
@@ -15123,18 +15022,6 @@
         null,
         null
       ]
-    }
-  },
-  "f4c816216bc5d245d6257616b0219f01c047cb5aea25390b0d8fd2d0c0497e53": {
-    "query": "\n        DELETE FROM squadov.vods\n        WHERE video_uuid = $1\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": []
     }
   },
   "f50c5ac94f3d32241a5da1fe7b41a8a4b61f67e8c2957aee8b13a222a4eac3fb": {

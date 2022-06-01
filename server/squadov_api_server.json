@@ -245,21 +245,6 @@
       "nullable": []
     }
   },
-  "067d9d1a88051fe6a302e20c0e0289deb90ca53652cc8dbebfb92016d9871ddf": {
-    "query": "\n        INSERT INTO squadov.combat_logs (\n            partition_id,\n            start_time,\n            owner_id,\n            cl_state\n        ) VALUES (\n            $1,\n            $2,\n            $3,\n            $4\n        )\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Varchar",
-          "Timestamptz",
-          "Int8",
-          "Jsonb"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "06924108c0da13d78eac8195c0a7507b8e984b819f8031fa2626e2812abf8bfc": {
     "query": "\n            SELECT u.uuid, lmpi.participant_id\n            FROM squadov.lol_match_participant_identities AS lmpi\n            INNER JOIN squadov.riot_accounts AS ra\n                ON ra.summoner_id = lmpi.summoner_id\n            INNER JOIN squadov.riot_account_links AS ral\n                ON ral.puuid = ra.puuid\n            INNER JOIN squadov.users AS u\n                ON u.id = ral.user_id\n            WHERE lmpi.match_uuid = $1\n                AND u.uuid = ANY($2)\n            ",
     "describe": {
@@ -582,68 +567,6 @@
       },
       "nullable": [
         null
-      ]
-    }
-  },
-  "0c1b4a94c2061802d9e68f0a4cd9e555077b068d686449cf64e3e894c10ca26e": {
-    "query": "\n            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid, combat_log_partition_id\n            FROM squadov.wow_match_view\n            WHERE id = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "alt_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "user_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "combat_log_version",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "advanced_log",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 5,
-          "name": "build_version",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 6,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 7,
-          "name": "combat_log_partition_id",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true
       ]
     }
   },
@@ -1376,74 +1299,6 @@
         false,
         false,
         null
-      ]
-    }
-  },
-  "1315134fafe8a6effd7a3081483840a706c7ad5c8562da716a728f5392073244": {
-    "query": "\n            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid, combat_log_partition_id, start_tm\n            FROM squadov.wow_match_view\n            WHERE id = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "alt_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "user_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "combat_log_version",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "advanced_log",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 5,
-          "name": "build_version",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 6,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 7,
-          "name": "combat_log_partition_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 8,
-          "name": "start_tm",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false
       ]
     }
   },
@@ -2688,27 +2543,6 @@
       "parameters": {
         "Left": [
           "Text"
-        ]
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
-  "241a7c267e604501abaa484be86548cc1a0410b6dd80d61e30dd2d0a009453d2": {
-    "query": "\n                SELECT v.video_uuid\n                FROM squadov.vods AS v\n                INNER JOIN squadov.users AS u\n                    ON u.uuid = v.user_uuid\n                WHERE v.video_uuid = ANY($1)\n                    AND u.id = $2\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "video_uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "Int8"
         ]
       },
       "nullable": [
@@ -5016,69 +4850,6 @@
       ]
     }
   },
-  "4a1d798b01a96376c67bd40a0671321b1cf6c2cfe7cd24daa049ed9cca6a44e7": {
-    "query": "\n            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid, combat_log_partition_id\n            FROM squadov.wow_match_view\n            WHERE match_uuid = $1 AND user_id = $2\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "alt_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "user_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "combat_log_version",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "advanced_log",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 5,
-          "name": "build_version",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 6,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 7,
-          "name": "combat_log_partition_id",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true
-      ]
-    }
-  },
   "4a6228eceba9b7d3b33bf510395734d8a9ab10556ca956d43e370ed87afda0f4": {
     "query": "\n            UPDATE squadov.vod_metadata\n            SET session_id = $3\n            WHERE video_uuid = $1\n                AND id = $2\n            ",
     "describe": {
@@ -5543,27 +5314,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "5083948128d3ad6cc48b1dd87ab5aa5bfa1b75769ba6a1097d5afcd50bd2826b": {
-    "query": "\n            SELECT video_uuid\n            FROM squadov.vods AS v\n            INNER JOIN squadov.users AS u\n                ON u.uuid = v.user_uuid\n            WHERE video_uuid = ANY($1)\n                AND is_local\n                AND u.id = $2\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "video_uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false
-      ]
     }
   },
   "50e5bf138da27e6485d3a633d157e16b749c5ab21dd6b9fef9faa304f5fb16b8": {
@@ -6983,6 +6733,20 @@
       ]
     }
   },
+  "624edaec622258f44a26ba834dfdb59cfe0e536a2a7faaa26830e058c2cdba39": {
+    "query": "\n        DELETE FROM squadov.vod_storage_copies\n        WHERE video_uuid = ANY($1)\n            AND loc = $2\n            AND spec = $3\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int4",
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "64001db312548f4e16f805112a9f663a2db59ffd419a2f4cf931f99b2aa20134": {
     "query": "\n        SELECT *\n        FROM squadov.tft_match_participant_units\n        WHERE match_uuid = $1\n        ",
     "describe": {
@@ -7063,6 +6827,19 @@
       "nullable": [
         false
       ]
+    }
+  },
+  "66c597dacc6f9d280cc7b3def7a9664f52b4e260639352d528ce7770cfdbcd45": {
+    "query": "\n        DELETE FROM squadov.vod_storage_copies\n        WHERE video_uuid = ANY($1)\n            AND loc = $2\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int4"
+        ]
+      },
+      "nullable": []
     }
   },
   "67d145c0431201069eb430413fc11b78cb7386307a883541da76f120a26e196f": {
@@ -7832,6 +7609,80 @@
       "nullable": []
     }
   },
+  "73bca2fc13ffc30122dc75697cd3e9a99a8b02a9321216a4fab7d37860f23749": {
+    "query": "\n            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid, combat_log_partition_id, start_tm, end_tm\n            FROM squadov.wow_match_view\n            WHERE combat_log_partition_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "alt_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "combat_log_version",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "advanced_log",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "build_version",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 7,
+          "name": "combat_log_partition_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 8,
+          "name": "start_tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 9,
+          "name": "end_tm",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        true
+      ]
+    }
+  },
   "73d048164e52ff1f31fe0112c9e7d6bafc80156364f6b4d8fa2946d90ab6429e": {
     "query": "\n            INSERT INTO squadov.new_wow_instances (\n                match_uuid,\n                tr,\n                instance_id,\n                instance_type,\n                players,\n                players_raw\n            )\n            SELECT\n                $1,\n                tstzrange(wmv.start_tm, $4, '[]'),\n                wav.instance_id,\n                wav.instance_type,\n                $2,\n                $5\n            FROM squadov.wow_match_view AS wmv\n            INNER JOIN squadov.wow_instance_view AS wav\n                ON wav.view_id = wmv.id\n            WHERE wmv.id = $3\n            ",
     "describe": {
@@ -8554,6 +8405,81 @@
       "nullable": []
     }
   },
+  "7d6a0cafc25b909971c28de150f0c376dca499477cd115e04e0f98681d959e33": {
+    "query": "\n            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid, combat_log_partition_id, start_tm, end_tm\n            FROM squadov.wow_match_view\n            WHERE match_uuid = $1 AND user_id = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "alt_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "combat_log_version",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "advanced_log",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "build_version",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 7,
+          "name": "combat_log_partition_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 8,
+          "name": "start_tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 9,
+          "name": "end_tm",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        true
+      ]
+    }
+  },
   "7e19801aecd1145d5dc7e5f21967a5330bbbad55da77184b6c7f3252c0369f09": {
     "query": "\n            UPDATE squadov.users\n            SET welcome_sent = TRUE\n            WHERE id = $1\n            ",
     "describe": {
@@ -8856,6 +8782,38 @@
       ]
     }
   },
+  "81c4adbfd8fa095ea82649a80e4a3078476921fe6d4c0071aca9beedd0be2ce2": {
+    "query": "\n            SELECT *\n            FROM squadov.vod_storage_copies\n            WHERE video_uuid = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "loc",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "spec",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "829847ab83efe9b5425b4eb0183a0d03bda929fffc2043762fe9f3d64f624076": {
     "query": "\n        UPDATE squadov.user_profiles\n        SET cover_picture_blob = $2\n        WHERE user_id = $1\n        ",
     "describe": {
@@ -8877,19 +8835,6 @@
         "Left": [
           "Uuid",
           "Timestamptz"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "854fbd9f8185cb894eedd409203154c89a5481d3422d532d147e387aa21be377": {
-    "query": "\n            UPDATE squadov.wow_match_view\n            SET combat_log_partition_id = $2\n            WHERE id = $1\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Varchar"
         ]
       },
       "nullable": []
@@ -9403,18 +9348,6 @@
       "parameters": {
         "Left": [
           "Uuid"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "8c68c3d6d7de48ebcd6133dffb06330e91242421833aa38242bce99cfd02bb15": {
-    "query": "\n            DELETE FROM squadov.vods\n            WHERE video_uuid = ANY($1)\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "UuidArray"
         ]
       },
       "nullable": []
@@ -10160,74 +10093,6 @@
       },
       "nullable": [
         null
-      ]
-    }
-  },
-  "9bb29c3225ddf21fd5ff5c16d53038e31ced388a046f0c73a0970019fa6b5ef4": {
-    "query": "\n            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid, combat_log_partition_id, start_tm\n            FROM squadov.wow_match_view\n            WHERE combat_log_partition_id = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "alt_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "user_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "combat_log_version",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "advanced_log",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 5,
-          "name": "build_version",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 6,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 7,
-          "name": "combat_log_partition_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 8,
-          "name": "start_tm",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false
       ]
     }
   },
@@ -10984,73 +10849,18 @@
       ]
     }
   },
-  "ab11675d966df87abc60fe4cda6404815bf9c91e0f082ae2e121ba2ef473b59d": {
-    "query": "\n            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid, combat_log_partition_id, start_tm\n            FROM squadov.wow_match_view\n            WHERE match_uuid = $1 AND user_id = $2\n            ",
+  "aabc0072169484ead91e3e878461258f806611a59564160c5ef9f53c430c549f": {
+    "query": "\n        INSERT INTO squadov.vod_storage_copies (\n            video_uuid,\n            loc,\n            spec\n        )\n        SELECT inp.id, $2, $3\n        FROM UNNEST($1::UUID[]) AS inp(id)\n        ON CONFLICT DO NOTHING\n        ",
     "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "alt_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "user_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "combat_log_version",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "advanced_log",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 5,
-          "name": "build_version",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 6,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 7,
-          "name": "combat_log_partition_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 8,
-          "name": "start_tm",
-          "type_info": "Timestamptz"
-        }
-      ],
+      "columns": [],
       "parameters": {
         "Left": [
-          "Uuid",
-          "Int8"
+          "UuidArray",
+          "Int4",
+          "Varchar"
         ]
       },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false
-      ]
+      "nullable": []
     }
   },
   "ab31b9de96ddfd358b4c8f58fa6ad2318f1b63a9c7ba1895d4b52758328796e7": {
@@ -12751,6 +12561,80 @@
       ]
     }
   },
+  "cd521b79188e17aaf7a9e2bc9703f6a0f5d49a79549eb79d37eb0f68666e5f58": {
+    "query": "\n            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid, combat_log_partition_id, start_tm, end_tm\n            FROM squadov.wow_match_view\n            WHERE id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "alt_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "combat_log_version",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "advanced_log",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 5,
+          "name": "build_version",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "match_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 7,
+          "name": "combat_log_partition_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 8,
+          "name": "start_tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 9,
+          "name": "end_tm",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        true
+      ]
+    }
+  },
   "cd8b4612f932e3fd5429d1a05c02db216afaec8da992a3402d5caba5c3c25984": {
     "query": "\n                SELECT reason\n                FROM squadov.user_favorite_matches\n                WHERE match_uuid = $1\n                    AND user_id = $2\n\n                ",
     "describe": {
@@ -13780,68 +13664,6 @@
       "nullable": []
     }
   },
-  "dfe91800c6b8d2c48f8af088d4217455e3283919ef1472a93ef06457746dda12": {
-    "query": "\n            SELECT id, alt_id, user_id, combat_log_version, advanced_log, build_version, match_uuid, combat_log_partition_id\n            FROM squadov.wow_match_view\n            WHERE combat_log_partition_id = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "alt_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "user_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "combat_log_version",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "advanced_log",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 5,
-          "name": "build_version",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 6,
-          "name": "match_uuid",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 7,
-          "name": "combat_log_partition_id",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true
-      ]
-    }
-  },
   "e00558509a78455a49874abb1350d1ca57fa45c2aae33269864a1d5f301d1e9f": {
     "query": "\n                SELECT COALESCE(BOOL_OR(f.has_fastify), FALSE) AS \"has_fastify!\"\n                FROM (\n                    SELECT has_fastify\n                    FROM squadov.vod_metadata\n                    WHERE video_uuid = $1\n                ) AS f\n                ",
     "describe": {
@@ -14390,6 +14212,39 @@
         false,
         false,
         true
+      ]
+    }
+  },
+  "e5319652b953b46c7aaacb6643bcf171d960b73195f3a2ab100e67996532179e": {
+    "query": "\n            SELECT *\n            FROM squadov.vod_storage_copies\n            WHERE loc = $1\n                AND spec = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "video_uuid",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "loc",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "spec",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false
       ]
     }
   },
@@ -15167,18 +15022,6 @@
         null,
         null
       ]
-    }
-  },
-  "f4c816216bc5d245d6257616b0219f01c047cb5aea25390b0d8fd2d0c0497e53": {
-    "query": "\n        DELETE FROM squadov.vods\n        WHERE video_uuid = $1\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": []
     }
   },
   "f50c5ac94f3d32241a5da1fe7b41a8a4b61f67e8c2957aee8b13a222a4eac3fb": {

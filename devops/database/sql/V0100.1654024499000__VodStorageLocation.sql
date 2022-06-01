@@ -14,8 +14,9 @@ INSERT INTO vod_storage_copies (
     loc,
     spec
 )
-SELECT vm.video_uuid, 0, vm.bucket
+SELECT DISTINCT vm.video_uuid, 0, vm.bucket
 FROM vod_metadata AS vm
 INNER JOIN vods AS v
     ON vm.video_uuid = v.video_uuid
-WHERE NOT v.is_local;
+WHERE NOT v.is_local
+ON CONFLICT DO NOTHING;

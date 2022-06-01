@@ -377,7 +377,10 @@ impl RabbitMqListener for ElasticSearchJobInterface {
             ElasticSearchSyncTask::UpdateVodClip{video_uuid} => self.update_vod_clip(&video_uuid).await?,
             ElasticSearchSyncTask::UpdateVodCopies{video_uuid} => {
                 for v in video_uuid {
-                    self.update_vod_copies(&v).await?;
+                    match self.update_vod_copies(&v).await {
+                        Ok(_) => (),
+                        Err(err) => log::warn!("Failed to update VOD copy."),
+                    }
                 }
             }
         };

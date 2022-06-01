@@ -959,27 +959,6 @@
       ]
     }
   },
-  "241a7c267e604501abaa484be86548cc1a0410b6dd80d61e30dd2d0a009453d2": {
-    "query": "\n                SELECT v.video_uuid\n                FROM squadov.vods AS v\n                INNER JOIN squadov.users AS u\n                    ON u.uuid = v.user_uuid\n                WHERE v.video_uuid = ANY($1)\n                    AND u.id = $2\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "video_uuid",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "UuidArray",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
   "24678c48e1187b2ed630ccb0f05c7cef18ae7d8524b80f37170c9b4d518327e5": {
     "query": "\n            SELECT (\n                SELECT COUNT(*)\n                FROM squadov.clip_reacts\n                WHERE user_id = $1\n            ) AS \"likes!\", (\n                SELECT COUNT(*)\n                FROM squadov.clip_comments\n                WHERE user_id = $1\n            ) AS \"comments!\"\n            ",
     "describe": {
@@ -4001,18 +3980,6 @@
         true,
         true
       ]
-    }
-  },
-  "8c68c3d6d7de48ebcd6133dffb06330e91242421833aa38242bce99cfd02bb15": {
-    "query": "\n            DELETE FROM squadov.vods\n            WHERE video_uuid = ANY($1)\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "UuidArray"
-        ]
-      },
-      "nullable": []
     }
   },
   "8f28a33438269f29e09147f2f9f1426dedf7f909bb0b15fcf41585500d326e0f": {
