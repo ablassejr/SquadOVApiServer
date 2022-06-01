@@ -90,7 +90,7 @@ where
                     Ok(r) => r,
                     Err(err) => {
                         log::warn!("Failed to do AWS S3 part upload {:?} - RETRYING", err);
-                        async_std::task::sleep(std::time::Duration::from_millis(100u64 + 2u64.pow(i) + rng.gen_range(0..1000))).await;
+                        async_std::task::sleep(std::time::Duration::from_millis(100u64 * 2u64.pow(i) + rng.gen_range(0..1000))).await;
                         continue;
                     }
                 };
