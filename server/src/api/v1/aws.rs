@@ -34,8 +34,9 @@ pub async fn get_aws_credentials_handler(app : web::Data<Arc<ApiApplication>>, r
         let result = aws.cognito.get_open_id_token_for_developer_identity(GetOpenIdTokenForDeveloperIdentityInput{
             identity_pool_id: app.config.aws.cognito.pool_id.clone(),
             logins,
-            // Giving us a LARGE buffer around how long a session is valid for.
-            token_duration: Some(7200i64),
+            // This is set to 3 hours - this way we have a VERY generous buffer just in case the user's stuff goes to shit.
+            // But also forces the user to call home to get a new token for security concerns.
+            token_duration: Some(10800i64),
             ..GetOpenIdTokenForDeveloperIdentityInput::default()
         }).await?;
 
