@@ -26,6 +26,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use std::convert::TryFrom;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct MatchPlayerPair {
@@ -322,7 +323,7 @@ where
     )
 }
 
-pub fn vod_document_to_match_pov_for_user(doc: ESVodDocument, user_id: i64) -> RecentMatchPov {
+pub fn vod_document_to_match_pov_for_user(doc: ESVodDocument, user_id: i64, machine_id: &str) -> RecentMatchPov {
     let fav = doc.find_favorite_reason(user_id);
     let watchlist = doc.is_on_user_watchlist(user_id);
     RecentMatchPov {
@@ -332,7 +333,9 @@ pub fn vod_document_to_match_pov_for_user(doc: ESVodDocument, user_id: i64) -> R
         user_id: doc.owner.user_id,
         favorite_reason: fav,
         is_watchlist: watchlist,
-        is_local: doc.vod.is_local,
+        is_local: doc.storage_copies_exact.map(|copies| {
+            copies.iter().any(|x| { x.spec == machine_id })
+        }).unwrap_or(false),
         tags: vod::condense_raw_vod_tags(doc.tags, user_id),
         access_token: None,
         aimlab_task: doc.data.aimlab.map(|x| { x.task }),
@@ -345,4 +348,29 @@ pub fn vod_document_to_match_pov_for_user(doc: ESVodDocument, user_id: i64) -> R
         wow_instance: doc.data.wow.as_ref().map(|x| { x.instance.clone() }).flatten(),
         csgo_match: doc.data.csgo.map(|x| { x.pov }),
     }
+}
+
+pub fn vod_documents_to_recent_matches(documents: Vec<ESVodDocument>, user_id: i64, machine_id: &str) -> Vec<RecentMatch> {
+    let mut matches: HashMap<Uuid, RecentMatch> = HashMap::new();
+    for d in documents {
+        if let Some(match_uuid) = d.data.match_uuid {
+            if !matches.contains_key(&match_uuid) {
+                matches.insert(match_uuid.clone(), RecentMatch{
+                    match_uuid: match_uuid.clone(),
+                    game: d.data.game,
+                    povs: vec![]
+                });
+            }
+
+            let parent_match = matches.get_mut(&match_uuid).unwrap();
+            let new_pov = vod_document_to_match_pov_for_user(d, user_id, machine_id);
+            parent_match.povs.push(new_pov);
+        }
+    }
+
+    let mut matches = matches.into_values().collect::<Vec<_>>();
+    matches.sort_by(|a, b| {
+        b.povs.first().unwrap().tm.partial_cmp(&a.povs.first().unwrap().tm).unwrap()
+    });
+    matches
 }

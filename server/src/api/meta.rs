@@ -1,4 +1,9 @@
-use crate::api;
+use crate::{
+    api::{
+        self,
+        v1::RecentMatchQuery,
+    },
+};
 use squadov_common::{
     SquadOvError,
     SquadOvGames,
@@ -7,12 +12,14 @@ use squadov_common::{
     },
     access::AccessTokenRequest,
     VodSegmentId,
-    vod::db as vod_db
+    vod::db as vod_db,
+    elastic::vod::ESVodDocument,
+    matches,
 };
-use crate::api::v1::RecentMatchHandle;
 use actix_web::{web, HttpResponse};
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
+use elasticsearch_dsl::{Sort, SortOrder};
 
 #[derive(Deserialize)]
 pub struct MetaParams {
@@ -81,16 +88,25 @@ impl api::ApiApplication {
         // has been fastified. Otherwise it's just a fancy link.
 
         if let Some(clip_uuid) = &access.clip_uuid {
-            let clips = self.get_vod_clip_from_clip_uuids(&[clip_uuid.clone()], user.id).await?;
+            let clips = self.get_vod_clip_from_clip_uuids(&[clip_uuid.clone()], user.id, "").await?;
             let clip = clips.first().ok_or(SquadOvError::NotFound)?;
             metadata.meta_title = clip.title.clone();
             metadata.meta_username = clip.clipper.clone();
         } else if let Some(match_uuid) = &access.match_uuid {
-            let base_matches = self.get_recent_base_matches(&[RecentMatchHandle{
-                match_uuid: match_uuid.clone(),
-                user_uuids: vec![meta_user.uuid.clone()],
-            }], user.id).await?;
-            let recent_matches = self.get_recent_matches_from_uuids(base_matches).await?;
+            let es_search = RecentMatchQuery{
+                matches: Some(vec![match_uuid.clone()]),
+                users: Some(vec![meta_user.id]),
+                ..RecentMatchQuery::default()
+            }.to_es_search(user.id, None, false)
+                .from(0)
+                .size(1)
+                .sort(vec![
+                    Sort::new("vod.endTime")
+                        .order(SortOrder::Desc)
+                ]);
+        
+            let documents: Vec<ESVodDocument> = self.es_api.search_documents(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?;
+            let recent_matches = matches::vod_documents_to_recent_matches(documents, user.id, "");
             let m = recent_matches.first().ok_or(SquadOvError::NotFound)?;
             let pov = m.povs.first().ok_or(SquadOvError::NotFound)?;
 

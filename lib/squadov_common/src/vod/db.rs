@@ -23,14 +23,14 @@ use uuid::Uuid;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-pub async fn find_accessible_vods_in_match_for_user<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64) -> Result<Vec<VodAssociation>, SquadOvError>
+pub async fn find_accessible_vods_in_match_for_user<'a, T>(ex: T, match_uuid: &Uuid, user_id: i64, machine_id: &str) -> Result<Vec<VodAssociation>, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
 {
     Ok(sqlx::query_as!(
         VodAssociation,
-        "
-        SELECT DISTINCT v.*
+        r#"
+        SELECT DISTINCT v.*, lvsc.video_uuid IS NOT NULL AS "is_local!"
         FROM squadov.vods AS v
         INNER JOIN squadov.users AS u
             ON u.uuid = v.user_uuid
@@ -38,13 +38,21 @@ where
             ON vau.video_uuid = v.video_uuid
                 AND vau.match_uuid = $1
                 AND vau.user_id = $2
+        LEFT JOIN squadov.vod_storage_copies AS cvsc
+            ON cvsc.video_uuid = v.video_uuid
+                AND cvsc.loc = 0
+        LEFT JOIN squadov.vod_storage_copies AS lvsc
+            ON lvsc.video_uuid = v.video_uuid
+                AND lvsc.loc = 1
+                AND lvsc.spec = $3
         WHERE v.match_uuid = $1 
             AND (u.id = $2 OR vau.video_uuid IS NOT NULL)
             AND v.is_clip = FALSE
-            AND (v.is_local = FALSE OR u.id = $2)
-        ",
+            AND (cvsc.video_uuid IS NOT NULL OR u.id = $2)
+        "#,
         match_uuid,
         user_id,
+        machine_id,
     )
         .fetch_all(ex)
         .await?)
@@ -298,15 +306,13 @@ where
         SET match_uuid = $1,
             user_uuid = $2,
             start_time = $3,
-            end_time = $4,
-            is_local = $5
-        WHERE video_uuid = $6
+            end_time = $4
+        WHERE video_uuid = $5
         ",
         assoc.match_uuid,
         assoc.user_uuid,
         assoc.start_time,
         assoc.end_time,
-        assoc.is_local,
         assoc.video_uuid,
     )
         .execute(ex)
@@ -460,11 +466,11 @@ where
     Ok(
         sqlx::query_as!(
             VodAssociation,
-            "
-            SELECT *
+            r#"
+            SELECT *, FALSE as "is_local!"
             FROM squadov.vods
             WHERE video_uuid = $1
-            ",
+            "#,
             uuid,
         )
             .fetch_one(ex)
@@ -671,10 +677,12 @@ where
                 FROM squadov.vods AS v
                 INNER JOIN squadov.users AS u
                     ON u.uuid = v.user_uuid
+                INNER JOIN squadov.vod_storage_copies AS vsc
+                    ON vsc.video_uuid = v.video_uuid
                 WHERE u.id = $1
                     AND v.match_uuid = $2
                     AND v.is_clip = FALSE
-                    AND v.is_local = FALSE
+                    AND vsc.loc = 0
                     AND v.end_time IS NOT NULL
             ) AS "exists!"
             "#,

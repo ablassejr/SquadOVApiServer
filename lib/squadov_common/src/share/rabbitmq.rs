@@ -181,7 +181,7 @@ impl RabbitMqListener for SharingRabbitmqInterface {
                 tx.commit().await?;
 
                 if let Some(match_uuid) = conn.match_uuid {
-                    let vods = vdb::find_accessible_vods_in_match_for_user(&*self.db, &match_uuid, user_id).await?;
+                    let vods = vdb::find_accessible_vods_in_match_for_user(&*self.db, &match_uuid, user_id, "").await?;
                     for v in vods {
                         self.es_itf.request_update_vod_sharing(v.video_uuid).await?;    
                     }

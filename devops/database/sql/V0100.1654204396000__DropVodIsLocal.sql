@@ -1,0 +1,2 @@
+ALTER TABLE vods
+DROP COLUMN is_local;

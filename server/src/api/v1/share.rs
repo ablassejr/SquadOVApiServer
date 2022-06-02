@@ -17,6 +17,7 @@ use squadov_common::{
     },
     VodAssociation,
     matches,
+    vod::db as vdb,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -115,7 +116,7 @@ impl api::ApiApplication {
                 return Err(SquadOvError::BadRequest);
             }
         } else if let Some(video_uuid) = some_video_uuid {
-            let assocs = self.find_vod_associations(&[video_uuid.clone()]).await?;
+            let assocs = self.find_vod_associations(&[video_uuid.clone()], "").await?;
             if let Some(vod) = assocs.get(video_uuid) {
                 let vod_user_uuid = vod.user_uuid.clone().ok_or(SquadOvError::BadRequest)?;
                 if vod_user_uuid == user_uuid {
@@ -155,7 +156,7 @@ async fn find_associated_video_uuids_for_connection(app : web::Data<Arc<api::Api
             // to obtain whether or not we can share that particular VOD since I don't believe the SQL query to do a proper
             // permission check can be created easily.
             let mut filtered_video_uuids: Vec<Uuid> = vec![];
-            let raw_vods = app.find_accessible_vods_in_match_for_user(match_uuid, user_id).await?;
+            let raw_vods = vdb::find_accessible_vods_in_match_for_user(&*app.pool, match_uuid, user_id, "").await?;
 
             for vod in raw_vods {
                 if vod.user_uuid.unwrap_or(Uuid::nil()) != user_uuid {
@@ -273,7 +274,7 @@ pub async fn edit_share_connection_handler(app : web::Data<Arc<api::ApiApplicati
 
     let conn = share::get_match_vod_share_connection(&*app.pool, path.connection_id).await?;
     if let Some(match_uuid) = conn.match_uuid {
-        let raw_vods = app.find_accessible_vods_in_match_for_user(&match_uuid, session.user.id).await?;
+        let raw_vods = vdb::find_accessible_vods_in_match_for_user(&*app.pool, &match_uuid, session.user.id, "").await?;
         for v in raw_vods {
             app.es_itf.request_update_vod_sharing(v.video_uuid).await?;
         }
@@ -306,7 +307,7 @@ pub async fn get_share_permissions_handler(app : web::Data<Arc<api::ApiApplicati
             false
         }
     } else if let Some(video_uuid) = data.video_uuid {
-        let assocs = app.find_vod_associations(&[video_uuid.clone()]).await?;
+        let assocs = app.find_vod_associations(&[video_uuid.clone()], "").await?;
         if let Some(vod) = assocs.get(&video_uuid) {
             if let Some(user_uuid) = vod.user_uuid {
                 user_uuid == session.user.uuid

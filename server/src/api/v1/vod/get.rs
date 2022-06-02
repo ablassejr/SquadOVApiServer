@@ -10,7 +10,12 @@ use squadov_common::{
         db,
     }
 };
-use crate::api;
+use crate::{
+    api::{
+        self,
+        auth::SquadOvMachineId,
+    },
+};
 use actix_web::{web, HttpResponse};
 use serde::{Serialize, Deserialize};
 use std::default::Default;
@@ -113,7 +118,7 @@ impl api::ApiApplication {
 
     pub async fn get_vod(&self, video_uuid: &[Uuid]) -> Result<HashMap<Uuid, VodManifest>, SquadOvError> {
         let quality_options = self.get_vod_quality_options(video_uuid).await?;
-        let associations = self.find_vod_associations(video_uuid).await?;
+        let associations = self.find_vod_associations(video_uuid, "").await?;
 
         Ok(
             associations.into_iter()
@@ -190,8 +195,8 @@ pub async fn get_vod_handler(data : web::Path<VodFindFromVideoUuid>, app : web::
     Ok(HttpResponse::Ok().json(data))
 }
 
-pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>, query: web::Query<UploadPartQuery>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
-    let mut assocs = app.find_vod_associations(&[data.video_uuid.clone()]).await?;
+pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>, query: web::Query<UploadPartQuery>, app : web::Data<Arc<api::ApiApplication>>, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+    let mut assocs = app.find_vod_associations(&[data.video_uuid.clone()], &machine_id.id).await?;
     let vod = assocs.remove(&data.video_uuid).ok_or(SquadOvError::NotFound)?;
     let accel = query.accel.unwrap_or(0) == 1;
 
@@ -228,8 +233,8 @@ pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>,
     ))
 }
 
-pub async fn get_vod_association_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {
-    let mut assocs = app.find_vod_associations(&[data.video_uuid.clone()]).await?;
+pub async fn get_vod_association_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<Arc<api::ApiApplication>>, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+    let mut assocs = app.find_vod_associations(&[data.video_uuid.clone()], &machine_id.id).await?;
     Ok(HttpResponse::Ok().json(assocs.remove(&data.video_uuid).ok_or(SquadOvError::NotFound)?))
 }
 

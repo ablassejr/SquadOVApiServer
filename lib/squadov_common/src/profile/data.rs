@@ -121,8 +121,11 @@ where
                 INNER JOIN squadov.user_profile_vods AS upv
                     ON upv.user_id = u.id
                         AND upv.video_uuid = v.video_uuid
+                INNER JOIN squadov.vod_storage_copies AS vsc
+                    ON vsc.video_uuid = v.video_uuid
                 WHERE u.id = $1 AND v.match_uuid = $2
-                    AND v.is_clip = FALSE AND v.is_local = FALSE
+                    AND v.is_clip = FALSE
+                    AND vsc.loc = 0
                     AND v.end_time IS NOT NULL
             ) AS "exists!"
             "#,
@@ -169,11 +172,14 @@ where
         )
         SELECT $2, v.video_uuid
         FROM squadov.vods AS v
+        INNER JOIN squadov.vod_storage_copies AS vsc
+            ON vsc.video_uuid = v.video_uuid
         INNER JOIN squadov.users AS u
             ON u.uuid = v.user_uuid
         WHERE u.id = $2
             AND v.match_uuid = $1
-            AND v.is_clip = FALSE AND v.is_local = FALSE
+            AND v.is_clip = FALSE
+            AND vsc.loc = 0
             AND v.end_time IS NOT NULL
         ON CONFLICT DO NOTHING
         ",
@@ -198,9 +204,12 @@ where
                 FROM squadov.vods AS v
                 INNER JOIN squadov.users AS u
                     ON u.uuid = v.user_uuid
+                INNER JOIN squadov.vod_storage_copies AS vsc
+                    ON vsc.video_uuid = v.video_uuid
                 WHERE u.id = $2
                     AND v.match_uuid = $1
-                    AND v.is_clip = FALSE AND v.is_local = FALSE
+                    AND v.is_clip = FALSE
+                    AND vsc.loc = 0
                     AND v.end_time IS NOT NULL
             )
         ",

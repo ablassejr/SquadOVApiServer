@@ -15,7 +15,7 @@ pub use tags::*;
 pub use local::*;
 
 use crate::api;
-use crate::api::auth::SquadOVSession;
+use crate::api::auth::{SquadOvMachineId, SquadOVSession};
 use crate::api::v1::FavoriteResponse;
 use uuid::Uuid;
 use serde::Deserialize;
@@ -86,7 +86,7 @@ pub async fn delete_clip_share_signature_handler(app : web::Data<Arc<api::ApiApp
     Ok(HttpResponse::NoContent().finish())
 }
 
-pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericClipPathInput>, data: web::Json<ClipShareSignatureData>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericClipPathInput>, data: web::Json<ClipShareSignatureData>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
@@ -94,7 +94,7 @@ pub async fn create_clip_share_signature_handler(app : web::Data<Arc<api::ApiApp
     };
 
     // Only the owner of the clip and those with the share permission can share.
-    let clips = app.get_vod_clip_from_clip_uuids(&[path.clip_uuid.clone()], session.user.id).await?;
+    let clips = app.get_vod_clip_from_clip_uuids(&[path.clip_uuid.clone()], session.user.id, &machine_id.id).await?;
     if clips.is_empty() {
         return Err(SquadOvError::BadRequest);
     }
@@ -186,7 +186,7 @@ impl api::ApiApplication {
     pub async fn make_vod_public(&self, video_uuid: &Uuid) -> Result<(), SquadOvError> {
         // Get all the segments that exist for this VOD.
         let quality_options = self.get_vod_quality_options(&[video_uuid.clone()]).await?;
-        let assocs = self.find_vod_associations(&[video_uuid.clone()]).await?;
+        let assocs = self.find_vod_associations(&[video_uuid.clone()], "").await?;
         if let Some(vod) = assocs.get(video_uuid) {
             if !vod.is_local {
                 let metadata = db::get_vod_metadata(&*self.pool, video_uuid, "source").await?;

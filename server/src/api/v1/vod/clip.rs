@@ -90,7 +90,7 @@ impl api::ApiApplication {
         })
     }
 
-    pub async fn get_vod_clip_from_clip_uuids(&self, uuids: &[Uuid], user_id: i64) -> Result<Vec<VodClip>, SquadOvError> {
+    pub async fn get_vod_clip_from_clip_uuids(&self, uuids: &[Uuid], user_id: i64, machine_id: &str) -> Result<Vec<VodClip>, SquadOvError> {
         // This is a multi-pass solution to get all the data we need in the most efficient way.
         // First we get all the basic VOD clip data stored in the database. After that, the only thing
         // we need to take care of is grabbing the VodAssociation and VodManifest for each clip.
@@ -140,7 +140,7 @@ impl api::ApiApplication {
         // Don't use the input uuids but rather use the more accurate UUIDs that we collected in base_data
         // as the input may (or may not) have invalid UUIDs.
         let clip_uuids: Vec<Uuid> = base_data.iter().map(|x| { x.clip_uuid.clone() }).collect();
-        let mut clip_vod_associations = self.find_vod_associations(&clip_uuids).await?;
+        let mut clip_vod_associations = self.find_vod_associations(&clip_uuids, machine_id).await?;
         let mut clip_vod_manifests = self.get_vod(&clip_uuids).await?;
 
         Ok(base_data.into_iter().map(|x| {
@@ -530,14 +530,14 @@ pub async fn get_profile_clips_handler(app : web::Data<Arc<api::ApiApplication>>
     get_recent_clips_for_user(path.profile_id, app, &request, page, query, filter, true, machine_id).await
 }
 
-pub async fn get_clip_handler(app : web::Data<Arc<api::ApiApplication>>, pth: web::Path<ClipPathInput>, request : HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_clip_handler(app : web::Data<Arc<api::ApiApplication>>, pth: web::Path<ClipPathInput>, request : HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
     let extensions = request.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    let clips = app.get_vod_clip_from_clip_uuids(&[pth.clip_uuid.clone()], session.user.id).await?;
+    let clips = app.get_vod_clip_from_clip_uuids(&[pth.clip_uuid.clone()], session.user.id, &machine_id.id).await?;
 
     if clips.is_empty() {
         Err(SquadOvError::NotFound)

@@ -25,6 +25,7 @@ use squadov_common::{
     generate_combatants_key,
     generate_combatants_hashed_array,
     elastic::vod::ESVodDocument,
+    vod::db as vdb,
 };
 use actix_web::{web, HttpResponse, HttpRequest, HttpMessage};
 use crate::api;
@@ -310,45 +311,6 @@ impl WowListQuery {
             instance_ids.extend(arenas);
         }
         instance_ids
-    }
-    
-    pub fn build_friendly_composition_filter(&self) -> Result<String, SquadOvError> {
-        WowListQuery::build_composition_filter(self.friendly_composition.as_ref())
-    }
-
-    pub fn build_enemy_composition_filter(&self) -> Result<String, SquadOvError> {
-        WowListQuery::build_composition_filter(self.enemy_composition.as_ref())
-    }
-
-    fn build_composition_filter(f: Option<&Vec<String>>) -> Result<String, SquadOvError> {
-        Ok(
-            if let Some(inner) = f {
-                let mut pieces: Vec<String> = vec![];
-                for x in inner {
-                    // Each string is going to be a JSON array of integers [1, 2, 3].
-                    let json_arr: Vec<i32> = serde_json::from_str(x)?;
-
-                    // It could be empty in which case we want to match anything.
-                    if json_arr.is_empty() {
-                        continue;
-                    }
-
-                    // Each JSON array needs to be converted into a regex lookahead group
-                    // that looks like: (?=.*,(1|2|3),)
-                    pieces.push(format!(
-                        "(?=.*,({}),)",
-                        json_arr.into_iter().map(|x| {
-                            format!("{}", x)
-                        })
-                            .collect::<Vec<String>>()
-                            .join("|")
-                    ));
-                }
-                format!("^{}.*$", pieces.join(""))
-            } else {
-                String::from(".*")
-            }
-        )
     }
 
     pub fn build_friendly_es_composition_filter(&self) -> (NestedQuery, bool) {
@@ -1685,13 +1647,13 @@ struct WowUserAccessibleVodOutput {
     pub user_to_id: HashMap<Uuid, i64>
 }
 
-pub async fn list_wow_vods_for_squad_in_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_wow_vods_for_squad_in_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
-    let vods = app.find_accessible_vods_in_match_for_user(&path.match_uuid, session.user.id).await?;
+    let vods = vdb::find_accessible_vods_in_match_for_user(&*app.pool, &path.match_uuid, session.user.id, &machine_id.id).await?;
 
     // Note that for each VOD we also need to figure out the mapping from user uuid to puuid.
     let user_uuids: Vec<Uuid> = vods.iter()
