@@ -219,7 +219,6 @@ impl<'a> WowStatReportGenerator<'a> {
 
     fn add_damage_dealt_for_unit(&mut self, tm: DateTime<Utc>, unit: &str, damage: i64) -> Result<(), SquadOvError> {
         if let Some(unit) = self.get_player_user_from_guid(unit) {
-            log::info!("add damage dealt: {} {}", &unit, damage);
             if let Some(summary) = self.summary.get_mut(&unit) {
                 summary.damage_dealt += damage;
             } else {

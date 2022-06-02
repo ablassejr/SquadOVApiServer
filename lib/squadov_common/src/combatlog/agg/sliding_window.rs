@@ -69,7 +69,6 @@ where
 
                     // val / buffer_time gets us the amount per millisecond. Then we multiply by unit_time to get the amount of
                     // the amount value that would happen in unit_time.
-                    log::info!("Val: {}, Buffer: {}, Unit: {}", val, buffer_time, unit_time);
                     T::from(val / buffer_time * unit_time).ok_or(SquadOvError::BadRequest)?
                 }
             }
