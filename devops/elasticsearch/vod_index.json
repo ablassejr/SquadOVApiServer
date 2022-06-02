@@ -574,6 +574,12 @@
                                                 "properties": {
                                                     "data": {
                                                         "properties": {
+                                                            "guid": {
+                                                                "type": "keyword"
+                                                            },
+                                                            "name": {
+                                                                "type": "text"
+                                                            },
                                                             "ilvl": {
                                                                 "type": "integer"
                                                             },
@@ -717,6 +723,17 @@
                     },
                     "spec": {
                         "type": "text"
+                    }
+                }
+            },
+            "storageCopiesExact": {
+                "type": "nested",
+                "properties": {
+                    "loc": {
+                        "type": "integer"
+                    },
+                    "spec": {
+                        "type": "keyword"
                     }
                 }
             }

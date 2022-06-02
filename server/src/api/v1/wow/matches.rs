@@ -28,10 +28,12 @@ use squadov_common::{
 };
 use actix_web::{web, HttpResponse, HttpRequest, HttpMessage};
 use crate::api;
-use crate::api::auth::SquadOVSession;
+use crate::api::auth::{SquadOvMachineId, SquadOVSession};
 use crate::api::v1::{
     GenericMatchPathInput,
     RecentMatchQuery,
+    RecentMatchGameQuery,
+    GenericWowQuery,
 };
 use squadov_common::vod::VodAssociation;
 use std::sync::Arc;
@@ -40,7 +42,7 @@ use sqlx::{Postgres, Transaction};
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
-use elasticsearch_dsl::{Query, BoolQuery, NestedQuery};
+use elasticsearch_dsl::{Query, BoolQuery, NestedQuery, Sort, SortOrder};
 
 #[derive(Deserialize)]
 pub struct GenericMatchCreationRequest<T> {
@@ -57,7 +59,7 @@ pub struct GenericMatchFinishCreationRequest<T> {
     pub combatants: Vec<WoWCombatantInfo>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all="camelCase")]
 pub struct WowListQuery {
     pub has_vod: Option<bool>,
@@ -77,6 +79,7 @@ pub struct WowListQuery {
     // If not set, wins + losses. If true, only wins. If false, only losses.
     pub is_winner: Option<bool>,
     pub instance_types: Option<Vec<WowInstanceType>>,
+    pub guids: Option<Vec<String>>,
     pub enabled: bool,
 }
 
@@ -99,6 +102,7 @@ impl Default for WowListQuery {
             keystone_high: None,
             is_winner: None,
             instance_types: None,
+            guids: None,
             enabled: true,
         }
     }
@@ -190,6 +194,18 @@ impl WowListQuery {
                             team_query
                         },
                     ));
+                }
+   
+                if let Some(guids) = self.guids.as_ref() {
+                    q = q.filter(
+                        Query::nested(
+                            "data.wow.teams",
+                            Query::nested(
+                                "data.wow.teams.players",
+                                Query::terms("data.wow.teams.players.info.data.guid", guids.clone()),
+                            )
+                        )
+                    );
                 }
 
                 if let Some(encounter_difficulties) = self.encounter_difficulties.as_ref() {
@@ -371,311 +387,201 @@ impl WowListQuery {
 }
 
 impl api::ApiApplication {
-    async fn list_wow_encounters_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWEncounter>, SquadOvError> {
-        let pairs = sqlx::query!(
-            r#"
-            SELECT DISTINCT
-                wmv.match_uuid AS "match_uuid!",
-                u.uuid AS "player_uuid!",
-                wmv.start_tm
-            FROM squadov.wow_match_view AS wmv
-            INNER JOIN squadov.wow_encounter_view AS wav
-                ON wav.view_id = wmv.id
-            INNER JOIN squadov.wow_match_view_character_presence AS wcp
-                ON wcp.view_id = wmv.id
-            INNER JOIN squadov.wow_match_view_combatants AS wvc
-                ON wvc.character_id = wcp.character_id
-            INNER JOIN squadov.users AS u
-                ON u.id = wmv.user_id
-            LEFT JOIN squadov.vods AS v
-                ON v.match_uuid = wmv.match_uuid
-                    AND v.user_uuid = u.uuid
-                    AND v.is_clip = FALSE
-            LEFT JOIN squadov.view_share_connections_access_users AS sau
-                ON sau.match_uuid = wmv.match_uuid
-                    AND sau.user_id = $8
-            CROSS JOIN LATERAL (
-                SELECT ',' || STRING_AGG(val::VARCHAR, ',') || ',' AS vv
-                FROM (
-                    SELECT MIN(wvc.spec_id)
-                    FROM squadov.wow_match_view_character_presence AS wcp
-                    INNER JOIN squadov.wow_match_view_combatants AS wvc
-                        ON wvc.character_id = wcp.character_id
-                    WHERE wcp.view_id = wmv.id
-                    GROUP BY wcp.view_id, wcp.unit_guid
-                ) sub(val)
-            ) AS specs(s)
-            WHERE wmv.user_id = $2
-                AND wcp.unit_guid = $1
-                AND wmv.match_uuid IS NOT NULL
-                AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))
-                AND (CARDINALITY($6::INTEGER[]) = 0 OR wav.encounter_id = ANY($6))
-                AND (NOT $7::BOOLEAN OR v.video_uuid IS NOT NULL)
-                AND ($2 = $8 OR sau.match_uuid IS NOT NULL)
-                AND ($9::BOOLEAN IS NULL OR wav.success = $9)
-                AND (CARDINALITY($10::INTEGER[]) = 0 OR wav.difficulty = ANY($10))
-                AND (CARDINALITY($11::INTEGER[]) = 0 OR wvc.spec_id = ANY($11))
-                AND specs.s ~ $12
-            ORDER BY wmv.start_tm DESC, wmv.match_uuid, u.uuid
-            LIMIT $3 OFFSET $4
-            "#,
-            character_guid,
-            user_id,
-            end - start,
-            start,
-            &filters.raids.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            &filters.encounters.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            filters.has_vod.unwrap_or(false),
-            req_user_id,
-            filters.is_winner,
-            &filters.encounter_difficulties.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            &filters.pov_spec.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            &filters.build_friendly_composition_filter()?,
-        )
-            .fetch_all(&*self.heavy_pool)
-            .await?
-            .into_iter()
-            .map(|x| {
-                MatchPlayerPair{
-                    match_uuid: x.match_uuid,
-                    player_uuid: x.player_uuid,
-                }
-            })
-            .collect::<Vec<MatchPlayerPair>>();
+    async fn list_wow_encounters_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery, machine_id: &str) -> Result<Vec<WoWEncounter>, SquadOvError> {
+        let filter = RecentMatchQuery{
+            games: Some(vec![SquadOvGames::WorldOfWarcraft]),
+            users: Some(vec![user_id]),
+            squads: Some(self.get_user_squads(req_user_id).await?.into_iter().map(|x| { x.squad.id }).collect()),
+            filters: RecentMatchGameQuery{
+                wow: GenericWowQuery{
+                    encounters: WowListQuery{
+                        guids: Some(vec![character_guid.to_string()]),
+                        ..filters.clone()
+                    },
+                    keystones: WowListQuery{
+                        enabled: false,
+                        ..WowListQuery::default()
+                    },
+                    arenas: WowListQuery{
+                        enabled: false,
+                        ..WowListQuery::default()
+                    },
+                    instances: WowListQuery{
+                        enabled: false,
+                        ..WowListQuery::default()
+                    },
+                    ..GenericWowQuery::default()
+                },
+                ..RecentMatchGameQuery::default()
+            },
+            ..RecentMatchQuery::default()
+        };
+    
+        let es_search = filter.to_es_search(req_user_id, Some(&machine_id), false)
+            .from(start)
+            .size(end)
+            .sort(vec![
+                Sort::new("vod.endTime")
+                    .order(SortOrder::Desc)
+            ]);
+        let pairs: Vec<_> = self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
+                .into_iter()
+                .map(|x| {
+                    MatchPlayerPair{
+                        match_uuid: x.data.match_uuid.unwrap_or(Uuid::new_v4()),
+                        player_uuid: x.owner.uuid,
+                    }
+                })
+                .collect();
+
         Ok(wm::list_wow_encounter_for_uuids(&*self.heavy_pool, &pairs).await?)
     }
 
-    async fn list_wow_challenges_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWChallenge>, SquadOvError> {
-        let pairs = sqlx::query!(
-            r#"
-            SELECT DISTINCT
-                wmv.match_uuid AS "match_uuid!",
-                u.uuid AS "player_uuid!",
-                wmv.start_tm
-            FROM squadov.wow_match_view AS wmv
-            INNER JOIN squadov.wow_challenge_view AS wav
-                ON wav.view_id = wmv.id
-            INNER JOIN squadov.wow_match_view_character_presence AS wcp
-                ON wcp.view_id = wmv.id
-            INNER JOIN squadov.wow_match_view_combatants AS wvc
-                ON wvc.character_id = wcp.character_id
-            INNER JOIN squadov.users AS u
-                ON u.id = wmv.user_id
-            CROSS JOIN LATERAL (
-                SELECT ',' || STRING_AGG(val::VARCHAR, ',') || ',' AS vv
-                FROM (
-                    SELECT MIN(wvc.spec_id)
-                    FROM squadov.wow_match_view_character_presence AS wcp
-                    INNER JOIN squadov.wow_match_view_combatants AS wvc
-                        ON wvc.character_id = wcp.character_id
-                    WHERE wcp.view_id = wmv.id
-                    GROUP BY wcp.view_id, wcp.unit_guid
-                ) sub(val)
-            ) AS specs(s)
-            LEFT JOIN squadov.vods AS v
-                ON v.match_uuid = wmv.match_uuid
-                    AND v.user_uuid = u.uuid
-                    AND v.is_clip = FALSE
-            LEFT JOIN squadov.view_share_connections_access_users AS sau
-                ON sau.match_uuid = wmv.match_uuid
-                    AND sau.user_id = $7
-            WHERE wmv.user_id = $2
-                AND wcp.unit_guid = $1
-                AND wmv.match_uuid IS NOT NULL
-                AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))
-                AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
-                AND ($2 = $7 OR sau.match_uuid IS NOT NULL)
-                AND ($8::BOOLEAN IS NULL OR wav.success = $8)
-                AND ($9::INTEGER IS NULL OR wav.keystone_level >= $9)
-                AND ($10::INTEGER IS NULL OR wav.keystone_level <= $10)
-                AND (CARDINALITY($11::INTEGER[]) = 0 OR wvc.spec_id = ANY($11))
-                AND specs.s ~ $12
-            ORDER BY wmv.start_tm DESC, wmv.match_uuid, u.uuid
-            LIMIT $3 OFFSET $4
-            "#,
-            character_guid,
-            user_id,
-            end - start,
-            start,
-            &filters.dungeons.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            filters.has_vod.unwrap_or(false),
-            req_user_id,
-            filters.is_winner,
-            filters.keystone_low,
-            filters.keystone_high,
-            &filters.pov_spec.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            &filters.build_friendly_composition_filter()?,
-        )
-            .fetch_all(&*self.heavy_pool)
-            .await?
-            .into_iter()
-            .map(|x| {
-                MatchPlayerPair{
-                    match_uuid: x.match_uuid,
-                    player_uuid: x.player_uuid,
-                }
-            })
-            .collect::<Vec<MatchPlayerPair>>();
+    async fn list_wow_challenges_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery, machine_id: &str) -> Result<Vec<WoWChallenge>, SquadOvError> {
+        let filter = RecentMatchQuery{
+            games: Some(vec![SquadOvGames::WorldOfWarcraft]),
+            users: Some(vec![user_id]),
+            squads: Some(self.get_user_squads(req_user_id).await?.into_iter().map(|x| { x.squad.id }).collect()),
+            filters: RecentMatchGameQuery{
+                wow: GenericWowQuery{
+                    keystones: WowListQuery{
+                        guids: Some(vec![character_guid.to_string()]),
+                        ..filters.clone()
+                    },
+                    encounters: WowListQuery{
+                        enabled: false,
+                        ..WowListQuery::default()
+                    },
+                    arenas: WowListQuery{
+                        enabled: false,
+                        ..WowListQuery::default()
+                    },
+                    instances: WowListQuery{
+                        enabled: false,
+                        ..WowListQuery::default()
+                    },
+                    ..GenericWowQuery::default()
+                },
+                ..RecentMatchGameQuery::default()
+            },
+            ..RecentMatchQuery::default()
+        };
+    
+        let es_search = filter.to_es_search(req_user_id, Some(&machine_id), false)
+            .from(start)
+            .size(end)
+            .sort(vec![
+                Sort::new("vod.endTime")
+                    .order(SortOrder::Desc)
+            ]);
+        let pairs: Vec<_> = self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
+                .into_iter()
+                .map(|x| {
+                    MatchPlayerPair{
+                        match_uuid: x.data.match_uuid.unwrap_or(Uuid::new_v4()),
+                        player_uuid: x.owner.uuid,
+                    }
+                })
+                .collect();
         Ok(wm::list_wow_challenges_for_uuids(&*self.heavy_pool, &pairs).await?)
     }
 
-    async fn list_wow_arenas_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WoWArena>, SquadOvError> {
-        let pairs = sqlx::query!(
-            r#"
-            SELECT DISTINCT
-                wmv.match_uuid AS "match_uuid!",
-                u.uuid AS "player_uuid!",
-                wmv.start_tm
-            FROM squadov.wow_match_view AS wmv
-            INNER JOIN squadov.wow_arena_view AS wav
-                ON wav.view_id = wmv.id
-            INNER JOIN squadov.wow_match_view_character_presence AS wcp
-                ON wcp.view_id = wmv.id
-            INNER JOIN squadov.wow_match_view_combatants AS mvc
-                ON mvc.character_id = wcp.character_id
-            CROSS JOIN LATERAL (
-                SELECT ',' || STRING_AGG(val::VARCHAR, ',') || ',' AS vv
-                FROM (
-                    SELECT MIN(wvc.spec_id)
-                    FROM squadov.wow_match_view_character_presence AS wcp
-                    INNER JOIN squadov.wow_match_view_combatants AS wvc
-                        ON wvc.character_id = wcp.character_id
-                    WHERE wcp.view_id = wmv.id
-                        AND wvc.team = 0
-                    GROUP BY wcp.view_id, wcp.unit_guid
-                ) sub(val)
-            ) AS t0(s)
-            CROSS JOIN LATERAL (
-                SELECT ',' || STRING_AGG(val::VARCHAR, ',') || ',' AS vv
-                FROM (
-                    SELECT MIN(wvc.spec_id)
-                    FROM squadov.wow_match_view_character_presence AS wcp
-                    INNER JOIN squadov.wow_match_view_combatants AS wvc
-                        ON wvc.character_id = wcp.character_id
-                    WHERE wcp.view_id = wmv.id
-                        AND wvc.team = 1
-                    GROUP BY wcp.view_id, wcp.unit_guid
-                ) sub(val)
-            ) AS t1(s)
-            INNER JOIN squadov.users AS u
-                ON u.id = wmv.user_id
-            LEFT JOIN squadov.vods AS v
-                ON v.match_uuid = wmv.match_uuid
-                    AND v.user_uuid = u.uuid
-                    AND v.is_clip = FALSE
-            LEFT JOIN squadov.view_share_connections_access_users AS sau
-                ON sau.match_uuid = wmv.match_uuid
-                    AND sau.user_id = $7
-            WHERE wmv.user_id = $2
-                AND wcp.unit_guid = $1
-                AND wmv.match_uuid IS NOT NULL
-                AND (CARDINALITY($5::INTEGER[]) = 0 OR wav.instance_id = ANY($5))
-                AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
-                AND ($2 = $7 OR sau.match_uuid IS NOT NULL)
-                AND (CARDINALITY($8::VARCHAR[]) = 0 OR wav.arena_type = ANY($8))
-                AND ($9::BOOLEAN IS NULL OR ((wav.winning_team_id = mvc.team) = $9))
-                AND (CARDINALITY($10::INTEGER[]) = 0 OR mvc.spec_id = ANY($10))
-                AND ($11::INTEGER IS NULL OR mvc.rating >= $11)
-                AND ($12::INTEGER IS NULL OR mvc.rating <= $12)
-                AND (
-                    (t0.s ~ $13 AND t1.s ~ $14)
-                    OR
-                    (t0.s ~ $14 AND t1.s ~ $13)
-                )
-            ORDER BY wmv.start_tm DESC, wmv.match_uuid, u.uuid
-            LIMIT $3 OFFSET $4
-            "#,
-            character_guid,
-            user_id,
-            end - start,
-            start,
-            &filters.arenas.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            filters.has_vod.unwrap_or(false),
-            req_user_id,
-            &filters.brackets.as_ref().unwrap_or(&vec![]).iter().map(|x| { x.clone() }).collect::<Vec<String>>(),
-            filters.is_winner,
-            &filters.pov_spec.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x }).collect::<Vec<i32>>(),
-            filters.rating_low,
-            filters.rating_high,
-            &filters.build_friendly_composition_filter()?,
-            &filters.build_enemy_composition_filter()?,
-        )
-            .fetch_all(&*self.heavy_pool)
-            .await?
-            .into_iter()
-            .map(|x| {
-                MatchPlayerPair{
-                    match_uuid: x.match_uuid,
-                    player_uuid: x.player_uuid,
-                }
-            })
-            .collect::<Vec<MatchPlayerPair>>();
+    async fn list_wow_arenas_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery, machine_id: &str) -> Result<Vec<WoWArena>, SquadOvError> {
+        let filter = RecentMatchQuery{
+            games: Some(vec![SquadOvGames::WorldOfWarcraft]),
+            users: Some(vec![user_id]),
+            squads: Some(self.get_user_squads(req_user_id).await?.into_iter().map(|x| { x.squad.id }).collect()),
+            filters: RecentMatchGameQuery{
+                wow: GenericWowQuery{
+                    arenas: WowListQuery{
+                        guids: Some(vec![character_guid.to_string()]),
+                        ..filters.clone()
+                    },
+                    encounters: WowListQuery{
+                        enabled: false,
+                        ..WowListQuery::default()
+                    },
+                    keystones: WowListQuery{
+                        enabled: false,
+                        ..WowListQuery::default()
+                    },
+                    instances: WowListQuery{
+                        enabled: false,
+                        ..WowListQuery::default()
+                    },
+                    ..GenericWowQuery::default()
+                },
+                ..RecentMatchGameQuery::default()
+            },
+            ..RecentMatchQuery::default()
+        };
+    
+        let es_search = filter.to_es_search(req_user_id, Some(&machine_id), false)
+            .from(start)
+            .size(end)
+            .sort(vec![
+                Sort::new("vod.endTime")
+                    .order(SortOrder::Desc)
+            ]);
+
+        let pairs: Vec<_> = self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
+                .into_iter()
+                .map(|x| {
+                    MatchPlayerPair{
+                        match_uuid: x.data.match_uuid.unwrap_or(Uuid::new_v4()),
+                        player_uuid: x.owner.uuid,
+                    }
+                })
+                .collect();
         Ok(wm::list_wow_arenas_for_uuids(&*self.heavy_pool, &pairs).await?)
     }
 
-    async fn list_wow_instances_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery) -> Result<Vec<WowInstance>, SquadOvError> {
-        let mut instance_ids: Vec<i32> = vec![];
-        if let Some(raids) = filters.raids.as_ref() {
-            instance_ids.extend(raids);
-        }
-
-        if let Some(dungeons) = filters.dungeons.as_ref() {
-            instance_ids.extend(dungeons);
-        }
-        
-        if let Some(arenas) = filters.arenas.as_ref() {
-            instance_ids.extend(arenas);
-        }
-
-        let pairs = sqlx::query!(
-            r#"
-            SELECT DISTINCT
-                wmv.match_uuid AS "match_uuid!",
-                u.uuid AS "player_uuid!",
-                wmv.start_tm
-            FROM squadov.wow_match_view AS wmv
-            INNER JOIN squadov.wow_instance_view AS wiv
-                ON wiv.view_id = wmv.id
-            INNER JOIN squadov.wow_match_view_character_presence AS wcp
-                ON wcp.view_id = wmv.id
-            INNER JOIN squadov.users AS u
-                ON u.id = wmv.user_id
-            LEFT JOIN squadov.vods AS v
-                ON v.match_uuid = wmv.match_uuid
-                    AND v.user_uuid = u.uuid
-                    AND v.is_clip = FALSE
-            LEFT JOIN squadov.view_share_connections_access_users AS sau
-                ON sau.match_uuid = wmv.match_uuid
-                    AND sau.user_id = $7
-            WHERE wmv.user_id = $2
-                AND wcp.unit_guid = $1
-                AND wmv.match_uuid IS NOT NULL
-                AND (CARDINALITY($5::INTEGER[]) = 0 OR wiv.instance_id = ANY($5))
-                AND (NOT $6::BOOLEAN OR v.video_uuid IS NOT NULL)
-                AND ($2 = $7 OR sau.match_uuid IS NOT NULL)
-                AND (CARDINALITY($8::INTEGER[]) = 0 OR wiv.instance_type = ANY($8))
-            ORDER BY wmv.start_tm DESC, wmv.match_uuid, u.uuid
-            LIMIT $3 OFFSET $4
-            "#,
-            character_guid,
-            user_id,
-            end - start,
-            start,
-            &instance_ids,
-            filters.has_vod.unwrap_or(false),
-            req_user_id,
-            &filters.instance_types.as_ref().unwrap_or(&vec![]).iter().map(|x| { *x as i32 }).collect::<Vec<i32>>(),
-        )
-            .fetch_all(&*self.heavy_pool)
-            .await?
-            .into_iter()
-            .map(|x| {
-                MatchPlayerPair{
-                    match_uuid: x.match_uuid,
-                    player_uuid: x.player_uuid,
-                }
-            })
-            .collect::<Vec<MatchPlayerPair>>();
+    async fn list_wow_instances_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery, machine_id: &str) -> Result<Vec<WowInstance>, SquadOvError> {
+        let filter = RecentMatchQuery{
+            games: Some(vec![SquadOvGames::WorldOfWarcraft]),
+            users: Some(vec![user_id]),
+            squads: Some(self.get_user_squads(req_user_id).await?.into_iter().map(|x| { x.squad.id }).collect()),
+            filters: RecentMatchGameQuery{
+                wow: GenericWowQuery{
+                    instances: WowListQuery{
+                        guids: Some(vec![character_guid.to_string()]),
+                        ..filters.clone()
+                    },
+                    encounters: WowListQuery{
+                        enabled: false,
+                        ..WowListQuery::default()
+                    },
+                    keystones: WowListQuery{
+                        enabled: false,
+                        ..WowListQuery::default()
+                    },
+                    arenas: WowListQuery{
+                        enabled: false,
+                        ..WowListQuery::default()
+                    },
+                    ..GenericWowQuery::default()
+                },
+                ..RecentMatchGameQuery::default()
+            },
+            ..RecentMatchQuery::default()
+        };
+    
+        let es_search = filter.to_es_search(req_user_id, Some(&machine_id), false)
+            .from(start)
+            .size(end)
+            .sort(vec![
+                Sort::new("vod.endTime")
+                    .order(SortOrder::Desc)
+            ]);
+        let pairs: Vec<_> = self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
+                .into_iter()
+                .map(|x| {
+                    MatchPlayerPair{
+                        match_uuid: x.data.match_uuid.unwrap_or(Uuid::new_v4()),
+                        player_uuid: x.owner.uuid,
+                    }
+                })
+                .collect();
         Ok(wm::list_wow_instances_for_uuids(&*self.heavy_pool, &pairs).await?)
     }
 
@@ -1655,7 +1561,7 @@ pub async fn finish_wow_arena_handler(app : web::Data<Arc<api::ApiApplication>>,
     Err(SquadOvError::InternalError(String::from("Too many errors in finishing WoW arena...Retry limit reached.")))
 }
 
-pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
@@ -1667,6 +1573,7 @@ pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::
         query.start,
         query.end,
         &filters,
+        &machine_id.id,
     ).await?;
 
     let expected_total = query.end - query.start;
@@ -1674,7 +1581,7 @@ pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::
     Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(encounters, &req, &query, expected_total == got_total)?))
 }
 
-pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
     
@@ -1686,6 +1593,7 @@ pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::
         query.start,
         query.end,
         &filters,
+        &machine_id.id,
     ).await?;
 
     let expected_total = query.end - query.start;
@@ -1693,7 +1601,7 @@ pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::
     Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(challenges, &req, &query, expected_total == got_total)?))
 }
 
-pub async fn list_wow_arenas_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_wow_arenas_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
@@ -1705,6 +1613,7 @@ pub async fn list_wow_arenas_for_character_handler(app : web::Data<Arc<api::ApiA
         query.start,
         query.end,
         &filters,
+        &machine_id.id,
     ).await?;
 
     let expected_total = query.end - query.start;
@@ -1712,7 +1621,7 @@ pub async fn list_wow_arenas_for_character_handler(app : web::Data<Arc<api::ApiA
     Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(challenges, &req, &query, expected_total == got_total)?))
 }
 
-pub async fn list_wow_instances_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_wow_instances_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
@@ -1724,6 +1633,7 @@ pub async fn list_wow_instances_for_character_handler(app : web::Data<Arc<api::A
         query.start,
         query.end,
         &filters,
+        &machine_id.id,
     ).await?;
 
     let expected_total = query.end - query.start;

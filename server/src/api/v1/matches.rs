@@ -333,7 +333,7 @@ impl RecentMatchQuery {
                 self.filters.wow.instances.build_es_query()
             } else {
                 Query::bool()
-                    .must_not(Query::exists("data.wow.challenge"))
+                    .must_not(Query::exists("data.wow.instance"))
             },
         ];
 
