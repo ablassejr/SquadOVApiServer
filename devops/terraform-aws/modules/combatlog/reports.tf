@@ -6,7 +6,7 @@ resource "aws_lambda_function" "combat_log_reports_lambda" {
     source_code_hash = filebase64sha256("../../aws/lambda/reports.zip")
 
     handler = "not.used"
-    memory_size = 128
+    memory_size = 512
     package_type = "Zip"
     reserved_concurrent_executions = 256
     runtime = "provided.al2"
