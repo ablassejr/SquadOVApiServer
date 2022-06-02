@@ -1,4 +1,10 @@
 {
+    "settings": {
+        "index": {
+            "number_of_shards": 2,
+            "number_of_replicas": 1
+        }
+    },
     "mappings": {
         "dynamic": false,
         "properties": {
@@ -714,17 +720,6 @@
                         "type": "date"
                     }
                 }   
-            },
-            "storageCopies": {
-                "type": "nested",
-                "properties": {
-                    "loc": {
-                        "type": "integer"
-                    },
-                    "spec": {
-                        "type": "text"
-                    }
-                }
             },
             "storageCopiesExact": {
                 "type": "nested",

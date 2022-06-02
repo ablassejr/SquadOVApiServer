@@ -146,7 +146,7 @@ impl SharedClient {
         Ok(())
     }
 
-    fn parse_logs<TPacketData: CombatLogPacket>(partition_key: &str, decoded: CombatLogData, cl_state: serde_json::Value) -> Vec<(String, Option<TPacketData::Data>)> {
+    fn parse_logs<TPacketData: CombatLogPacket>(partition_key: &str, decoded: CombatLogData, cl_state: &serde_json::Value) -> Vec<(String, Option<TPacketData::Data>)> {
         decoded.logs.into_iter()
             .map(|x| {
                 let result = std::panic::catch_unwind(|| {
@@ -195,67 +195,75 @@ impl SharedClient {
         (raw_logs, parsed_logs)
     }
 
-    async fn generic_parse_combat_log_data<TPacketData: CombatLogPacket>(&self, data: KinesisData) -> Result<(), SquadOvError> {
-        // The inner data is base64 encoded - note that we're expecting a JSON structure of FF14 combat logs.
-        // The data that we get is BASE64(GZIP(JSON)) so we need to reverse those operations to
-        // properly decode the packet.
-        let decoded = serde_json::from_slice::<CombatLogData>(&{
-            let mut uncompressed_data: Vec<u8> = Vec::new();
-            {
-                let raw_data = base64::decode(&data.data)?;
-                let mut decoder = flate2::read::GzDecoder::new(&*raw_data);
-                decoder.read_to_end(&mut uncompressed_data)?;
-            }
-            uncompressed_data
-        })?;
+    async fn generic_parse_combat_log_data<TPacketData: CombatLogPacket>(&self, partition_key: &str, all_data: Vec<KinesisData>) -> Result<(), SquadOvError> {
+        log::info!("Start Generic Combat Log Parse: {}", all_data.len());
 
+        log::info!("...Retrieving Combat Log State");
         // Get combat log state - ideally grab it from our cache.
         let cl_state = {
             if let Some(cl_state) = {
                 let mut state_cache = self.state_cache.write().await;
-                state_cache.get(&data.partition_key).cloned()
+                state_cache.get(&partition_key.to_string()).cloned()
             } {
                 cl_state
             } else {
-                let cl_state = db::get_combat_log_state(&*self.pool, &data.partition_key).await?;
+                let cl_state = db::get_combat_log_state(&*self.pool, partition_key).await?;
 
                 let mut state_cache = self.state_cache.write().await;
-                state_cache.put(data.partition_key.clone(), cl_state.clone());
+                state_cache.put(partition_key.to_string(), cl_state.clone());
 
                 cl_state
             }
         };
 
-        // We do a best effort parsing of all the combat log lines. If any one line fails to parse,
-        // that doesn't prevent the entire batch from being parsed. We ignore that line and move on.
-        log::info!("Parse Logs...");
-        let parsed_logs = Self::parse_logs::<TPacketData>(&data.partition_key, decoded, cl_state);
+        let mut parsed_logs: Vec<(String, Option<TPacketData::Data>)> = vec![];
+
+        for data in all_data {
+            // The inner data is base64 encoded - note that we're expecting a JSON structure of combat log data.
+            // The data that we get is BASE64(GZIP(JSON)) so we need to reverse those operations to
+            // properly decode the packet.
+            log::info!("...Unpacking and Decoding Data");
+            let decoded = serde_json::from_slice::<CombatLogData>(&{
+                let mut uncompressed_data: Vec<u8> = Vec::new();
+                {
+                    let raw_data = base64::decode(&data.data)?;
+                    let mut decoder = flate2::read::GzDecoder::new(&*raw_data);
+                    decoder.read_to_end(&mut uncompressed_data)?;
+                }
+                uncompressed_data
+            })?;
+
+            // We do a best effort parsing of all the combat log lines. If any one line fails to parse,
+            // that doesn't prevent the entire batch from being parsed. We ignore that line and move on.
+            log::info!("...Parse Logs and Append: {}", decoded.logs.len());
+            parsed_logs.extend(Self::parse_logs::<TPacketData>(partition_key, decoded, &cl_state));
+        }
 
         log::info!("Split Logs...");
-        let (raw_logs, parsed_logs) = Self::split_raw_parsed::<TPacketData>(&data.partition_key, parsed_logs);
+        let (raw_logs, parsed_logs) = Self::split_raw_parsed::<TPacketData>(partition_key, parsed_logs);
         
         // Stream the raw and parsed data into AWS s3.
         // Note that to process this data we will rely on an S3 event notification to determine
         // when the flushed object is written.
         log::info!("Upload raw {}...", raw_logs.len());
-        self.upload_to_s3::<TPacketData::Data>(&data.partition_key, raw_logs).await?;
+        self.upload_to_s3::<TPacketData::Data>(partition_key, raw_logs).await?;
 
         log::info!("Upload parsed {}...", parsed_logs.len());
-        self.upload_to_s3::<TPacketData::Data>(&data.partition_key, parsed_logs).await?;
+        self.upload_to_s3::<TPacketData::Data>(partition_key, parsed_logs).await?;
 
         log::info!("...Finish!");
         Ok(())
     }
 
-    async fn handle_kinesis_data(&self, data: KinesisData) -> Result<(), SquadOvError> {
+    async fn handle_kinesis_data(&self, partition_key: &str, data: Vec<KinesisData>) -> Result<(), SquadOvError> {
         // Note that our partition keys will be of the form GAME_UUID. The UUID can be a match UUID
         // or a view UUID depending on the game.
-        if data.partition_key.starts_with("ff14_") {
-            self.generic_parse_combat_log_data::<Ff14CombatLogPacket>(data).await?;
-        } else if data.partition_key.starts_with("wow_") {
-            self.generic_parse_combat_log_data::<WowCombatLogPacket>(data).await?;
+        if partition_key.starts_with("ff14_") {
+            self.generic_parse_combat_log_data::<Ff14CombatLogPacket>(partition_key, data).await?;
+        } else if partition_key.starts_with("wow_") {
+            self.generic_parse_combat_log_data::<WowCombatLogPacket>(partition_key, data).await?;
         } else {
-            log::warn!("...Invalid Game Partition Key: {}", &data.partition_key);
+            log::warn!("...Invalid Game Partition Key: {}", partition_key);
             return Err(SquadOvError::BadRequest);
         }
         Ok(())
@@ -342,8 +350,25 @@ async fn main() -> Result<(), SquadOvError> {
         // 
         // See: https://aws.amazon.com/blogs/compute/new-aws-lambda-scaling-controls-for-kinesis-and-dynamodb-event-sources/
         let payload = serde_json::from_value::<Payload>(event)?;
+
+        // There's a possibility of getting multiple partition keys in a single batch (maybe unlikely?).
+        // There's also a possibility of getting more than one kinesis packet for a single partition.
+        // For efficiency, we should batch things together to reduce the amount of times we need to do compression/uploading.
+        let mut per_partition_records: HashMap<String, Vec<KinesisData>> = HashMap::new();
+
         for record in payload.records {
-            shared_ref.handle_kinesis_data(record.kinesis).await?;
+            if let Some(all) = per_partition_records.get_mut(&record.kinesis.partition_key) {
+                all.push(record.kinesis);
+            } else {
+                per_partition_records.insert(record.kinesis.partition_key.clone(), vec![record.kinesis]);
+            }
+        }
+
+        for (partition_key, records) in per_partition_records {
+            match shared_ref.handle_kinesis_data(&partition_key, records).await {
+                Ok(_) => (),
+                Err(err) => log::error!("Failed to parse WoW combat log data: {}", err),
+            }
         }
 
         Ok::<(), SquadOvError>(())
