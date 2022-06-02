@@ -576,7 +576,7 @@ where
             manifest,
             vod: assoc,
             clip: build_es_vod_clip(ex, video_uuid).await?,
-            storage_copies: Some(build_es_vod_storage_copies(ex, video_uuid).await?),
+            storage_copies_exact: Some(build_es_vod_storage_copies(ex, video_uuid).await?),
         }
     )
 }
