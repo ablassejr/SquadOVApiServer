@@ -384,7 +384,7 @@ impl CombatLogReportIO for WowCharacterReportGenerator {
             }
 
             if let Some(loadout) = self.loadouts.get(&self_guid) {
-                report.items = loadout.items.iter().map(|x| { x.item_id as i32 }).collect();
+                report.items = loadout.items.iter().map(|x| { x.ilvl as i32 }).collect();
             }
 
             ret.push(Arc::new(report));
