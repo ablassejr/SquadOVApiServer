@@ -206,7 +206,7 @@ pub struct ESVodDocument {
     pub manifest: VodManifest,
     pub vod: VodAssociation,
     pub clip: Option<ESVodClip>,
-    pub storage_copies: Option<Vec<ESVodCopy>>,
+    pub storage_copies_exact: Option<Vec<ESVodCopy>>,
 }
 
 impl ESVodDocument {

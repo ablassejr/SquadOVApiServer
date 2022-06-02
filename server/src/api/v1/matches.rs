@@ -221,24 +221,24 @@ impl RecentMatchQuery {
                         Query::bool()
                             .must_not(
                                 Query::nested(
-                                    "storageCopies",
-                                    Query::exists("storageCopies")
+                                    "storageCopiesExact",
+                                    Query::exists("storageCopiesExact")
                                 )
                             )
                     )
                     .should(
                         Query::nested(
-                            "storageCopies",
+                            "storageCopiesExact",
                             Query::bool()
-                                .filter(Query::term("storageCopies.loc", 0))
+                                .filter(Query::term("storageCopiesExact.loc", 0))
                         )
                     )
                     .should(
                         Query::nested(
-                            "storageCopies",
+                            "storageCopiesExact",
                             Query::bool()
-                                .filter(Query::term("storageCopies.loc", 1))
-                                .filter(Query::term("storageCopies.spec", machine_id))
+                                .filter(Query::term("storageCopiesExact.loc", 1))
+                                .filter(Query::term("storageCopiesExact.spec", machine_id))
                         )
                     )
             );

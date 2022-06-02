@@ -243,12 +243,12 @@ impl ElasticSearchJobInterface {
         #[derive(Serialize)]
         #[serde(rename_all="camelCase")]
         struct Update {
-            storage_copies: Option<Vec<ESVodCopy>>,
+            storage_copies_exact: Option<Vec<ESVodCopy>>,
         }
 
         let update = ElasticSearchDocUpdate{
             doc: Update{
-                storage_copies: Some(elastic::vod::build_es_vod_storage_copies(&*self.db, video_uuid).await?),
+                storage_copies_exact: Some(elastic::vod::build_es_vod_storage_copies(&*self.db, video_uuid).await?),
             }
         };
 
