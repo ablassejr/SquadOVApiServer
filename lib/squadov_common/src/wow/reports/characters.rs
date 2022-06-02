@@ -146,6 +146,7 @@ impl CombatLogReportHandler for WowCharacterReportGenerator {
                             c.rating = *rating;
                         }
 
+                        self.initialize_loadout(guid)?;
                         if let Some(l) = self.loadouts.get_mut(guid) {
                             l.items = items.iter().map(|x| {
                                 WowItem{
@@ -250,7 +251,10 @@ impl WowCharacterReportGenerator {
                 class_id: None,
             });
         }
+        Ok(())
+    }
 
+    fn initialize_loadout(&mut self, guid: &str) -> Result<(), SquadOvError> {
         if !self.loadouts.contains_key(guid) {
             self.loadouts.insert(guid.to_string(), WowFullCharacter{
                 items: vec![],

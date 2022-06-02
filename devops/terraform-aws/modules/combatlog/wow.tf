@@ -69,6 +69,10 @@ resource "aws_lambda_function" "wow_combat_log_lambda" {
         subnet_ids = var.lambda_subnets
         security_group_ids = var.lambda_security_groups
     }
+
+    layers = [
+        "arn:aws:lambda:us-east-2:580247275435:layer:LambdaInsightsExtension:18"
+    ]
 }
 
 resource "aws_lambda_event_source_mapping" "wow_lambda_kinesis" {

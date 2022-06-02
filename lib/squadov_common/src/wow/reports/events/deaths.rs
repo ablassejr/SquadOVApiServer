@@ -212,6 +212,11 @@ impl<'a> WowDeathEventsReportGenerator<'a> {
     }
 
     fn construct_death_report(&mut self, event_id: i64, guid: &str, ref_time: DateTime<Utc>) -> Result<(), SquadOvError> {
+        // Only generate death reports for players and not random NPCs and what not.
+        if !guid.starts_with("Player-") {
+            return Ok(());
+        }
+
         // We don't want to potentially store a shit ton of events in memory so we flush it all to disk.
         if let Some(dir) = self.work_dir.as_ref() {
             let mut writer = CombatLogAvroFileIO::new(dir.as_str(), &DEATH_RECAP_SCHEMA)?;
@@ -267,7 +272,7 @@ impl<'a> CombatLogReportIO for WowDeathEventsReportGenerator<'a> {
         let mut ret: Vec<Arc<dyn CombatLogReport + Send + Sync>> = vec![];
         for r in self.completed_death_recaps.drain(0..) {
             ret.push(r);
-        }        
+        }
 
         if let Some(w) = self.writer.take() {
             ret.push(

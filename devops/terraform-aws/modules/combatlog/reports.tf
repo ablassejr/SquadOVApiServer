@@ -35,4 +35,8 @@ resource "aws_lambda_function" "combat_log_reports_lambda" {
             "SQUADOV_ES_RABBITMQ_QUEUE" = "squadov_elasticsearch"
         }
     }
+
+    layers = [
+        "arn:aws:lambda:us-east-2:580247275435:layer:LambdaInsightsExtension:18"
+    ]
 }

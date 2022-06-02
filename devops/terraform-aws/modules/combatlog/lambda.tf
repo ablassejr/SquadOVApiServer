@@ -62,6 +62,11 @@ resource "aws_iam_role_policy_attachment" "lambda_basic_attachment" {
     policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_role_policy_attachment" "lambda_insights_policy" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy"
+}
+
 resource "aws_lambda_permission" "lambda_combatlog_bucket_permissions" {
     action        = "lambda:InvokeFunction"
     function_name = aws_lambda_function.combat_log_reports_lambda.arn
