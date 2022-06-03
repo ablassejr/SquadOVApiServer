@@ -277,22 +277,23 @@ impl ElasticSearchJobInterface {
     pub async fn handle_sync_vod(&self, video_uuid: &[Uuid]) -> Result<(), SquadOvError> {
         // TODO: Actually batch?
         for id in video_uuid {
-            if let Ok(doc) = elastic::vod::build_es_vod_document(&*self.db, id, self.cl_itf.as_ref().unwrap().clone()).await {
-                self.es_client.as_ref().unwrap().add_or_update_document(&self.esconfig.as_ref().unwrap().vod_index_write, id.to_string().as_str(), serde_json::to_value(doc)?).await?;
+            match elastic::vod::build_es_vod_document(&*self.db, id, self.cl_itf.as_ref().unwrap().clone()).await {
+                Ok(doc) => {
+                    self.es_client.as_ref().unwrap().add_or_update_document(&self.esconfig.as_ref().unwrap().vod_index_write, id.to_string().as_str(), serde_json::to_value(doc)?).await?;
 
-                // Actually remember when we last sync'd this data.
-                sqlx::query!(
-                    "
-                    UPDATE squadov.vods
-                    SET last_sync_elasticsearch = NOW()
-                    WHERE video_uuid = $1
-                    ",
-                    id,
-                )
-                    .execute(&*self.db)
-                    .await?;
-            } else {
-                log::warn!("Failed to build ES vod document: {}", id);
+                    // Actually remember when we last sync'd this data.
+                    sqlx::query!(
+                        "
+                        UPDATE squadov.vods
+                        SET last_sync_elasticsearch = NOW()
+                        WHERE video_uuid = $1
+                        ",
+                        id,
+                    )
+                        .execute(&*self.db)
+                        .await?;
+                },
+                Err(err) => log::warn!("Failed to build ES vod document: {} - {}", id, err),
             }
         }
         Ok(())

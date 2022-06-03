@@ -39,7 +39,7 @@ if __name__ == '__main__':
             'routing_key={}'.format(args.queue),
             'payload={}'.format(
                 json.dumps({
-                    'type': 'UpdateVodCopies',
+                    'type': 'SyncVod',
                     'video_uuid': sub,
                 })
             )

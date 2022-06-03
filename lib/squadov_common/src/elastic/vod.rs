@@ -470,10 +470,15 @@ where
                     // For every combatant, grab their loadout reports.
                     let mut ret_wrappers = vec![];
                     for c in combatants {
-                        ret_wrappers.push(WowCharacterWrapper{
-                            traits: cl_itf.get_report_json::<WowFullCharacter>(&combat_log_partition_id, WowReportTypes::CharacterLoadout as i32, &format!("{}.json", &c.unit_guid)).await?,
-                            data: c.into(),
-                        });
+                        match cl_itf.get_report_json::<WowFullCharacter>(&combat_log_partition_id, WowReportTypes::CharacterLoadout as i32, &format!("{}.json", &c.unit_guid)).await {
+                            Ok(traits) => {
+                                ret_wrappers.push(WowCharacterWrapper{
+                                    traits: traits,
+                                    data: c.into(),
+                                });
+                            },
+                            Err(err) => log::warn!("Skipping combatant {} - {}", &c.unit_guid, err),
+                        }
                     }
 
                     if let Some(encounter) = encounter.as_mut() {
