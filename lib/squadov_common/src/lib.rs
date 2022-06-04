@@ -51,6 +51,7 @@ pub mod zendesk;
 pub mod ff14;
 pub mod combatlog;
 pub mod elastic;
+pub mod stripe;
 
 pub use error::*;
 pub use parse::*;

@@ -87,6 +87,7 @@ use squadov_common::{
         rabbitmq::ElasticSearchJobInterface,
     },
     combatlog::interface::CombatLogInterface,
+    stripe::{StripeApiClient, StripeApiConfig},
 };
 use url::Url;
 use std::vec::Vec;
@@ -268,6 +269,7 @@ pub struct ApiConfig {
     pub zendesk: ZendeskConfig,
     pub combatlog: CombatLogConfig,
     pub elasticsearch: ElasticSearchConfig,
+    pub stripe: StripeApiConfig,
 }
 
 impl CommonConfig for DatabaseConfig {
@@ -329,6 +331,7 @@ pub struct ApiApplication {
     pub es_api: Arc<ElasticSearchClient>,
     pub cl_itf: Arc<CombatLogInterface>,
     pub rabbitmq: Arc<RabbitMqInterface>,
+    pub stripe: Arc<StripeApiClient>,
 }
 
 impl ApiApplication {
@@ -610,6 +613,7 @@ impl ApiApplication {
             es_api,
             cl_itf,
             rabbitmq,
+            stripe: Arc::new(StripeApiClient::new(&config.stripe)),
         };
 
         app.create_vod_manager(&config.storage.vods.global).await.unwrap();

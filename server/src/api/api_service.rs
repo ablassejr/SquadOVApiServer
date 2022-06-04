@@ -108,6 +108,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                     web::scope("/link/{link_id}")
                         .route("", web::get().to(v1::get_public_invite_link_data_handler))
                 )
+                .service(
+                    web::scope("/subscription")
+                        .route("/pricing", web::get().to(v1::get_subscription_pricing_handler))
+                )
         )
         .service(
             web::scope("/profile")
