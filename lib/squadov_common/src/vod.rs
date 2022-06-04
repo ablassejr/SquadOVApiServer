@@ -502,6 +502,9 @@ impl VodProcessingInterface {
         log::info!("[Clip] Mark Executed - {}", request.id);
         db::mark_staged_clip_executed(&mut tx, request.id, &clip_uuid).await?;
 
+        log::info!("[Clip] Mark VOD Copy - {}", request.id);
+        db::bulk_sync_vod_copies(&mut tx, &[clip_uuid.clone()], VodCopyLocation::Cloud, &metadata.bucket).await?;
+
         log::info!("[Clip] TX (Commit) - {}", request.id);
         tx.commit().await?;
 

@@ -530,14 +530,14 @@ pub async fn get_profile_clips_handler(app : web::Data<Arc<api::ApiApplication>>
     get_recent_clips_for_user(path.profile_id, app, &request, page, query, filter, true, machine_id).await
 }
 
-pub async fn get_clip_handler(app : web::Data<Arc<api::ApiApplication>>, pth: web::Path<ClipPathInput>, request : HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_clip_handler(app : web::Data<Arc<api::ApiApplication>>, pth: web::Path<ClipPathInput>, request : HttpRequest, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
     let extensions = request.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    let clips = app.get_vod_clip_from_clip_uuids(&[pth.clip_uuid.clone()], session.user.id, &machine_id.id).await?;
+    let clips = app.get_vod_clip_from_clip_uuids(&[pth.clip_uuid.clone()], session.user.id, machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str() ).await?;
 
     if clips.is_empty() {
         Err(SquadOvError::NotFound)
