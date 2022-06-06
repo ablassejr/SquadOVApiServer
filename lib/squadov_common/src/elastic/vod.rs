@@ -513,7 +513,12 @@ where
                         }).collect();
                     }
 
-                    ret_wrappers
+                    // If one character has items, then EVERY character must have items.
+                    if ret_wrappers.iter().any(|x| { !x.traits.items.is_empty() }) {
+                        ret_wrappers.into_iter().filter(|x| { !x.traits.items.is_empty() }).collect()
+                    } else {
+                        ret_wrappers
+                    }
                 } else {
                     let characters = wc::list_wow_characters_for_match(ex, &match_uuid, owner.id).await?;
                     let mut ret_wrappers = vec![];
