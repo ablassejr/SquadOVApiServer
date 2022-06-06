@@ -37,43 +37,76 @@ impl CombatLogReport for WowUserCharacterCacheReport {
     }
 
     async fn store_dynamic_report(&self, tx: &mut Transaction<'_, Postgres>) -> Result<(), SquadOvError> {
-        sqlx::query!(
-            "
-            INSERT INTO squadov.wow_user_character_cache (
-                user_id,
-                unit_guid,
-                unit_name,
-                spec_id,
-                class_id,
-                items,
-                cache_time,
-                build_version
-            ) VALUES (
-                $1,
-                $2,
-                $3,
-                $4,
-                $5,
-                $6,
-                NOW(),
-                $7
-            ) ON CONFLICT (user_id, unit_guid) DO UPDATE SET
-                unit_name = EXCLUDED.unit_name,
-                class_id = EXCLUDED.class_id,
-                spec_id = EXCLUDED.spec_id,
-                items = EXCLUDED.items,
-                build_version = EXCLUDED.build_version
-            ",
-            &self.user_id,
-            &self.unit_guid,
-            &self.unit_name,
-            &self.spec_id,
-            self.class_id,
-            &self.items,
-            &self.build_version,
-        )
-            .execute(tx)
-            .await?;
+        if self.items.is_empty() {
+            // In this case, we didn't get full combatant information. Only update basic information (player name).
+            sqlx::query!(
+                "
+                INSERT INTO squadov.wow_user_character_cache (
+                    user_id,
+                    unit_guid,
+                    unit_name,
+                    class_id,
+                    cache_time,
+                    build_version
+                ) VALUES (
+                    $1,
+                    $2,
+                    $3,
+                    $4,
+                    NOW(),
+                    $5
+                ) ON CONFLICT (user_id, unit_guid) DO UPDATE SET
+                    unit_name = EXCLUDED.unit_name,
+                    class_id = EXCLUDED.class_id,
+                    build_version = EXCLUDED.build_version
+                ",
+                &self.user_id,
+                &self.unit_guid,
+                &self.unit_name,
+                self.class_id,
+                &self.build_version,
+            )
+                .execute(tx)
+                .await?;
+        } else {
+            sqlx::query!(
+                "
+                INSERT INTO squadov.wow_user_character_cache (
+                    user_id,
+                    unit_guid,
+                    unit_name,
+                    spec_id,
+                    class_id,
+                    items,
+                    cache_time,
+                    build_version
+                ) VALUES (
+                    $1,
+                    $2,
+                    $3,
+                    $4,
+                    $5,
+                    $6,
+                    NOW(),
+                    $7
+                ) ON CONFLICT (user_id, unit_guid) DO UPDATE SET
+                    unit_name = EXCLUDED.unit_name,
+                    class_id = EXCLUDED.class_id,
+                    spec_id = EXCLUDED.spec_id,
+                    items = EXCLUDED.items,
+                    build_version = EXCLUDED.build_version
+                ",
+                &self.user_id,
+                &self.unit_guid,
+                &self.unit_name,
+                &self.spec_id,
+                self.class_id,
+                &self.items,
+                &self.build_version,
+            )
+                .execute(tx)
+                .await?;
+        }
         Ok(())
     }
 }
