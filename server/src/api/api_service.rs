@@ -331,6 +331,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                                 .route(web::delete().to(v1::remove_local_storage_handler))
                                         )
                                 )
+                                .service(
+                                    web::scope("/subscription")
+                                        .route("/checkout", web::get().to(v1::start_subscription_checkout_handler))
+                                )
                         )
                         .service(
                             web::scope("/{user_id}")

@@ -13,12 +13,21 @@ use std::str::FromStr;
 use squadov_common::{
     SquadOvError,
     stripe::{
-        product::StripeListAllProductRequest,
+        product::{
+            StripeListAllProductRequest,
+            StripeSearchProductsRequest,
+        },
         price::{
             ListAllPricesRequest,
             StripeRecurring,
             StripeRecurringInterval,
         },
+        checkout::{
+            StripeCreateSessionRequest,
+            StripeCheckoutSessionMode,
+            StripeCheckoutLineItem,
+            StripeCheckoutDiscount,
+        }
     },
     subscriptions::{
         SquadOvFullPricingInfo,
@@ -87,4 +96,60 @@ pub async fn get_subscription_pricing_handler(app : web::Data<Arc<api::ApiApplic
     Ok(HttpResponse::Ok().json(
         get_subscription_pricing(app.get_ref().clone(), session.map(|x| { x.user.id }), query.annual).await?
     ))
+}
+
+#[derive(Deserialize)]
+pub struct CheckoutQuery {
+    pub tier: SquadOvSubTiers,
+    pub annual: bool,
+}
+
+pub async fn start_subscription_checkout_handler(app : web::Data<Arc<api::ApiApplication>>, session: SquadOVSession, query: web::Query<CheckoutQuery>) -> Result<HttpResponse, SquadOvError> {
+    // Check for any user discounts here.
+
+
+    let mut products = app.stripe.search_products(StripeSearchProductsRequest{
+        active: Some(true),
+        metadata: Some(HashMap::from([
+            ("tier".to_string(), format!("{}", query.tier))
+        ]))
+    }).await?;
+
+    if let Some(p) = products.data.pop() {
+        let mut pricing = app.stripe.list_all_prices(ListAllPricesRequest{
+            product: Some(p.id.clone()),
+            recurring: Some(StripeRecurring{
+                interval: Some(
+                    if query.annual {
+                        StripeRecurringInterval::Year
+                    } else {
+                        StripeRecurringInterval::Month
+                    }
+                )
+            })
+        }).await?;
+
+        if let Some(price) = pricing.data.pop() {
+            // Now we have the product + price + any potential discounts we want to apply.
+            // We can go ahead and create the Stripe checkout session.
+            let session = app.stripe.create_a_session(StripeCreateSessionRequest{
+                cancel_url: format!("{}/subscription?success=0&tier={}&annual={}", &app.config.squadov.app_url, &query.tier, query.annual),
+                success_url: format!("{}/subscription?success=1&tier={}&annual={}", &app.config.squadov.app_url, &query.tier, query.annual),
+                mode: StripeCheckoutSessionMode::Subscription,
+                line_items: vec![
+                    StripeCheckoutLineItem{
+                        price: price.id,
+                        quantity: Some(1),
+                    }
+                ],
+                discounts: vec![],
+            }).await?;
+
+            Ok(HttpResponse::Ok().json(session.url))
+        } else {
+            Err(SquadOvError::NotFound)
+        }
+    } else {
+        Err(SquadOvError::NotFound)
+    }
 }

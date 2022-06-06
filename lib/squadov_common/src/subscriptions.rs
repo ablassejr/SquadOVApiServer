@@ -1,4 +1,4 @@
-use serde::{Serializer, Serialize};
+use serde::{Serializer, Serialize, Deserialize, Deserializer, de::Error};
 use chrono::{DateTime, Utc};
 use sqlx::{Executor, Postgres};
 use std::collections::HashMap;
@@ -89,6 +89,20 @@ impl Serialize for SquadOvSubTiers {
         S: Serializer,
     {
         serializer.serialize_str(&format!("{}", self))
+    }
+}
+
+impl<'de> Deserialize<'de> for SquadOvSubTiers {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(
+            match SquadOvSubTiers::from_str(s.to_uppercase().as_str()) {
+                Ok(x) => x,
+                Err(_) => return Err(D::Error::custom("Invalid")),
+            }
+        )
     }
 }
 

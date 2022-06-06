@@ -54,6 +54,7 @@ pub struct StripeRecurring {
 
 #[derive(Deserialize)]
 pub struct StripePrice {
+    pub id: String,
     pub unit_amount: i64,
     pub recurring: Option<StripeRecurring>,
 }
