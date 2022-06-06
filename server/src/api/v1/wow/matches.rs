@@ -17,10 +17,6 @@ use squadov_common::{
     WowInstanceType,
     matches::{
         self,
-        MatchPlayerPair,
-    },
-    wow::{
-        matches as wm,
     },
     generate_combatants_key,
     generate_combatants_hashed_array,
@@ -386,17 +382,15 @@ impl api::ApiApplication {
                 Sort::new("vod.endTime")
                     .order(SortOrder::Desc)
             ]);
-        let pairs: Vec<_> = self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
+        Ok(
+            self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
                 .into_iter()
+                .filter(|x| { x.data.wow.is_some() && x.data.wow.as_ref().unwrap().challenge.is_some() })
                 .map(|x| {
-                    MatchPlayerPair{
-                        match_uuid: x.data.match_uuid.unwrap_or(Uuid::new_v4()),
-                        player_uuid: x.owner.uuid,
-                    }
+                    x.data.wow.unwrap().encounter.unwrap()
                 })
-                .collect();
-
-        Ok(wm::list_wow_encounter_for_uuids(&*self.heavy_pool, &pairs).await?)
+                .collect()
+        )
     }
 
     async fn list_wow_challenges_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery, machine_id: &str) -> Result<Vec<WoWChallenge>, SquadOvError> {
@@ -436,16 +430,15 @@ impl api::ApiApplication {
                 Sort::new("vod.endTime")
                     .order(SortOrder::Desc)
             ]);
-        let pairs: Vec<_> = self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
+        Ok(
+            self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
                 .into_iter()
+                .filter(|x| { x.data.wow.is_some() && x.data.wow.as_ref().unwrap().challenge.is_some() })
                 .map(|x| {
-                    MatchPlayerPair{
-                        match_uuid: x.data.match_uuid.unwrap_or(Uuid::new_v4()),
-                        player_uuid: x.owner.uuid,
-                    }
+                    x.data.wow.unwrap().challenge.unwrap()
                 })
-                .collect();
-        Ok(wm::list_wow_challenges_for_uuids(&*self.heavy_pool, &pairs).await?)
+                .collect()
+        )
     }
 
     async fn list_wow_arenas_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery, machine_id: &str) -> Result<Vec<WoWArena>, SquadOvError> {
@@ -486,16 +479,15 @@ impl api::ApiApplication {
                     .order(SortOrder::Desc)
             ]);
 
-        let pairs: Vec<_> = self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
+        Ok(
+            self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
                 .into_iter()
+                .filter(|x| { x.data.wow.is_some() && x.data.wow.as_ref().unwrap().arena.is_some() })
                 .map(|x| {
-                    MatchPlayerPair{
-                        match_uuid: x.data.match_uuid.unwrap_or(Uuid::new_v4()),
-                        player_uuid: x.owner.uuid,
-                    }
+                    x.data.wow.unwrap().arena.unwrap()
                 })
-                .collect();
-        Ok(wm::list_wow_arenas_for_uuids(&*self.heavy_pool, &pairs).await?)
+                .collect()
+        )
     }
 
     async fn list_wow_instances_for_character(&self, character_guid: &str, user_id: i64, req_user_id: i64, start: i64, end: i64, filters: &WowListQuery, machine_id: &str) -> Result<Vec<WowInstance>, SquadOvError> {
@@ -535,16 +527,16 @@ impl api::ApiApplication {
                 Sort::new("vod.endTime")
                     .order(SortOrder::Desc)
             ]);
-        let pairs: Vec<_> = self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
+
+        Ok(
+            self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
                 .into_iter()
+                .filter(|x| { x.data.wow.is_some() && x.data.wow.as_ref().unwrap().instance.is_some() })
                 .map(|x| {
-                    MatchPlayerPair{
-                        match_uuid: x.data.match_uuid.unwrap_or(Uuid::new_v4()),
-                        player_uuid: x.owner.uuid,
-                    }
+                    x.data.wow.unwrap().instance.unwrap()
                 })
-                .collect();
-        Ok(wm::list_wow_instances_for_uuids(&*self.heavy_pool, &pairs).await?)
+                .collect()
+        )
     }
 
     pub async fn get_wow_match_view_owner(&self, view_uuid: &Uuid) -> Result<i64, SquadOvError> {
