@@ -18,6 +18,7 @@ use squadov_common::{
                 WowCombatantReport,
             },
         },
+        WoWCharacter,
     },
 };
 use uuid::Uuid;
@@ -164,12 +165,20 @@ pub async fn list_wow_characters_for_user_handler(app : web::Data<Arc<api::ApiAp
 
 pub async fn list_wow_characters_for_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>) -> Result<HttpResponse, SquadOvError> {
     let chars = if let Some(combat_log_partition_id) = matches::get_generic_wow_match_view_from_match_user(&*app.pool, &path.match_uuid, path.user_id).await?.combat_log_partition_id {
-        app.cl_itf.get_report_avro::<WowCombatantReport>(&combat_log_partition_id, WowReportTypes::MatchCombatants as i32, "combatants.avro").await?.into_iter().map(|x| {
+        let chars: Vec<WoWCharacter> = app.cl_itf.get_report_avro::<WowCombatantReport>(&combat_log_partition_id, WowReportTypes::MatchCombatants as i32, "combatants.avro").await?.into_iter().map(|x| {
             x.into()
-        }).collect()
+        }).collect();
+
+        if chars.iter().any(|x| { x.ilvl > 0 }) {
+            // If one combatant has and ilvl then that means we need to filter all the other useless chars that don't have an ilvl.
+            chars.into_iter().filter(|x| { x.ilvl > 0 }).collect()
+        } else {
+            chars
+        }
     } else {
         characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?
     };
+
     Ok(HttpResponse::Ok().json(chars))
 }
 

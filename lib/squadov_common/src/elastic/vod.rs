@@ -470,15 +470,20 @@ where
                     // For every combatant, grab their loadout reports.
                     let mut ret_wrappers = vec![];
                     for c in combatants {
-                        match cl_itf.get_report_json::<WowFullCharacter>(&combat_log_partition_id, WowReportTypes::CharacterLoadout as i32, &format!("{}.json", &c.unit_guid)).await {
-                            Ok(traits) => {
-                                ret_wrappers.push(WowCharacterWrapper{
-                                    traits: traits,
-                                    data: c.into(),
-                                });
+                        let loadout = match cl_itf.get_report_json::<WowFullCharacter>(&combat_log_partition_id, WowReportTypes::CharacterLoadout as i32, &format!("{}.json", &c.unit_guid)).await {
+                            Ok(traits) => traits,
+                            Err(_) => WowFullCharacter{
+                                items: vec![],
+                                covenant: None,
+                                talents: vec![],
+                                pvp_talents: vec![],
                             },
-                            Err(err) => log::warn!("Skipping combatant {} - {}", &c.unit_guid, err),
-                        }
+                        };
+
+                        ret_wrappers.push(WowCharacterWrapper{
+                            traits: loadout,
+                            data: c.into(),
+                        });
                     }
 
                     if let Some(encounter) = encounter.as_mut() {
@@ -508,7 +513,12 @@ where
                         }).collect();
                     }
 
-                    ret_wrappers
+                    // If one character has items, then EVERY character must have items.
+                    if ret_wrappers.iter().any(|x| { !x.traits.items.is_empty() }) {
+                        ret_wrappers.into_iter().filter(|x| { !x.traits.items.is_empty() }).collect()
+                    } else {
+                        ret_wrappers
+                    }
                 } else {
                     let characters = wc::list_wow_characters_for_match(ex, &match_uuid, owner.id).await?;
                     let mut ret_wrappers = vec![];
