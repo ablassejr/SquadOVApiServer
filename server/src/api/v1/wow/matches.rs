@@ -479,7 +479,6 @@ impl api::ApiApplication {
                     .order(SortOrder::Desc)
             ]);
 
-        log::info!("es: {}", serde_json::to_string_pretty(&es_search)?);
         Ok(
             self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
                 .into_iter()
