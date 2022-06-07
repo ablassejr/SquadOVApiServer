@@ -598,7 +598,7 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
             start: current_end,
             end: current_end + 20,
         })
-    })?)) 
+    })?))
 }
 
 pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, query: web::Query<api::PaginationParameters>, filter: web::Json<RecentMatchQuery>, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {

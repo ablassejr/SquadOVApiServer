@@ -1530,9 +1530,15 @@ pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::
         &machine_id.id,
     ).await?;
 
-    let expected_total = query.end - query.start;
-    let got_total = encounters.len() as i64;
-    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(encounters, &req, &query, expected_total == got_total)?))
+    let no_videos_left = encounters.is_empty();
+    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response_with_next(encounters, &req, &query, if no_videos_left {
+        None
+    } else {
+        Some(api::PaginationParameters{
+            start: query.end,
+            end: query.end + 20,
+        })
+    })?))
 }
 
 pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
@@ -1550,9 +1556,15 @@ pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::
         &machine_id.id,
     ).await?;
 
-    let expected_total = query.end - query.start;
-    let got_total = challenges.len() as i64;
-    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(challenges, &req, &query, expected_total == got_total)?))
+    let no_videos_left = challenges.is_empty();
+    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response_with_next(challenges, &req, &query, if no_videos_left {
+        None
+    } else {
+        Some(api::PaginationParameters{
+            start: query.end,
+            end: query.end + 20,
+        })
+    })?))
 }
 
 pub async fn list_wow_arenas_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
@@ -1570,9 +1582,15 @@ pub async fn list_wow_arenas_for_character_handler(app : web::Data<Arc<api::ApiA
         &machine_id.id,
     ).await?;
 
-    let expected_total = query.end - query.start;
-    let got_total = challenges.len() as i64;
-    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(challenges, &req, &query, expected_total == got_total)?))
+    let no_videos_left = challenges.is_empty();
+    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response_with_next(challenges, &req, &query, if no_videos_left {
+        None
+    } else {
+        Some(api::PaginationParameters{
+            start: query.end,
+            end: query.end + 20,
+        })
+    })?))
 }
 
 pub async fn list_wow_instances_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
@@ -1590,9 +1608,15 @@ pub async fn list_wow_instances_for_character_handler(app : web::Data<Arc<api::A
         &machine_id.id,
     ).await?;
 
-    let expected_total = query.end - query.start;
-    let got_total = instances.len() as i64;
-    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response(instances, &req, &query, expected_total == got_total)?))
+    let no_videos_left = instances.is_empty();
+    Ok(HttpResponse::Ok().json(api::construct_hal_pagination_response_with_next(instances, &req, &query, if no_videos_left {
+        None
+    } else {
+        Some(api::PaginationParameters{
+            start: query.end,
+            end: query.end + 20,
+        })
+    })?))
 }
 
 pub async fn get_wow_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWUserMatchPath>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
