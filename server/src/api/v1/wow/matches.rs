@@ -377,7 +377,7 @@ impl api::ApiApplication {
     
         let es_search = filter.to_es_search(req_user_id, Some(&machine_id), false)
             .from(start)
-            .size(end)
+            .size(end-start)
             .sort(vec![
                 Sort::new("vod.endTime")
                     .order(SortOrder::Desc)
@@ -385,7 +385,7 @@ impl api::ApiApplication {
         Ok(
             self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
                 .into_iter()
-                .filter(|x| { x.data.wow.is_some() && x.data.wow.as_ref().unwrap().challenge.is_some() })
+                .filter(|x| { x.data.wow.is_some() && x.data.wow.as_ref().unwrap().encounter.is_some() })
                 .map(|x| {
                     x.data.wow.unwrap().encounter.unwrap()
                 })
@@ -425,7 +425,7 @@ impl api::ApiApplication {
     
         let es_search = filter.to_es_search(req_user_id, Some(&machine_id), false)
             .from(start)
-            .size(end)
+            .size(end-start)
             .sort(vec![
                 Sort::new("vod.endTime")
                     .order(SortOrder::Desc)
@@ -473,12 +473,13 @@ impl api::ApiApplication {
     
         let es_search = filter.to_es_search(req_user_id, Some(&machine_id), false)
             .from(start)
-            .size(end)
+            .size(end-start)
             .sort(vec![
                 Sort::new("vod.endTime")
                     .order(SortOrder::Desc)
             ]);
 
+        log::info!("es: {}", serde_json::to_string_pretty(&es_search)?);
         Ok(
             self.es_api.search_documents::<ESVodDocument>(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?
                 .into_iter()
@@ -522,7 +523,7 @@ impl api::ApiApplication {
     
         let es_search = filter.to_es_search(req_user_id, Some(&machine_id), false)
             .from(start)
-            .size(end)
+            .size(end-start)
             .sort(vec![
                 Sort::new("vod.endTime")
                     .order(SortOrder::Desc)
