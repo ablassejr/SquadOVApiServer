@@ -83,6 +83,29 @@ impl FromStr for SquadOvSubTiers {
     }
 }
 
+pub async fn get_user_sub_tier<'a, T>(ex: T, user_id: i64) -> Result<SquadOvSubTiers, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT tier
+            FROM squadov.user_subscription_tier
+            WHERE user_id = $1
+            ",
+            user_id
+        )
+            .fetch_optional(ex)
+            .await?
+            .map(|x| {
+                SquadOvSubTiers::from_str(&x.tier).unwrap_or(SquadOvSubTiers::Basic)
+            })
+            .unwrap_or(SquadOvSubTiers::Basic)
+    )
+}
+
+
 impl Serialize for SquadOvSubTiers {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

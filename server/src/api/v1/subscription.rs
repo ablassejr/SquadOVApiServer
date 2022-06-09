@@ -31,6 +31,7 @@ use squadov_common::{
         StripeApiClient,
     },
     subscriptions::{
+        self,
         SquadOvFullPricingInfo,
         SquadOvSubTiers,
         SquadOvDiscount,
@@ -61,7 +62,6 @@ async fn get_largest_discount_for_user(app: Arc<api::ApiApplication>, stripe: Ar
         .map(|x| { x.coupon })
         .collect();
 
-    log::info!("user id: {} - {:?}", user_id, &user_discounts);
     // If multiple coupons are relevant here, get the one with the largest discount.
     // Assume we only use percentage discounts here.
     let mut highest_discount: Option<SquadOvDiscount> = None;
@@ -84,7 +84,6 @@ async fn get_largest_discount_for_user(app: Arc<api::ApiApplication>, stripe: Ar
         }
     }
 
-    log::info!("discount: {:?}" , &highest_discount);
     Ok(
         if let Some(hd) = highest_discount {
             vec![hd]
@@ -105,7 +104,6 @@ async fn get_subscription_pricing(app : Arc<api::ApiApplication>, user_id: Optio
         active: Some(true),
     }).await?;
 
-    log::info!("get sub pricing for : {:?} {}", user_id, annual);
     let mut info = SquadOvFullPricingInfo{
         pricing: HashMap::new(),
         discounts: if let Some(user_id) = user_id { get_largest_discount_for_user(app.clone(), app.stripe.clone(), user_id).await? } else { vec![] },
@@ -212,4 +210,10 @@ pub async fn start_subscription_checkout_handler(app : web::Data<Arc<api::ApiApp
     } else {
         Err(SquadOvError::NotFound)
     }
+}
+
+pub async fn get_user_tier_handler(app : web::Data<Arc<api::ApiApplication>>, session: SquadOVSession) -> Result<HttpResponse, SquadOvError> {
+    Ok(HttpResponse::Ok().json(
+        subscriptions::get_user_sub_tier(&*app.pool, session.user.id).await?
+    ))
 }

@@ -335,6 +335,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                                 .service(
                                     web::scope("/subscription")
                                         .route("/checkout", web::get().to(v1::start_subscription_checkout_handler))
+                                        .route("/tier", web::get().to(v1::get_user_tier_handler))
                                 )
                         )
                         .service(
