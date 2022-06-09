@@ -116,8 +116,8 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn find_vod_from_match_user_id_handler(data : web::Path<VodMatchFindFromMatchUserId>, app : web::Data<Arc<api::ApiApplication>>, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
-    let assoc = app.find_vod_from_match_user_id(data.match_uuid, data.user_id, &machine_id.id).await?;
+pub async fn find_vod_from_match_user_id_handler(data : web::Path<VodMatchFindFromMatchUserId>, app : web::Data<Arc<api::ApiApplication>>, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
+    let assoc = app.find_vod_from_match_user_id(data.match_uuid, data.user_id, machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str()).await?;
     match assoc {
         Some(x) => Ok(HttpResponse::Ok().json(&x)),
         None => Err(SquadOvError::NotFound),

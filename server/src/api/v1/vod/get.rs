@@ -233,8 +233,8 @@ pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>,
     ))
 }
 
-pub async fn get_vod_association_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<Arc<api::ApiApplication>>, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
-    let mut assocs = app.find_vod_associations(&[data.video_uuid.clone()], &machine_id.id).await?;
+pub async fn get_vod_association_handler(data : web::Path<VodFindFromVideoUuid>, app : web::Data<Arc<api::ApiApplication>>, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
+    let mut assocs = app.find_vod_associations(&[data.video_uuid.clone()], machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str()).await?;
     Ok(HttpResponse::Ok().json(assocs.remove(&data.video_uuid).ok_or(SquadOvError::NotFound)?))
 }
 

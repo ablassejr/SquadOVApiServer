@@ -81,13 +81,13 @@ pub async fn create_new_custom_match_event_handler(app : web::Data<Arc<ApiApplic
     Ok(HttpResponse::NoContent().finish())
 }
 
-pub async fn get_accessible_match_custom_events_handler(app : web::Data<Arc<ApiApplication>>, match_path: web::Path<GenericMatchPathInput>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_accessible_match_custom_events_handler(app : web::Data<Arc<ApiApplication>>, match_path: web::Path<GenericMatchPathInput>, req: HttpRequest, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
     // Use the 'find_accessible_vods_in_match_for_user' since that already takes care of all the sharing stuff.
     // This way sharing VODs is equivalent to sharing custom events (for better or worse).
-    let vods = vdb::find_accessible_vods_in_match_for_user(&*app.pool, &match_path.match_uuid, session.user.id, &machine_id.id).await?;
+    let vods = vdb::find_accessible_vods_in_match_for_user(&*app.pool, &match_path.match_uuid, session.user.id, machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str()).await?;
     let user_uuids: Vec<Uuid> = vods.iter()
         .filter(|x| { x.user_uuid.is_some() })
         .map(|x| { x.user_uuid.unwrap().clone() })

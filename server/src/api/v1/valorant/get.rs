@@ -128,7 +128,7 @@ struct ValorantUserAccessibleVodOutput {
     pub user_mapping: HashMap<Uuid, String>
 }
 
-pub async fn get_valorant_match_user_accessible_vod_handler(data: web::Path<GenericMatchPathInput>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_valorant_match_user_accessible_vod_handler(data: web::Path<GenericMatchPathInput>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
@@ -138,7 +138,7 @@ pub async fn get_valorant_match_user_accessible_vod_handler(data: web::Path<Gene
     // We need to get a list of VOD information for each player in the match filtered by
     // the users that the input user has access to. We assume that the ACL on the user_id is
     // appropriate and taken care of externally.
-    let vods = vdb::find_accessible_vods_in_match_for_user(&*app.pool, &data.match_uuid, session.user.id, &machine_id.id).await?;
+    let vods = vdb::find_accessible_vods_in_match_for_user(&*app.pool, &data.match_uuid, session.user.id, machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str()).await?;
 
     // Note that for each VOD we also need to figure out the mapping from user uuid to puuid.
     let user_uuids: Vec<Uuid> = vods.iter()

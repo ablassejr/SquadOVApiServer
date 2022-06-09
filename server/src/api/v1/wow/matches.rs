@@ -1515,7 +1515,7 @@ pub async fn finish_wow_arena_handler(app : web::Data<Arc<api::ApiApplication>>,
     Err(SquadOvError::InternalError(String::from("Too many errors in finishing WoW arena...Retry limit reached.")))
 }
 
-pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
@@ -1527,7 +1527,7 @@ pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::
         query.start,
         query.end,
         &filters,
-        &machine_id.id,
+        machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str(),
     ).await?;
 
     let no_videos_left = encounters.is_empty();
@@ -1541,7 +1541,7 @@ pub async fn list_wow_encounters_for_character_handler(app : web::Data<Arc<api::
     })?))
 }
 
-pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
     
@@ -1553,7 +1553,7 @@ pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::
         query.start,
         query.end,
         &filters,
-        &machine_id.id,
+        machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str(),
     ).await?;
 
     let no_videos_left = challenges.is_empty();
@@ -1567,7 +1567,7 @@ pub async fn list_wow_challenges_for_character_handler(app : web::Data<Arc<api::
     })?))
 }
 
-pub async fn list_wow_arenas_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_wow_arenas_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
@@ -1579,7 +1579,7 @@ pub async fn list_wow_arenas_for_character_handler(app : web::Data<Arc<api::ApiA
         query.start,
         query.end,
         &filters,
-        &machine_id.id,
+        machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str(),
     ).await?;
 
     let no_videos_left = challenges.is_empty();
@@ -1593,7 +1593,7 @@ pub async fn list_wow_arenas_for_character_handler(app : web::Data<Arc<api::ApiA
     })?))
 }
 
-pub async fn list_wow_instances_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_wow_instances_for_character_handler(app : web::Data<Arc<api::ApiApplication>>, query: web::Query<api::PaginationParameters>, filters: web::Json<WowListQuery>, path: web::Path<super::WoWUserCharacterPath>, req: HttpRequest, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
@@ -1605,7 +1605,7 @@ pub async fn list_wow_instances_for_character_handler(app : web::Data<Arc<api::A
         query.start,
         query.end,
         &filters,
-        &machine_id.id,
+        machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str(),
     ).await?;
 
     let no_videos_left = instances.is_empty();
@@ -1663,13 +1663,13 @@ struct WowUserAccessibleVodOutput {
     pub user_to_id: HashMap<Uuid, i64>
 }
 
-pub async fn list_wow_vods_for_squad_in_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+pub async fn list_wow_vods_for_squad_in_match_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<GenericMatchPathInput>, req: HttpRequest, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
-    let vods = vdb::find_accessible_vods_in_match_for_user(&*app.pool, &path.match_uuid, session.user.id, &machine_id.id).await?;
+    let vods = vdb::find_accessible_vods_in_match_for_user(&*app.pool, &path.match_uuid, session.user.id, machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str()).await?;
 
     // Note that for each VOD we also need to figure out the mapping from user uuid to puuid.
     let user_uuids: Vec<Uuid> = vods.iter()

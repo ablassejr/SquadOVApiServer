@@ -311,13 +311,13 @@ struct HearthstoneUserAccessibleVodOutput {
 }
 
 
-pub async fn get_hearthstone_match_user_accessible_vod_handler(data: web::Path<GenericMatchPathInput>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, squadov_common::SquadOvError> {
+pub async fn get_hearthstone_match_user_accessible_vod_handler(data: web::Path<GenericMatchPathInput>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, squadov_common::SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
-    let vods = vdb::find_accessible_vods_in_match_for_user(&*app.pool, &data.match_uuid, session.user.id, &machine_id.id).await?;
+    let vods = vdb::find_accessible_vods_in_match_for_user(&*app.pool, &data.match_uuid, session.user.id, machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str()).await?;
 
     let user_uuids: Vec<Uuid> = vods.iter()
         .filter(|x| { x.user_uuid.is_some() })
