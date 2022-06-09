@@ -77,6 +77,7 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
         .service(
             // TODO: More generic signature verification here?
             web::scope("/public")
+                .wrap(auth::ApiSessionValidator{required: false})
                 .service(
                     web::scope("/squad")
                         .service(

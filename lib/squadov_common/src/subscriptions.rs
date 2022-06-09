@@ -106,8 +106,10 @@ impl<'de> Deserialize<'de> for SquadOvSubTiers {
     }
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Debug)]
 pub struct SquadOvDiscount {
+    #[serde(skip_serializing)]
+    pub id: String,
     pub percent: f64,
     pub reason: String,
 }

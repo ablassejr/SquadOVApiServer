@@ -27,16 +27,72 @@ use squadov_common::{
             StripeCheckoutSessionMode,
             StripeCheckoutLineItem,
             StripeCheckoutDiscount,
-        }
+        },
+        StripeApiClient,
     },
     subscriptions::{
         SquadOvFullPricingInfo,
         SquadOvSubTiers,
+        SquadOvDiscount,
     },
 };
 use std::collections::HashMap;
 use cached::{TimedCache, proc_macro::cached};
 use serde::Deserialize;
+
+#[cached(
+    result=true,
+    type = "TimedCache<i64, Vec<SquadOvDiscount>>",
+    create = "{ TimedCache::with_lifespan_and_capacity(600, 30) }",
+    convert = r#"{ user_id }"#
+)]
+async fn get_largest_discount_for_user(app: Arc<api::ApiApplication>, stripe: Arc<StripeApiClient>, user_id: i64) -> Result<Vec<SquadOvDiscount>, SquadOvError> {
+    let user_discounts: Vec<String> = sqlx::query!(
+        "
+        SELECT coupon
+        FROM squadov.stripe_user_coupons
+        where user_id = $1
+        ",
+        user_id,
+    )
+        .fetch_all(&*app.pool)
+        .await?
+        .into_iter()
+        .map(|x| { x.coupon })
+        .collect();
+
+    log::info!("user id: {} - {:?}", user_id, &user_discounts);
+    // If multiple coupons are relevant here, get the one with the largest discount.
+    // Assume we only use percentage discounts here.
+    let mut highest_discount: Option<SquadOvDiscount> = None;
+    for d in user_discounts {
+        let coupon = stripe.retrieve_a_coupon(&d).await?;
+        if let Some(pd) = coupon.percent_off {
+            let nd = SquadOvDiscount{
+                id: d,
+                reason: coupon.name.clone(),
+                percent: pd / 100.0,
+            };
+
+            if let Some(hd) = highest_discount.as_ref() {
+                if nd.percent > hd.percent {
+                    highest_discount = Some(nd);    
+                }
+            } else {
+                highest_discount = Some(nd);
+            }
+        }
+    }
+
+    log::info!("discount: {:?}" , &highest_discount);
+    Ok(
+        if let Some(hd) = highest_discount {
+            vec![hd]
+        } else {
+            vec![]
+        }
+    )
+}
 
 #[cached(
     result=true,
@@ -49,9 +105,10 @@ async fn get_subscription_pricing(app : Arc<api::ApiApplication>, user_id: Optio
         active: Some(true),
     }).await?;
 
+    log::info!("get sub pricing for : {:?} {}", user_id, annual);
     let mut info = SquadOvFullPricingInfo{
         pricing: HashMap::new(),
-        discounts: vec![],
+        discounts: if let Some(user_id) = user_id { get_largest_discount_for_user(app.clone(), app.stripe.clone(), user_id).await? } else { vec![] },
     };
 
     info.pricing.insert(SquadOvSubTiers::Basic, 0.0);
@@ -80,10 +137,6 @@ async fn get_subscription_pricing(app : Arc<api::ApiApplication>, user_id: Optio
         }
     }
 
-    if let Some(user_id) = user_id {
-
-    }
-
     Ok(info)
 }
 
@@ -106,7 +159,7 @@ pub struct CheckoutQuery {
 
 pub async fn start_subscription_checkout_handler(app : web::Data<Arc<api::ApiApplication>>, session: SquadOVSession, query: web::Query<CheckoutQuery>) -> Result<HttpResponse, SquadOvError> {
     // Check for any user discounts here.
-
+    let discounts = get_largest_discount_for_user(app.get_ref().clone(), app.stripe.clone(), session.user.id).await?;
 
     let mut products = app.stripe.search_products(StripeSearchProductsRequest{
         active: Some(true),
@@ -142,7 +195,14 @@ pub async fn start_subscription_checkout_handler(app : web::Data<Arc<api::ApiApp
                         quantity: Some(1),
                     }
                 ],
-                discounts: vec![],
+                discounts: if let Some(d) = discounts.first() {
+                    vec![StripeCheckoutDiscount{
+                        coupon: Some(d.id.clone()),
+                        promotion_code: None,
+                    }]
+                } else {
+                    vec![]
+                },
             }).await?;
 
             Ok(HttpResponse::Ok().json(session.url))

@@ -1,6 +1,7 @@
 pub mod product;
 pub mod price;
 pub mod checkout;
+pub mod coupon;
 
 use crate::{
     SquadOvError,
