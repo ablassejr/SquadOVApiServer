@@ -26,14 +26,14 @@ pub async fn get_tft_match_handler(data : web::Path<super::TftMatchInput>, app :
     Ok(HttpResponse::Ok().json(&tft_match))
 }
 
-pub async fn get_tft_match_user_accessible_vod_handler(data: web::Path<GenericMatchPathInput>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_tft_match_user_accessible_vod_handler(data: web::Path<GenericMatchPathInput>, app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    let vods = vdb::find_accessible_vods_in_match_for_user(&*app.pool, &data.match_uuid, session.user.id, &machine_id.id).await?;
+    let vods = vdb::find_accessible_vods_in_match_for_user(&*app.pool, &data.match_uuid, session.user.id, machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str()).await?;
 
     // Note that for each VOD we also need to figure out the mapping from user uuid to participant ID.
     let user_uuids: Vec<Uuid> = vods.iter()

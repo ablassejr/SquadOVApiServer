@@ -84,7 +84,7 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data : web::Json<super::VodAssociateBodyInput>, app : web::Data<Arc<api::ApiApplication>>, machine_id: web::Header<SquadOvMachineId>, request : HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data : web::Json<super::VodAssociateBodyInput>, app : web::Data<Arc<api::ApiApplication>>, machine_id: Option<web::Header<SquadOvMachineId>>, request : HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let data = data.into_inner();
     if path.video_uuid != data.association.video_uuid {
         return Err(SquadOvError::BadRequest);
@@ -129,7 +129,10 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
 
     // Upon association, the video *should* only exist in one place. Either on the cloud OR on the user's machine.
     if data.association.is_local {
-        vdb::bulk_sync_vod_copies(&mut tx, &[data.association.video_uuid.clone()], VodCopyLocation::Local, &machine_id.id).await?;
+        if machine_id.is_none() {
+            return Err(SquadOvError::BadRequest);
+        }
+        vdb::bulk_sync_vod_copies(&mut tx, &[data.association.video_uuid.clone()], VodCopyLocation::Local, machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str()).await?;
     } else {
         vdb::bulk_sync_vod_copies(&mut tx, &[data.association.video_uuid.clone()], VodCopyLocation::Cloud, &bucket).await?;
     }

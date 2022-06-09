@@ -457,7 +457,7 @@ impl api::ApiApplication {
     }
 }
 
-pub async fn get_vod_recent_match_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, path: web::Path<super::GenericVodPathInput>, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_vod_recent_match_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, path: web::Path<super::GenericVodPathInput>, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
@@ -473,7 +473,7 @@ pub async fn get_vod_recent_match_handler(app : web::Data<Arc<api::ApiApplicatio
         ]);
 
     let documents: Vec<ESVodDocument> = app.es_api.search_documents(&app.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?;
-    let matches = matches::vod_documents_to_recent_matches(documents, session.user.id, &machine_id.id);
+    let matches = matches::vod_documents_to_recent_matches(documents, session.user.id, machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str());
 
     if matches.is_empty() {
         Err(SquadOvError::NotFound)
@@ -482,7 +482,7 @@ pub async fn get_vod_recent_match_handler(app : web::Data<Arc<api::ApiApplicatio
     }
 }
 
-async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiApplication>>, req: &HttpRequest, query: web::Query<api::PaginationParameters>, mut filter: web::Json<RecentMatchQuery>, needs_access_tokens: bool, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiApplication>>, req: &HttpRequest, query: web::Query<api::PaginationParameters>, mut filter: web::Json<RecentMatchQuery>, needs_access_tokens: bool, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
@@ -514,7 +514,7 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
     while has_access && matches.len() < expected_total {
         let query_size = current_end - current_start;
         // Convert the query and filter into an ElasticSearch query.
-        let es_search = filter.to_es_search(session.user.id, Some(&machine_id.id), false)
+        let es_search = filter.to_es_search(session.user.id, Some(machine_id.as_ref().map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str()), false)
             .from(current_start)
             .size(current_end)
             .sort(vec![
@@ -538,7 +538,7 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
                 let parent_match = matches.get_mut(&match_uuid).unwrap();
                 existing_video_uuids.insert(d.vod.video_uuid.clone());
 
-                let new_pov = matches::vod_document_to_match_pov_for_user(d, session.user.id, &machine_id.id);
+                let new_pov = matches::vod_document_to_match_pov_for_user(d, session.user.id, machine_id.as_ref().map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str());
                 parent_match.povs.push(new_pov);
             }
         }
@@ -562,7 +562,7 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
         filter.matches = Some(matches.keys().cloned().collect());
         filter.not_vods = Some(existing_video_uuids.into_iter().collect());
 
-        let documents: Vec<ESVodDocument> = app.es_api.search_documents(&app.config.elasticsearch.vod_index_read, serde_json::to_value(filter.to_es_search(session.user.id, Some(&machine_id.id), false))?).await?;
+        let documents: Vec<ESVodDocument> = app.es_api.search_documents(&app.config.elasticsearch.vod_index_read, serde_json::to_value(filter.to_es_search(session.user.id, Some(machine_id.as_ref().map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str()), false))?).await?;
         for d in documents {
             if let Some(match_uuid) = d.data.match_uuid {
                 // This is an error if I've ever seen one sheeee.
@@ -571,7 +571,7 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
                 }
 
                 let parent_match = matches.get_mut(&match_uuid).unwrap();
-                let new_pov = matches::vod_document_to_match_pov_for_user(d, session.user.id, &machine_id.id);
+                let new_pov = matches::vod_document_to_match_pov_for_user(d, session.user.id, machine_id.as_ref().map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str());
                 parent_match.povs.push(new_pov);
             }
         }
@@ -601,7 +601,7 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
     })?)) 
 }
 
-pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, query: web::Query<api::PaginationParameters>, filter: web::Json<RecentMatchQuery>, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiApplication>>, req: HttpRequest, query: web::Query<api::PaginationParameters>, filter: web::Json<RecentMatchQuery>, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
@@ -611,7 +611,7 @@ pub async fn get_recent_matches_for_me_handler(app : web::Data<Arc<api::ApiAppli
     get_recent_matches_for_user(session.user.id, app, &req, query, filter, false, machine_id).await
 }
 
-pub async fn get_profile_matches_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<UserProfilePath>, req: HttpRequest, query: web::Query<api::PaginationParameters>, mut filter: web::Json<RecentMatchQuery>, machine_id: web::Header<SquadOvMachineId>) -> Result<HttpResponse, SquadOvError> {
+pub async fn get_profile_matches_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<UserProfilePath>, req: HttpRequest, query: web::Query<api::PaginationParameters>, mut filter: web::Json<RecentMatchQuery>, machine_id: Option<web::Header<SquadOvMachineId>>) -> Result<HttpResponse, SquadOvError> {
     filter.only_profile = true;
     get_recent_matches_for_user(path.profile_id, app, &req, query, filter, true, machine_id).await
 }

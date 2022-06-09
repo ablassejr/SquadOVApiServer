@@ -51,24 +51,24 @@ async fn delete_vod_helper(app: Arc<api::ApiApplication>, video_uuids: &[Uuid], 
     Ok(())
 }
 
-pub async fn delete_vod_handler(data : web::Path<VodDeleteFromUuid>, app : web::Data<Arc<api::ApiApplication>>, query: web::Query<DeleteVodQuery>, machine_id: web::Header<SquadOvMachineId>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn delete_vod_handler(data : web::Path<VodDeleteFromUuid>, app : web::Data<Arc<api::ApiApplication>>, query: web::Query<DeleteVodQuery>, machine_id: Option<web::Header<SquadOvMachineId>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    delete_vod_helper(app.get_ref().clone(), &[data.video_uuid.clone()], session.user.id, if query.local_only { Some(machine_id.id.clone()) } else { None }).await?;
+    delete_vod_helper(app.get_ref().clone(), &[data.video_uuid.clone()], session.user.id, if query.local_only { Some(machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new())) } else { None }).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
-pub async fn bulk_delete_vods_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<BulkDeleteVodData>, machine_id: web::Header<SquadOvMachineId>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
+pub async fn bulk_delete_vods_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<BulkDeleteVodData>, machine_id: Option<web::Header<SquadOvMachineId>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
     let extensions = req.extensions();
     let session = match extensions.get::<SquadOVSession>() {
         Some(s) => s,
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    delete_vod_helper(app.get_ref().clone(), &data.vods, session.user.id, if data.local_only { Some(machine_id.id.clone()) } else { None }).await?;
+    delete_vod_helper(app.get_ref().clone(), &data.vods, session.user.id, if data.local_only { Some(machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new())) } else { None }).await?;
     Ok(HttpResponse::NoContent().finish())
 }
