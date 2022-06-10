@@ -349,6 +349,7 @@ where
             u.is_admin,
             u.welcome_sent,
             u.registration_time,
+            u.support_priority,
             ARRAY_AGG(cr.id) AS "roles!",
             cm.sub_id AS "sub_id"
         FROM squadov.community_membership AS cm
@@ -379,6 +380,7 @@ where
                     is_admin: x.is_admin,
                     welcome_sent: x.welcome_sent,
                     registration_time: x.registration_time,
+                    support_priority: x.support_priority,
                 },
                 roles: x.roles,
                 sub_id: x.sub_id,

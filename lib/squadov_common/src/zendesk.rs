@@ -73,16 +73,18 @@ pub struct ZendeskTicket {
     tags: Option<Vec<String>>,
     comment: ZendeskTicketComment,
     requester: Option<ZendeskTicketRequester>,
-    custom_fields: Option<Vec<ZendeskCustomField>>
+    custom_fields: Option<Vec<ZendeskCustomField>>,
+    priority: String,
 }
 
 impl ZendeskTicket {
-    pub fn new(subject: String, comment: ZendeskTicketComment, username: String, email: String) -> Self {
+    pub fn new(subject: String, comment: ZendeskTicketComment, username: String, email: String, priority: String) -> Self {
         Self {
             email_ccs: None,
             subject: Some(subject),
             tags: None,
             comment,
+            priority,
             requester: Some(ZendeskTicketRequester{
                 locale_id: 1,
                 name: username.clone(),

@@ -138,7 +138,8 @@ impl SessionManager {
                 u.is_admin AS \"is_admin\",
                 us.is_temp AS \"is_temp\",
                 u.welcome_sent AS \"welcome_sent\",
-                u.registration_time AS \"registration_time\"
+                u.registration_time AS \"registration_time\",
+                u.support_priority as \"support_priority\"
             FROM squadov.user_sessions AS us
             INNER JOIN squadov.users AS u
                 ON u.id = us.user_id
@@ -160,6 +161,7 @@ impl SessionManager {
                     is_admin: x.is_admin,
                     welcome_sent: x.welcome_sent,
                     registration_time: x.registration_time,
+                    support_priority: x.support_priority,
                 },
                 access_token: x.access_token,
                 refresh_token: x.refresh_token,

@@ -27,6 +27,7 @@ impl api::ApiApplication {
                     .add_upload(attachment_id),
                 user.username.clone(),
                 user.email.clone(),
+                user.support_priority.clone(),
             ),
         ).await?;
 
@@ -40,6 +41,10 @@ pub async fn create_bug_report_handler(app : web::Data<Arc<api::ApiApplication>>
         Some(x) => x,
         None => return Err(SquadOvError::BadRequest)
     };
+
+    if !session.user.verified {
+        return Err(SquadOvError::Unauthorized);
+    }
     
     let mut title = web::BytesMut::new();
     let mut description = web::BytesMut::new();

@@ -7,6 +7,7 @@ use crate::{
 use sqlx::{Executor, Postgres};
 
 #[derive(Debug, Serialize, Clone)]
+#[serde(rename_all="camelCase")]
 pub struct SquadOVUser {
     pub id: i64,
     pub username: String,
@@ -19,8 +20,8 @@ pub struct SquadOVUser {
     pub is_admin: bool,
     #[serde(skip_serializing)]
     pub welcome_sent: bool,
-    #[serde(rename="registrationTime")]
     pub registration_time: Option<DateTime<Utc>>,
+    pub support_priority: String,
 }
 
 pub async fn get_squadov_user_from_uuid<'a, T>(ex: T, uuid: &Uuid) -> Result<SquadOVUser, SquadOvError>
@@ -40,7 +41,8 @@ where
                 is_test,
                 is_admin,
                 welcome_sent,
-                registration_time
+                registration_time,
+                support_priority
             FROM squadov.users
             WHERE uuid = $1
             ",
