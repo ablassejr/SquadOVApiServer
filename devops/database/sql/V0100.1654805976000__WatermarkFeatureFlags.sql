@@ -1,0 +1,3 @@
+ALTER TABLE user_feature_flags
+ADD COLUMN mandatory_watermark BOOLEAN NOT NULL DEFAULT TRUE,
+ADD COLUMN watermark_min_size DOUBLE PRECISION NOT NULL DEFAULT 0.05;

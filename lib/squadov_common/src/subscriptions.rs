@@ -144,3 +144,24 @@ pub struct SquadOvFullPricingInfo {
     pub pricing: HashMap<SquadOvSubTiers, f64>,
     pub discounts: Vec<SquadOvDiscount>,
 }
+
+pub async fn get_user_stripe_customer_id<'a, T>(ex: T, user_id: i64) -> Result<Option<String>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT customer
+            FROM squadov.stripe_customers
+            WHERE user_id = $1
+            ",
+            user_id
+        )
+            .fetch_optional(ex)
+            .await?
+            .map(|x| {
+                x.customer
+            })
+    )
+}

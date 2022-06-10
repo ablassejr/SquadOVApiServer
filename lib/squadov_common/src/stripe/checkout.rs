@@ -63,6 +63,9 @@ pub struct StripeCreateSessionRequest {
     pub cancel_url: String,
     pub mode: StripeCheckoutSessionMode,
     pub success_url: String,
+    pub client_reference_id: Option<String>,
+    pub customer: Option<String>,
+    pub customer_email: Option<String>,
     pub line_items: Vec<StripeCheckoutLineItem>,
     pub discounts: Vec<StripeCheckoutDiscount>,
 }
@@ -75,6 +78,18 @@ impl StripeCreateSessionRequest {
             ("cancel_url".to_string(), self.cancel_url.clone()),
             ("mode".to_string(), format!("{}", &self.mode)),
         ];
+
+        if let Some(c) = self.client_reference_id.as_ref() {
+            tuples.push(("client_reference_id".to_string(), c.clone()));
+        }
+
+        if let Some(c) = self.customer.as_ref() {
+            tuples.push(("customer".to_string(), c.clone()));
+        }
+
+        if let Some(c) = self.customer_email.as_ref() {
+            tuples.push(("customer_email".to_string(), c.clone()));
+        }
 
         for (i, li) in self.line_items.iter().enumerate() {
             tuples.push(

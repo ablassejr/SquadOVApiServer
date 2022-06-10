@@ -28,6 +28,9 @@ use squadov_common::{
             StripeCheckoutLineItem,
             StripeCheckoutDiscount,
         },
+        customer_portal::{
+            StripeCreatePortalSessionRequest,
+        },
         StripeApiClient,
     },
     subscriptions::{
@@ -201,6 +204,9 @@ pub async fn start_subscription_checkout_handler(app : web::Data<Arc<api::ApiApp
                 } else {
                     vec![]
                 },
+                customer: subscriptions::get_user_stripe_customer_id(&*app.pool, session.user.id).await?,
+                client_reference_id: Some(session.user.uuid.to_string()),
+                customer_email: Some(session.user.email.clone()),
             }).await?;
 
             Ok(HttpResponse::Ok().json(session.url))
@@ -210,6 +216,15 @@ pub async fn start_subscription_checkout_handler(app : web::Data<Arc<api::ApiApp
     } else {
         Err(SquadOvError::NotFound)
     }
+}
+
+pub async fn start_subscription_manage_handler(app : web::Data<Arc<api::ApiApplication>>, session: SquadOVSession) -> Result<HttpResponse, SquadOvError> {
+    let session = app.stripe.create_a_portal_session(StripeCreatePortalSessionRequest{
+        customer: subscriptions::get_user_stripe_customer_id(&*app.pool, session.user.id).await?.ok_or(SquadOvError::NotFound)?,
+        return_url: Some(format!("{}/settings", &app.config.squadov.app_url)),
+    }).await?;
+
+    Ok(HttpResponse::Ok().json(session.url))
 }
 
 pub async fn get_user_tier_handler(app : web::Data<Arc<api::ApiApplication>>, session: SquadOVSession) -> Result<HttpResponse, SquadOvError> {

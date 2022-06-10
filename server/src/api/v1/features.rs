@@ -17,21 +17,25 @@ pub struct FeatureFlags {
     max_bitrate_kbps: i32,
     can_instant_clip: bool,
     disable_es_search: bool,
+    mandatory_watermark: bool,
+    watermark_min_size: f64,
 }
 
 impl Default for FeatureFlags {
     fn default() -> Self {
         Self {
             user_id: -1,
-            max_record_pixel_y: 1080,
+            max_record_pixel_y: 720,
             max_record_fps: 60,
             allow_record_upload: true,
             allow_wow_combat_log_upload: true,
             enable_user_profiles: true,
             disable_sentry: false,
-            max_bitrate_kbps: 9000,
+            max_bitrate_kbps: 6000,
             can_instant_clip: true,
             disable_es_search: false,
+            mandatory_watermark: true,
+            watermark_min_size: 0.01,
         }
     }
 }

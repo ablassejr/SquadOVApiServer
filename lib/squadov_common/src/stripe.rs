@@ -2,6 +2,7 @@ pub mod product;
 pub mod price;
 pub mod checkout;
 pub mod coupon;
+pub mod customer_portal;
 
 use crate::{
     SquadOvError,
