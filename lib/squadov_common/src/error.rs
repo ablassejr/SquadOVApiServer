@@ -365,3 +365,17 @@ impl From<avro_rs::DeError> for SquadOvError {
         return Self::InternalError(format!("Avro Deserialize Error {:?}", err))
     }
 }
+
+impl From<serenity::prelude::SerenityError> for SquadOvError {
+    fn from(err: serenity::prelude::SerenityError) -> Self {
+        match err {
+            serenity::prelude::SerenityError::Http(inner) => {
+                match *inner {
+                    serenity::http::HttpError::RateLimitI64F64 | serenity::http::HttpError::RateLimitUtf8 => SquadOvError::RateLimit,
+                    _ => Self::InternalError(format!("Serenity HTTP Error {:?}", inner)),
+                }
+            },
+            _ => Self::InternalError(format!("Serenity Error {:?}", err)),
+        }
+    }
+}

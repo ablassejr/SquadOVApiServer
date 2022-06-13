@@ -2,7 +2,17 @@ db_endpoint = "${DATABASE_HOST}"
 db_username = "${POSTGRES_USER}"
 db_password = "${POSTGRES_PASSWORD}"
 db_connections = 4
-combatlog_bucket = "${COMBAT_LOG_BUCKET}"
+external_workers = 4
+
+[discord]
+token = "${DISCORD_BOT_TOKEN}"
+server_id = 790620222758322197
+
+[discord.roles]
+silver = 985948720887656459
+gold = 985949015290052658
+diamond = 985949129270243448
+early_access = 885542848366252053
 
 [rabbitmq]
 amqp_url = "${RABBITMQ_AMQP_URL}"
@@ -31,32 +41,7 @@ twitch_queue = "twitch_api"
 enable_sharing = false
 sharing_queue = "squadov_sharing"
 misc_valorant_queue = "misc_valorant"
-enable_elasticsearch = true
+enable_elasticsearch = false
 elasticsearch_queue = "squadov_elasticsearch"
-elasticsearch_workers = 4
+elasticsearch_workers = 0
 discord_queue = "discord"
-
-[elasticsearch]
-host = "${ES_HOSTNAME}"
-username = "${ES_USERNAME}"
-password = "${ES_PASSWORD}"
-vod_index_read = "vod-index-read"
-vod_index_write = "vod-index-write"
-
-[aws]
-enabled = true
-credential_path = "aws/api.profile"
-profile = "api"
-region = "us-east-2"
-account_id = "${AWS_ACCOUNT_ID}"
-
-[aws.cdn]
-public_cdn_domain = "https://d1goqoukzs4rbo.cloudfront.net"
-private_cdn_domain = "https://d2chagikgdm7bl.cloudfront.net"
-blob_cdn_domain = "https://d395ja7261zvra.cloudfront.net"
-public_key_id = "K1JG8A4WKH1W0X"
-private_key_fname = "aws/private_s3_vod_cloudfront.pem"
-
-[aws.cognito]
-pool_id = "${COGNITO_POOL_ID}"
-provider = "${COGNITO_PROVIDER}"

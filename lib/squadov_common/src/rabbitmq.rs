@@ -54,6 +54,7 @@ pub struct RabbitMqConfig {
     pub misc_valorant_queue: String,
     pub enable_sharing: bool,
     pub sharing_queue: String,
+    pub discord_queue: String,
     pub enable_elasticsearch: bool,
     pub elasticsearch_queue: String,
     pub elasticsearch_workers: i32,
@@ -216,6 +217,14 @@ impl RabbitMqConnectionBundle {
             if !config.sharing_queue.is_empty() {
                 ch.queue_declare(
                     &config.sharing_queue,
+                    queue_opts.clone(),
+                    default_table.clone(),
+                ).await?;
+            }
+
+            if !config.discord_queue.is_empty() {
+                ch.queue_declare(
+                    &config.discord_queue,
                     queue_opts.clone(),
                     default_table.clone(),
                 ).await?;

@@ -65,6 +65,7 @@
 	"AWS_ACCOUNT_ID": "ENC[AES256_GCM,data:gYNFdTGWBcqSeETv,iv:dCUV5zSK81IMmCnCfxQ7tG+zMuOPUWRYo0jai0MDhj8=,tag:Tzozsu8/CeWXTqZIn2HOGQ==,type:str]",
 	"COGNITO_POOL_ID": "ENC[AES256_GCM,data:o08CcPQluqw3XBJsG2uDJ0e+EO5Fgc2rvZe07GqzOO4fKbxUy7SCdEcGcBUXAg==,iv:NF2KKjQjw82V+wyMFRrkdotHFAMGxGtfURKqlf/17sw=,tag:bxtea1TiLJ56Q8rl9m9nWw==,type:str]",
 	"COGNITO_PROVIDER": "ENC[AES256_GCM,data:TOFvdMmkxYulxLaSoO8=,iv:tDWsnZ5DStxAPjQG9hdELhQ36JEnrKkMqN/xIc/uThs=,tag:brjnTxeEBvw+80wsH56DIg==,type:str]",
+	"DISCORD_BOT_TOKEN": "ENC[AES256_GCM,data:+IB8jEVbILgsoP6+1qMBHz1tG1+FBaSH4nj6sx5zIoxqT3s83koBLOhpOTvsa0Fa5OPxR50lRZ4Wk+ArZj4eBERY+BS2uw==,iv:OoZNsK+fVi7ufvuAXAp0nvulRGq7tVwZQK/X1OwVd20=,tag:VbddEy4veLwZYLNIsB4eIg==,type:str]",
 	"sops": {
 		"kms": null,
 		"gcp_kms": [
@@ -76,8 +77,8 @@
 		],
 		"azure_kv": null,
 		"hc_vault": null,
-		"lastmodified": "2022-05-30T17:51:35Z",
-		"mac": "ENC[AES256_GCM,data:x5tnyvYCDZTHqO+tMN+N9ApbyWiyLE5NJmW5AeHGC82Cot2j5e0ezq3WN9xuYCHOooiLMF2QG0zRM6NHeWo5MO8j5nArhi4WdVBWfo8eY8izgXzPlVjtUeMzaZZa6UcvfZ1KdWL4WZ9ncVsGCxzn+W/bE6dHq6lvzRzr0NgKIiU=,iv:AfO4WP+JdRVQPBNG0kcirAGMVuTl/U+qODH6TsHFWp0=,tag:pRwowwclh3Rs9g+eDskxLQ==,type:str]",
+		"lastmodified": "2022-06-13T17:21:21Z",
+		"mac": "ENC[AES256_GCM,data:HCmtZpSomwEGz67a4nziabR4NmmfitSuoqj7uKN/OCOItkIqJJ2z4j0MMQHBz5qCPk8By9tfKvSO8ALgXQXCj/8LOpG3v+8cwbkhzA8T3DAdt0z1jzfIePtHF3oPadDNgD2EXCDrPVAsO2qik82LKXw1Z+HVxB1Uu51L3heBpes=,iv:oQWDNQvG49EMjecVKIQIh9GIQ99kTY544o3FhIQplNk=,tag:1t0egMBwov07rKbwyaLp9Q==,type:str]",
 		"pgp": null,
 		"unencrypted_suffix": "_unencrypted",
 		"version": "3.6.1"

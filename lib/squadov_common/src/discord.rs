@@ -1,6 +1,8 @@
 pub mod oauth;
 pub mod api;
 pub mod db;
+pub mod bot;
+pub mod rabbitmq;
 
 use serde::{Serialize, Deserialize};
 
