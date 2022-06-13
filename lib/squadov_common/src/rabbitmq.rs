@@ -17,6 +17,7 @@ use chrono::{DateTime, Utc, NaiveDateTime};
 use rand::Rng;
 use sqlx::PgPool;
 
+pub const RABBITMQ_MAINTENANCE_PRIORITY: u8 = 1;
 pub const RABBITMQ_LOW_PRIORITY: u8 = 2;
 pub const RABBITMQ_DEFAULT_PRIORITY: u8 = 5;
 pub const RABBITMQ_HIGH_PRIORITY: u8 = 8;

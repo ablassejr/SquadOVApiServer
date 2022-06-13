@@ -6,6 +6,9 @@ mod api;
 use structopt::StructOpt;
 use std::{fs, sync::Arc};
 use uuid::Uuid;
+use squadov_common::{
+    rabbitmq::RABBITMQ_MAINTENANCE_PRIORITY,
+};
 
 #[derive(StructOpt, Debug)]
 struct Options {
@@ -17,10 +20,10 @@ struct Options {
     workers: usize,
 }
 
-pub fn start_cleanup_loop(app: Arc<api::ApiApplication>) {
+pub fn start_unpublished_clips_cleanup_loop(app: Arc<api::ApiApplication>) {
     tokio::task::spawn(async move {
         loop {
-            log::info!("Doing cleanup loop...");
+            log::info!("Doing unpublished clip cleanup loop...");
 
             let old_unpublished_clips: Vec<Uuid> = sqlx::query!(
                 "
@@ -40,7 +43,7 @@ pub fn start_cleanup_loop(app: Arc<api::ApiApplication>) {
                 .collect();
             log::info!("Found {} Unpublished Clips", old_unpublished_clips.len());
             for x in old_unpublished_clips {
-                match app.vod_itf.request_delete_vod(&x).await {
+                match app.vod_itf.request_delete_vod(&x, RABBITMQ_MAINTENANCE_PRIORITY).await {
                     Ok(_) => (),
                     Err(err) => log::warn!("...Failed to delete VOD [{}] {:?}", &x, err),
                 }
@@ -48,6 +51,64 @@ pub fn start_cleanup_loop(app: Arc<api::ApiApplication>) {
 
             // Doing this once per day should be sufficient...
             tokio::time::sleep(tokio::time::Duration::from_secs(86400)).await;
+        }
+    });
+}
+
+pub fn start_expired_vods_cleanup_loop(app: Arc<api::ApiApplication>) {
+    tokio::task::spawn(async move {
+        loop {
+            log::info!("Doing expired VODs cleanup loop...");
+
+            let expired_vods: Vec<Uuid> = sqlx::query!(
+                r#"
+                SELECT v.video_uuid AS "video_uuid!"
+                FROM squadov.vods AS v
+                INNER JOIN squadov.vod_storage_copies AS vsc
+                    ON vsc.video_uuid = v.video_uuid
+                        AND vsc.loc = 0
+                WHERE v.expiration_time <= NOW()
+                    AND v.request_expiration_time IS NULL
+                "#
+            )
+                .fetch_all(&*app.pool)
+                .await
+                .unwrap_or(vec![])
+                .into_iter()
+                .map(|x| {
+                    x.video_uuid
+                })
+                .collect();
+
+            log::info!("Found {} Expired VODs", expired_vods.len());
+            for x in &expired_vods {
+                match app.vod_itf.request_delete_vod(&x, RABBITMQ_MAINTENANCE_PRIORITY).await {
+                    Ok(_) => (),
+                    Err(err) => log::warn!("...Failed to delete VOD [{}] {:?}", &x, err),
+                }
+            }
+
+            match sqlx::query!(
+                "
+                UPDATE squadov.vods
+                SET request_expiration_time = NOW()
+                FROM (
+                    SELECT *
+                    FROM UNNEST($1::UUID[]) 
+                ) AS sub(video_uuid)
+                WHERE sub.video_uuid = vods.video_uuid
+                ",
+                &expired_vods
+            )
+                .execute(&*app.pool)
+                .await {
+                Ok(_) => (),
+                Err(err) => log::warn!("Failed to mark expired VOD request time: {}", err),
+            }
+
+            // We *should* check for expired VODs every once in awhile. This keeps the spikiness of the amount of work we need
+            // to do fairly short. 
+            tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
         }
     });
 }
@@ -84,7 +145,8 @@ fn main() -> std::io::Result<()> {
             tokio::task::spawn(async move {
                 let app = Arc::new(api::ApiApplication::new(&config, "singleton_event").await);
                 api::start_event_loop(app.clone());
-                start_cleanup_loop(app.clone());
+                start_unpublished_clips_cleanup_loop(app.clone());
+                start_expired_vods_cleanup_loop(app.clone());
 
                 loop {
                     async_std::task::sleep(std::time::Duration::from_secs(1)).await;

@@ -84,6 +84,8 @@ pub struct VodAssociation {
     #[serde(skip)]
     pub request_sync_elasticsearch: Option<DateTime<Utc>>,
     pub expiration_time: Option<DateTime<Utc>>,
+    #[serde(skip)]
+    pub request_expiration_time: Option<DateTime<Utc>>,
 }
 
 #[derive(Serialize,Deserialize,Clone,Debug)]
@@ -478,6 +480,7 @@ impl VodProcessingInterface {
             last_sync_elasticsearch: None,
             request_sync_elasticsearch: None,
             expiration_time: None,
+            request_expiration_time: None,
         }).await?;
 
         log::info!("[Clip] Add Video Metadata - {}", request.id);

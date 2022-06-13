@@ -1,0 +1,1 @@
+CREATE INDEX CONCURRENTLY ON vods(expiration_time);
