@@ -67,28 +67,23 @@ pub struct VodThumbnail {
 }
 
 #[derive(Serialize,Deserialize, Clone, Debug, Default)]
+#[serde(rename_all="camelCase")]
 pub struct VodAssociation {
-    #[serde(rename = "matchUuid")]
     pub match_uuid: Option<Uuid>,
-    #[serde(rename = "userUuid")]
     pub user_uuid: Option<Uuid>,
-    #[serde(rename = "videoUuid")]
     pub video_uuid: Uuid,
-    #[serde(rename = "startTime")]
     pub start_time: Option<DateTime<Utc>>,
-    #[serde(rename = "endTime")]
     pub end_time: Option<DateTime<Utc>>,
-    #[serde(rename = "rawContainerFormat")]
     pub raw_container_format: String,
-    #[serde(rename = "isClip")]
     pub is_clip: bool,
-    #[serde(rename = "isLocal", default)]
+    #[serde(default)]
     pub is_local: bool,
     pub md5: Option<String>,
     #[serde(skip)]
     pub last_sync_elasticsearch: Option<DateTime<Utc>>,
     #[serde(skip)]
     pub request_sync_elasticsearch: Option<DateTime<Utc>>,
+    pub expiration_time: Option<DateTime<Utc>>,
 }
 
 #[derive(Serialize,Deserialize,Clone,Debug)]
@@ -482,6 +477,7 @@ impl VodProcessingInterface {
             md5: None,
             last_sync_elasticsearch: None,
             request_sync_elasticsearch: None,
+            expiration_time: None,
         }).await?;
 
         log::info!("[Clip] Add Video Metadata - {}", request.id);

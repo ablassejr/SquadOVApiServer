@@ -302,12 +302,26 @@ where
 {
     sqlx::query!(
         "
-        UPDATE squadov.vods
+        WITH vod_expiration(video_uuid, tm) AS (
+            SELECT v.video_uuid, CASE 
+                        WHEN (NOT v.is_clip AND uf.vod_retention IS NOT NULL) THEN (NOW() + uf.vod_retention * INTERVAL '1 sec')
+                        ELSE NULL
+                   END 
+            FROM squadov.vods AS v
+            INNER JOIN squadov.users AS u
+                ON u.uuid = v.user_uuid
+            INNER JOIN squadov.user_feature_flags AS uf
+                ON uf.user_id = u.id
+            WHERE video_uuid = $5
+        )
+        UPDATE squadov.vods AS v
         SET match_uuid = $1,
             user_uuid = $2,
             start_time = $3,
-            end_time = $4
-        WHERE video_uuid = $5
+            end_time = $4,
+            expiration_time = ve.tm
+        FROM vod_expiration AS ve
+        WHERE ve.video_uuid = v.video_uuid
         ",
         assoc.match_uuid,
         assoc.user_uuid,

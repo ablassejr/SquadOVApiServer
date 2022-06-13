@@ -25,6 +25,7 @@ pub struct FeatureFlags {
     pub watermark_min_size: f64,
     pub vod_priority: i16,
     pub early_access: bool,
+    pub vod_retention: Option<i64>,
 }
 
 impl Default for FeatureFlags {
@@ -44,6 +45,7 @@ impl Default for FeatureFlags {
             watermark_min_size: 0.01,
             vod_priority: RABBITMQ_DEFAULT_PRIORITY as i16,
             early_access: false,
+            vod_retention: Some(chrono::Duration::days(7).num_seconds()),
         }
     }
 }

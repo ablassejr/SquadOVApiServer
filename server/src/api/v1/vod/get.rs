@@ -13,7 +13,7 @@ use squadov_common::{
 use crate::{
     api::{
         self,
-        auth::SquadOvMachineId,
+        auth::{SquadOvMachineId},
     },
 };
 use actix_web::{web, HttpResponse};
@@ -228,6 +228,13 @@ pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>,
                 return Err(SquadOvError::BadRequest);
             }
         } else {
+            // If we get here, we're starting an upload for a VOD that is probably already tracked on our server.
+            if let Some(expiration) = vod.expiration_time.as_ref() {
+                if expiration > &Utc::now() {
+                    return Err(SquadOvError::BadRequest);
+                }
+            }
+
             app.create_vod_destination(&data.video_uuid, &vod.raw_container_format, accel).await?
         }
     ))

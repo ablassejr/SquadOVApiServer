@@ -1,0 +1,2 @@
+ALTER TABLE vods
+ADD COLUMN expiration_time TIMESTAMPTZ;
