@@ -24,6 +24,7 @@ pub struct FeatureFlags {
     pub mandatory_watermark: bool,
     pub watermark_min_size: f64,
     pub vod_priority: i16,
+    pub early_access: bool,
 }
 
 impl Default for FeatureFlags {
@@ -42,6 +43,7 @@ impl Default for FeatureFlags {
             mandatory_watermark: true,
             watermark_min_size: 0.01,
             vod_priority: RABBITMQ_DEFAULT_PRIORITY as i16,
+            early_access: false,
         }
     }
 }

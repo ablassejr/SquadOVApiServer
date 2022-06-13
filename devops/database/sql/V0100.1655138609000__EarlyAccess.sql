@@ -1,0 +1,2 @@
+ALTER TABLE user_feature_flags
+ADD COLUMN early_access BOOLEAN NOT NULL DEFAULT FALSE;
