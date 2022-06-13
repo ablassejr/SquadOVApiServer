@@ -4,6 +4,7 @@ use squadov_common::{
         db,
         VodCopyLocation,
     },
+    rabbitmq::RABBITMQ_DEFAULT_PRIORITY,
 };
 use crate::api;
 use crate::api::auth::{SquadOvMachineId, SquadOVSession};
@@ -32,7 +33,7 @@ pub struct DeleteVodQuery {
     local_only: bool
 }
 
-async fn delete_vod_helper(app: Arc<api::ApiApplication>, video_uuids: &[Uuid], user_id: i64, from_machine: Option<String>) -> Result<(), SquadOvError> {
+async fn delete_vod_helper(app: Arc<api::ApiApplication>, video_uuids: &[Uuid], user_id: i64, priority: u8, from_machine: Option<String>) -> Result<(), SquadOvError> {
     // Security measure to make sure user is only ever able to delete their own VODs.
     let video_uuids = db::get_video_uuids_owned_by_user(&*app.pool, video_uuids, user_id).await?;
 
@@ -40,7 +41,7 @@ async fn delete_vod_helper(app: Arc<api::ApiApplication>, video_uuids: &[Uuid], 
         db::bulk_delete_vod_copies(&*app.pool, &video_uuids, VodCopyLocation::Local, &machine_id).await?;
     } else {
         for v in &video_uuids {
-            app.vod_itf.request_delete_vod(v).await?;
+            app.vod_itf.request_delete_vod(v, priority).await?;
         }
     }
 
@@ -58,7 +59,7 @@ pub async fn delete_vod_handler(data : web::Path<VodDeleteFromUuid>, app : web::
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    delete_vod_helper(app.get_ref().clone(), &[data.video_uuid.clone()], session.user.id, if query.local_only { Some(machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new())) } else { None }).await?;
+    delete_vod_helper(app.get_ref().clone(), &[data.video_uuid.clone()], session.user.id, session.features.as_ref().map(|x| { x.vod_priority as u8 } ).unwrap_or(RABBITMQ_DEFAULT_PRIORITY), if query.local_only { Some(machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new())) } else { None }).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -69,6 +70,6 @@ pub async fn bulk_delete_vods_handler(app : web::Data<Arc<api::ApiApplication>>,
         None => return Err(SquadOvError::Unauthorized),
     };
 
-    delete_vod_helper(app.get_ref().clone(), &data.vods, session.user.id, if data.local_only { Some(machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new())) } else { None }).await?;
+    delete_vod_helper(app.get_ref().clone(), &data.vods, session.user.id, session.features.as_ref().map(|x| { x.vod_priority as u8 } ).unwrap_or(RABBITMQ_DEFAULT_PRIORITY), if data.local_only { Some(machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new())) } else { None }).await?;
     Ok(HttpResponse::NoContent().finish())
 }

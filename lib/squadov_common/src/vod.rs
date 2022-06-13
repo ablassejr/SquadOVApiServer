@@ -14,9 +14,6 @@ use crate::{
     SquadOvError,
     SquadOvGames,
     rabbitmq::{
-        RABBITMQ_LOW_PRIORITY,
-        RABBITMQ_DEFAULT_PRIORITY,
-        RABBITMQ_HIGH_PRIORITY,
         INFINITE_MAX_AGE,
         RabbitMqInterface,
         RabbitMqListener,
@@ -306,7 +303,7 @@ pub enum VodProcessingTask {
 
 #[async_trait]
 impl RabbitMqListener for VodProcessingInterface {
-    async fn handle(&self, data: &[u8], _queue: &str) -> Result<(), SquadOvError> {
+    async fn handle(&self, data: &[u8], _queue: &str, priority: u8) -> Result<(), SquadOvError> {
         log::info!("Handle VOD Task: {}", std::str::from_utf8(data).unwrap_or("failure"));
         let task: VodProcessingTask = serde_json::from_slice(data)?;
         match task {
@@ -314,10 +311,11 @@ impl RabbitMqListener for VodProcessingInterface {
                 &vod_uuid,
                 &id.unwrap_or(String::from("source")),
                 session_id.as_ref(),
+                priority,
             ).await?,
             VodProcessingTask::GeneratePreview{vod_uuid} => self.generate_preview(&vod_uuid).await?,
             VodProcessingTask::GenerateThumbnail{vod_uuid} => self.generate_thumbnail(&vod_uuid).await?,
-            VodProcessingTask::GenerateStagedClip{request} => self.generate_staged_clip(&request).await?,
+            VodProcessingTask::GenerateStagedClip{request} => self.generate_staged_clip(&request, priority).await?,
             VodProcessingTask::Delete{vod_uuid} => self.delete_vod(&vod_uuid).await?,
         };
         Ok(())
@@ -335,33 +333,33 @@ impl VodProcessingInterface {
         }
     }
 
-    pub async fn request_vod_processing(&self, vod_uuid: &Uuid, id: &str, session_id: Option<String>, high_priority: bool) -> Result<(), SquadOvError> {
+    pub async fn request_vod_processing(&self, vod_uuid: &Uuid, id: &str, session_id: Option<String>, priority: u8) -> Result<(), SquadOvError> {
         self.rmq.publish(&self.queue, serde_json::to_vec(&VodProcessingTask::Process{
             vod_uuid: vod_uuid.clone(),
             session_id,
             id: Some(id.to_string()),
-        })?, if high_priority { RABBITMQ_HIGH_PRIORITY } else { RABBITMQ_DEFAULT_PRIORITY }, VOD_MAX_AGE_SECONDS).await;
+        })?, priority, VOD_MAX_AGE_SECONDS).await;
         Ok(())
     }
 
-    pub async fn request_generate_preview(&self, vod_uuid: & Uuid) -> Result<(), SquadOvError> {
+    pub async fn request_generate_preview(&self, vod_uuid: & Uuid, priority: u8) -> Result<(), SquadOvError> {
         self.rmq.publish(&self.queue, serde_json::to_vec(&VodProcessingTask::GeneratePreview{
             vod_uuid: vod_uuid.clone(),
-        })?, RABBITMQ_DEFAULT_PRIORITY, VOD_MAX_AGE_SECONDS).await;
+        })?, priority, VOD_MAX_AGE_SECONDS).await;
         Ok(())
     }
 
-    pub async fn request_generate_thumbnail(&self, vod_uuid: & Uuid) -> Result<(), SquadOvError> {
+    pub async fn request_generate_thumbnail(&self, vod_uuid: & Uuid, priority: u8) -> Result<(), SquadOvError> {
         self.rmq.publish(&self.queue, serde_json::to_vec(&VodProcessingTask::GenerateThumbnail{
             vod_uuid: vod_uuid.clone(),
-        })?, RABBITMQ_DEFAULT_PRIORITY, VOD_MAX_AGE_SECONDS).await;
+        })?, priority, VOD_MAX_AGE_SECONDS).await;
         Ok(())
     }
 
-    pub async fn request_generate_staged_clip(&self, request: &StagedVodClip) -> Result<(), SquadOvError> {
+    pub async fn request_generate_staged_clip(&self, request: &StagedVodClip, priority: u8) -> Result<(), SquadOvError> {
         self.rmq.publish(&self.queue, serde_json::to_vec(&VodProcessingTask::GenerateStagedClip{
             request: request.clone(),
-        })?, RABBITMQ_DEFAULT_PRIORITY, VOD_MAX_AGE_SECONDS).await;
+        })?, priority, VOD_MAX_AGE_SECONDS).await;
         Ok(())
     }
 
@@ -419,7 +417,7 @@ impl VodProcessingInterface {
         Ok(())
     }
 
-    pub async fn generate_staged_clip(&self, request: &StagedVodClip) -> Result<(), SquadOvError> {
+    pub async fn generate_staged_clip(&self, request: &StagedVodClip, priority: u8) -> Result<(), SquadOvError> {
         log::info!("[Clip] Downloading VOD {}", request.id);
         let (vod, metadata, uri) = self.get_raw_uri(&request.video_uuid, "Clip").await?;
 
@@ -496,8 +494,8 @@ impl VodProcessingInterface {
         db::store_vod_md5(&mut tx, &clip_uuid, &md5_hash).await?;
 
         log::info!("[Clip] Dispatch Jobs - {}", request.id);
-        self.request_generate_preview(&clip_uuid).await?;
-        self.request_generate_thumbnail(&clip_uuid).await?;
+        self.request_generate_preview(&clip_uuid, priority).await?;
+        self.request_generate_thumbnail(&clip_uuid, priority).await?;
 
         log::info!("[Clip] Mark Executed - {}", request.id);
         db::mark_staged_clip_executed(&mut tx, request.id, &clip_uuid).await?;
@@ -557,7 +555,7 @@ impl VodProcessingInterface {
         Ok(())
     }
 
-    pub async fn process_vod(&self, vod_uuid: &Uuid, id: &str, session_id: Option<&String>) -> Result<(), SquadOvError> {
+    pub async fn process_vod(&self, vod_uuid: &Uuid, id: &str, session_id: Option<&String>, priority: u8) -> Result<(), SquadOvError> {
         log::info!("[Fastify] Start Processing VOD {} [{:?}]", vod_uuid, session_id);
 
         log::info!("[Fastify] Get VOD Association");
@@ -656,20 +654,20 @@ impl VodProcessingInterface {
         let staged_clips = db::get_staged_clips_for_vod(&*self.db, vod_uuid).await?;
 
         log::info!("[Fastify] Dispatch Jobs - {}", vod_uuid);
-        self.request_generate_preview(vod_uuid).await?;
-        self.request_generate_thumbnail(vod_uuid).await?;
+        self.request_generate_preview(vod_uuid, priority).await?;
+        self.request_generate_thumbnail(vod_uuid, priority).await?;
         for sc in staged_clips {
-            self.request_generate_staged_clip(&sc).await?;
+            self.request_generate_staged_clip(&sc, priority).await?;
         }
 
         log::info!("[Fastify] Finish Fastifying {:?}", vod_uuid);
         Ok(())
     }
 
-    pub async fn request_delete_vod(&self, vod_uuid: &Uuid) -> Result<(), SquadOvError> {
+    pub async fn request_delete_vod(&self, vod_uuid: &Uuid, priority: u8) -> Result<(), SquadOvError> {
         self.rmq.publish(&self.queue, serde_json::to_vec(&VodProcessingTask::Delete{
             vod_uuid: vod_uuid.clone(),
-        })?, RABBITMQ_LOW_PRIORITY, INFINITE_MAX_AGE).await;
+        })?, priority, INFINITE_MAX_AGE).await;
         Ok(())
     }
 

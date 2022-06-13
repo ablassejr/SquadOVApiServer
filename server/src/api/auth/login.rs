@@ -1,7 +1,10 @@
 use actix_web::{web, HttpRequest, HttpResponse, HttpMessage};
 use serde::{Serialize, Deserialize};
-use crate::api;
-use crate::api::fusionauth;
+use crate::api::{
+    self,
+    fusionauth,
+    v1::get_feature_flags,
+};
 use squadov_common::{
     SquadOvError,
     profile,
@@ -64,6 +67,7 @@ impl api::ApiApplication {
                 is_temp: false,
                 share_token: None,
                 sqv_access_token: None,
+                features: None,
             },
             None => return Err(SquadOvError::InternalError(String::from("Could not find user auth registration with the current app."))),
         };
@@ -113,6 +117,7 @@ impl api::ApiApplication {
             self.segment.track(&stored_user.uuid.to_string(), "registered").await?;
         }
 
+        session.features = Some(get_feature_flags(&*self.pool, stored_user.id).await?);
         session.user = stored_user;
         // Store this session in our database and ensure the user is made aware of which session they should
         // be echoing back to us so we can verify their session. It's the client's responsibility to store

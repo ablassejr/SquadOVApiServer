@@ -27,6 +27,7 @@ use actix_web::{dev::ServiceRequest, dev::ServiceResponse, Error, web, HttpMessa
 use futures::future::{ok, Ready};
 use futures::Future;
 use chrono::Utc;
+use crate::api::v1::get_feature_flags;
 
 /// Session validation middleware.
 /// 
@@ -104,10 +105,12 @@ where
                 };
 
                 if !is_expired {
+                    let user = app.users.get_stored_user_from_id(access_token.user_id.unwrap_or(-1), &*app.pool).await?.ok_or(SquadOvError::NotFound)?;
                     Some(SquadOVSession{
                         session_id: String::new(),
+                        features: Some(get_feature_flags(&*app.pool, user.id).await?),
                         // We do want this to fail if the access token's user id is not set. It's legacy behavior what can you do.
-                        user: app.users.get_stored_user_from_id(access_token.user_id.unwrap_or(-1), &*app.pool).await?.ok_or(SquadOvError::NotFound)?,
+                        user,
                         access_token: String::new(),
                         refresh_token: String::new(),
                         is_temp: true,
@@ -118,9 +121,11 @@ where
                     return Err(actix_web::error::ErrorUnauthorized("Expired access token"));
                 }
             } else if let Some(share_token) = share_token {
+                let user = app.users.get_stored_user_from_uuid(&share_token.user_uuid, &*app.pool).await?.ok_or(SquadOvError::NotFound)?;
                 Some(SquadOVSession{
                     session_id: String::new(),
-                    user: app.users.get_stored_user_from_uuid(&share_token.user_uuid, &*app.pool).await?.ok_or(SquadOvError::NotFound)?,
+                    features: Some(get_feature_flags(&*app.pool, user.id).await?),
+                    user,
                     access_token: String::new(),
                     refresh_token: String::new(),
                     is_temp: true,

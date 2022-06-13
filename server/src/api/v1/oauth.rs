@@ -51,6 +51,7 @@ pub async fn get_user_rso_auth_url_handler(app : web::Data<Arc<api::ApiApplicati
         is_temp: true,
         share_token: None,
         sqv_access_token: None,
+        features: None,
     };
     app.session.store_session(&*app.pool, &session).await?;
 
@@ -75,6 +76,7 @@ pub async fn get_twitch_login_url_handler(app : web::Data<Arc<api::ApiApplicatio
         is_temp: true,
         share_token: None,
         sqv_access_token: None,
+        features: None,
     };
     app.session.store_session(&*app.pool, &session).await?;
 
@@ -178,6 +180,7 @@ pub async fn get_discord_login_url_handler(app : web::Data<Arc<api::ApiApplicati
         is_temp: true,
         share_token: None,
         sqv_access_token: None,
+        features: None,
     };
     app.session.store_session(&*app.pool, &session).await?;
 

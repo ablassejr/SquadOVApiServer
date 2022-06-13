@@ -28,7 +28,13 @@ use squadov_common::{
         AccessToken,
     },
 };
-use crate::api::fusionauth;
+use crate::api::{
+    fusionauth,
+    v1::{
+        FeatureFlags,
+        get_feature_flags,
+    },
+};
 use uuid::Uuid;
 use crate::logged_error;
 use serde::Serialize;
@@ -43,6 +49,7 @@ pub struct SquadOVSession {
     pub is_temp: bool,
     pub share_token: Option<AccessTokenRequest>,
     pub sqv_access_token: Option<AccessToken>,
+    pub features: Option<FeatureFlags>,
 }
 
 impl FromRequest for SquadOVSession {
@@ -122,7 +129,7 @@ impl SessionManager {
         return Ok(())
     }
 
-    pub async fn get_session_from_id(&self, id : &str, pool: &PgPool) -> Result<Option<SquadOVSession>, sqlx::Error> {
+    pub async fn get_session_from_id(&self, id : &str, pool: &PgPool) -> Result<Option<SquadOVSession>, SquadOvError> {
         let ret = sqlx::query!(
             "
             SELECT
@@ -168,12 +175,13 @@ impl SessionManager {
                 is_temp: x.is_temp,
                 share_token: None,
                 sqv_access_token: None,
+                features: Some(get_feature_flags(pool, x.user_id).await?),
             })),
             None => Ok(None),
         }
     }
 
-    pub async fn get_session_from_request(&self, req : &HttpRequest, pool: &PgPool) -> Result<Option<SquadOVSession>, sqlx::Error> {
+    pub async fn get_session_from_request(&self, req : &HttpRequest, pool: &PgPool) -> Result<Option<SquadOVSession>, SquadOvError> {
         match req.headers().get(SESSION_ID_HEADER_KEY) {
             Some(id) => self.get_session_from_id(id.to_str().unwrap(), pool).await,
             None => Ok(None),
@@ -200,7 +208,7 @@ impl SessionManager {
         }
     }
 
-    pub async fn store_session<'a, T>(&self, ex: T, session: &SquadOVSession) -> Result<(), sqlx::Error>
+    pub async fn store_session<'a, T>(&self, ex: T, session: &SquadOVSession) -> Result<(), SquadOvError>
     where
         T: Executor<'a, Database = Postgres>
     {

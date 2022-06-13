@@ -79,7 +79,7 @@ impl RabbitMqConfig {
 
 #[async_trait]
 pub trait RabbitMqListener: Send + Sync {
-    async fn handle(&self, data: &[u8], queue: &str) -> Result<(), SquadOvError>;
+    async fn handle(&self, data: &[u8], queue: &str, priority: u8) -> Result<(), SquadOvError>;
 }
 
 pub struct RabbitMqConnectionBundle {
@@ -355,6 +355,7 @@ impl RabbitMqConnectionBundle {
             };
             let mut requeue_ms: Option<i64> = None;
             let mut change_queue: Option<String> = None;
+            let msg_priority = msg.properties.priority().unwrap_or(RABBITMQ_DEFAULT_PRIORITY);
 
             if !expired {
                 let current_listeners = listeners.read().await.clone();
@@ -362,7 +363,7 @@ impl RabbitMqConnectionBundle {
                 if topic_listeners.is_some() {
                     let topic_listeners = topic_listeners.unwrap();
                     for l in topic_listeners {
-                        match l.handle(&msg.data, &queue).await {
+                        match l.handle(&msg.data, &queue, msg_priority).await {
                             Ok(_) => (),
                             Err(err) => {
                                 log::warn!("Failure in processing RabbitMQ message: {:?}", err);
@@ -404,7 +405,7 @@ impl RabbitMqConnectionBundle {
                 requeue_callback(&*itf, RabbitMqPacket{
                     queue: queue.clone(),
                     data: msg.data.clone(),
-                    priority: msg.properties.priority().unwrap_or(RABBITMQ_DEFAULT_PRIORITY),
+                    priority: msg_priority,
                     timestamp: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(og_timestamp as i64, 0), Utc),
                     retry_count: retry_count + 1,
                     base_delay_ms: requeue_ms,
@@ -414,7 +415,7 @@ impl RabbitMqConnectionBundle {
                 requeue_callback(&*itf, RabbitMqPacket{
                     queue: new_queue.clone(),
                     data: msg.data.clone(),
-                    priority: msg.properties.priority().unwrap_or(RABBITMQ_DEFAULT_PRIORITY),
+                    priority: msg_priority,
                     timestamp: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(og_timestamp as i64, 0), Utc),
                     retry_count: 0,
                     base_delay_ms: requeue_ms,

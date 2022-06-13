@@ -27,6 +27,7 @@ use squadov_common::{
         db as vdb,
     },
     elastic::vod::ESVodDocument,
+    rabbitmq::RABBITMQ_DEFAULT_PRIORITY,
 };
 use std::sync::Arc;
 use std::convert::TryFrom;
@@ -474,7 +475,7 @@ pub async fn create_staged_clip_for_vod_handler(pth: web::Path<CreateClipPathInp
         .await?;
 
     if data.execute {
-        app.vod_itf.request_generate_staged_clip(&svc).await?;
+        app.vod_itf.request_generate_staged_clip(&svc, session.features.as_ref().map(|x| { x.vod_priority as u8 }).unwrap_or(RABBITMQ_DEFAULT_PRIORITY)).await?;
     }
 
     Ok(HttpResponse::Ok().json(&svc.id))

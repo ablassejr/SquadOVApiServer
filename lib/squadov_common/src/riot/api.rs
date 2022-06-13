@@ -276,7 +276,7 @@ impl RiotApiApplicationInterface {
 
 #[async_trait]
 impl RabbitMqListener for RiotApiApplicationInterface {
-    async fn handle(&self, data: &[u8], queue: &str) -> Result<(), SquadOvError> {
+    async fn handle(&self, data: &[u8], queue: &str, _priority: u8) -> Result<(), SquadOvError> {
         log::info!("Handle Riot RabbitMQ Task: {} [{}]", std::str::from_utf8(data).unwrap_or("failure"), queue);
         let task: RiotApiTask = serde_json::from_slice(data)?;
         match task {

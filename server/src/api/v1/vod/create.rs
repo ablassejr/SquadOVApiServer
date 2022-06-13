@@ -17,6 +17,7 @@ use squadov_common::{
         manager::StorageType,
     },
     storage::CloudStorageLocation,
+    rabbitmq::RABBITMQ_DEFAULT_PRIORITY,
 };
 
 #[derive(Deserialize)]
@@ -161,7 +162,12 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
             }, session_uri, &data.parts.unwrap_or(vec![])).await?;
         }
 
-        app.vod_itf.request_vod_processing(&data.association.video_uuid, &metadata_id, data.session_uri.clone(), true).await?;
+        app.vod_itf.request_vod_processing(
+            &data.association.video_uuid,
+            &metadata_id,
+            data.session_uri.clone(),
+            session.features.as_ref().map(|x| { x.vod_priority as u8 }).unwrap_or(RABBITMQ_DEFAULT_PRIORITY),
+        ).await?;
 
         // If this is the user's first VOD, we want to record that in our analytics so that we can tell users about their momentous occasation.
         if !data.association.is_clip && app.get_user_full_match_vod_count(session.user.id).await? == 1 {

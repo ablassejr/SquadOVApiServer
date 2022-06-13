@@ -110,7 +110,7 @@ impl CsgoRabbitmqInterface {
 
 #[async_trait]
 impl RabbitMqListener for CsgoRabbitmqInterface {
-    async fn handle(&self, data: &[u8], _queue: &str) -> Result<(), SquadOvError> {
+    async fn handle(&self, data: &[u8], _queue: &str, _priority: u8) -> Result<(), SquadOvError> {
         log::info!("Handle CSGO RabbitMQ Task: {}", std::str::from_utf8(data).unwrap_or("failure"));
         let task: CsgoTask = serde_json::from_slice(data)?;
         match task {

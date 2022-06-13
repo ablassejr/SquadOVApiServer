@@ -291,7 +291,7 @@ impl WowTaskHandler {
 
 #[async_trait]
 impl RabbitMqListener for WowTaskHandler {
-    async fn handle(&self, data: &[u8], _queue: &str) -> Result<(), SquadOvError> {
+    async fn handle(&self, data: &[u8], _queue: &str, _priority: u8) -> Result<(), SquadOvError> {
         let view_ids: Vec<Uuid> = serde_json::from_slice(data)?;
         log::info!("Handle Combat Log Transfer RabbitMQ Task: {:?}", &view_ids);
         for view_id in view_ids {

@@ -1,24 +1,29 @@
 use serde::Serialize;
-use squadov_common::{SquadOvError};
+use squadov_common::{
+    SquadOvError,
+    rabbitmq::RABBITMQ_DEFAULT_PRIORITY,
+};
+use sqlx::{Executor, Postgres};
 use actix_web::{web, HttpResponse};
 use crate::api;
 use std::sync::Arc;
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FeatureFlags {
-    user_id: i64,
-    max_record_pixel_y: i32,
-    max_record_fps: i32,
-    allow_record_upload: bool,
-    allow_wow_combat_log_upload: bool,
-    enable_user_profiles: bool,
-    disable_sentry: bool,
-    max_bitrate_kbps: i32,
-    can_instant_clip: bool,
-    disable_es_search: bool,
-    mandatory_watermark: bool,
-    watermark_min_size: f64,
+    pub user_id: i64,
+    pub max_record_pixel_y: i32,
+    pub max_record_fps: i32,
+    pub allow_record_upload: bool,
+    pub allow_wow_combat_log_upload: bool,
+    pub enable_user_profiles: bool,
+    pub disable_sentry: bool,
+    pub max_bitrate_kbps: i32,
+    pub can_instant_clip: bool,
+    pub disable_es_search: bool,
+    pub mandatory_watermark: bool,
+    pub watermark_min_size: f64,
+    pub vod_priority: i16,
 }
 
 impl Default for FeatureFlags {
@@ -36,6 +41,7 @@ impl Default for FeatureFlags {
             disable_es_search: false,
             mandatory_watermark: true,
             watermark_min_size: 0.01,
+            vod_priority: RABBITMQ_DEFAULT_PRIORITY as i16,
         }
     }
 }
@@ -52,6 +58,29 @@ impl Default for GlobalFlags {
             disable_registration: false,
         }
     }
+}
+
+pub async fn get_feature_flags<'a, T>(ex: T, user_id: i64) -> Result<FeatureFlags, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            FeatureFlags,
+            "
+            SELECT *
+            FROM squadov.user_feature_flags
+            WHERE user_id = $1
+            ",
+            user_id,
+        )
+            .fetch_optional(ex)
+            .await?
+            .unwrap_or(FeatureFlags{
+                user_id,
+                ..FeatureFlags::default()
+            })
+    )
 }
 
 impl api::ApiApplication {
@@ -75,26 +104,7 @@ impl api::ApiApplication {
 }
 
 pub async fn get_user_feature_flags_handler(app : web::Data<Arc<api::ApiApplication>>, data : web::Path<super::UserResourcePath>) -> Result<HttpResponse, SquadOvError> {
-    let flags = sqlx::query_as!(
-        FeatureFlags,
-        "
-        SELECT *
-        FROM squadov.user_feature_flags
-        WHERE user_id = $1
-        ",
-        data.user_id,
-    )
-        .fetch_optional(&*app.pool)
-        .await?;
-
-    if flags.is_some() {
-        Ok(HttpResponse::Ok().json(&flags.unwrap()))
-    } else {
-        Ok(HttpResponse::Ok().json(FeatureFlags{
-            user_id: data.user_id,
-            ..FeatureFlags::default()
-        }))
-    }
+    Ok(HttpResponse::Ok().json(&get_feature_flags(&*app.pool, data.user_id).await?))
 }
 
 pub async fn get_global_app_flags_handler(app : web::Data<Arc<api::ApiApplication>>) -> Result<HttpResponse, SquadOvError> {

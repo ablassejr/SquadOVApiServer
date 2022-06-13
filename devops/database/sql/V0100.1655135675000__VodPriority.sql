@@ -1,0 +1,2 @@
+ALTER TABLE user_feature_flags
+ADD COLUMN vod_priority SMALLINT NOT NULL DEFAULT 5;

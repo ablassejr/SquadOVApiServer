@@ -359,7 +359,7 @@ impl WowTaskHandler {
 
 #[async_trait]
 impl RabbitMqListener for WowTaskHandler {
-    async fn handle(&self, data: &[u8], _queue: &str) -> Result<(), SquadOvError> {
+    async fn handle(&self, data: &[u8], _queue: &str, _priority: u8) -> Result<(), SquadOvError> {
         log::info!("Handle Transfer RabbitMQ Task: {}", if self.characters { "Characters" } else if self.encounter { "Encounter" } else { "Arena" });
         if self.characters {
             let task_ids: Vec<String> = serde_json::from_slice(data)?;
