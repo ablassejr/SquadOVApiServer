@@ -63,8 +63,10 @@ where
 async fn handle_invoice_paid(app: Arc<ApiApplication>, event: StripeTypedWebhookEvent<StripeInvoice>) -> Result<(), SquadOvError> {
     // Invoice has been paid - find the customer and make sure we track them as having the proper subscription.
     if let Some(user_id) = subscriptions::get_user_id_from_stripe_customer_id(&*app.pool, &event.data.object.customer).await? {
+        let user = user::get_squadov_user_from_id(&*app.pool, user_id).await?;
         for d in &event.data.object.lines.data {
             if update_user_subscription_from_line_item(&*app.pool, app.clone(), user_id, &d).await? {
+                app.segment.track(&user.uuid.to_string(), "start_subscription").await?;
                 app.discord.request_sync_user(user_id).await?;
                 break;
             }
