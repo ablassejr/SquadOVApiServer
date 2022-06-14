@@ -52,6 +52,7 @@ use squadov_common::{
         RABBITMQ_DEFAULT_PRIORITY,
         RABBITMQ_HIGH_PRIORITY,
     },
+    vod::db as vdb,
 };
 use std::collections::HashMap;
 use cached::{TimedCache, proc_macro::cached};
@@ -314,6 +315,7 @@ impl api::ApiApplication {
                 }).await?;
             },
         }
+        vdb::update_user_vods_expiration_from_feature_flags(&mut tx, user_id).await?;
         tx.commit().await?;
         Ok(())
     }

@@ -988,3 +988,30 @@ where
             .collect()
     )
 }
+
+pub async fn update_user_vods_expiration_from_feature_flags<'a, T>(ex: T, user_id: i64) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        UPDATE squadov.vods AS v
+        SET expiration_time = v.end_time + sub.vod_retention * INTERVAL '1 second'
+        FROM (
+            SELECT u.uuid, uf.vod_retention
+            FROM squadov.users AS u
+            INNER JOIN squadov.user_feature_flags AS uf
+                ON uf.user_id = u.id
+            WHERE u.id = $1
+        ) AS sub(uuid, vod_retention)
+        WHERE sub.uuid = v.user_uuid
+            AND NOT v.is_clip
+            AND v.match_uuid IS NOT NULL
+            AND v.end_time IS NOT NULL
+        ",
+        user_id,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
