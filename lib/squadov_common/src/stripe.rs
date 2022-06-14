@@ -3,6 +3,9 @@ pub mod price;
 pub mod checkout;
 pub mod coupon;
 pub mod customer_portal;
+pub mod invoice;
+pub mod webhook;
+pub mod subscription;
 
 use crate::{
     SquadOvError,
@@ -54,6 +57,7 @@ pub struct StripeApiConfig {
 //    publishable_api_key: String,
     secret_api_key: String,
     api_version: StripeApiVersion,
+    pub webhook_secret: String,
 }
 
 impl StripeApiClient {

@@ -47,16 +47,17 @@ impl<'de> Deserialize<'de> for StripeRecurringInterval {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct StripeRecurring {
     pub interval: Option<StripeRecurringInterval>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct StripePrice {
     pub id: String,
     pub unit_amount: i64,
     pub recurring: Option<StripeRecurring>,
+    pub product: String,
 }
 
 pub struct ListAllPricesRequest {
@@ -92,6 +93,17 @@ impl StripeApiClient {
             )
                 .await?
                 .json::<ListAllPricesResponse>().await?
+        )
+    }
+
+    pub async fn retrieve_a_price(&self, price: &str) -> Result<StripePrice, SquadOvError> {
+        Ok(
+            self.send_request(
+                self.client.get(&Self::build_url(&format!("v1/prices/{}", price)))
+                    .build()?
+            )
+                .await?
+                .json::<StripePrice>().await?
         )
     }
 }

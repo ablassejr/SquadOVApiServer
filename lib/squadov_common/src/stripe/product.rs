@@ -68,4 +68,15 @@ impl StripeApiClient {
                 .json::<StripeListAllProductResponse>().await?
         )
     }
+
+    pub async fn retrieve_a_product(&self, product: &str) -> Result<StripeProduct, SquadOvError> {
+        Ok(
+            self.send_request(
+                self.client.get(&Self::build_url(&format!("v1/products/{}", product)))
+                    .build()?
+            )
+                .await?
+                .json::<StripeProduct>().await?
+        )
+    }
 }

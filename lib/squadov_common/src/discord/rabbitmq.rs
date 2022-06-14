@@ -4,6 +4,8 @@ use crate::{
     rabbitmq::{
         RabbitMqInterface,
         RabbitMqListener,
+        RABBITMQ_DEFAULT_PRIORITY,
+        RabbitMqConfig,
     },
     discord::{
         bot::DiscordBotConfig,
@@ -22,6 +24,8 @@ use serenity::{
     http::CacheHttp,
 };
 
+const DISCORD_MAX_AGE_SECONDS: i64 = 172800; // 2 day
+
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum DiscordTask {
@@ -32,13 +36,22 @@ pub enum DiscordTask {
 
 pub struct DiscordTaskProducer {
     rmq: Arc<RabbitMqInterface>,
+    config: RabbitMqConfig,
 }
 
 impl DiscordTaskProducer {
-    pub fn new(rmq: Arc<RabbitMqInterface>) -> Self {
+    pub fn new(rmq: Arc<RabbitMqInterface>, config: RabbitMqConfig) -> Self {
         Self {
-            rmq
+            rmq,
+            config,
         }
+    }
+
+    pub async fn request_sync_user(&self, user_id: i64) -> Result<(), SquadOvError> {
+        self.rmq.publish(&self.config.discord_queue, serde_json::to_vec(&DiscordTask::SyncUser{
+            user_id,
+        })?, RABBITMQ_DEFAULT_PRIORITY, DISCORD_MAX_AGE_SECONDS).await;
+        Ok(())
     }
 }
 

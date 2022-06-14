@@ -1,6 +1,9 @@
 use crate::{
     SquadOvError,
-    stripe::StripeApiClient,
+    stripe::{
+        StripeApiClient,
+        invoice::StripeInvoiceLineContainer,
+    },
 };
 use serde::{
     Serialize,
@@ -46,10 +49,11 @@ impl<'de> Deserialize<'de> for StripeCheckoutSessionMode {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct StripeCheckoutLineItem {
     pub price: String,
     pub quantity: Option<i32>,
+    pub subscription: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -123,7 +127,10 @@ impl StripeCreateSessionRequest {
 
 #[derive(Deserialize)]
 pub struct StripeCheckoutSession {
-    pub url: String
+    pub client_reference_id: Option<String>,
+    pub customer: Option<String>,
+    pub url: Option<String>,
+    pub line_items: Option<StripeInvoiceLineContainer>,
 }
 
 impl StripeApiClient {

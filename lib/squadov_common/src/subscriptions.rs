@@ -83,6 +83,15 @@ impl FromStr for SquadOvSubTiers {
     }
 }
 
+impl SquadOvSubTiers {
+    pub fn has_subscription(&self) -> bool {
+        match self {
+            SquadOvSubTiers::Basic => false,
+            _ => true
+        }
+    }
+}
+
 pub async fn get_user_sub_tier<'a, T>(ex: T, user_id: i64) -> Result<SquadOvSubTiers, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>
@@ -93,6 +102,7 @@ where
             SELECT tier
             FROM squadov.user_subscription_tier
             WHERE user_id = $1
+                AND end_tm >= NOW()
             ",
             user_id
         )
@@ -105,6 +115,35 @@ where
     )
 }
 
+pub async fn set_user_sub_tier<'a, T>(ex: T, user_id: i64, tier: SquadOvSubTiers, end_tm: Option<DateTime<Utc>>) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        INSERT INTO squadov.user_subscription_tier (
+            user_id,
+            tier,
+            start_tm,
+            end_tm
+        ) VALUES (
+            $1,
+            $2,
+            NOW(),
+            $3
+        ) ON CONFLICT (user_id) DO UPDATE
+            SET tier = EXCLUDED.tier,
+                start_tm = EXCLUDED.start_tm,
+                end_tm = EXCLUDED.end_tm
+        ",
+        user_id,
+        &format!("{}", tier),
+        end_tm,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
 
 impl Serialize for SquadOvSubTiers {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -164,4 +203,43 @@ where
                 x.customer
             })
     )
+}
+
+pub async fn get_user_id_from_stripe_customer_id<'a, T>(ex: T, customer_id: &str) -> Result<Option<i64>, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query!(
+            "
+            SELECT user_id
+            FROM squadov.stripe_customers
+            WHERE customer = $1
+            ",
+            customer_id,
+        )
+            .fetch_optional(ex)
+            .await?
+            .map(|x| {
+                x.user_id
+            })
+    )
+}
+
+pub async fn associate_user_id_with_customer_id<'a, T>(ex: T, user_id: i64, customer_id: &str) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        INSERT INTO squadov.stripe_customers (user_id, customer)
+        VALUES ($1, $2)
+        ON CONFLICT DO NOTHING
+        ",
+        user_id,
+        customer_id,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
 }

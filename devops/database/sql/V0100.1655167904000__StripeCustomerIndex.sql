@@ -1,0 +1,1 @@
+CREATE INDEX CONCURRENTLY ON stripe_customers(customer);

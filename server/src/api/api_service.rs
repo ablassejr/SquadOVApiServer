@@ -39,6 +39,10 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 )
         )
         .service(
+            web::scope("/webhooks")
+                .route("/stripe", web::post().to(v1::stripe_webhook_handler))
+        )
+        .service(
             web::scope("/auth")
                 .route("/login", web::post().to(auth::login_handler))
                 .route("/login/mfa", web::post().to(auth::mfa_login_handler))

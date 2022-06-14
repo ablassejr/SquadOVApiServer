@@ -88,6 +88,7 @@ use squadov_common::{
     },
     combatlog::interface::CombatLogInterface,
     stripe::{StripeApiClient, StripeApiConfig},
+    discord::rabbitmq::DiscordTaskProducer,
 };
 use url::Url;
 use std::vec::Vec;
@@ -332,6 +333,7 @@ pub struct ApiApplication {
     pub cl_itf: Arc<CombatLogInterface>,
     pub rabbitmq: Arc<RabbitMqInterface>,
     pub stripe: Arc<StripeApiClient>,
+    pub discord: Arc<DiscordTaskProducer>,
 }
 
 impl ApiApplication {
@@ -613,8 +615,9 @@ impl ApiApplication {
             zendesk: Arc::new(ZendeskClient::new(config.zendesk.clone())),
             es_api,
             cl_itf,
-            rabbitmq,
+            rabbitmq: rabbitmq.clone(),
             stripe: Arc::new(StripeApiClient::new(&config.stripe)),
+            discord: Arc::new(DiscordTaskProducer::new(rabbitmq.clone(), config.rabbitmq.clone())),
         };
 
         app.create_vod_manager(&config.storage.vods.global).await.unwrap();
