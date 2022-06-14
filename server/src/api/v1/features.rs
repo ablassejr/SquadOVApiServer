@@ -87,6 +87,50 @@ where
     )
 }
 
+pub async fn update_feature_flags<'a, T>(ex: T, user_id: i64, flags: FeatureFlags) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        UPDATE squadov.user_feature_flags
+        SET max_record_pixel_y = $2,
+            max_record_fps = $3,
+            allow_record_upload = $4,
+            allow_wow_combat_log_upload = $5,
+            enable_user_profiles = $6,
+            disable_sentry = $7,
+            max_bitrate_kbps = $8,
+            can_instant_clip = $9,
+            disable_es_search = $10,
+            mandatory_watermark = $11,
+            watermark_min_size = $12,
+            vod_priority = $13,
+            early_access = $14,
+            vod_retention = $15
+        WHERE user_id = $1
+        ",
+        user_id,
+        flags.max_record_pixel_y,
+        flags.max_record_fps,    
+        flags.allow_record_upload,
+        flags.allow_wow_combat_log_upload,
+        flags.enable_user_profiles,
+        flags.disable_sentry,
+        flags.max_bitrate_kbps,
+        flags.can_instant_clip,
+        flags.disable_es_search,
+        flags.mandatory_watermark,
+        flags.watermark_min_size,
+        flags.vod_priority,
+        flags.early_access,
+        flags.vod_retention,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
 impl api::ApiApplication {
     pub async fn get_global_app_flags(&self) -> Result<GlobalFlags, SquadOvError> {
         let kvp_flags = sqlx::query!("

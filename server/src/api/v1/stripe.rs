@@ -71,6 +71,7 @@ async fn handle_invoice_paid(app: Arc<ApiApplication>, event: StripeTypedWebhook
                 break;
             }
         }
+        app.update_user_subscription(user_id).await?;
     }
     Ok(())
 }
@@ -81,7 +82,10 @@ async fn handle_invoice_payment_failed(app: Arc<ApiApplication>, event: StripeTy
     if let Some(user_id) = user_id {
         let user = user::get_squadov_user_from_id(&*app.pool, user_id).await?;
         app.segment.track(&user.uuid.to_string(), "payment_failed").await?;
-        subscriptions::set_user_sub_tier(&*app.pool, user_id, SquadOvSubTiers::Basic, None).await?;
+        let mut tx = app.pool.begin().await?;
+        subscriptions::set_user_sub_tier(&mut tx, user_id, SquadOvSubTiers::Basic, None).await?;
+        tx.commit().await?;
+        app.update_user_subscription(user_id).await?;
     }
     Ok(())
 }
@@ -114,6 +118,8 @@ async fn handle_checkout_session_completed(app: Arc<ApiApplication>, event: Stri
         }
     }
     tx.commit().await?;
+    
+    app.update_user_subscription(user.id).await?;
     Ok(())
 }
 
@@ -136,6 +142,7 @@ async fn handle_customer_subscription_update(app: Arc<ApiApplication>, event: St
         tx.commit().await?;
 
         app.discord.request_sync_user(user_id).await?;
+        app.update_user_subscription(user_id).await?;
     }
 
     Ok(())

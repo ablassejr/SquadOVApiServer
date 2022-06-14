@@ -24,6 +24,38 @@ pub struct SquadOVUser {
     pub support_priority: String,
 }
 
+pub enum SupportLevel {
+    Normal,
+    High
+}
+
+impl ToString for SupportLevel {
+    fn to_string(&self) -> String {
+        match self {
+            SupportLevel::Normal => "normal",
+            SupportLevel::High => "high"
+        }.to_string()
+    }
+}
+
+pub async fn update_user_support_priority<'a, T>(ex: T, id: i64, level: SupportLevel) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        UPDATE squadov.users
+        SET support_priority = $2
+        WHERE id = $1
+        ",
+        id,
+        &level.to_string(),
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
+}
+
 pub async fn get_squadov_user_from_uuid<'a, T>(ex: T, uuid: &Uuid) -> Result<SquadOVUser, SquadOvError>
 where
     T: Executor<'a, Database = Postgres>

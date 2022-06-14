@@ -6,6 +6,10 @@ use crate::{
     api::{
         self,
         auth::SquadOVSession,
+        v1::{
+            self,
+            FeatureFlags,
+        },
     },
 };
 use std::sync::Arc;
@@ -38,6 +42,15 @@ use squadov_common::{
         SquadOvFullPricingInfo,
         SquadOvSubTiers,
         SquadOvDiscount,
+    },
+    user::{
+        self,
+        SupportLevel,
+    },
+    rabbitmq::{
+        RABBITMQ_LOW_PRIORITY,
+        RABBITMQ_DEFAULT_PRIORITY,
+        RABBITMQ_HIGH_PRIORITY,
     },
 };
 use std::collections::HashMap;
@@ -239,4 +252,69 @@ pub async fn get_user_tier_handler(app : web::Data<Arc<api::ApiApplication>>, se
     Ok(HttpResponse::Ok().json(
         subscriptions::get_user_sub_tier(&*app.pool, session.user.id).await?
     ))
+}
+
+impl api::ApiApplication {
+    pub async fn update_user_subscription(&self, user_id: i64) -> Result<(), SquadOvError> {
+        let tier = subscriptions::get_user_sub_tier(&*self.pool, user_id).await?;
+        let flags = v1::get_feature_flags(&*self.pool, user_id).await?;
+
+        let mut tx = self.pool.begin().await?;
+        match tier {
+            SquadOvSubTiers::Basic => {
+                user::update_user_support_priority(&mut tx, user_id, SupportLevel::Normal).await?;
+                v1::update_feature_flags(&mut tx, user_id, FeatureFlags{
+                    max_record_pixel_y: 720,
+                    max_record_fps: 60,
+                    max_bitrate_kbps: 6000,
+                    mandatory_watermark: true,
+                    vod_priority: RABBITMQ_LOW_PRIORITY as i16,
+                    early_access: false,
+                    vod_retention: Some(chrono::Duration::days(7).num_seconds()),
+                    ..flags
+                }).await?;
+            },
+            SquadOvSubTiers::Silver => {
+                user::update_user_support_priority(&mut tx, user_id, SupportLevel::Normal).await?;
+                v1::update_feature_flags(&mut tx, user_id, FeatureFlags{
+                    max_record_pixel_y: 1080,
+                    max_record_fps: 60,
+                    max_bitrate_kbps: 12000,
+                    mandatory_watermark: false,
+                    vod_priority: RABBITMQ_DEFAULT_PRIORITY as i16,
+                    early_access: false,
+                    vod_retention: None,
+                    ..flags
+                }).await?;
+            },
+            SquadOvSubTiers::Gold => {
+                user::update_user_support_priority(&mut tx, user_id, SupportLevel::High).await?;
+                v1::update_feature_flags(&mut tx, user_id, FeatureFlags{
+                    max_record_pixel_y: 1440,
+                    max_record_fps: 60,
+                    max_bitrate_kbps: 18000,
+                    mandatory_watermark: false,
+                    vod_priority: RABBITMQ_DEFAULT_PRIORITY as i16,
+                    early_access: true,
+                    vod_retention: None,
+                    ..flags
+                }).await?;
+            },
+            SquadOvSubTiers::Diamond => {
+                user::update_user_support_priority(&mut tx, user_id, SupportLevel::High).await?;
+                v1::update_feature_flags(&mut tx, user_id, FeatureFlags{
+                    max_record_pixel_y: 99999,
+                    max_record_fps: 144,
+                    max_bitrate_kbps: 24000,
+                    mandatory_watermark: false,
+                    vod_priority: RABBITMQ_HIGH_PRIORITY as i16,
+                    early_access: true,
+                    vod_retention: None,
+                    ..flags
+                }).await?;
+            },
+        }
+        tx.commit().await?;
+        Ok(())
+    }
 }
