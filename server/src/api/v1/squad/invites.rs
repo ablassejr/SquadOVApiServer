@@ -16,7 +16,7 @@ use squadov_common::{
         }
     }
 };
-use sqlx::{Transaction, Postgres, Row};
+use sqlx::{Transaction, Executor, Postgres, Row};
 use serde::{Serialize, Deserialize};
 use chrono::Utc;
 use std::collections::HashMap;
@@ -167,7 +167,33 @@ impl api::ApiApplication {
         Ok(())
     }
 
+    pub async fn is_squad_full<'a, T>(&self, ex: T, squad_id: i64) -> Result<bool, SquadOvError>
+    where
+        T: Executor<'a, Database = Postgres>
+    {
+        Ok(
+            sqlx::query!(
+                r#"
+                SELECT COALESCE(sq.member_count >= s.max_members, FALSE) AS "valid!"
+                FROM squadov.squad_overview as sq
+                INNER JOIN squadov.squads as s
+                    ON s.id = sq.id
+                WHERE sq.id = $1
+                "#,
+                squad_id
+            )
+                .fetch_one(ex)
+                .await?
+                .valid
+        )
+    }
+
     pub async fn force_add_user_to_squad(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, user_id: i64) -> Result<(), SquadOvError> {
+        // First do a check to make sure there's slots left in the squad.
+        if self.is_squad_full(&mut *tx, squad_id).await? {
+            return Err(SquadOvError::BadRequest);
+        }
+
         sqlx::query!(
             "
             INSERT INTO squadov.squad_role_assignments (
@@ -192,6 +218,10 @@ impl api::ApiApplication {
     }
 
     pub async fn add_user_to_squad_from_invite(&self, tx: &mut Transaction<'_, Postgres>, squad_id: i64, invite_uuid: &Uuid) -> Result<(), SquadOvError> {
+        if self.is_squad_full(&mut *tx, squad_id).await? {
+            return Err(SquadOvError::BadRequest);
+        }
+
         let invite_user_id = sqlx::query!(
             "
             INSERT INTO squadov.squad_role_assignments (
@@ -378,7 +408,10 @@ impl api::ApiApplication {
 
         // I'm assuming this should really only ever be an array of 1 invite so it won't be expensive to iterate.
         for inv in &invites {
-            self.add_user_to_squad_from_invite(&mut tx, inv.squad_id, &inv.invite_uuid).await?;
+            match self.add_user_to_squad_from_invite(&mut tx, inv.squad_id, &inv.invite_uuid).await {
+                Ok(_) => (),
+                Err(err) => log::warn!("Failed to join squad from invite? - {:?}", err),
+            }
         }
 
         tx.commit().await?;

@@ -18,12 +18,6 @@ impl api::ApiApplication {
     pub async fn create_default_squad(&self, tx: &mut Transaction<'_, Postgres>, user: &SquadOVUser) -> Result<(), SquadOvError> {
         let name = format!("{}'s Squad", &user.username);
         self.create_squad(&mut *tx, &name, user.id, true).await?;
-
-        // Mike
-        //self.force_add_user_to_squad(&mut *tx, squad_id, 1).await?;
-
-        // Derek
-        //self.force_add_user_to_squad(&mut *tx, squad_id, 4).await?;
         Ok(())
     }
 
@@ -34,18 +28,18 @@ impl api::ApiApplication {
                 INSERT INTO squadov.squads (
                     squad_name,
                     creation_time,
-                    is_default
+                    is_default,
+                    max_members
                 )
-                VALUES (
-                    $1,
-                    $2,
-                    $3
-                )
+                SELECT $1, $2, $3, max_squad_size 
+                FROM squadov.user_feature_flags
+                WHERE user_id = $4
                 RETURNING id
                 ",
                 squad_name,
                 Utc::now(),
-                default
+                default,
+                owner_id,
             )
         ).await?.get(0);
 

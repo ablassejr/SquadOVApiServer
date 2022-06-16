@@ -25,9 +25,12 @@ impl api::ApiApplication {
                 sq.member_count AS "member_count!",
                 sq.pending_invite_count AS "pending_invite_count!",
                 sq.is_public AS "is_public!",
-                sq.is_discoverable AS "is_discoverable!"
+                sq.is_discoverable AS "is_discoverable!",
+                s.max_members AS "max_members"
             FROM squadov.squad_overview AS sq
-            WHERE id = $1
+            INNER JOIN squadov.squads AS s
+                ON s.id = sq.id
+            WHERE sq.id = $1
             "#,
             squad_id,
         )
@@ -66,6 +69,7 @@ impl api::ApiApplication {
                 sq.pending_invite_count AS "pending_invite_count!",
                 sq.is_public AS "is_public!",
                 sq.is_discoverable AS "is_discoverable!",
+                s.max_members AS "max_members",
                 sra.squad_role AS "squad_role: SquadRole",
                 us.username AS "username",
                 us.id AS "user_id",
@@ -98,6 +102,7 @@ impl api::ApiApplication {
                     pending_invite_count: x.pending_invite_count,
                     is_public: x.is_public,
                     is_discoverable: x.is_discoverable,
+                    max_members: x.max_members,
                 },
                 role: x.squad_role,
                 username: x.username,
@@ -118,11 +123,14 @@ impl api::ApiApplication {
                 sq.pending_invite_count AS "pending_invite_count!",
                 sq.is_public AS "is_public!",
                 sq.is_discoverable AS "is_discoverable!",
+                s.max_members AS "max_members",
                 sra.squad_role AS "squad_role: SquadRole",
                 us.username AS "username",
                 us.id AS "user_id",
                 sub.squad_id IS NULL AS "can_share!"
             FROM squadov.squad_overview AS sq
+            INNER JOIN squadov.squads AS s
+                ON s.id = sq.id
             INNER JOIN squadov.squad_role_assignments AS sra
                 ON sra.squad_id = sq.id
             INNER JOIN squadov.users AS us
@@ -147,6 +155,7 @@ impl api::ApiApplication {
                     pending_invite_count: x.pending_invite_count,
                     is_public: x.is_public,
                     is_discoverable: x.is_discoverable,
+                    max_members: x.max_members,
                 },
                 role: x.squad_role,
                 username: x.username,
@@ -167,11 +176,14 @@ impl api::ApiApplication {
                 sq.pending_invite_count AS "pending_invite_count!",
                 sq.is_public AS "is_public!",
                 sq.is_discoverable AS "is_discoverable!",
+                s.max_members AS "max_members",
                 sra.squad_role AS "squad_role: SquadRole",
                 us.username AS "username",
                 us.id AS "user_id",
                 sub.squad_id IS NULL AS "can_share!"
             FROM squadov.squad_overview AS sq
+            INNER JOIN squadov.squads AS s
+                ON s.id = sq.id
             INNER JOIN squadov.squad_role_assignments AS sra
                 ON sra.squad_id = sq.id
             INNER JOIN squadov.users AS us
@@ -202,6 +214,7 @@ impl api::ApiApplication {
                 pending_invite_count: x.pending_invite_count,
                 is_public: x.is_public,
                 is_discoverable: x.is_discoverable,
+                max_members: x.max_members,
             },
             role: x.squad_role,
             username: x.username,
@@ -274,8 +287,11 @@ impl api::ApiApplication {
                     sq.member_count AS "member_count!",
                     sq.pending_invite_count AS "pending_invite_count!",
                     sq.is_public AS "is_public!",
-                    sq.is_discoverable AS "is_discoverable!"
+                    sq.is_discoverable AS "is_discoverable!",
+                    s.max_members AS "max_members"
                 FROM squadov.squad_overview AS sq
+                INNER JOIN squadov.squads AS s
+                    ON s.id = sq.id
                 LEFT JOIN squadov.squad_role_assignments AS sra
                     ON sra.squad_id = sq.id
                         AND sra.user_id = $1

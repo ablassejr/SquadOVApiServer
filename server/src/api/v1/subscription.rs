@@ -272,6 +272,7 @@ impl api::ApiApplication {
                     vod_priority: RABBITMQ_LOW_PRIORITY as i16,
                     early_access: false,
                     vod_retention: Some(chrono::Duration::days(7).num_seconds()),
+                    max_squad_size: Some(20),
                     ..flags
                 }).await?;
             },
@@ -285,6 +286,7 @@ impl api::ApiApplication {
                     vod_priority: RABBITMQ_DEFAULT_PRIORITY as i16,
                     early_access: false,
                     vod_retention: None,
+                    max_squad_size: Some(100),
                     ..flags
                 }).await?;
             },
@@ -298,6 +300,7 @@ impl api::ApiApplication {
                     vod_priority: RABBITMQ_DEFAULT_PRIORITY as i16,
                     early_access: true,
                     vod_retention: None,
+                    max_squad_size: None,
                     ..flags
                 }).await?;
             },
@@ -311,11 +314,13 @@ impl api::ApiApplication {
                     vod_priority: RABBITMQ_HIGH_PRIORITY as i16,
                     early_access: true,
                     vod_retention: None,
+                    max_squad_size: None,
                     ..flags
                 }).await?;
             },
         }
         vdb::update_user_vods_expiration_from_feature_flags(&mut tx, user_id).await?;
+        v1::edit_user_max_squad_size_from_feature_flags(&mut tx, user_id).await?;
         tx.commit().await?;
         Ok(())
     }

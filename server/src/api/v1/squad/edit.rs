@@ -2,13 +2,40 @@ use actix_web::{web, HttpResponse};
 use crate::api;
 use std::sync::Arc;
 use squadov_common::SquadOvError;
-use sqlx::{Transaction, Postgres};
+use sqlx::{Transaction, Executor, Postgres};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct EditSquadInput {
     #[serde(rename="squadName")]
     squad_name: String
+}
+
+pub async fn edit_user_max_squad_size_from_feature_flags<'a, T>(ex: T, user_id: i64) -> Result<(), SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    sqlx::query!(
+        "
+        UPDATE squadov.squads AS s
+        SET max_members = sub.max_squad_size
+        FROM (
+            SELECT squad_id, uf.max_squad_size
+            FROM squadov.squad_role_assignments AS sra
+            INNER JOIN squadov.user_feature_flags AS uf
+                ON uf.user_id = sra.user_id
+            WHERE sra.user_id = $1
+                AND sra.squad_role = 'Owner'
+        ) AS sub
+        WHERE sub.squad_id = s.id
+            AND NOT s.is_public
+            AND NOT s.is_discoverable
+        ",
+        user_id,
+    )
+        .execute(ex)
+        .await?;
+    Ok(())
 }
 
 impl api::ApiApplication {

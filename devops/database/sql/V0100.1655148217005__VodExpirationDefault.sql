@@ -1,0 +1,2 @@
+ALTER TABLE vods
+ALTER COLUMN expiration_time SET DEFAULT NULL;

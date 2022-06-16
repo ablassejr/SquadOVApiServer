@@ -26,6 +26,7 @@ pub struct FeatureFlags {
     pub vod_priority: i16,
     pub early_access: bool,
     pub vod_retention: Option<i64>,
+    pub max_squad_size: Option<i64>,
 }
 
 impl Default for FeatureFlags {
@@ -46,6 +47,7 @@ impl Default for FeatureFlags {
             vod_priority: RABBITMQ_DEFAULT_PRIORITY as i16,
             early_access: false,
             vod_retention: Some(chrono::Duration::days(7).num_seconds()),
+            max_squad_size: Some(20),
         }
     }
 }
@@ -107,7 +109,8 @@ where
             watermark_min_size = $12,
             vod_priority = $13,
             early_access = $14,
-            vod_retention = $15
+            vod_retention = $15,
+            max_squad_size = $16
         WHERE user_id = $1
         ",
         user_id,
@@ -125,6 +128,7 @@ where
         flags.vod_priority,
         flags.early_access,
         flags.vod_retention,
+        flags.max_squad_size,
     )
         .execute(ex)
         .await?;

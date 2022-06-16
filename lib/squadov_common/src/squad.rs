@@ -17,6 +17,7 @@ pub struct SquadOvSquad {
     pub pending_invite_count: i64,
     pub is_public: bool,
     pub is_discoverable: bool,
+    pub max_members: Option<i64>,
 }
 
 #[derive(Serialize)]
