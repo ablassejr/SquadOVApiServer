@@ -61,6 +61,7 @@ impl api::ApiApplication {
                     welcome_sent: false,
                     registration_time: Some(DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(x.insert_instant / 1000, 0), Utc)),
                     support_priority: String::from("normal"),
+                    last_trial_usage: None,
                 },
                 access_token: result.token,
                 refresh_token: result.refresh_token,

@@ -67,6 +67,13 @@ impl StripeSubscriptionStatus {
             _ => false
         }
     }
+
+    pub fn is_trial(&self) -> bool {
+        match self {
+            StripeSubscriptionStatus::Trialing => true,
+            _ => false
+        }
+    }
 }
 
 #[derive(Deserialize)]

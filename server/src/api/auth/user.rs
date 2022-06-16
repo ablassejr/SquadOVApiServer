@@ -45,7 +45,8 @@ impl UserManager {
                 is_admin,
                 welcome_sent,
                 registration_time,
-                support_priority
+                support_priority,
+                last_trial_usage
             FROM squadov.users
             WHERE email = $1
             ",
@@ -67,7 +68,8 @@ impl UserManager {
                 is_admin,
                 welcome_sent,
                 registration_time,
-                support_priority
+                support_priority,
+                last_trial_usage
             FROM squadov.users
             WHERE id = $1
             ",
@@ -89,7 +91,8 @@ impl UserManager {
                 is_admin,
                 welcome_sent,
                 registration_time,
-                support_priority
+                support_priority,
+                last_trial_usage
             FROM squadov.users
             WHERE uuid = $1
             ",
@@ -118,7 +121,8 @@ impl UserManager {
                 is_admin,
                 welcome_sent,
                 registration_time,
-                support_priority
+                support_priority,
+                last_trial_usage
             ",
             user.email,
             user.username,

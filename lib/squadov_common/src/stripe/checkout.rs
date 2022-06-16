@@ -63,6 +63,11 @@ pub struct StripeCheckoutDiscount {
 }
 
 #[derive(Serialize)]
+pub struct StripeCheckoutSubscriptionData {
+    pub trial_period_days: Option<i64>,
+}
+
+#[derive(Serialize)]
 pub struct StripeCreateSessionRequest {
     pub cancel_url: String,
     pub mode: StripeCheckoutSessionMode,
@@ -72,6 +77,7 @@ pub struct StripeCreateSessionRequest {
     pub customer_email: Option<String>,
     pub line_items: Vec<StripeCheckoutLineItem>,
     pub discounts: Vec<StripeCheckoutDiscount>,
+    pub subscription_data: Option<StripeCheckoutSubscriptionData>,
 }
 
 impl StripeCreateSessionRequest {
@@ -117,6 +123,14 @@ impl StripeCreateSessionRequest {
             if let Some(p) = di.promotion_code.as_ref() {
                 tuples.push(
                     (format!("discounts[{}][promotion_code]", i), p.clone()),
+                );
+            }
+        }
+
+        if let Some(s) = self.subscription_data.as_ref() {
+            if let Some(td) = s.trial_period_days {
+                tuples.push(
+                    ("subscription_data[trial_period_days]".to_string(), format!("{}", td)),
                 );
             }
         }

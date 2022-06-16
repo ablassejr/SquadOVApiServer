@@ -31,6 +31,7 @@ use squadov_common::{
             StripeCheckoutSessionMode,
             StripeCheckoutLineItem,
             StripeCheckoutDiscount,
+            StripeCheckoutSubscriptionData,
         },
         customer_portal::{
             StripeCreatePortalSessionRequest,
@@ -57,6 +58,7 @@ use squadov_common::{
 use std::collections::HashMap;
 use cached::{TimedCache, proc_macro::cached};
 use serde::Deserialize;
+use chrono::Utc;
 
 #[cached(
     result=true,
@@ -180,6 +182,11 @@ pub async fn start_subscription_checkout_handler(app : web::Data<Arc<api::ApiApp
     } else {
         // Check for any user discounts here.
         let discounts = get_largest_discount_for_user(app.get_ref().clone(), app.stripe.clone(), session.user.id).await?;
+        let can_do_trial = if let Some(last_trial) = session.user.last_trial_usage.as_ref() {
+            Utc::now().signed_duration_since(last_trial.clone()).num_days() >= 365
+        } else {
+            true
+        };
 
         let mut products = app.stripe.search_products(StripeSearchProductsRequest{
             active: Some(true),
@@ -228,6 +235,13 @@ pub async fn start_subscription_checkout_handler(app : web::Data<Arc<api::ApiApp
                     client_reference_id: Some(session.user.uuid.to_string()),
                     customer_email: if existing_customer.is_none() { Some(session.user.email.clone()) } else { None },
                     customer: existing_customer,
+                    subscription_data: if can_do_trial {
+                        Some(StripeCheckoutSubscriptionData{
+                            trial_period_days: Some(7),
+                        })
+                    } else {
+                        None
+                    },
                 }).await?;
 
                 Ok(HttpResponse::Ok().json(session.url))

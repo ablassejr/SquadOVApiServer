@@ -50,6 +50,19 @@ where
             if let Some(tier) = product.metadata.get("tier") {
                 let tier = SquadOvSubTiers::from_str(&tier)?;
                 subscriptions::set_user_sub_tier(ex, user_id, tier, Some(subscription.current_period_end + chrono::Duration::days(2))).await?;
+
+                if subscription.status.is_trial() {
+                    sqlx::query!(
+                        "
+                        UPDATE squadov.users
+                        SET last_trial_usage = NOW()
+                        WHERE id = $1
+                        ",
+                        user_id,
+                    )
+                        .execute(&*app.pool)
+                        .await?;
+                }
                 true
             } else {
                 false

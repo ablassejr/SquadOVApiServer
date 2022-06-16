@@ -22,6 +22,7 @@ pub struct SquadOVUser {
     pub welcome_sent: bool,
     pub registration_time: Option<DateTime<Utc>>,
     pub support_priority: String,
+    pub last_trial_usage: Option<DateTime<Utc>>,
 }
 
 pub enum SupportLevel {
@@ -74,7 +75,8 @@ where
                 is_admin,
                 welcome_sent,
                 registration_time,
-                support_priority
+                support_priority,
+                last_trial_usage
             FROM squadov.users
             WHERE uuid = $1
             ",
@@ -103,7 +105,8 @@ where
                 is_admin,
                 welcome_sent,
                 registration_time,
-                support_priority
+                support_priority,
+                last_trial_usage
             FROM squadov.users
             WHERE id = $1
             ",
