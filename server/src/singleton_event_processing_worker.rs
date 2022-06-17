@@ -67,7 +67,8 @@ pub fn start_expired_vods_cleanup_loop(app: Arc<api::ApiApplication>) {
                 INNER JOIN squadov.vod_storage_copies AS vsc
                     ON vsc.video_uuid = v.video_uuid
                         AND vsc.loc = 0
-                WHERE v.expiration_time <= NOW()
+                WHERE v.expiration_time IS NOT NULL
+                    AND v.expiration_time <= NOW()
                     AND v.request_expiration_time IS NULL
                 "#
             )

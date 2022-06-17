@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: discord
+    labels:
+        task: discord
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            task: discord
+    template:
+        metadata:
+            labels:
+                task: discord
+        spec:
+            nodeSelector:
+                eks.amazonaws.com/compute-type: fargate
+            containers:
+                - name: worker
+                  image: "registry.gitlab.com/squadov/squadovapiserver/{{ .Values.environment }}/discord:{{ .Values.commitHash }}"
+                  resources:
+                    requests:
+                        cpu: "500m"
+                        memory: "1Gi"
+                  env:
+                    - name: SQUADOV_DB_CONNECTIONS
+                      value: "{{ .Values.dbConns }}"
+                    - name: SQUADOV_RABBITMQ__ELASTICSEARCH_WORKERS
+                      value: "{{ .Values.workers }}"
+                    - name: SQUADOV_EXTERNAL_WORKERS
+                      value: "{{ .Values.workers }}"
+            imagePullSecrets:
+                - name: regcred

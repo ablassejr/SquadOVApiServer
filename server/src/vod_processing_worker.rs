@@ -47,7 +47,7 @@ pub async fn main() -> Result<(), SquadOvError> {
     let _ = tokio::task::spawn(async move {
         let app = api::ApiApplication::new(&config, "vod").await;
         if let Some(vod) = opts.vod {
-            app.vod_itf.process_vod(&vod, "source", None).await.unwrap();
+            app.vod_itf.process_vod(&vod, "source", None, 1).await.unwrap();
         } else {
             loop {
                 async_std::task::sleep(std::time::Duration::from_secs(10)).await;
