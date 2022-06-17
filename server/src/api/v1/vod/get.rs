@@ -230,7 +230,7 @@ pub async fn get_vod_upload_path_handler(data : web::Path<VodFindFromVideoUuid>,
         } else {
             // If we get here, we're starting an upload for a VOD that is probably already tracked on our server.
             if let Some(expiration) = vod.expiration_time.as_ref() {
-                if expiration > &Utc::now() {
+                if expiration < &Utc::now() {
                     return Err(SquadOvError::BadRequest);
                 }
             }

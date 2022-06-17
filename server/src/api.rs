@@ -352,7 +352,8 @@ impl ApiApplication {
                 u.is_admin,
                 u.welcome_sent,
                 u.registration_time,
-                u.support_priority
+                u.support_priority,
+                u.last_trial_usage
             FROM squadov.users AS u
             LEFT JOIN squadov.daily_active_sessions AS das
                 ON das.user_id = u.id
