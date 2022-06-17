@@ -88,7 +88,6 @@ impl StripeCreateSessionRequest {
             ("success_url".to_string(), self.success_url.clone()),
             ("cancel_url".to_string(), self.cancel_url.clone()),
             ("mode".to_string(), format!("{}", &self.mode)),
-            ("allow_promotion_codes".to_string(), (if self.allow_promotion_codes { "true" } else { "false" }).to_string()),
         ];
 
         if let Some(c) = self.client_reference_id.as_ref() {
@@ -127,6 +126,10 @@ impl StripeCreateSessionRequest {
                     (format!("discounts[{}][promotion_code]", i), p.clone()),
                 );
             }
+        }
+
+        if self.discounts.is_empty() {
+            tuples.push(("allow_promotion_codes".to_string(), (if self.allow_promotion_codes { "true" } else { "false" }).to_string()));
         }
 
         if let Some(s) = self.subscription_data.as_ref() {
