@@ -143,6 +143,13 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                 ))
                 .wrap(auth::ApiSessionValidator{required: true})
                 .service(
+                    web::scope("/util")
+                        .wrap(access::ApiAccess::new(
+                            Box::new(access::DenyShareTokenAccess{}),
+                        ))
+                        .route("/time", web::get().to(v1::get_server_time_handler))
+                )
+                .service(
                     web::scope("/link")
                         .wrap(access::ApiAccess::new(
                             Box::new(access::DenyShareTokenAccess{}),

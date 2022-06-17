@@ -25,6 +25,7 @@ mod combat_log;
 mod aws;
 mod subscription;
 mod stripe;
+mod util;
 
 pub use user::*;
 pub use matches::*;
@@ -53,6 +54,7 @@ pub use combat_log::*;
 pub use aws::*;
 pub use subscription::*;
 pub use stripe::*;
+pub use util::*;
 
 use serde::Serialize;
 

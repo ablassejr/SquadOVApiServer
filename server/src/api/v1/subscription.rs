@@ -242,6 +242,7 @@ pub async fn start_subscription_checkout_handler(app : web::Data<Arc<api::ApiApp
                     } else {
                         None
                     },
+                    allow_promotion_codes: true,
                 }).await?;
 
                 Ok(HttpResponse::Ok().json(session.url))

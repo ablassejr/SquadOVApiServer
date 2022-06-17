@@ -24,6 +24,7 @@ use crate::{
         rabbitmq::ElasticSearchJobInterface,
     },
     matches,
+    user,
 };
 use std::sync::{Arc};
 use std::io::{self, BufReader};
@@ -466,10 +467,13 @@ impl VodProcessingInterface {
             false,
         ).await?;
 
+        log::info!("[Clip] Get Requester - {}", request.id);
+        let requester_user = user::get_squadov_user_from_id(&*self.db, request.user_id).await?;
+
         log::info!("[Clip] Associating VOD (DB) - {}", request.id);
         db::associate_vod(&mut tx, &VodAssociation{
             match_uuid: vod.match_uuid.clone(),
-            user_uuid: vod.user_uuid.clone(),
+            user_uuid: Some(requester_user.uuid.clone()),
             video_uuid: clip_uuid.clone(),
             start_time: vod.start_time.map(|x| { x + chrono::Duration::milliseconds(request.start_offset_ms) }),
             end_time: vod.start_time.map(|x| { x + chrono::Duration::milliseconds(request.end_offset_ms) }),

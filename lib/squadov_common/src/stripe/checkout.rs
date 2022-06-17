@@ -78,6 +78,7 @@ pub struct StripeCreateSessionRequest {
     pub line_items: Vec<StripeCheckoutLineItem>,
     pub discounts: Vec<StripeCheckoutDiscount>,
     pub subscription_data: Option<StripeCheckoutSubscriptionData>,
+    pub allow_promotion_codes: bool,
 }
 
 impl StripeCreateSessionRequest {
@@ -87,6 +88,7 @@ impl StripeCreateSessionRequest {
             ("success_url".to_string(), self.success_url.clone()),
             ("cancel_url".to_string(), self.cancel_url.clone()),
             ("mode".to_string(), format!("{}", &self.mode)),
+            ("allow_promotion_codes".to_string(), (if self.allow_promotion_codes { "true" } else { "false" }).to_string()),
         ];
 
         if let Some(c) = self.client_reference_id.as_ref() {
