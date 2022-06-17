@@ -215,5 +215,6 @@ pub async fn handle_discord_oauth_callback_handler(app : web::Data<Arc<api::ApiA
     discord::db::link_discord_user_to_squadv(&mut tx, session.user.id, discord_user.id.parse::<i64>()?, &token).await?;
     tx.commit().await?;
 
+    app.discord.request_sync_user(session.user.id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
