@@ -99,6 +99,17 @@ pub async fn associate_vod_handler(path: web::Path<VodAssociatePathInput>, data 
         Some(x) => x,
         None => return Err(SquadOvError::BadRequest)
     };
+
+    if data.association.is_clip {
+        if let Some(et) = data.association.end_time.as_ref() {
+            if let Some(st) = data.association.start_time.as_ref() {
+                // Check max clip length here
+                if ((et.clone() - st.clone()).num_milliseconds() - 4000) >= (session.features.as_ref().ok_or(SquadOvError::Unauthorized)?.max_clip_seconds * 1000) {
+                    return Err(SquadOvError::BadRequest);
+                }
+            }
+        }
+    }
     
     let input_user_uuid = match data.association.user_uuid {
         Some(x) => x,

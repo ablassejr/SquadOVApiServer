@@ -33,6 +33,9 @@ use squadov_common::{
             StripeCheckoutDiscount,
             StripeCheckoutSubscriptionData,
         },
+        currency::{
+            StripeCurrency,
+        },
         customer_portal::{
             StripeCreatePortalSessionRequest,
         },
@@ -114,11 +117,11 @@ async fn get_largest_discount_for_user(app: Arc<api::ApiApplication>, stripe: Ar
 
 #[cached(
     result=true,
-    type = "TimedCache<(Option<i64>, bool), SquadOvFullPricingInfo>",
+    type = "TimedCache<(Option<i64>, bool, StripeCurrency), SquadOvFullPricingInfo>",
     create = "{ TimedCache::with_lifespan_and_capacity(600, 30) }",
-    convert = r#"{ (user_id.clone(), annual) }"#
+    convert = r#"{ (user_id.clone(), annual, currency.clone()) }"#
 )]
-async fn get_subscription_pricing(app : Arc<api::ApiApplication>, user_id: Option<i64>, annual: bool) -> Result<SquadOvFullPricingInfo, SquadOvError> {
+async fn get_subscription_pricing(app : Arc<api::ApiApplication>, user_id: Option<i64>, annual: bool, currency: StripeCurrency) -> Result<SquadOvFullPricingInfo, SquadOvError> {
     let products = app.stripe.list_all_products(StripeListAllProductRequest{
         active: Some(true),
     }).await?;
@@ -132,25 +135,26 @@ async fn get_subscription_pricing(app : Arc<api::ApiApplication>, user_id: Optio
     for p in products.data {
         if let Some(tier) = p.metadata.get("tier") {
             let tier = SquadOvSubTiers::from_str(&tier)?;
-            info.pricing.insert(
-                tier,
-                {
-                    let pricing = app.stripe.list_all_prices(ListAllPricesRequest{
-                        product: Some(p.id.clone()),
-                        recurring: Some(StripeRecurring{
-                            interval: Some(
-                                if annual {
-                                    StripeRecurringInterval::Year
-                                } else {
-                                    StripeRecurringInterval::Month
-                                }
-                            )
-                        })
-                    }).await?;
+            let pricing = app.stripe.list_all_prices(ListAllPricesRequest{
+                product: Some(p.id.clone()),
+                recurring: Some(StripeRecurring{
+                    interval: Some(
+                        if annual {
+                            StripeRecurringInterval::Year
+                        } else {
+                            StripeRecurringInterval::Month
+                        }
+                    )
+                }),
+                currency: Some(currency.clone()),
+            }).await?;
 
-                    pricing.data.first().ok_or(SquadOvError::BadRequest)?.unit_amount as f64 / 100.0 / if annual { 12.0 } else { 1.0 }
-                }
-            );
+            if let Some(pr) = pricing.data.first() {
+                info.pricing.insert(
+                    tier,
+                    pr.unit_amount as f64 / 100.0 / if annual { 12.0 } else { 1.0 },
+                );
+            }
         }
     }
 
@@ -159,12 +163,14 @@ async fn get_subscription_pricing(app : Arc<api::ApiApplication>, user_id: Optio
 
 #[derive(Deserialize)]
 pub struct SubscriptionQuery {
-    pub annual: bool
+    pub annual: bool,
+    #[serde(default="StripeCurrency::default")]
+    pub currency: StripeCurrency,
 }
 
 pub async fn get_subscription_pricing_handler(app : web::Data<Arc<api::ApiApplication>>, session: Option<SquadOVSession>, query: web::Query<SubscriptionQuery>) -> Result<HttpResponse, SquadOvError> {
     Ok(HttpResponse::Ok().json(
-        get_subscription_pricing(app.get_ref().clone(), session.map(|x| { x.user.id }), query.annual).await?
+        get_subscription_pricing(app.get_ref().clone(), session.map(|x| { x.user.id }), query.annual, query.currency.clone()).await?
     ))
 }
 
@@ -172,6 +178,8 @@ pub async fn get_subscription_pricing_handler(app : web::Data<Arc<api::ApiApplic
 pub struct CheckoutQuery {
     pub tier: SquadOvSubTiers,
     pub annual: bool,
+    #[serde(default="StripeCurrency::default")]
+    pub currency: StripeCurrency,
 }
 
 pub async fn start_subscription_checkout_handler(app : web::Data<Arc<api::ApiApplication>>, session: SquadOVSession, query: web::Query<CheckoutQuery>) -> Result<HttpResponse, SquadOvError> {
@@ -206,7 +214,8 @@ pub async fn start_subscription_checkout_handler(app : web::Data<Arc<api::ApiApp
                             StripeRecurringInterval::Month
                         }
                     )
-                })
+                }),
+                currency: Some(query.currency.clone()),
             }).await?;
 
             if let Some(price) = pricing.data.pop() {
@@ -288,6 +297,7 @@ impl api::ApiApplication {
                     early_access: false,
                     vod_retention: Some(chrono::Duration::days(7).num_seconds()),
                     max_squad_size: Some(20),
+                    max_clip_seconds: 120,
                     ..flags
                 }).await?;
             },
@@ -302,6 +312,7 @@ impl api::ApiApplication {
                     early_access: false,
                     vod_retention: None,
                     max_squad_size: Some(100),
+                    max_clip_seconds: 180,
                     ..flags
                 }).await?;
             },
@@ -316,6 +327,7 @@ impl api::ApiApplication {
                     early_access: true,
                     vod_retention: None,
                     max_squad_size: None,
+                    max_clip_seconds: 300,
                     ..flags
                 }).await?;
             },
@@ -330,6 +342,7 @@ impl api::ApiApplication {
                     early_access: true,
                     vod_retention: None,
                     max_squad_size: None,
+                    max_clip_seconds: 300,
                     ..flags
                 }).await?;
             },

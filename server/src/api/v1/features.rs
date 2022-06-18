@@ -27,6 +27,7 @@ pub struct FeatureFlags {
     pub early_access: bool,
     pub vod_retention: Option<i64>,
     pub max_squad_size: Option<i64>,
+    pub max_clip_seconds: i64,
 }
 
 impl Default for FeatureFlags {
@@ -48,6 +49,7 @@ impl Default for FeatureFlags {
             early_access: false,
             vod_retention: Some(chrono::Duration::days(7).num_seconds()),
             max_squad_size: Some(20),
+            max_clip_seconds: 120,
         }
     }
 }

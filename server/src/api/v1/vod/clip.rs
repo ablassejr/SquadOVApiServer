@@ -416,8 +416,8 @@ pub async fn create_staged_clip_for_vod_handler(pth: web::Path<CreateClipPathInp
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
-    // Must be less than 3 minutes. Give it a 4 second buffer to account for rounding and the extra second we tack onto the end of clips.
-    if (data.end - data.start - 4000) >= (3 * 60 * 1000) {
+    // Must be less than the user's max length time. Give it a 4 second buffer to account for rounding and the extra second we tack onto the end of clips.
+    if (data.end - data.start - 4000) >= (session.features.as_ref().ok_or(SquadOvError::Unauthorized)?.max_clip_seconds * 1000) {
         return Err(SquadOvError::BadRequest);
     }
 

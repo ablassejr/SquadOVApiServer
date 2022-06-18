@@ -1,6 +1,9 @@
 use crate::{
     SquadOvError,
-    stripe::StripeApiClient,
+    stripe::{
+        StripeApiClient,
+        currency::StripeCurrency,
+    },
 };
 use serde::{
     Serialize,
@@ -63,6 +66,7 @@ pub struct StripePrice {
 pub struct ListAllPricesRequest {
     pub product: Option<String>,
     pub recurring: Option<StripeRecurring>,
+    pub currency: Option<StripeCurrency>,
 }
 
 #[derive(Deserialize)]
@@ -86,6 +90,11 @@ impl StripeApiClient {
                         } else {
                             vec![]
                         }
+                    } else {
+                        vec![]
+                    })
+                    .query(&if let Some(c) = request.currency {
+                        vec![("currency", format!("{}", c))]
                     } else {
                         vec![]
                     })
