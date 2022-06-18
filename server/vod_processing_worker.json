@@ -121,6 +121,11 @@
           "ordinal": 15,
           "name": "max_squad_size",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 16,
+          "name": "max_clip_seconds",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -144,7 +149,8 @@
         false,
         false,
         true,
-        true
+        true,
+        false
       ]
     }
   },
