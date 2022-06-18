@@ -19,7 +19,7 @@ resource "aws_s3_bucket" "vod_storage_bucket" {
         abort_incomplete_multipart_upload_days = 1
 
         transition {
-            days = 3
+            days = 12
             storage_class = "GLACIER_IR"
         }
     }
