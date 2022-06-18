@@ -92,5 +92,7 @@ pub async fn remove_content_from_squad_handler(app : web::Data<Arc<api::ApiAppli
     let mut tx = app.pool.begin().await?;
     app.remove_content_from_squad(&mut tx, path.squad_id, &path.video_uuid).await?;
     tx.commit().await?;
+
+    app.es_itf.request_update_vod_sharing(path.video_uuid.clone()).await?;
     Ok(HttpResponse::NoContent().finish())
 }
