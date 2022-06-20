@@ -996,7 +996,7 @@ where
     sqlx::query!(
         "
         UPDATE squadov.vods AS v
-        SET expiration_time = v.end_time + sub.vod_retention * INTERVAL '1 second'
+        SET expiration_time = GREATEST(v.end_time + sub.vod_retention * INTERVAL '1 second', NOW() + INTERVAL '1 day')
         FROM (
             SELECT u.uuid, uf.vod_retention
             FROM squadov.users AS u
