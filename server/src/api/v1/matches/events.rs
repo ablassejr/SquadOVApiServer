@@ -85,12 +85,10 @@ pub async fn get_accessible_match_custom_events_handler(app : web::Data<Arc<ApiA
     let extensions = req.extensions();
     let session = extensions.get::<SquadOVSession>().ok_or(SquadOvError::Unauthorized)?;
 
-    // Use the 'find_accessible_vods_in_match_for_user' since that already takes care of all the sharing stuff.
-    // This way sharing VODs is equivalent to sharing custom events (for better or worse).
+    
     let vods = vdb::find_accessible_vods_in_match_for_user(&*app.pool, &match_path.match_uuid, session.user.id, machine_id.map(|x| { x.id.clone() }).unwrap_or(String::new()).as_str()).await?;
-    let user_uuids: Vec<Uuid> = vods.iter()
-        .filter(|x| { x.user_uuid.is_some() })
-        .map(|x| { x.user_uuid.unwrap().clone() })
+    let video_uuids: Vec<Uuid> = vods.iter()
+        .map(|x| { x.video_uuid.clone() })
         .collect();
 
     Ok(HttpResponse::Ok().json(
@@ -109,10 +107,10 @@ pub async fn get_accessible_match_custom_events_handler(app : web::Data<Arc<ApiA
             INNER JOIN squadov.users AS u
                 ON u.id = mce.user_id
             WHERE mce.match_uuid = $1
-                AND u.uuid = ANY($2)
+                AND mce.video_uuid = ANY($2)
             "#,
             &match_path.match_uuid,
-            &user_uuids,
+            &video_uuids,
         )
             .fetch_all(&*app.pool)
             .await?
