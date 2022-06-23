@@ -35,6 +35,10 @@ use squadov_common::{
         db as vdb,
     },
     elastic::vod::ESVodDocument,
+    subscriptions::{
+        self,
+        SquadOvSubTiers,
+    },
 };
 use std::sync::Arc;
 use chrono::{Utc, Duration};
@@ -46,6 +50,7 @@ use crate::api::v1::{
     wow::WowListQuery,
 };
 use elasticsearch_dsl::{Search, Sort, SortOrder, Query};
+use cached::{TimedCache, proc_macro::cached};
 
 pub struct Match {
     pub uuid : Uuid
@@ -311,6 +316,16 @@ impl Default for RecentMatchQuery {
 pub struct RecentMatchHandle {
     pub match_uuid: Uuid,
     pub user_uuids: Vec<Uuid>,
+}
+
+#[cached(
+    result=true,
+    type = "TimedCache<i64, SquadOvSubTiers>",
+    create = "{ TimedCache::with_lifespan_and_capacity(600, 200) }",
+    convert = r#"{ user_id }"#
+)]
+async fn get_cached_user_tier(app: Arc<api::ApiApplication>, user_id: i64) -> Result<SquadOvSubTiers, SquadOvError> {
+    subscriptions::get_user_sub_tier(&*app.pool, user_id).await
 }
 
 impl api::ApiApplication {
@@ -588,6 +603,12 @@ async fn get_recent_matches_for_user(user_id: i64, app : web::Data<Arc<api::ApiA
             for p in &mut m.povs {
                 p.access_token = Some(app.generate_access_token_for_recent_match(&m.match_uuid, m.game, p.user_id, &p.vod.video_tracks[0].metadata.video_uuid)?);
             }
+        }
+    }
+
+    for m in &mut matches {
+        for p in &mut m.povs {
+            p.tier = get_cached_user_tier(app.as_ref().clone(), p.user_id).await?;
         }
     }
     

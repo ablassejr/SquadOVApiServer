@@ -57,7 +57,7 @@ where
     )
 }
 
-#[derive(Eq, PartialEq, Display, Hash, Clone)]
+#[derive(Eq, PartialEq, Display, Hash, Clone, Debug)]
 pub enum SquadOvSubTiers {
     #[display(fmt="BASIC")]
     Basic,

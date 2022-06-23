@@ -106,6 +106,7 @@ impl api::ApiApplication {
                 ]);
         
             let documents: Vec<ESVodDocument> = self.es_api.search_documents(&self.config.elasticsearch.vod_index_read, serde_json::to_value(es_search)?).await?;
+            // We don't really need the tier information here so fill it in with a filler.
             let recent_matches = matches::vod_documents_to_recent_matches(documents, user.id, "");
             let m = recent_matches.first().ok_or(SquadOvError::NotFound)?;
             let pov = m.povs.first().ok_or(SquadOvError::NotFound)?;

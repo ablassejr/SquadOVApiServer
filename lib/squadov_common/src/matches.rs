@@ -21,6 +21,7 @@ use crate::{
     },
     csgo::summary::CsgoPlayerMatchSummary,
     elastic::vod::ESVodDocument,
+    subscriptions::SquadOvSubTiers,
     vod,
 };
 use chrono::{DateTime, Utc};
@@ -112,6 +113,7 @@ pub struct RecentMatchPov {
     pub is_local: bool,
     pub tags: Vec<VodTag>,
     pub access_token: Option<String>,
+    pub tier: SquadOvSubTiers,
     // GAME DATA
     pub aimlab_task: Option<AimlabTask>,
     pub lol_match: Option<LolPlayerMatchSummary>,
@@ -323,7 +325,7 @@ where
     )
 }
 
-pub fn vod_document_to_match_pov_for_user(doc: ESVodDocument, user_id: i64, machine_id: &str) -> RecentMatchPov {
+pub fn vod_document_to_match_pov_for_user(doc: ESVodDocument, user_id: i64,  machine_id: &str) -> RecentMatchPov {
     let fav = doc.find_favorite_reason(user_id);
     let watchlist = doc.is_on_user_watchlist(user_id);
     RecentMatchPov {
@@ -347,6 +349,7 @@ pub fn vod_document_to_match_pov_for_user(doc: ESVodDocument, user_id: i64, mach
         wow_arena: doc.data.wow.as_ref().map(|x| { x.arena.clone() }).flatten(),
         wow_instance: doc.data.wow.as_ref().map(|x| { x.instance.clone() }).flatten(),
         csgo_match: doc.data.csgo.map(|x| { x.pov }),
+        tier: SquadOvSubTiers::Basic,
     }
 }
 
