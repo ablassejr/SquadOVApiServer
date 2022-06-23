@@ -552,6 +552,9 @@ where
                         mime_type: if metadata.has_fastify { vod::container_format_to_fastify_mime_type(&assoc.raw_container_format) } else { vod::container_format_to_mime_type(&assoc.raw_container_format) },
                     }],
                     preview: preview,
+                    thumbnail: get_vod_thumbnail(ex, &assoc.video_uuid).await?.map(|x| {
+                        format!("/v1/vod/{path}", path=&x.filepath)
+                    }),
                 }
             ]
         }

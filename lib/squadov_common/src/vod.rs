@@ -253,6 +253,7 @@ pub struct VodTrack {
     pub metadata: VodMetadata,
     pub segments: Vec<VodSegment>,
     pub preview: Option<String>,
+    pub thumbnail: Option<String>,
 }
 
 #[derive(Serialize,Deserialize,Debug, Clone)]

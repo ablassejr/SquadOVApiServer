@@ -118,6 +118,7 @@ impl ElasticSearchJobInterface {
                     },
                     segments: vec![],
                     preview: None,
+                    thumbnail: None,
                 }
             ]
         });

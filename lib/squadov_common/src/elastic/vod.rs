@@ -327,6 +327,7 @@ where
                 },
                 segments: vec![],
                 preview: None,
+                thumbnail: None,
             }
         ]
     });
