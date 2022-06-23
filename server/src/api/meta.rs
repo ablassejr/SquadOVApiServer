@@ -194,6 +194,7 @@ impl api::ApiApplication {
             if let Some(vmm) = vod_metadata_map.get(&video_uuid) {
                 if let Some(vod_metadata) = vmm.first() {
                     let manager = self.get_vod_manager(&vod_metadata.bucket).await?;
+                    let assoc = vod_db::get_vod_association(&*self.pool, &video_uuid).await?;
 
                     if vod_metadata.has_fastify {
                         metadata.meta_has_video = true;
@@ -219,7 +220,7 @@ impl api::ApiApplication {
                         metadata.meta_video = Some(manager.get_public_segment_redirect_uri(&VodSegmentId{
                             video_uuid: video_uuid.clone(),
                             quality: String::from("source"),
-                            segment_name: String::from("fastify.mp4"),
+                            segment_name: format!("fastify.{}", squadov_common::container_format_to_fastify_extension(&assoc.raw_container_format)),
                         }).await?);
                         metadata.meta_player = Some(
                             format!(
@@ -229,7 +230,7 @@ impl api::ApiApplication {
                                 share_token=&share_token,
                             ),
                         );
-                        metadata.meta_video_type = Some(String::from("video/mp4"));
+                        metadata.meta_video_type = Some(squadov_common::container_format_to_fastify_mime_type(&assoc.raw_container_format));
 
                         if let Some(thumbnail) = vod_db::get_vod_thumbnail(&*self.pool, video_uuid).await? {
                             metadata.meta_has_thumbnail = true;

@@ -372,7 +372,7 @@ impl VodProcessingInterface {
         let source_segment_id = VodSegmentId{
             video_uuid: vod_uuid.clone(),
             quality: String::from("source"),
-            segment_name: String::from("fastify.mp4"),
+            segment_name: format!("fastify.{}", crate::container_format_to_fastify_extension(&vod.raw_container_format)),
         };
 
         log::info!("[{}] Get VOD Manager {}", context, vod_uuid);
@@ -392,7 +392,7 @@ impl VodProcessingInterface {
         let length_seconds = vod.end_time.unwrap_or(Utc::now()).signed_duration_since(vod.start_time.unwrap_or(Utc::now())).num_seconds();
 
         log::info!("[Preview] Generate Preview Mp4 - {}", vod_uuid);
-        preview::generate_vod_preview(&uri, &preview_filename, length_seconds).await?;
+        preview::generate_vod_preview(&uri, &crate::container_format_to_fastify_container_format(&vod.raw_container_format), &preview_filename, "mp4", length_seconds).await?;
 
         log::info!("[Preview] Upload Preview VOD - {}", vod_uuid);
         let manager = self.vod.get_bucket(&metadata.bucket).await.ok_or(SquadOvError::InternalError(format!("Invalid bucket: {}", &metadata.bucket)))?;
@@ -424,7 +424,8 @@ impl VodProcessingInterface {
 
         log::info!("[Clip] Generating Clip {}", request.id);
         let clip_filename = NamedTempFile::new()?.into_temp_path();
-        clip::generate_clip(&uri, &clip_filename, request.start_offset_ms, request.end_offset_ms).await?;
+        let new_container_format = crate::container_format_to_fastify_container_format(&vod.raw_container_format);
+        clip::generate_clip(&uri, &new_container_format, &clip_filename, &new_container_format,  request.start_offset_ms, request.end_offset_ms).await?;
 
         log::info!("[Clip] Computing VOD MD5 - {}", request.id);
         let md5_hash = {
@@ -439,7 +440,7 @@ impl VodProcessingInterface {
         let clip_id = VodSegmentId{
             video_uuid: clip_uuid.clone(),
             quality: String::from("source"),
-            segment_name: String::from("fastify.mp4"),
+            segment_name: format!("fastify.{}", &new_container_format),
         };
         manager.upload_vod_from_file(&clip_id, &clip_filename, manager::StorageType::Hot).await?;
 
@@ -453,7 +454,7 @@ impl VodProcessingInterface {
         let mut tx = self.db.begin().await?;
 
         log::info!("[Clip] Reserving Clip UUID - {}", request.id);
-        db::reserve_vod_uuid(&mut tx, &clip_uuid, "mp4", request.user_id, true).await?;
+        db::reserve_vod_uuid(&mut tx, &clip_uuid, &new_container_format, request.user_id, true).await?;
 
         log::info!("[Clip] Creating Clip (DB) - {}", request.id);
         db::create_clip(
@@ -477,7 +478,7 @@ impl VodProcessingInterface {
             video_uuid: clip_uuid.clone(),
             start_time: vod.start_time.map(|x| { x + chrono::Duration::milliseconds(request.start_offset_ms) }),
             end_time: vod.start_time.map(|x| { x + chrono::Duration::milliseconds(request.end_offset_ms) }),
-            raw_container_format: "mp4".to_string(),
+            raw_container_format: new_container_format.clone(),
             is_clip: true,
             is_local: false,
             md5: None,
@@ -522,7 +523,7 @@ impl VodProcessingInterface {
         let length_seconds = vod.end_time.unwrap_or(Utc::now()).signed_duration_since(vod.start_time.unwrap_or(Utc::now())).num_seconds();
 
         log::info!("[Thumbnail] Generate Thumbnail - {}", vod_uuid);
-        preview::generate_vod_thumbnail(&uri, &thumbnail_filename, length_seconds).await?;
+        preview::generate_vod_thumbnail(&uri, &crate::container_format_to_fastify_container_format(&vod.raw_container_format), &thumbnail_filename, length_seconds).await?;
 
         log::info!("[Thumbnail] Upload Thumbnail - {}", vod_uuid);
         let manager = self.vod.get_bucket(&metadata.bucket).await.ok_or(SquadOvError::InternalError(format!("Invalid bucket: {}", &metadata.bucket)))?;
@@ -608,14 +609,14 @@ impl VodProcessingInterface {
 
         let fastify_filename = NamedTempFile::new()?.into_temp_path();
 
-        log::info!("[Fastify] Fastify Mp4 - {}", vod_uuid);
-        fastify::fastify_mp4(input_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &vod.raw_container_format, &fastify_filename).await?;
+        log::info!("[Fastify] Fastify VOD - {}", vod_uuid);
+        fastify::fastify_mp4(input_filename.as_os_str().to_str().ok_or(SquadOvError::BadRequest)?, &vod.raw_container_format, &fastify_filename, &crate::container_format_to_fastify_container_format(&vod.raw_container_format)).await?;
 
         log::info!("[Fastify] Upload Fastify VOD - {}", vod_uuid);
         let fastify_segment = VodSegmentId{
             video_uuid: vod_uuid.clone(),
             quality: String::from("source"),
-            segment_name: String::from("fastify.mp4"),
+            segment_name: format!("fastify.{}", crate::container_format_to_fastify_extension(&vod.raw_container_format)),
         };
         manager.upload_vod_from_file(&fastify_segment, &fastify_filename, manager::StorageType::Hot).await?;
 
@@ -686,6 +687,9 @@ impl VodProcessingInterface {
         log::info!("[Delete] Get VOD Metadata");
         let metadata = db::get_vod_metadata(&*self.db, vod_uuid, "source").await?;
 
+        log::info!("[Delete] Get VOD Assoc");
+        let vod = db::get_vod_association(&*self.db, vod_uuid).await?;
+
         log::info!("[Delete] Get VOD Thumbnail");
         let thumbnail = db::get_vod_thumbnail(&*self.db, vod_uuid).await?;
 
@@ -703,9 +707,9 @@ impl VodProcessingInterface {
             video_uuid: vod_uuid.clone(),
             quality: String::from("source"),
             segment_name: if metadata.has_fastify {
-                String::from("fastify.mp4")
+                format!("fastify.{}", crate::container_format_to_fastify_extension(&vod.raw_container_format))
             } else {
-                String::from("video.ts")
+                format!("video.{}", crate::container_format_to_extension(&vod.raw_container_format))
             },
         }).await?;
 
@@ -746,6 +750,7 @@ impl VodProcessingInterface {
 pub fn container_format_to_extension(container_format: &str) -> String {
     match container_format {
         "mpegts" => String::from("ts"),
+        "webm" => String::from("webm"),
         _ => String::from("mp4")
     }
 }
@@ -753,7 +758,29 @@ pub fn container_format_to_extension(container_format: &str) -> String {
 pub fn container_format_to_mime_type(container_format: &str) -> String {
     match container_format {
         "mpegts" => String::from("video/mp2t"),
+        "webm" => String::from("video/webm"),
         _ => String::from("video/mp4")
+    }
+}
+
+pub fn container_format_to_fastify_extension(container_format: &str) -> String {
+    match container_format {
+        "webm" => String::from("webm"),
+        _ => String::from("mp4"),
+    }
+}
+
+pub fn container_format_to_fastify_mime_type(container_format: &str) -> String {
+    match container_format {
+        "webm" => String::from("video/webm"),
+        _ => String::from("video/mp4")
+    }
+}
+
+pub fn container_format_to_fastify_container_format(container_format: &str) -> String {
+    match container_format {
+        "webm" => String::from("webm"),
+        _ => String::from("mp4")
     }
 }
 

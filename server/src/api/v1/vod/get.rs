@@ -143,12 +143,6 @@ impl api::ApiApplication {
                                 preview: None,
                             };
 
-                            let container_format = String::from(if quality.has_fastify {
-                                "mp4"
-                            } else {
-                                &assoc.raw_container_format
-                            });
-
                             // Eventually we'll want to figure out how to do real segments and maintaining
                             // compatability wit Electron but for now just a single file is all we have so just
                             // pretend we just have a single segment.
@@ -161,13 +155,13 @@ impl api::ApiApplication {
                                     } else {
                                         "video"
                                     },
-                                    extension=&squadov_common::container_format_to_extension(&container_format),
+                                    extension=&if quality.has_fastify { squadov_common::container_format_to_fastify_extension(&assoc.raw_container_format) } else { squadov_common::container_format_to_extension(&assoc.raw_container_format) },
                                 ),
                                 // Duration is a placeholder - not really needed but will be useful once we get
                                 // back to using semgnets.
                                 duration: 0.0,
                                 segment_start: 0.0,
-                                mime_type: squadov_common::container_format_to_mime_type(&container_format),
+                                mime_type: if quality.has_fastify { squadov_common::container_format_to_fastify_mime_type(&assoc.raw_container_format) } else { squadov_common::container_format_to_mime_type(&assoc.raw_container_format) },
                             });
 
                             if quality.has_preview {
@@ -276,7 +270,7 @@ pub async fn get_vod_track_segment_handler(data : web::Path<squadov_common::VodS
             ,
             None,
         )
-    } else if data.segment_name != "preview.mp4" && db::check_if_vod_public(&*app.pool, &data.video_uuid).await? && manager.check_vod_segment_is_public(&data).await? {
+    } else if !data.segment_name.starts_with("preview.") && db::check_if_vod_public(&*app.pool, &data.video_uuid).await? && manager.check_vod_segment_is_public(&data).await? {
         // If the VOD is public (shared), then we can return the public URL instead of the signed private one.
         (manager.get_public_segment_redirect_uri(&data).await?, None)
     } else {

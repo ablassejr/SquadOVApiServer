@@ -298,6 +298,7 @@ impl api::ApiApplication {
                     vod_retention: Some(chrono::Duration::days(7).num_seconds()),
                     max_squad_size: Some(20),
                     max_clip_seconds: 120,
+                    allow_vp9: false,
                     ..flags
                 }).await?;
             },
@@ -313,6 +314,7 @@ impl api::ApiApplication {
                     vod_retention: None,
                     max_squad_size: Some(100),
                     max_clip_seconds: 180,
+                    allow_vp9: false,
                     ..flags
                 }).await?;
             },
@@ -328,6 +330,7 @@ impl api::ApiApplication {
                     vod_retention: None,
                     max_squad_size: None,
                     max_clip_seconds: 300,
+                    allow_vp9: true,
                     ..flags
                 }).await?;
             },
@@ -343,6 +346,7 @@ impl api::ApiApplication {
                     vod_retention: None,
                     max_squad_size: None,
                     max_clip_seconds: 300,
+                    allow_vp9: true,
                     ..flags
                 }).await?;
             },

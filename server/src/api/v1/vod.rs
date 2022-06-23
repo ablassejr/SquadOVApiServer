@@ -193,6 +193,7 @@ impl api::ApiApplication {
                 let manager = self.get_vod_manager(&metadata.bucket).await?;
                 if let Some(quality_arr) = quality_options.get(video_uuid) {    
                     let raw_extension = squadov_common::container_format_to_extension(&vod.raw_container_format);
+                    let fastify_extension = squadov_common::container_format_to_fastify_extension(&vod.raw_container_format);
                     for quality in quality_arr {
                         // We only need to make one segment public since only one or the other will ever exist
                         // at a given point in time.
@@ -200,7 +201,7 @@ impl api::ApiApplication {
                             squadov_common::VodSegmentId{
                                 video_uuid: video_uuid.clone(),
                                 quality: quality.id.clone(),
-                                segment_name: String::from("fastify.mp4"),
+                                segment_name: format!("fastify.{}", &fastify_extension),
                             }
                         } else {
                             squadov_common::VodSegmentId{

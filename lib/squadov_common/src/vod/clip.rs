@@ -1,7 +1,7 @@
 use crate::SquadOvError;
 use tokio::process::Command;
 
-pub async fn generate_clip(input_fname: &str, output_fname: &std::path::Path, start: i64, end: i64) -> Result<(), SquadOvError> {
+pub async fn generate_clip(input_fname: &str, input_container: &str, output_fname: &std::path::Path, output_container: &str, start: i64, end: i64) -> Result<(), SquadOvError> {
     let ffmpeg_path = std::env::var("FFMPEG_BINARY_PATH")?;
     let ffmpeg_output = Command::new(&ffmpeg_path)
         // Single threaded so that we can split our CPU bandwidth among multiple videos.
@@ -12,7 +12,7 @@ pub async fn generate_clip(input_fname: &str, output_fname: &std::path::Path, st
         // Need to auto accept overwriting existing files to prevent blocking.
         .arg("-y")
         .arg("-f")
-        .arg("mp4")
+        .arg(input_container)
         .arg("-probesize")
         .arg("100M")
         .arg("-analyzeduration")
@@ -35,7 +35,7 @@ pub async fn generate_clip(input_fname: &str, output_fname: &std::path::Path, st
         .arg("-avoid_negative_ts")
         .arg("make_zero")
         .arg("-f")
-        .arg("mp4")
+        .arg(output_container)
         .arg(output_fname.as_os_str())
         .output()
         .await?;

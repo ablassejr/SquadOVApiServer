@@ -2,7 +2,7 @@ use crate::SquadOvError;
 use tokio::process::Command;
 
 // Generate a thumbnail
-pub async fn generate_vod_thumbnail(input_fname: &str, output_fname: &std::path::Path, length_seconds: i64) -> Result<(), SquadOvError> {
+pub async fn generate_vod_thumbnail(input_fname: &str, input_container: &str, output_fname: &std::path::Path, length_seconds: i64) -> Result<(), SquadOvError> {
     let ffmpeg_path = std::env::var("FFMPEG_BINARY_PATH")?;
     let ffmpeg_output = Command::new(&ffmpeg_path)
         // Single threaded so that we can split our CPU bandwidth among multiple videos.
@@ -16,7 +16,7 @@ pub async fn generate_vod_thumbnail(input_fname: &str, output_fname: &std::path:
         .arg("-ss")
         .arg(format!("{}", std::cmp::max(length_seconds - 30, 0)))
         .arg("-f")
-        .arg("mp4")
+        .arg(input_container)
         .arg("-i")
         .arg(input_fname)
         .arg("-vframes")
@@ -40,7 +40,7 @@ pub async fn generate_vod_thumbnail(input_fname: &str, output_fname: &std::path:
 }
 
 // Generate a (hopefully) relevant clip for use as the VOD's preview.
-pub async fn generate_vod_preview(input_fname: &str, output_fname: &std::path::Path, length_seconds: i64) -> Result<(), SquadOvError> {
+pub async fn generate_vod_preview(input_fname: &str, input_container: &str, output_fname: &std::path::Path, output_container: &str, length_seconds: i64) -> Result<(), SquadOvError> {
     // HARD CODING OF MP4 HERE IS FINE FOR NOW.
     let ffmpeg_path = std::env::var("FFMPEG_BINARY_PATH")?;
     let ffmpeg_output = if cfg!(unix) {
@@ -55,7 +55,7 @@ pub async fn generate_vod_preview(input_fname: &str, output_fname: &std::path::P
             .arg("-t")
             .arg("25")
             .arg("-f")
-            .arg("mp4")
+            .arg(input_container)
             .arg("-i")
             .arg(input_fname)
             .arg("-vf")
@@ -70,7 +70,7 @@ pub async fn generate_vod_preview(input_fname: &str, output_fname: &std::path::P
             .arg("-movflags")
             .arg("+faststart")
             .arg("-f")
-            .arg("mp4")
+            .arg(output_container)
             .arg(output_fname.as_os_str())
             .output()
             .await?
@@ -89,7 +89,7 @@ pub async fn generate_vod_preview(input_fname: &str, output_fname: &std::path::P
             .arg("-t")
             .arg("25")
             .arg("-f")
-            .arg("mp4")
+            .arg(input_container)
             .arg("-i")
             .arg(input_fname)
             .arg("-vf")
@@ -100,7 +100,7 @@ pub async fn generate_vod_preview(input_fname: &str, output_fname: &std::path::P
             .arg("-movflags")
             .arg("+faststart")
             .arg("-f")
-            .arg("mp4")
+            .arg(output_container)
             .arg(output_fname.as_os_str())
             .output()
             .await?

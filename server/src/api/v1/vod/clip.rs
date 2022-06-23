@@ -678,6 +678,7 @@ pub async fn get_staged_clip_status_handler(app : web::Data<Arc<api::ApiApplicat
             uuid: Uuid,
         }
 
+        let assoc = vdb::get_vod_association(&*app.pool, &clip_uuid).await?;
         let metadata = vdb::get_vod_metadata(&*app.pool, &clip_uuid, "source").await?;
         let manager = app.get_vod_manager(&metadata.bucket).await?;
 
@@ -685,7 +686,7 @@ pub async fn get_staged_clip_status_handler(app : web::Data<Arc<api::ApiApplicat
             url: manager.get_segment_redirect_uri(&VodSegmentId{
                 video_uuid: clip_uuid.clone(),
                 quality: String::from("source"),
-                segment_name: String::from("fastify.mp4"),
+                segment_name: format!("fastify.{}", squadov_common::container_format_to_fastify_extension(&assoc.raw_container_format)),
             }, true).await?.0,
             uuid: clip_uuid.clone(),
         }))
