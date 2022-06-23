@@ -322,7 +322,7 @@ impl api::ApiApplication {
                 user::update_user_support_priority(&mut tx, user_id, SupportLevel::High).await?;
                 v1::update_feature_flags(&mut tx, user_id, FeatureFlags{
                     max_record_pixel_y: 1440,
-                    max_record_fps: 60,
+                    max_record_fps: 90,
                     max_bitrate_kbps: 18000,
                     mandatory_watermark: false,
                     vod_priority: RABBITMQ_DEFAULT_PRIORITY as i16,
