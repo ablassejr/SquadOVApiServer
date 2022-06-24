@@ -299,6 +299,7 @@ impl api::ApiApplication {
                     max_squad_size: Some(20),
                     max_clip_seconds: 120,
                     allow_vp9: false,
+                    allow_separate_audio_channels: false,
                     ..flags
                 }).await?;
             },
@@ -315,6 +316,7 @@ impl api::ApiApplication {
                     max_squad_size: Some(100),
                     max_clip_seconds: 180,
                     allow_vp9: false,
+                    allow_separate_audio_channels: false,
                     ..flags
                 }).await?;
             },
@@ -331,6 +333,7 @@ impl api::ApiApplication {
                     max_squad_size: None,
                     max_clip_seconds: 300,
                     allow_vp9: true,
+                    allow_separate_audio_channels: true,
                     ..flags
                 }).await?;
             },
@@ -347,6 +350,7 @@ impl api::ApiApplication {
                     max_squad_size: None,
                     max_clip_seconds: 300,
                     allow_vp9: true,
+                    allow_separate_audio_channels: true,
                     ..flags
                 }).await?;
             },

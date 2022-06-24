@@ -29,6 +29,7 @@ pub struct FeatureFlags {
     pub max_squad_size: Option<i64>,
     pub max_clip_seconds: i64,
     pub allow_vp9: bool,
+    pub allow_separate_audio_channels: bool,
 }
 
 impl Default for FeatureFlags {
@@ -52,6 +53,7 @@ impl Default for FeatureFlags {
             max_squad_size: Some(20),
             max_clip_seconds: 120,
             allow_vp9: false,
+            allow_separate_audio_channels: false,
         }
     }
 }
@@ -114,7 +116,9 @@ where
             vod_priority = $13,
             early_access = $14,
             vod_retention = $15,
-            max_squad_size = $16
+            max_squad_size = $16,
+            allow_vp9 = $17,
+            allow_separate_audio_channels = $18
         WHERE user_id = $1
         ",
         user_id,
@@ -133,6 +137,8 @@ where
         flags.early_access,
         flags.vod_retention,
         flags.max_squad_size,
+        flags.allow_vp9,
+        flags.allow_separate_audio_channels,
     )
         .execute(ex)
         .await?;
