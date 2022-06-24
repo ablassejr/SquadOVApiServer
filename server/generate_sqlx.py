@@ -1,8 +1,7 @@
 bins = [
     "squadov_api_server",
     "vod_processing_worker",
-    "singleton_event_processing_worker",
-    "wow_combat_log_transfer_worker"
+    "singleton_event_processing_worker"
 ]
 
 import subprocess
