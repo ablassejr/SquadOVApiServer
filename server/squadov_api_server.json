@@ -188,6 +188,63 @@
       ]
     }
   },
+  "03e9346a2fd445d82d37fcf77817913246e36df6c8af4d47db9031014ed03486": {
+    "query": "\n            SELECT\n                mce.match_uuid AS \"match_uuid!\",\n                u.id AS \"user_id!\",\n                u.username AS \"username!\",\n                mce.tm,\n                mce.label,\n                mce.icon,\n                mce.event_id\n            FROM squadov.match_custom_events AS mce\n            INNER JOIN squadov.users AS u\n                ON u.id = mce.user_id\n            WHERE mce.match_uuid = $1\n                AND mce.video_uuid = ANY($2)\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "match_uuid!",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "user_id!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "username!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "tm",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "label",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "icon",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "event_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "UuidArray"
+        ]
+      },
+      "nullable": [
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "0428a1fc0d342165a6a044ddb99b04f21b8cf5f94d485032e3aa18cd29d3f843": {
     "query": "\n        INSERT INTO squadov.twitch_event_subscriptions (\n            id,\n            sub,\n            raw_data\n        ) VALUES (\n            $1,\n            $2,\n            $3\n        )\n        ",
     "describe": {
@@ -444,6 +501,11 @@
           "ordinal": 15,
           "name": "max_squad_size",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 16,
+          "name": "max_clip_seconds",
+          "type_info": "Int8"
         }
       ],
       "parameters": {
@@ -467,7 +529,8 @@
         false,
         false,
         true,
-        true
+        true,
+        false
       ]
     }
   },
@@ -957,6 +1020,35 @@
         true,
         true
       ]
+    }
+  },
+  "0f2c0ffa34c5b5c9e577afd42a9a546dd3f050884013ddb77668314816396a4b": {
+    "query": "\n        UPDATE squadov.user_feature_flags\n        SET max_record_pixel_y = $2,\n            max_record_fps = $3,\n            allow_record_upload = $4,\n            allow_wow_combat_log_upload = $5,\n            enable_user_profiles = $6,\n            disable_sentry = $7,\n            max_bitrate_kbps = $8,\n            can_instant_clip = $9,\n            disable_es_search = $10,\n            mandatory_watermark = $11,\n            watermark_min_size = $12,\n            vod_priority = $13,\n            early_access = $14,\n            vod_retention = $15,\n            max_squad_size = $16,\n            allow_vp9 = $17,\n            allow_separate_audio_channels = $18\n        WHERE user_id = $1\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int4",
+          "Int4",
+          "Bool",
+          "Bool",
+          "Bool",
+          "Bool",
+          "Int4",
+          "Bool",
+          "Bool",
+          "Bool",
+          "Float8",
+          "Int2",
+          "Bool",
+          "Int8",
+          "Int8",
+          "Bool",
+          "Bool"
+        ]
+      },
+      "nullable": []
     }
   },
   "0f35596b6fdafe1d70ecb524044bcff6a60494897c8d0ddc1e9046a8bca2d6a4": {
@@ -6600,18 +6692,6 @@
           "UuidArray",
           "Int4",
           "Text"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "63e857ca2cea0ccbd043839baa513f421d5466f9c80fa05c8d1ef9dfb7c91f4f": {
-    "query": "\n        UPDATE squadov.vods AS v\n        SET expiration_time = v.end_time + sub.vod_retention * INTERVAL '1 second'\n        FROM (\n            SELECT u.uuid, uf.vod_retention\n            FROM squadov.users AS u\n            INNER JOIN squadov.user_feature_flags AS uf\n                ON uf.user_id = u.id\n            WHERE u.id = $1\n        ) AS sub(uuid, vod_retention)\n        WHERE sub.uuid = v.user_uuid\n            AND NOT v.is_clip\n            AND v.match_uuid IS NOT NULL\n            AND v.end_time IS NOT NULL\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
         ]
       },
       "nullable": []
@@ -14573,6 +14653,18 @@
         true,
         true
       ]
+    }
+  },
+  "ea14e00285a8e2381236b2f4c08e845d6caf1b3cc8a32e08391832f115585e0e": {
+    "query": "\n        UPDATE squadov.vods AS v\n        SET expiration_time = GREATEST(v.end_time + sub.vod_retention * INTERVAL '1 second', NOW() + INTERVAL '1 day')\n        FROM (\n            SELECT u.uuid, uf.vod_retention\n            FROM squadov.users AS u\n            INNER JOIN squadov.user_feature_flags AS uf\n                ON uf.user_id = u.id\n            WHERE u.id = $1\n        ) AS sub(uuid, vod_retention)\n        WHERE sub.uuid = v.user_uuid\n            AND NOT v.is_clip\n            AND v.match_uuid IS NOT NULL\n            AND v.end_time IS NOT NULL\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "eac92ea4e659dd3d945238802b16d378efe3f443e960429b466e5182783ef4bf": {

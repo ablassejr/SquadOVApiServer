@@ -3944,18 +3944,6 @@
       "nullable": []
     }
   },
-  "63e857ca2cea0ccbd043839baa513f421d5466f9c80fa05c8d1ef9dfb7c91f4f": {
-    "query": "\n        UPDATE squadov.vods AS v\n        SET expiration_time = v.end_time + sub.vod_retention * INTERVAL '1 second'\n        FROM (\n            SELECT u.uuid, uf.vod_retention\n            FROM squadov.users AS u\n            INNER JOIN squadov.user_feature_flags AS uf\n                ON uf.user_id = u.id\n            WHERE u.id = $1\n        ) AS sub(uuid, vod_retention)\n        WHERE sub.uuid = v.user_uuid\n            AND NOT v.is_clip\n            AND v.match_uuid IS NOT NULL\n            AND v.end_time IS NOT NULL\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "64001db312548f4e16f805112a9f663a2db59ffd419a2f4cf931f99b2aa20134": {
     "query": "\n        SELECT *\n        FROM squadov.tft_match_participant_units\n        WHERE match_uuid = $1\n        ",
     "describe": {
@@ -9156,6 +9144,18 @@
         false,
         true
       ]
+    }
+  },
+  "ea14e00285a8e2381236b2f4c08e845d6caf1b3cc8a32e08391832f115585e0e": {
+    "query": "\n        UPDATE squadov.vods AS v\n        SET expiration_time = GREATEST(v.end_time + sub.vod_retention * INTERVAL '1 second', NOW() + INTERVAL '1 day')\n        FROM (\n            SELECT u.uuid, uf.vod_retention\n            FROM squadov.users AS u\n            INNER JOIN squadov.user_feature_flags AS uf\n                ON uf.user_id = u.id\n            WHERE u.id = $1\n        ) AS sub(uuid, vod_retention)\n        WHERE sub.uuid = v.user_uuid\n            AND NOT v.is_clip\n            AND v.match_uuid IS NOT NULL\n            AND v.end_time IS NOT NULL\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "eb3aebb67abd053c06ac9a864cafd78a586d38283da4ea1d3f0bb6027df0675b": {
