@@ -521,16 +521,7 @@ where
                         ret_wrappers
                     }
                 } else {
-                    let characters = wc::list_wow_characters_for_match(ex, &match_uuid, owner.id).await?;
-                    let mut ret_wrappers = vec![];
-                    for c in characters {
-                        ret_wrappers.push(WowCharacterWrapper{
-                            traits: wc::get_wow_full_character(ex, &match_view.id, &c.guid).await?,
-                            data: c,
-                        });
-                    }
-
-                    ret_wrappers
+                    vec![]
                 };
 
                 // If this is an arena, we need to determine success based off of the POV's team ID and comparing it to the winning team ID.

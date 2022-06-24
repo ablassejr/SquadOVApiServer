@@ -21,7 +21,6 @@ use squadov_common::{
         WoWCharacter,
     },
 };
-use uuid::Uuid;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -59,41 +58,6 @@ impl api::ApiApplication {
                 WHERE wucc.unit_guid = ANY($1)
                 "#,
                 guids,
-                request_user_id,
-            )
-                .fetch_all(&*self.heavy_pool)
-                .await?
-        )
-    }
-
-    async fn list_wow_characters_association_for_squad_in_match(&self, match_uuid: &Uuid, view_user_id: i64, request_user_id: i64) -> Result<Vec<WoWCharacterUserAssociation>, SquadOvError> {
-        Ok(
-            sqlx::query_as!(
-                WoWCharacterUserAssociation,
-                r#"
-                SELECT wucc.user_id, wucc.unit_guid AS "guid"
-                FROM squadov.wow_match_view AS wmv
-                INNER JOIN squadov.wow_match_view_character_presence AS wcp
-                    ON wcp.view_id = wmv.id
-                INNER JOIN squadov.wow_user_character_cache AS wucc
-                    ON wucc.unit_guid = wcp.unit_guid
-                INNER JOIN (
-                    SELECT $3
-                    UNION
-                    SELECT ora.user_id
-                    FROM squadov.users AS u
-                    LEFT JOIN squadov.squad_role_assignments AS sra
-                        ON sra.user_id = u.id
-                    LEFT JOIN squadov.squad_role_assignments AS ora
-                        ON ora.squad_id = sra.squad_id
-                    WHERE u.id = $3
-                ) AS squ (user_id)
-                    ON squ.user_id = wucc.user_id
-                WHERE wmv.match_uuid = $1
-                    AND wmv.user_id = $2
-                "#,
-                match_uuid,
-                view_user_id,
                 request_user_id,
             )
                 .fetch_all(&*self.heavy_pool)
@@ -176,7 +140,7 @@ pub async fn list_wow_characters_for_match_handler(app : web::Data<Arc<api::ApiA
             chars
         }
     } else {
-        characters::list_wow_characters_for_match(&*app.heavy_pool, &path.match_uuid, path.user_id).await?
+        return Err(SquadOvError::BadRequest);
     };
 
     Ok(HttpResponse::Ok().json(chars))
@@ -196,7 +160,7 @@ pub async fn list_wow_characters_association_for_squad_in_match_handler(app : we
         }).collect();
         app.list_wow_characters_association_for_squad_from_guids(&combatants, session.user.id).await?
     } else {
-        app.list_wow_characters_association_for_squad_in_match(&path.match_uuid, path.user_id, session.user.id).await?    
+        return Err(SquadOvError::BadRequest);
     }))
 }
 
@@ -240,6 +204,6 @@ pub async fn get_full_wow_character_for_match_handler(app : web::Data<Arc<api::A
     Ok(HttpResponse::Ok().json(if let Some(combat_log_partition_id) = match_view.combat_log_partition_id.as_ref() {
         app.cl_itf.get_report_json::<WowFullCharacter>(&combat_log_partition_id, WowReportTypes::CharacterLoadout as i32, &format!("{}.json", &char_path.character_guid)).await?
     } else {
-        characters::get_wow_full_character(&*app.heavy_pool, &match_view.id, &char_path.character_guid).await?
+        return Err(SquadOvError::BadRequest);
     }))
 }

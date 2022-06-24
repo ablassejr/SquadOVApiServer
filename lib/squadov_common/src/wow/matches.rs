@@ -5,11 +5,10 @@ use crate::{
 use serde::{Serialize, Deserialize};
 use serde_repr::{Serialize_repr, Deserialize_repr};
 use num_enum::TryFromPrimitive;
-use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use sqlx::{Executor, Postgres};
 use std::convert::TryFrom;
-use itertools::izip;
+use uuid::Uuid;
 use super::WoWCombatLogState;
 
 #[derive(Deserialize)]
@@ -321,10 +320,6 @@ where
                     wav.num_players,
                     wav.instance_id,
                     COALESCE(wav.success, FALSE) AS "success!",
-                    ARRAY_AGG(web.name) AS "boss_names!: Vec<Option<String>>",
-                    ARRAY_AGG(web.npc_id) AS "boss_ids!: Vec<Option<i64>>",
-                    ARRAY_AGG(wcp.current_hp) AS "boss_hps!: Vec<Option<i64>>",
-                    ARRAY_AGG(wcp.max_hp) AS "boss_max_hps!: Vec<Option<i64>>",
                     MAX(mmc.match_order) AS "pull_number"
                 FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
                 INNER JOIN squadov.wow_match_view AS wmv
@@ -336,11 +331,6 @@ where
                     ON wav.view_id = wmv.id
                 INNER JOIN squadov.users AS u
                     ON u.id = wmv.user_id
-                LEFT JOIN squadov.wow_encounter_bosses AS web
-                    ON web.encounter_id = wav.encounter_id
-                LEFT JOIN squadov.wow_match_view_character_presence AS wcp
-                    ON wcp.view_id = wmv.id
-                        AND wcp.creature_id = web.npc_id
                 LEFT JOIN squadov.match_to_match_collection AS mmc
                     ON mmc.match_uuid = inp.match_uuid
                 GROUP BY
@@ -380,18 +370,7 @@ where
                     success: x.success,
                     user_uuid: x.user_uuid,
                     build: x.build,
-                    boss: izip!(x.boss_names, x.boss_ids, x.boss_hps, x.boss_max_hps).map(|(name, id, hp, max)|{
-                        WowBossStatus{
-                            name,
-                            npc_id: id,
-                            current_hp: hp,
-                            max_hp: max,
-                        }
-                    })
-                        .filter(|x| {
-                            x.name.is_some() && x.npc_id.is_some()
-                        })
-                        .collect::<Vec<WowBossStatus>>(),
+                    boss: vec![],
                     pull_number: x.pull_number,
                 }
             })
@@ -467,11 +446,7 @@ where
                     wav.match_duration_seconds,
                     wav.new_ratings,
                     u.uuid AS "user_uuid",
-                    (
-                        CASE WHEN wvc.event_id IS NOT NULL THEN wvc.team = wav.winning_team_id
-                            ELSE FALSE
-                        END
-                    ) AS "success!"
+                    FALSE AS "success!"
                 FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
                 INNER JOIN squadov.wow_match_view AS wmv
                     ON wmv.match_uuid = inp.match_uuid
@@ -480,10 +455,6 @@ where
                     ON wa.match_uuid = wmv.match_uuid
                 INNER JOIN squadov.wow_arena_view AS wav
                     ON wav.view_id = wmv.id
-                LEFT JOIN squadov.wow_match_view_character_presence AS wcp
-                    ON wcp.view_id = wmv.id
-                LEFT JOIN squadov.wow_match_view_combatants AS wvc
-                    ON wvc.character_id = wcp.character_id
                 INNER JOIN squadov.users AS u
                     ON u.id = wmv.user_id
                 ORDER BY wmv.match_uuid, u.uuid
