@@ -32,7 +32,10 @@ use squadov_common::{
     share::{
         LinkShareData,
     },
-    vod::db
+    vod::{
+        db,
+        VodCopyLocation,
+    },
 };
 
 #[derive(Deserialize)]
@@ -187,8 +190,9 @@ impl api::ApiApplication {
         // Get all the segments that exist for this VOD.
         let quality_options = self.get_vod_quality_options(&[video_uuid.clone()]).await?;
         let assocs = self.find_vod_associations(&[video_uuid.clone()], "").await?;
+        let copies = db::get_vod_copies(&*self.pool, video_uuid).await?;
         if let Some(vod) = assocs.get(video_uuid) {
-            if !vod.is_local {
+            if copies.iter().any(|x| { x.loc == VodCopyLocation::Cloud }) {
                 let metadata = db::get_vod_metadata(&*self.pool, video_uuid, "source").await?;
                 let manager = self.get_vod_manager(&metadata.bucket).await?;
                 if let Some(quality_arr) = quality_options.get(video_uuid) {    
@@ -228,7 +232,6 @@ impl api::ApiApplication {
                 }
             }
         }
-
         Ok(())
     }
 
