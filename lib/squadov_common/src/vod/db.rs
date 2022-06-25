@@ -304,7 +304,7 @@ where
         "
         WITH vod_expiration(video_uuid, tm) AS (
             SELECT v.video_uuid, CASE 
-                        WHEN (NOT v.is_clip AND uf.vod_retention IS NOT NULL) THEN (NOW() + uf.vod_retention * INTERVAL '1 sec')
+                        WHEN (NOT v.is_clip AND uf.vod_retention IS NOT NULL) THEN (v.start_time + uf.vod_retention * INTERVAL '1 sec')
                         ELSE NULL
                    END 
             FROM squadov.vods AS v
@@ -997,7 +997,10 @@ where
     sqlx::query!(
         "
         UPDATE squadov.vods AS v
-        SET expiration_time = GREATEST(v.end_time + sub.vod_retention * INTERVAL '1 second', NOW() + INTERVAL '1 day')
+        SET expiration_time = CASE
+            WHEN sub.vod_retention IS NOT NULL THEN GREATEST(v.end_time + sub.vod_retention * INTERVAL '1 second', NOW() + INTERVAL '1 day')
+            ELSE NULL
+        END
         FROM (
             SELECT u.uuid, uf.vod_retention
             FROM squadov.users AS u
