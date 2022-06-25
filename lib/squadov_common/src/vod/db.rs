@@ -319,7 +319,8 @@ where
             user_uuid = $2,
             start_time = $3,
             end_time = $4,
-            expiration_time = ve.tm
+            expiration_time = ve.tm,
+            raw_container_format = $6
         FROM vod_expiration AS ve
         WHERE ve.video_uuid = v.video_uuid
         ",
@@ -328,6 +329,7 @@ where
         assoc.start_time,
         assoc.end_time,
         assoc.video_uuid,
+        &assoc.raw_container_format,
     )
         .execute(ex)
         .await?;
