@@ -117,6 +117,41 @@ resource "aws_db_instance" "primary_db" {
     }
 }
 
+resource "aws_db_instance" "secondary_db" {
+    allocated_storage = var.secondary_db_size
+    apply_immediately = false
+    max_allocated_storage = var.secondary_max_db_size
+    backup_retention_period = 14
+    backup_window = "02:00-02:30"
+    ca_cert_identifier = data.aws_rds_certificate.rds_cert.id
+    db_subnet_group_name = aws_db_subnet_group.primary_db_subnet.name
+    delete_automated_backups = false
+    deletion_protection = true
+    enabled_cloudwatch_logs_exports = [ "postgresql", "upgrade" ]
+    engine = "postgres"
+    engine_version = "12.8"
+    identifier = var.secondary_instance_name
+    instance_class = var.secondary_instance_type
+    name = "squadov"
+    password = var.postgres_password
+    parameter_group_name = aws_db_parameter_group.primary_db_parameters.name
+    publicly_accessible = true
+    storage_encrypted = true
+    storage_type = "gp2"
+    username = var.postgres_user
+    vpc_security_group_ids = var.postgres_db_security_groups
+
+    monitoring_interval = 30
+    monitoring_role_arn = aws_iam_role.rds_monitoring_role.arn
+
+    performance_insights_enabled = true
+    performance_insights_retention_period = 7
+
+    tags = {
+        "db" = "primary"
+    }
+}
+
 resource "aws_iam_role" "rds_proxy_role" {
     name = "rds-proxy-role"
 

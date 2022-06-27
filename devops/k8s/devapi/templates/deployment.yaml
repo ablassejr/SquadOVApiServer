@@ -35,7 +35,7 @@ spec:
                     - name: SQUADOV_WORKERS
                       value: "8"
                     - name: SQUADOV_DB_ENDPOINT
-                      value: "squadov-postgres-primary.ccy90hcqnqbc.us-east-2.rds.amazonaws.com"
+                      value: "squadov-postgres-primary-secondary.ccy90hcqnqbc.us-east-2.rds.amazonaws.com"
                     - name: SQUADOV_FA_URL
                       value: "https://auth.squadov.gg"
                     - name: SQUADOV_FA_TENANT_ID

@@ -37,3 +37,19 @@ variable "redis_instance_type" {
 variable "glue_subnet" {
     type = string
 }
+
+variable "secondary_instance_name" {
+    type = string
+}
+
+variable "secondary_instance_type" {
+    type = string
+}
+
+variable "secondary_db_size" {
+    type = number
+}
+
+variable "secondary_max_db_size" {
+    type = number
+}

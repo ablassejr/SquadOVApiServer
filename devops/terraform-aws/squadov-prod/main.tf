@@ -41,6 +41,11 @@ module "db" {
     postgres_db_security_groups = module.network.database_security_groups
     glue_subnet = module.network.private_k8s_subnets[0]
 
+    secondary_instance_name = "${var.postgres_instance_name}-secondary"
+    secondary_db_size = 1024
+    secondary_max_db_size = 5120
+    secondary_instance_type = "db.m6g.2xlarge"
+
     redis_instance_type = "cache.t4g.medium"
 }
 

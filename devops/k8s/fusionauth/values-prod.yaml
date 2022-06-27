@@ -1,1 +1,1 @@
-dbUrl: "squadov-postgres-primary.ccy90hcqnqbc.us-east-2.rds.amazonaws.com"
+dbUrl: "squadov-postgres-primary-secondary.ccy90hcqnqbc.us-east-2.rds.amazonaws.com"

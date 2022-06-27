@@ -991,6 +991,23 @@
       ]
     }
   },
+  "106a3a4151b4bf403da2768b812d5c903ac23dc6f049120476232e520913c2ad": {
+    "query": "\n        WITH vod_expiration(video_uuid, tm) AS (\n            SELECT v.video_uuid, CASE \n                        WHEN (NOT v.is_clip AND uf.vod_retention IS NOT NULL) THEN (v.start_time + uf.vod_retention * INTERVAL '1 sec')\n                        ELSE NULL\n                   END \n            FROM squadov.vods AS v\n            INNER JOIN squadov.users AS u\n                ON u.uuid = v.user_uuid\n            INNER JOIN squadov.user_feature_flags AS uf\n                ON uf.user_id = u.id\n            WHERE video_uuid = $5\n        )\n        UPDATE squadov.vods AS v\n        SET match_uuid = $1,\n            user_uuid = $2,\n            start_time = $3,\n            end_time = $4,\n            expiration_time = ve.tm,\n            raw_container_format = $6\n        FROM vod_expiration AS ve\n        WHERE ve.video_uuid = v.video_uuid\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid",
+          "Timestamptz",
+          "Timestamptz",
+          "Uuid",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "10737e3f0ab1240055bf0ddb39559113ac477c84a0bfd24b99af63c246369d6d": {
     "query": "\n            SELECT DISTINCT dest_user_id\n            FROM squadov.share_match_vod_connections\n            WHERE video_uuid = $1\n                AND dest_user_id IS NOT NULL\n            ",
     "describe": {
@@ -9595,22 +9612,6 @@
       ]
     }
   },
-  "a3e05c5a1ee32b23316d83636d334c16aa14c011329527652c584550545a281a": {
-    "query": "\n        WITH vod_expiration(video_uuid, tm) AS (\n            SELECT v.video_uuid, CASE \n                        WHEN (NOT v.is_clip AND uf.vod_retention IS NOT NULL) THEN (NOW() + uf.vod_retention * INTERVAL '1 sec')\n                        ELSE NULL\n                   END \n            FROM squadov.vods AS v\n            INNER JOIN squadov.users AS u\n                ON u.uuid = v.user_uuid\n            INNER JOIN squadov.user_feature_flags AS uf\n                ON uf.user_id = u.id\n            WHERE video_uuid = $5\n        )\n        UPDATE squadov.vods AS v\n        SET match_uuid = $1,\n            user_uuid = $2,\n            start_time = $3,\n            end_time = $4,\n            expiration_time = ve.tm\n        FROM vod_expiration AS ve\n        WHERE ve.video_uuid = v.video_uuid\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Uuid",
-          "Timestamptz",
-          "Timestamptz",
-          "Uuid"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "a443d0a5737b973d3fc499280820e010cfefc8aa8bf2897324b1f729f2ccd6ff": {
     "query": "\n            INSERT INTO squadov.wow_challenge_view (\n                view_id,\n                challenge_name,\n                instance_id,\n                keystone_level\n            )\n            VALUES (\n                $1,\n                $2,\n                $3,\n                $4\n            )\n            ",
     "describe": {
@@ -11497,23 +11498,6 @@
         "Left": [
           "Uuid",
           "Int8",
-          "Varchar"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "c8e9b035dd7e6e41c46d55bb855f5ddd73648b6c1db9d9c3e2b26c952808fa39": {
-    "query": "\n        WITH vod_expiration(video_uuid, tm) AS (\n            SELECT v.video_uuid, CASE \n                        WHEN (NOT v.is_clip AND uf.vod_retention IS NOT NULL) THEN (NOW() + uf.vod_retention * INTERVAL '1 sec')\n                        ELSE NULL\n                   END \n            FROM squadov.vods AS v\n            INNER JOIN squadov.users AS u\n                ON u.uuid = v.user_uuid\n            INNER JOIN squadov.user_feature_flags AS uf\n                ON uf.user_id = u.id\n            WHERE video_uuid = $5\n        )\n        UPDATE squadov.vods AS v\n        SET match_uuid = $1,\n            user_uuid = $2,\n            start_time = $3,\n            end_time = $4,\n            expiration_time = ve.tm,\n            raw_container_format = $6\n        FROM vod_expiration AS ve\n        WHERE ve.video_uuid = v.video_uuid\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Uuid",
-          "Timestamptz",
-          "Timestamptz",
-          "Uuid",
           "Varchar"
         ]
       },
@@ -15816,6 +15800,18 @@
         true,
         true
       ]
+    }
+  },
+  "ffe986a36070a6eefaa33c2d4a6af4d920ca21112bc97501a91cc5ec63e96b4b": {
+    "query": "\n        UPDATE squadov.vods AS v\n        SET expiration_time = CASE\n            WHEN sub.vod_retention IS NOT NULL THEN GREATEST(v.end_time + sub.vod_retention * INTERVAL '1 second', NOW() + INTERVAL '1 day')\n            ELSE NULL\n        END\n        FROM (\n            SELECT u.uuid, uf.vod_retention\n            FROM squadov.users AS u\n            INNER JOIN squadov.user_feature_flags AS uf\n                ON uf.user_id = u.id\n            WHERE u.id = $1\n        ) AS sub(uuid, vod_retention)\n        WHERE sub.uuid = v.user_uuid\n            AND NOT v.is_clip\n            AND v.match_uuid IS NOT NULL\n            AND v.end_time IS NOT NULL\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   }
 }
