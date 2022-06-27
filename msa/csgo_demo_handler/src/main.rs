@@ -7,8 +7,6 @@ use squadov_common::{
     },
     csgo::rabbitmq::CsgoRabbitmqInterface,
     elastic::{
-        ElasticSearchConfig,
-        ElasticSearchClient,
         rabbitmq::ElasticSearchJobInterface,
     },
 };
@@ -38,7 +36,6 @@ struct Config {
     connections: u32,
     rabbitmq: RabbitMqConfig,
     steam: SteamApiConfig,
-    elasticsearch: ElasticSearchConfig,
 }
 
 #[tokio::main]
@@ -73,9 +70,8 @@ async fn main() -> Result<(), SquadOvError> {
 
         let rabbitmq = RabbitMqInterface::new(&config.rabbitmq, Some(pool.clone()), true).await.unwrap();
         let steam_api = Arc::new(SteamApiClient::new(&config.steam));
-        let es_api = Arc::new(ElasticSearchClient::new(config.elasticsearch.clone()));
 
-        let es_itf = Arc::new(ElasticSearchJobInterface::new(es_api.clone(), &config.elasticsearch, &config.rabbitmq, rabbitmq.clone(), pool.clone()));
+        let es_itf = Arc::new(ElasticSearchJobInterface::new_producer_only(&config.rabbitmq, rabbitmq.clone(), pool.clone()));
         let steam_itf = Arc::new(SteamApiRabbitmqInterface::new(steam_api.clone(), &config.rabbitmq, rabbitmq.clone(), pool.clone()));
         let csgo_itf = Arc::new(CsgoRabbitmqInterface::new(steam_itf.clone(), &config.rabbitmq, rabbitmq.clone(), pool.clone(), es_itf.clone()));
         RabbitMqInterface::add_listener(rabbitmq.clone(), config.rabbitmq.csgo_queue.clone(), csgo_itf, config.rabbitmq.prefetch_count).await.unwrap();
