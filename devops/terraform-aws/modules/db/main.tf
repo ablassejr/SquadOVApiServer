@@ -51,6 +51,21 @@ resource "aws_db_parameter_group" "primary_db_parameters" {
 */
 }
 
+resource "aws_db_parameter_group" "primary_db_parameters_secondary" {
+    name = "primary-squadov-db-parameters-secondary"
+    family = "postgres13"
+
+    parameter {
+        name = "rds.force_ssl"
+        value = "1"
+    }
+
+    parameter {
+        name = "maintenance_work_mem"
+        value = "1048576"
+    }
+}
+
 resource "aws_db_subnet_group" "primary_db_subnet" {
     name = "primary-squadov-db-subnet-group"
     subnet_ids = var.postgres_db_subnets
@@ -122,19 +137,19 @@ resource "aws_db_instance" "secondary_db" {
     apply_immediately = false
     max_allocated_storage = var.secondary_max_db_size
     backup_retention_period = 14
-    backup_window = "02:00-02:30"
+    backup_window = "05:00-06:00"
     ca_cert_identifier = data.aws_rds_certificate.rds_cert.id
     db_subnet_group_name = aws_db_subnet_group.primary_db_subnet.name
     delete_automated_backups = false
     deletion_protection = true
     enabled_cloudwatch_logs_exports = [ "postgresql", "upgrade" ]
     engine = "postgres"
-    engine_version = "12.8"
+    engine_version = "13.6"
     identifier = var.secondary_instance_name
     instance_class = var.secondary_instance_type
     name = "squadov"
     password = var.postgres_password
-    parameter_group_name = aws_db_parameter_group.primary_db_parameters.name
+    parameter_group_name = aws_db_parameter_group.primary_db_parameters_secondary.name
     publicly_accessible = true
     storage_encrypted = true
     storage_type = "gp2"
@@ -143,6 +158,7 @@ resource "aws_db_instance" "secondary_db" {
 
     monitoring_interval = 30
     monitoring_role_arn = aws_iam_role.rds_monitoring_role.arn
+    allow_major_version_upgrade = true
 
     performance_insights_enabled = true
     performance_insights_retention_period = 7
@@ -219,7 +235,7 @@ output "db_secret_id" {
 }
 
 output "db_endpoint" {
-    value = aws_db_instance.primary_db.endpoint
+    value = aws_db_instance.secondary_db.endpoint
 }
 
 resource "aws_secretsmanager_secret_version" "primary_db_credentials_secret_ver" {
@@ -228,9 +244,9 @@ resource "aws_secretsmanager_secret_version" "primary_db_credentials_secret_ver"
         "username" = var.postgres_user,
         "password" = var.postgres_password,
         "engine"="postgres",
-        "host" = aws_db_instance.primary_db.address
+        "host" = aws_db_instance.secondary_db.address
         "port" = 5432,
-        "dbInstanceIdentifier" = aws_db_instance.primary_db.id
+        "dbInstanceIdentifier" = aws_db_instance.secondary_db.id
     })
 }
 
@@ -262,7 +278,7 @@ resource "aws_db_proxy_default_target_group" "primary_db_proxy_target_group" {
 }
 
 resource "aws_db_proxy_target" "primary_db_proxy_target" {
-    db_instance_identifier = aws_db_instance.primary_db.id
+    db_instance_identifier = aws_db_instance.secondary_db.id
     db_proxy_name          = aws_db_proxy.primary_db_proxy.name
     target_group_name      = aws_db_proxy_default_target_group.primary_db_proxy_target_group.name
 }
