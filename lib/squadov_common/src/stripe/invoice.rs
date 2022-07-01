@@ -51,7 +51,7 @@ impl<'de> Deserialize<'de> for StripeInvoiceStatus {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct StripeInvoiceLineItem {
     pub price: StripePrice,
     pub quantity: Option<i32>,

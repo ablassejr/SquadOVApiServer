@@ -44,7 +44,7 @@ module "db" {
     secondary_instance_name = "${var.postgres_instance_name}-secondary"
     secondary_db_size = 1024
     secondary_max_db_size = 5120
-    secondary_instance_type = "db.m6g.2xlarge"
+    secondary_instance_type = "db.m6g.8xlarge"
 
     redis_instance_type = "cache.t4g.medium"
 }

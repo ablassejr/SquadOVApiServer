@@ -86,6 +86,16 @@ pub struct StripeSubscription {
     pub current_period_end: DateTime<Utc>,
 }
 
+#[derive(Serialize)]
+pub struct StripeListSubscriptionsRequest {
+    pub customer: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct StripeListSubscriptionsResponse {
+    pub data: Vec<StripeSubscription>,
+}
+
 impl StripeApiClient {
     pub async fn retrieve_a_subscription(&self, subscription: &str) -> Result<StripeSubscription, SquadOvError> {
         Ok(
@@ -95,6 +105,24 @@ impl StripeApiClient {
             )
                 .await?
                 .json::<StripeSubscription>().await?
+        )
+    }
+
+    pub async fn list_subscriptions(&self, request: StripeListSubscriptionsRequest) -> Result<Vec<StripeSubscription>, SquadOvError> {
+        Ok(
+            self.send_request(
+                self.client.get(&Self::build_url("v1/subscriptions"))
+                    .query(&if let Some(customer) = request.customer {
+                        vec![("customer", customer)]
+                    } else {
+                        vec![]
+                    })
+                    .build()?
+            )
+                .await?
+                .json::<StripeListSubscriptionsResponse>()
+                .await?
+                .data
         )
     }
 }

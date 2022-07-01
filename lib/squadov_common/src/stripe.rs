@@ -7,6 +7,7 @@ pub mod invoice;
 pub mod webhook;
 pub mod subscription;
 pub mod currency;
+pub mod customer;
 
 use crate::{
     SquadOvError,

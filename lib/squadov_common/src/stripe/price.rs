@@ -14,7 +14,7 @@ use serde::{
 };
 use derive_more::{Display};
 
-#[derive(Display)]
+#[derive(Display, Clone)]
 pub enum StripeRecurringInterval {
     #[display(fmt="day")]
     Day,
@@ -50,12 +50,12 @@ impl<'de> Deserialize<'de> for StripeRecurringInterval {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct StripeRecurring {
     pub interval: Option<StripeRecurringInterval>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct StripePrice {
     pub id: String,
     pub unit_amount: i64,

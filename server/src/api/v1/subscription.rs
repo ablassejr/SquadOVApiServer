@@ -219,7 +219,20 @@ pub async fn start_subscription_checkout_handler(app : web::Data<Arc<api::ApiApp
             }).await?;
 
             if let Some(price) = pricing.data.pop() {
-                let existing_customer = subscriptions::get_user_stripe_customer_id(&*app.pool, session.user.id).await?;
+                let existing_customer = if let Some(customer) = subscriptions::get_user_stripe_customer_id(&*app.pool, session.user.id).await? {
+                    customer
+                } else {
+                    // Create the customer here and link to our own systems here. This way we don't
+                    // have to rely on other hacks to try and find the user later.
+                    let customer = app.stripe.create_a_customer(&session.user.email).await?;
+
+                    let mut tx = app.pool.begin().await?;
+                    subscriptions::associate_user_id_with_customer_id(&mut tx, session.user.id, &customer.id).await?;
+                    tx.commit().await?;
+
+                    customer.id
+                };
+
                 // Now we have the product + price + any potential discounts we want to apply.
                 // We can go ahead and create the Stripe checkout session.
                 let session = app.stripe.create_a_session(StripeCreateSessionRequest{
@@ -242,8 +255,8 @@ pub async fn start_subscription_checkout_handler(app : web::Data<Arc<api::ApiApp
                         vec![]
                     },
                     client_reference_id: Some(session.user.uuid.to_string()),
-                    customer_email: if existing_customer.is_none() { Some(session.user.email.clone()) } else { None },
-                    customer: existing_customer,
+                    customer: Some(existing_customer),
+                    customer_email: None,
                     subscription_data: if can_do_trial {
                         Some(StripeCheckoutSubscriptionData{
                             trial_period_days: Some(7),
@@ -360,4 +373,29 @@ impl api::ApiApplication {
         tx.commit().await?;
         Ok(())
     }
+}
+
+#[derive(Deserialize)]
+pub struct AdminUserSubInput {
+    pub user_id: i64,
+}
+
+pub async fn sync_user_subscription_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<AdminUserSubInput>) -> Result<HttpResponse, SquadOvError> {
+    let customer_id = if let Some(id) = subscriptions::get_user_stripe_customer_id(&*app.pool, path.user_id).await? {
+        id
+    } else {
+        return Err(SquadOvError::BadRequest);
+    };
+    v1::full_sync_stripe_from_customer_id(app.as_ref().clone(), &customer_id).await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+#[derive(Deserialize)]
+pub struct AdminCustomerSubInput {
+    pub customer_id: String,
+}
+
+pub async fn sync_customer_subscription_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<AdminCustomerSubInput>) -> Result<HttpResponse, SquadOvError> {
+    v1::full_sync_stripe_from_customer_id(app.as_ref().clone(), &path.customer_id).await?;
+    Ok(HttpResponse::NoContent().finish())
 }

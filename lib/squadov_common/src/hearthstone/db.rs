@@ -337,7 +337,7 @@ where
                 WHERE match_uuid = $1
                 ORDER BY last_action_id ASC
                 LIMIT 1
-            )), 0) AS \"elapsed_seconds!\"
+            )), 0)::DOUBLE PRECISION AS \"elapsed_seconds!\"
         FROM squadov.hearthstone_matches AS hm
         INNER JOIN squadov.hearthstone_match_view AS hmv
             ON hmv.match_uuid = hm.match_uuid

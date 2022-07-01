@@ -116,3 +116,33 @@ where
             .await?
     )
 }
+
+pub async fn get_squadov_user_from_email<'a, T>(ex: T, email: &str) -> Result<SquadOVUser, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres>
+{
+    Ok(
+        sqlx::query_as!(
+            SquadOVUser,
+            "
+            SELECT
+                id,
+                username,
+                email,
+                verified,
+                uuid,
+                is_test,
+                is_admin,
+                welcome_sent,
+                registration_time,
+                support_priority,
+                last_trial_usage
+            FROM squadov.users
+            WHERE email = $1
+            ",
+            email,
+        )
+            .fetch_one(ex)
+            .await?
+    )
+}

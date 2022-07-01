@@ -37,6 +37,11 @@ pub fn create_service(graphql_debug: bool) -> impl HttpServiceFactory {
                         .route("/daily", web::get().to(admin::get_daily_analytics_handler))
                         .route("/monthly", web::get().to(admin::get_monthly_analytics_handler))
                 )
+                .service(
+                    web::scope("/subscriptions")
+                        .route("/sync/user/{user_id}", web::post().to(v1::sync_user_subscription_handler))
+                        .route("/sync/customer/{customer_id}", web::post().to(v1::sync_customer_subscription_handler))
+                )
         )
         .service(
             web::scope("/webhooks")
