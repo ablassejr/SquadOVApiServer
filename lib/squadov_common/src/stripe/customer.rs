@@ -24,12 +24,13 @@ impl StripeApiClient {
         )
     }
 
-    pub async fn create_a_customer(&self, email: &str) -> Result<StripeCustomer, SquadOvError> {
+    pub async fn create_a_customer(&self, email: &str, name: &str) -> Result<StripeCustomer, SquadOvError> {
         Ok(
             self.send_request(
                 self.client.post(&Self::build_url("v1/customers"))
                     .form(&HashMap::<String, String>::from_iter(vec![
-                        ("email".to_string(), email.to_string())
+                        ("email".to_string(), email.to_string()),
+                        ("name".to_string(), name.to_string())
                     ]))
                     .build()?
             )

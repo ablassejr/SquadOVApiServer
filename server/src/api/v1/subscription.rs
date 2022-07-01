@@ -224,7 +224,7 @@ pub async fn start_subscription_checkout_handler(app : web::Data<Arc<api::ApiApp
                 } else {
                     // Create the customer here and link to our own systems here. This way we don't
                     // have to rely on other hacks to try and find the user later.
-                    let customer = app.stripe.create_a_customer(&session.user.email).await?;
+                    let customer = app.stripe.create_a_customer(&session.user.email, &session.user.username).await?;
 
                     let mut tx = app.pool.begin().await?;
                     subscriptions::associate_user_id_with_customer_id(&mut tx, session.user.id, &customer.id).await?;
