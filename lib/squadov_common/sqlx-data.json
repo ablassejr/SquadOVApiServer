@@ -1349,7 +1349,7 @@
         {
           "ordinal": 4,
           "name": "elapsed_seconds!",
-          "type_info": "Float8"
+          "type_info": "Numeric"
         }
       ],
       "parameters": {
@@ -3269,6 +3269,18 @@
       "nullable": [
         false
       ]
+    }
+  },
+  "30e1508645e2a0777fd74378b637c6ebf81e7e4a916e0c418d6f1b631b72e629": {
+    "query": "\n                UPDATE squadov.users\n                SET last_trial_usage = NOW()\n                WHERE id = $1\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "31351fc49f1d143329928a4b3d7ca11685fce8980b904464e7ae8d1c00e00010": {
@@ -5326,6 +5338,51 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "590e7a7e8c80396a2338927b685b857cd5da9d45796aa0654d2ae8ed6fd0bbfc": {
+    "query": "\n        SELECT\n            hmm.game_type,\n            hmm.format_type,\n            hmm.scenario_id,\n            hm.match_time,\n            COALESCE(EXTRACT(EPOCH FROM (\n                SELECT tm\n                FROM squadov.hearthstone_snapshots\n                WHERE match_uuid = $1\n                ORDER BY last_action_id DESC\n                LIMIT 1\n            )) - EXTRACT(EPOCH FROM (\n                SELECT tm\n                FROM squadov.hearthstone_snapshots\n                WHERE match_uuid = $1\n                ORDER BY last_action_id ASC\n                LIMIT 1\n            )), 0)::DOUBLE PRECISION AS \"elapsed_seconds!\"\n        FROM squadov.hearthstone_matches AS hm\n        INNER JOIN squadov.hearthstone_match_view AS hmv\n            ON hmv.match_uuid = hm.match_uuid\n        INNER JOIN squadov.hearthstone_match_metadata AS hmm\n            ON hmm.view_uuid = hmv.view_uuid\n        WHERE hm.match_uuid = $1 AND hmv.user_id = $2\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "game_type",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "format_type",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "scenario_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "match_time",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "elapsed_seconds!",
+          "type_info": "Float8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        null
+      ]
     }
   },
   "5a082905ddd159b03b23f2c65edafc4c03202cd60b6c5e59348b72676811e121": {
@@ -12543,6 +12600,18 @@
       "nullable": []
     }
   },
+  "dacb6c778698cb290db3a3d1eb5e1596ff3b536e0d1651783d78ddc8de88a2f0": {
+    "query": "\n                    UPDATE squadov.users\n                    SET last_trial_usage = NOW()\n                    WHERE id = $1\n                    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "db119ed15766bca0d522ecfffd6064335d91bf321b1787260f58309d5d7f0003": {
     "query": "\n        SELECT *\n        FROM squadov.communities\n        WHERE slug = $1\n        ",
     "describe": {
@@ -13741,18 +13810,6 @@
         true,
         true
       ]
-    }
-  },
-  "ea14e00285a8e2381236b2f4c08e845d6caf1b3cc8a32e08391832f115585e0e": {
-    "query": "\n        UPDATE squadov.vods AS v\n        SET expiration_time = GREATEST(v.end_time + sub.vod_retention * INTERVAL '1 second', NOW() + INTERVAL '1 day')\n        FROM (\n            SELECT u.uuid, uf.vod_retention\n            FROM squadov.users AS u\n            INNER JOIN squadov.user_feature_flags AS uf\n                ON uf.user_id = u.id\n            WHERE u.id = $1\n        ) AS sub(uuid, vod_retention)\n        WHERE sub.uuid = v.user_uuid\n            AND NOT v.is_clip\n            AND v.match_uuid IS NOT NULL\n            AND v.end_time IS NOT NULL\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "eac92ea4e659dd3d945238802b16d378efe3f443e960429b466e5182783ef4bf": {

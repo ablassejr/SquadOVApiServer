@@ -1,7 +1,7 @@
 pub mod s3;
 
 use crate::SquadOvError;
-use rusoto_core::{Region, HttpClient};
+use rusoto_core::{Region, HttpClient, HttpConfig};
 use rusoto_s3::S3Client;
 use rusoto_cognito_identity::CognitoIdentityClient;
 use rusoto_credential::ProfileProvider;
@@ -55,11 +55,23 @@ impl AWSClient {
     pub fn new(config: &AWSConfig) -> Self {
         let provider = ProfileProvider::with_configuration(&config.credential_path, &config.profile);
         let region = Region::from_str(config.region.as_str()).unwrap();
+        
+
         Self {
             region: region.clone(),
             provider: provider.clone(),
-            s3: S3Client::new_with(HttpClient::new().unwrap(), provider.clone(), region.clone()),
-            cognito: CognitoIdentityClient::new_with(HttpClient::new().unwrap(), provider.clone(), region.clone()),
+            s3: S3Client::new_with(
+                HttpClient::new_with_config({
+                    let mut http_config = HttpConfig::new();
+                    http_config.pool_idle_timeout(std::time::Duration::from_secs(30));
+                    http_config
+                }).unwrap(), provider.clone(), region.clone()
+            ),
+            cognito: CognitoIdentityClient::new_with(HttpClient::new_with_config({
+                let mut http_config = HttpConfig::new();
+                http_config.pool_idle_timeout(std::time::Duration::from_secs(30));
+                http_config
+            }).unwrap(), provider.clone(), region.clone()),
             config: config.clone(),
             cdn_private_key: RsaPrivateKey::read_pkcs1_pem_file(std::path::Path::new(&config.cdn.private_key_fname)).unwrap(),
         }

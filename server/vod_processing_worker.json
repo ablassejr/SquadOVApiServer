@@ -1276,6 +1276,18 @@
       ]
     }
   },
+  "30e1508645e2a0777fd74378b637c6ebf81e7e4a916e0c418d6f1b631b72e629": {
+    "query": "\n                UPDATE squadov.users\n                SET last_trial_usage = NOW()\n                WHERE id = $1\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "318f44f31151f13d5eb6f882a9f5c135162f5b496f942ff6ccd70a5ebfb21a04": {
     "query": "\n            INSERT INTO squadov.hearthstone_match_player_medals (\n                view_uuid,\n                player_match_id,\n                league_id,\n                earned_stars,\n                star_level,\n                best_star_level,\n                win_streak,\n                legend_index,\n                is_standard\n            )\n            VALUES (\n                $1,\n                $2,\n                $3,\n                $4,\n                $5,\n                $6,\n                $7,\n                $8,\n                $9\n            )\n            ON CONFLICT DO NOTHING\n            ",
     "describe": {

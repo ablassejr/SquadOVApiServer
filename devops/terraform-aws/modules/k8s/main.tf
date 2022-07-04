@@ -516,7 +516,7 @@ resource "aws_eks_node_group" "vod_nodes_secondary" {
     scaling_config {
         desired_size = 1
         min_size = 1
-        max_size = 24
+        max_size = 48
     }
 
     depends_on = [
