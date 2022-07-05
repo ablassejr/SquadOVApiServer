@@ -22,7 +22,7 @@ pub async fn generate_vod_thumbnail(input_fname: &str, input_container: &str, ou
         .arg("-vframes")
         .arg("1")
         .arg("-filter:v")
-        .arg("scale=-1:min(ih\\, 720)")
+        .arg("scale=-1:min(ih\\, 480)")
         .arg("-f")
         .arg("mjpeg")
         .arg(output_fname.as_os_str())
