@@ -10,7 +10,7 @@ use futures_util::future::{ok, err, Ready};
 use crate::{
     SquadOvError,
 };
-use hmac::{Hmac, Mac, NewMac};
+use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use std::convert::TryFrom;
 

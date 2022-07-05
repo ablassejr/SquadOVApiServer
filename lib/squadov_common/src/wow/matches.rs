@@ -480,14 +480,13 @@ where
             r#"
             SELECT * FROM (
                 SELECT DISTINCT ON (wmv.match_uuid, wmv.user_id)
-                    wmv.match_uuid AS "match_uuid!",
+                    wmv.match_uuid AS "view_match_uuid!",
                     wmv.start_tm AS "tm!",
                     wmv.end_tm AS "finish_time", 
                     wmv.build_version AS "build!",
                     '' AS "combatants_key!",
                     FALSE AS "success!",
-                    nwi.instance_id,
-                    nwi.instance_type,
+                    nwi.*,
                     u.uuid AS "user_uuid!"
                 FROM UNNEST($1::UUID[], $2::BIGINT[]) AS inp(match_uuid, user_id)
                 INNER JOIN squadov.wow_match_view AS wmv
@@ -509,7 +508,7 @@ where
             .into_iter()
             .map(|x| {
                 Ok(WowInstance{
-                    match_uuid: x.match_uuid,
+                    match_uuid: x.view_match_uuid,
                     tm: x.tm,
                     finish_time: x.finish_time,
                     build: x.build,
@@ -522,4 +521,82 @@ where
             })
             .collect::<Result<Vec<WowInstance>, SquadOvError>>()?
     )
+}
+
+pub async fn get_wow_encounter_view_match_lock_key<'a, T>(ex: T, view_uuid: &Uuid, combatants: &str) -> Result<String, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
+    let data = sqlx::query!(
+        "
+        SELECT wcv.encounter_id, wcv.difficulty, wcv.instance_id
+        FROM squadov.wow_encounter_view AS wcv
+        WHERE wcv.view_id = $1
+        ",
+        view_uuid,
+    )
+        .fetch_one(ex)
+        .await?;
+    Ok(format!("{}:{}:{}:{}", data.encounter_id, data.difficulty, data.instance_id, combatants))
+}
+
+pub async fn get_wow_challenge_view_match_lock_key<'a, T>(ex: T, view_uuid: &Uuid, combatants: &str) -> Result<String, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
+    let data = sqlx::query!(
+        "
+        SELECT wcv.keystone_level, wcv.instance_id
+        FROM squadov.wow_challenge_view AS wcv
+        WHERE wcv.view_id = $1
+        ",
+        view_uuid,
+    )
+        .fetch_one(ex)
+        .await?;
+    Ok(format!("{}:{}:{}", data.keystone_level, data.instance_id, combatants))
+}
+
+pub async fn get_wow_arena_view_match_lock_key<'a, T>(ex: T, view_uuid: &Uuid, combatants: &str) -> Result<String, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
+    let data = sqlx::query!(
+        "
+        SELECT wcv.arena_type, wcv.instance_id
+        FROM squadov.wow_arena_view AS wcv
+        WHERE wcv.view_id = $1
+        ",
+        view_uuid,
+    )
+        .fetch_one(ex)
+        .await?;
+    Ok(format!("{}:{}:{}", data.arena_type, data.instance_id, combatants))
+}
+
+// Unlike the others, the list of combatants coming from the user *could* be inaccurate here for instances.
+// Hence the full range of instances that could be in the same "match" as eachother is much broader and we
+// can't have a single string be the lock on all of them. What we can do instead is to round the match view
+// start time to the nearest 10 minutes and use that as a way to further restrict which locks should compete with
+// each other.
+pub async fn get_wow_instance_view_match_lock_key<'a, T>(ex: T, view_uuid: &Uuid) -> Result<String, SquadOvError>
+where
+    T: Executor<'a, Database = Postgres> + Copy
+{
+    let data = sqlx::query!(
+        r#"
+        SELECT
+            wcv.instance_type,
+            wcv.instance_id,
+            EXTRACT(EPOCH FROM DATE_TRUNC('hour', wmv.start_tm) + INTERVAL '10 min' * FLOOR(DATE_PART('minute', wmv.start_tm) / 10.0))  AS "tm!"
+        FROM squadov.wow_instance_view AS wcv
+        INNER JOIN squadov.wow_match_view as wmv
+            on wmv.id = wcv.view_id
+        WHERE wcv.view_id = $1
+        "#,
+        view_uuid,
+    )
+        .fetch_one(ex)
+        .await?;
+    Ok(format!("{}:{}:{}", data.instance_type, data.instance_id, data.tm))
 }

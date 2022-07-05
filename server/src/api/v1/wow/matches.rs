@@ -18,10 +18,12 @@ use squadov_common::{
     matches::{
         self,
     },
+    wow::matches as wm,
     generate_combatants_key,
     generate_combatants_hashed_array,
     elastic::vod::ESVodDocument,
     vod::db as vdb,
+    crypto,
 };
 use actix_web::{web, HttpResponse, HttpRequest, HttpMessage};
 use crate::api;
@@ -1263,8 +1265,20 @@ pub async fn create_wow_arena_match_handler(app : web::Data<Arc<api::ApiApplicat
 
 pub async fn finish_wow_encounter_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<GenericMatchFinishCreationRequest<WoWEncounterEnd>>, path: web::Path<super::WoWViewPath>) -> Result<HttpResponse, SquadOvError> {
     let combatants_key = generate_combatants_key(&data.combatants);
+    let match_lock_key = crypto::hash_str_to_i64(&wm::get_wow_encounter_view_match_lock_key(&*app.pool, &path.view_uuid, &combatants_key).await?)?;
+
     for _i in 0i32..2 {
         let mut tx = app.pool.begin().await?;
+
+        sqlx::query!(
+            "
+            SELECT pg_advisory_xact_lock($1)
+            ",
+            match_lock_key,
+        )
+            .execute(&mut tx)
+            .await?;
+
         let mut created_uuid: bool = false;
         let match_uuid = match app.find_existing_wow_encounter_match(&path.view_uuid, &data.timestamp, &combatants_key).await? {
             Some(uuid) => uuid,
@@ -1315,9 +1329,18 @@ pub async fn create_wow_instance_match_handler(app : web::Data<Arc<api::ApiAppli
 
 pub async fn finish_wow_instance_handler(app : web::Data<Arc<api::ApiApplication>>, path: web::Path<super::WoWViewPath>, data: web::Json<GenericMatchFinishCreationRequest<Option<()>>>) -> Result<HttpResponse, SquadOvError> {
     let player_hashes = generate_combatants_hashed_array(&data.combatants)?;
+    let match_lock_key = crypto::hash_str_to_i64(&wm::get_wow_instance_view_match_lock_key(&*app.pool, &path.view_uuid).await?)?;
 
     for _i in 0i32..2 {
         let mut tx = app.pool.begin().await?;
+        sqlx::query!(
+            "
+            SELECT pg_advisory_xact_lock($1)
+            ",
+            match_lock_key,
+        )
+            .execute(&mut tx)
+            .await?;
 
         // There's a couple of things that we need to take care of here.
         // 1) If an existing match exists note that we need to update the players array to ensure that the list of players
@@ -1381,8 +1404,19 @@ pub async fn convert_wow_instance_to_keystone_handler(app : web::Data<Arc<api::A
 
 pub async fn finish_wow_challenge_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<GenericMatchFinishCreationRequest<WoWChallengeEnd>>, path: web::Path<super::WoWViewPath>) -> Result<HttpResponse, SquadOvError> {
     let combatants_key = generate_combatants_key(&data.combatants);
+    let match_lock_key = crypto::hash_str_to_i64(&wm::get_wow_challenge_view_match_lock_key(&*app.pool, &path.view_uuid, &combatants_key).await?)?;
+
     for _i in 0i32..2 {
         let mut tx = app.pool.begin().await?;
+        sqlx::query!(
+            "
+            SELECT pg_advisory_xact_lock($1)
+            ",
+            match_lock_key,
+        )
+            .execute(&mut tx)
+            .await?;
+
         let match_uuid = match app.find_existing_wow_challenge_match(&path.view_uuid, &data.timestamp, &combatants_key).await? {
             Some(uuid) => uuid,
             None => {
@@ -1412,8 +1446,19 @@ pub async fn finish_wow_challenge_handler(app : web::Data<Arc<api::ApiApplicatio
 
 pub async fn finish_wow_arena_handler(app : web::Data<Arc<api::ApiApplication>>, data: web::Json<GenericMatchFinishCreationRequest<WoWArenaEnd>>, path: web::Path<super::WoWViewPath>) -> Result<HttpResponse, SquadOvError> {
     let combatants_key = generate_combatants_key(&data.combatants);
+    let match_lock_key = crypto::hash_str_to_i64(&wm::get_wow_arena_view_match_lock_key(&*app.pool, &path.view_uuid, &combatants_key).await?)?;
+
     for _i in 0i32..2 {
         let mut tx = app.pool.begin().await?;
+        sqlx::query!(
+            "
+            SELECT pg_advisory_xact_lock($1)
+            ",
+            match_lock_key,
+        )
+            .execute(&mut tx)
+            .await?;
+
         let match_uuid = match app.find_existing_wow_arena_match(&path.view_uuid, &data.timestamp, &combatants_key).await? {
             Some(uuid) => uuid,
             None => {

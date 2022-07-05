@@ -52,6 +52,7 @@ pub mod ff14;
 pub mod combatlog;
 pub mod elastic;
 pub mod stripe;
+pub mod crypto;
 
 pub use error::*;
 pub use parse::*;

@@ -27,7 +27,7 @@ ipnetwork = { version = "0.17.0", features = ["serde"] }
 juniper = { version = "0.15.2", features = ["scalar-naivetime"]}
 hex = "0.4.2"
 base64 = "0.13.0"
-sha2 = "0.9.1"
+sha2 = "0.10.2"
 log = "0.4.11"
 lazy_static = "1.4.0"
 regex = "1.4.2"
@@ -67,7 +67,7 @@ harsh = "0.2.1"
 petname = { path="../../deps/cargo/rust-petname", version = "1.1.0" }
 rsa = "0.5.0"
 sha-1 = "0.9.7"
-hmac = "0.11.0"
+hmac = "0.12.1"
 deadpool = "0.9.2"
 deadpool-redis = "0.10.2"
 redis = "0.21.5"
@@ -76,6 +76,7 @@ num = "0.4.0"
 itertools = "0.10.3"
 elasticsearch-dsl = "0.3.7"
 serenity = "0.11.2"
+hkdf = "0.12.3"
 
 [build-dependencies]
 prost-build = "0.7.0"

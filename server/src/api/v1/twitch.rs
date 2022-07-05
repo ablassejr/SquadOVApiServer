@@ -14,7 +14,7 @@ use crate::api::ApiApplication;
 use std::sync::Arc;
 use serde::Deserialize;
 use sha2::Sha256;
-use hmac::{Hmac, Mac, NewMac};
+use hmac::{Hmac, Mac};
 
 #[cfg(feature = "eventloop")]
 use squadov_common::{

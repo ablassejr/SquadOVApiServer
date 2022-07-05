@@ -312,9 +312,9 @@ impl From<rsa::errors::Error> for SquadOvError {
     }
 }
 
-impl From<hmac::crypto_mac::InvalidKeyLength> for SquadOvError {
-    fn from(err: hmac::crypto_mac::InvalidKeyLength) -> Self {
-        return Self::InternalError(format!("HMAC Error {:?}", err))
+impl From<sha2::digest::InvalidLength> for SquadOvError {
+    fn from(err: sha2::digest::InvalidLength) -> Self {
+        return Self::InternalError(format!("SHA2 Invalid Length {:?}", err))
     }
 }
 
