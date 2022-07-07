@@ -8,7 +8,7 @@ use crate::{
             LolMatchDto,
             LolMatchTimelineDto,
         },
-        api::riot_region_to_routing,
+        api::riot_region_to_routing_with_oce,
     },
 };
 use super::RiotApiTask;
@@ -19,7 +19,7 @@ const RIOT_MAX_AGE_SECONDS: i64 = 86400; // 1 day
 impl super::RiotApiHandler {
     pub async fn get_lol_matches_for_user(&self, puuid: &str, platform: &str, begin_index: i32, end_index: i32) -> Result<LolMatchlistDto, SquadOvError> {
         let client = self.create_http_client()?;
-        let endpoint = Self::build_api_endpoint(&riot_region_to_routing(platform)?, &format!("lol/match/v5/matches/by-puuid/{}/ids?start={}&count={}", puuid, begin_index, end_index - begin_index));
+        let endpoint = Self::build_api_endpoint(&riot_region_to_routing_with_oce(platform)?, &format!("lol/match/v5/matches/by-puuid/{}/ids?start={}&count={}", puuid, begin_index, end_index - begin_index));
         self.tick_thresholds().await?;
 
         let resp = client.get(&endpoint)
@@ -32,7 +32,7 @@ impl super::RiotApiHandler {
 
     pub async fn get_lol_match(&self, platform: &str, game_id: i64) -> Result<LolMatchDto, SquadOvError> {
         let client = self.create_http_client()?;
-        let endpoint = Self::build_api_endpoint(&riot_region_to_routing(platform)?, &format!("lol/match/v5/matches/{}_{}", platform, game_id));
+        let endpoint = Self::build_api_endpoint(&riot_region_to_routing_with_oce(platform)?, &format!("lol/match/v5/matches/{}_{}", platform, game_id));
         self.tick_thresholds().await?;
 
         let resp = client.get(&endpoint)
@@ -45,7 +45,7 @@ impl super::RiotApiHandler {
 
     pub async fn get_lol_match_timeline(&self, platform: &str, game_id: i64) -> Result<LolMatchTimelineDto, SquadOvError> {
         let client = self.create_http_client()?;
-        let endpoint = Self::build_api_endpoint(&riot_region_to_routing(platform)?, &format!("lol/match/v5/matches/{}_{}/timeline", platform, game_id));
+        let endpoint = Self::build_api_endpoint(&riot_region_to_routing_with_oce(platform)?, &format!("lol/match/v5/matches/{}_{}/timeline", platform, game_id));
         self.tick_thresholds().await?;
 
         let resp = client.get(&endpoint)

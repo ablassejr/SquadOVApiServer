@@ -2615,6 +2615,26 @@
       "nullable": []
     }
   },
+  "7426d51dddfa071da336a5a51f23e6b236cf69422906b579d26dfa7360ecba6b": {
+    "query": "\n            SELECT pg_advisory_xact_lock($1)\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "pg_advisory_xact_lock",
+          "type_info": "Void"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "75ddd119e403ece3ead2272f618c428eebe7af2dfe9e7683ec4693f0fdc95e48": {
     "query": "\n                SELECT transition_id\n                FROM squadov.user_sessions\n                WHERE id = $1\n                ",
     "describe": {

@@ -339,7 +339,7 @@ impl RabbitMqListener for RiotApiApplicationInterface {
     }
 }
 
-pub fn riot_region_to_routing(region: &str) -> Result<String, SquadOvError> {
+pub fn riot_region_to_routing_no_oce(region: &str) -> Result<String, SquadOvError> {
     let region = region.to_uppercase();
 
     Ok(String::from(
@@ -349,6 +349,24 @@ pub fn riot_region_to_routing(region: &str) -> Result<String, SquadOvError> {
             "asia"
         } else if region.starts_with("EU") || region.starts_with("TR") || region.starts_with("RU") {
             "europe"
+        } else {
+            return Err(SquadOvError::BadRequest);
+        }
+    ))
+}
+
+pub fn riot_region_to_routing_with_oce(region: &str) -> Result<String, SquadOvError> {
+    let region = region.to_uppercase();
+
+    Ok(String::from(
+        if region.starts_with("NA") || region.starts_with("BR") || region.starts_with("LAN") || region.starts_with("LAS") {
+            "americas"
+        } else if region.starts_with("KR") || region.starts_with("JP") {
+            "asia"
+        } else if region.starts_with("EU") || region.starts_with("TR") || region.starts_with("RU") {
+            "europe"
+        } else if region.starts_with("OC") {
+            "sea"
         } else {
             return Err(SquadOvError::BadRequest);
         }
