@@ -6347,7 +6347,6 @@ eirenic
 eisegetic
 eisegetical
 eisteddfodic
-ejaculatory
 elaborative
 elastomeric
 elderly
@@ -29565,8 +29564,6 @@ unfactual
 unfadable
 unfaded
 unfading
-unfagged
-unfagoted
 unfailed
 unfailing
 unfainting
