@@ -4304,6 +4304,26 @@
       ]
     }
   },
+  "4be1fd3083ab1d53a27ac1e5993d4e90c6ce4a22d432dfd080765a1f6708a768": {
+    "query": "\n                SELECT DISTINCT ora.user_id\n                FROM squadov.tft_match_participants AS tmp\n                INNER JOIN squadov.riot_accounts AS ra\n                    ON ra.puuid = tmp.puuid\n                INNER JOIN squadov.riot_account_links AS ral\n                    ON ral.puuid = ra.puuid\n                LEFT JOIN squadov.squad_role_assignments AS sra\n                    ON sra.user_id = ral.user_id\n                LEFT JOIN squadov.squad_role_assignments AS ora\n                    ON ora.squad_id = sra.squad_id\n                WHERE tmp.match_uuid = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "user_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "4bfd557962684743ebfeba362b14b6e4ada8c753b3ad036812a5f23a2a3771e2": {
     "query": "\n            INSERT INTO squadov.share_tokens (\n                id,\n                match_uuid,\n                user_id,\n                encrypted_token,\n                iv,\n                aad,\n                tag,\n                bulk_video_uuids,\n                meta_user_id\n            ) VALUES (\n                gen_random_uuid(),\n                $1,\n                $2,\n                $3,\n                $4,\n                $5,\n                $6,\n                $7,\n                $8\n            )\n            RETURNING id\n            ",
     "describe": {
@@ -6303,6 +6323,11 @@
           "ordinal": 7,
           "name": "clip_uuid",
           "type_info": "Uuid"
+        },
+        {
+          "ordinal": 8,
+          "name": "audio",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
@@ -6318,7 +6343,8 @@
         false,
         false,
         true,
-        true
+        true,
+        false
       ]
     }
   },
@@ -6429,26 +6455,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "6beb40b1b64b96da0faf055ff10e555eaf4540cccdc54ab50366c629edeb8bf4": {
-    "query": "\n                SELECT DISTINCT ou.id\n                FROM squadov.lol_match_participant_identities AS lmpi\n                INNER JOIN squadov.riot_accounts AS ra\n                    ON ra.summoner_id = lmpi.summoner_id\n                INNER JOIN squadov.riot_account_links AS ral\n                    ON ral.puuid = ra.puuid\n                LEFT JOIN squadov.squad_role_assignments AS sra\n                    ON sra.user_id = ral.user_id\n                LEFT JOIN squadov.squad_role_assignments AS ora\n                    ON ora.squad_id = sra.squad_id\n                INNER JOIN squadov.users AS ou\n                    ON ou.id = ora.user_id\n                        OR ou.id = ral.user_id\n                WHERE lmpi.match_uuid = $1\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false
-      ]
     }
   },
   "6c67a8b56e04f624cfb8beed0a961665f95c8d98d0379564dba75c19ba9be230": {
@@ -8484,26 +8490,6 @@
       "nullable": [
         false,
         false,
-        false
-      ]
-    }
-  },
-  "8f28a33438269f29e09147f2f9f1426dedf7f909bb0b15fcf41585500d326e0f": {
-    "query": "\n                SELECT DISTINCT ou.id\n                FROM squadov.tft_match_participants AS tmp\n                INNER JOIN squadov.riot_accounts AS ra\n                    ON ra.puuid = tmp.puuid\n                INNER JOIN squadov.riot_account_links AS ral\n                    ON ral.puuid = ra.puuid\n                LEFT JOIN squadov.squad_role_assignments AS sra\n                    ON sra.user_id = ral.user_id\n                LEFT JOIN squadov.squad_role_assignments AS ora\n                    ON ora.squad_id = sra.squad_id\n                INNER JOIN squadov.users AS ou\n                    ON ou.id = ora.user_id\n                        OR ou.id = ral.user_id\n                WHERE tmp.match_uuid = $1\n                ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
         false
       ]
     }
@@ -10946,27 +10932,8 @@
       "nullable": []
     }
   },
-  "ba9e24b0357e749e33842d75917917743470e68df124b6aa0d15f918e5808356": {
-    "query": "\n                INSERT INTO squadov.hearthstone_decks (\n                    user_id,\n                    deck_id,\n                    deck_name,\n                    hero_card,\n                    hero_premium,\n                    deck_type,\n                    create_date,\n                    is_wild\n                )\n                VALUES (\n                    $1,\n                    $2,\n                    $3,\n                    $4,\n                    $5,\n                    $6,\n                    $7,\n                    $8\n                )\n                ON CONFLICT (deck_id) DO UPDATE SET\n                    user_id = EXCLUDED.user_id,\n                    deck_name = EXCLUDED.deck_name,\n                    hero_card = EXCLUDED.hero_card,\n                    hero_premium = EXCLUDED.hero_premium,\n                    deck_type = EXCLUDED.deck_type,\n                    create_date = EXCLUDED.create_date,\n                    is_wild = EXCLUDED.is_wild\n                ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Varchar",
-          "Varchar",
-          "Int4",
-          "Int4",
-          "Timestamptz",
-          "Bool"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "bac06338acf984c8a9729587bd8c997300d269ef4f79e40ceaacffa974261c2d": {
-    "query": "\n        INSERT INTO squadov.staged_clips (\n            video_uuid,\n            user_id,\n            start_offset_ms,\n            end_offset_ms,\n            create_time\n        ) VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            NOW()\n        )\n        RETURNING *\n        ",
+  "ba0bd08a93f15f3f4c319c4d0d5b55bb3e939b8b640d6bf37866dc2d6246b438": {
+    "query": "\n        INSERT INTO squadov.staged_clips (\n            video_uuid,\n            user_id,\n            start_offset_ms,\n            end_offset_ms,\n            create_time,\n            audio\n        ) VALUES (\n            $1,\n            $2,\n            $3,\n            $4,\n            NOW(),\n            $5\n        )\n        RETURNING *\n        ",
     "describe": {
       "columns": [
         {
@@ -11008,6 +10975,11 @@
           "ordinal": 7,
           "name": "clip_uuid",
           "type_info": "Uuid"
+        },
+        {
+          "ordinal": 8,
+          "name": "audio",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
@@ -11015,7 +10987,8 @@
           "Uuid",
           "Int8",
           "Int8",
-          "Int8"
+          "Int8",
+          "Bool"
         ]
       },
       "nullable": [
@@ -11026,8 +10999,28 @@
         false,
         false,
         true,
-        true
+        true,
+        false
       ]
+    }
+  },
+  "ba9e24b0357e749e33842d75917917743470e68df124b6aa0d15f918e5808356": {
+    "query": "\n                INSERT INTO squadov.hearthstone_decks (\n                    user_id,\n                    deck_id,\n                    deck_name,\n                    hero_card,\n                    hero_premium,\n                    deck_type,\n                    create_date,\n                    is_wild\n                )\n                VALUES (\n                    $1,\n                    $2,\n                    $3,\n                    $4,\n                    $5,\n                    $6,\n                    $7,\n                    $8\n                )\n                ON CONFLICT (deck_id) DO UPDATE SET\n                    user_id = EXCLUDED.user_id,\n                    deck_name = EXCLUDED.deck_name,\n                    hero_card = EXCLUDED.hero_card,\n                    hero_premium = EXCLUDED.hero_premium,\n                    deck_type = EXCLUDED.deck_type,\n                    create_date = EXCLUDED.create_date,\n                    is_wild = EXCLUDED.is_wild\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Varchar",
+          "Varchar",
+          "Int4",
+          "Int4",
+          "Timestamptz",
+          "Bool"
+        ]
+      },
+      "nullable": []
     }
   },
   "bb822d832a0ee725d06a603d7128ca360168bb46318f89c152e196194c38b765": {
@@ -13361,6 +13354,26 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "e3b8d4d3c574f384d18facc44a2891acd054057ea90b19656f846161978b0ca6": {
+    "query": "\n                SELECT DISTINCT ora.user_id\n                FROM squadov.lol_match_participant_identities AS lmpi\n                INNER JOIN squadov.riot_accounts AS ra\n                    ON ra.summoner_id = lmpi.summoner_id\n                INNER JOIN squadov.riot_account_links AS ral\n                    ON ral.puuid = ra.puuid\n                LEFT JOIN squadov.squad_role_assignments AS sra\n                    ON sra.user_id = ral.user_id\n                LEFT JOIN squadov.squad_role_assignments AS ora\n                    ON ora.squad_id = sra.squad_id\n                WHERE lmpi.match_uuid = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "user_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "e5319652b953b46c7aaacb6643bcf171d960b73195f3a2ab100e67996532179e": {
