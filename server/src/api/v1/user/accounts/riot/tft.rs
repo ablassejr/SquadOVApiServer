@@ -9,7 +9,7 @@ impl api::ApiApplication {
         Ok(
             sqlx::query!(
                 "
-                SELECT DISTINCT ou.id
+                SELECT DISTINCT ora.user_id
                 FROM squadov.tft_match_participants AS tmp
                 INNER JOIN squadov.riot_accounts AS ra
                     ON ra.puuid = tmp.puuid
@@ -19,9 +19,6 @@ impl api::ApiApplication {
                     ON sra.user_id = ral.user_id
                 LEFT JOIN squadov.squad_role_assignments AS ora
                     ON ora.squad_id = sra.squad_id
-                INNER JOIN squadov.users AS ou
-                    ON ou.id = ora.user_id
-                        OR ou.id = ral.user_id
                 WHERE tmp.match_uuid = $1
                 ",
                 match_uuid,
@@ -30,7 +27,7 @@ impl api::ApiApplication {
                 .await?
                 .into_iter()
                 .map(|x| {
-                    x.id
+                    x.user_id
                 })
                 .collect()
         )
