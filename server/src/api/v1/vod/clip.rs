@@ -405,11 +405,17 @@ pub async fn create_clip_for_vod_handler(pth: web::Path<CreateClipPathInput>, da
     Ok(HttpResponse::Ok().json(&resp))
 }
 
+fn default_as_true() -> bool {
+    true
+}
+
 #[derive(Deserialize)]
 pub struct StagedClipInput {
     start: i64,
     end: i64,
     execute: bool,
+    #[serde(default="default_as_true")]
+    audio: bool,
 }
 
 pub async fn create_staged_clip_for_vod_handler(pth: web::Path<CreateClipPathInput>, data: web::Json<StagedClipInput>, app: web::Data<Arc<api::ApiApplication>>, req: HttpRequest) -> Result<HttpResponse, SquadOvError> {
@@ -456,13 +462,15 @@ pub async fn create_staged_clip_for_vod_handler(pth: web::Path<CreateClipPathInp
             user_id,
             start_offset_ms,
             end_offset_ms,
-            create_time
+            create_time,
+            audio
         ) VALUES (
             $1,
             $2,
             $3,
             $4,
-            NOW()
+            NOW(),
+            $5
         )
         RETURNING *
         "#,
@@ -470,6 +478,7 @@ pub async fn create_staged_clip_for_vod_handler(pth: web::Path<CreateClipPathInp
         session.user.id,
         data.start,
         data.end,
+        data.audio,
     )
         .fetch_one(&*app.pool)
         .await?;

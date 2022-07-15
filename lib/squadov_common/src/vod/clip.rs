@@ -1,13 +1,13 @@
 use crate::SquadOvError;
 use tokio::process::Command;
 
-pub async fn generate_clip(input_fname: &str, input_container: &str, output_fname: &std::path::Path, output_container: &str, start: i64, end: i64) -> Result<(), SquadOvError> {
+pub async fn generate_clip(input_fname: &str, input_container: &str, output_fname: &std::path::Path, output_container: &str, start: i64, end: i64, audio: bool) -> Result<(), SquadOvError> {
     let ffmpeg_path = std::env::var("FFMPEG_BINARY_PATH")?;
-    let ffmpeg_output = Command::new(&ffmpeg_path)
-        // Single threaded so that we can split our CPU bandwidth among multiple videos.
-        // I didn't find this to affect encoding performance much since we're just doing
-        // straight copies.
-        .arg("-threads")
+    let mut ffmpeg_output = Command::new(&ffmpeg_path);
+    // Single threaded so that we can split our CPU bandwidth among multiple videos.
+    // I didn't find this to affect encoding performance much since we're just doing
+    // straight copies.
+    ffmpeg_output.arg("-threads")
         .arg("1")
         // Need to auto accept overwriting existing files to prevent blocking.
         .arg("-y")
@@ -24,9 +24,18 @@ pub async fn generate_clip(input_fname: &str, input_container: &str, output_fnam
         .arg("-to")
         .arg(format!("{}ms", end))
         .arg("-c:v")
-        .arg("copy")
-        .arg("-c:a")
-        .arg("copy")
+        .arg("copy");
+
+    if audio {
+        ffmpeg_output
+            .arg("-c:a")
+            .arg("copy");
+    } else {
+        ffmpeg_output
+            .arg("-an");
+    }
+    
+    ffmpeg_output
         .arg("-max_muxing_queue_size")
         .arg("9999")
         .arg("-movflags")
@@ -36,9 +45,9 @@ pub async fn generate_clip(input_fname: &str, input_container: &str, output_fnam
         .arg("make_zero")
         .arg("-f")
         .arg(output_container)
-        .arg(output_fname.as_os_str())
-        .output()
-        .await?;
+        .arg(output_fname.as_os_str());
+
+    let ffmpeg_output = ffmpeg_output.output().await?;
     
     if !ffmpeg_output.status.success() {
         log::warn!("Failed to generate VOD clip with ffmpeg: {} to {}", input_fname, output_fname.display());

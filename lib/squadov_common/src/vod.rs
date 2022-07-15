@@ -47,6 +47,7 @@ pub struct StagedVodClip {
     pub create_time: DateTime<Utc>,
     pub execute_time: Option<DateTime<Utc>>,
     pub clip_uuid: Option<Uuid>,
+    pub audio: bool,
 }
 
 #[derive(Serialize,Deserialize, Clone)]
@@ -426,7 +427,7 @@ impl VodProcessingInterface {
         log::info!("[Clip] Generating Clip {}", request.id);
         let clip_filename = NamedTempFile::new()?.into_temp_path();
         let new_container_format = crate::container_format_to_fastify_container_format(&vod.raw_container_format);
-        clip::generate_clip(&uri, &new_container_format, &clip_filename, &new_container_format,  request.start_offset_ms, request.end_offset_ms).await?;
+        clip::generate_clip(&uri, &new_container_format, &clip_filename, &new_container_format,  request.start_offset_ms, request.end_offset_ms, request.audio).await?;
 
         log::info!("[Clip] Computing VOD MD5 - {}", request.id);
         let md5_hash = {
