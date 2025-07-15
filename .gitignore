@@ -1,2 +1,7 @@
 /target
 .vscode
+
+# Local development files
+config/squadov_local.toml
+devops/aws/local.profile
+devops/aws/keys/private_s3_vod_cloudfront.pem
