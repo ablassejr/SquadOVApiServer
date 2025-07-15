@@ -1,4 +1,4 @@
-FROM debian:buster-20200908-slim AS builder
+FROM debian:bullseye-slim AS builder
 ARG DEPLOYMENT_ENVIRONMENT
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     ca-certificates \
@@ -27,7 +27,7 @@ COPY devops/gcp /squadov/gcp
 WORKDIR /squadov
 RUN cargo build --release --bin squadov_api_server
 
-FROM debian:buster-20200908-slim
+FROM debian:bullseye-slim
 ARG DEPLOYMENT_ENVIRONMENT
 RUN mkdir -p /squadov/config
 RUN apt-get update && apt-get install -y --no-install-recommends \
